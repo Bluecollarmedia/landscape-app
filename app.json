@@ -1,25 +1,62 @@
 {
   "expo": {
-    "name": "landscape-app",
-    "slug": "landscape-app",
+    "name": "Brighton Lawn + Landscape",
+    "slug": "brighton-lawn-landscape",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/logo-icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "brighton-lawn",
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.brightonlawn.app",
+      "buildNumber": "2",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/logo-icon.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.brightonlawn.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/images/logo-icon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-image",
+      "expo-dev-client",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Brighton Lawn to access your photos for profile pictures.",
+          "cameraPermission": "Allow Brighton Lawn to use the camera for profile pictures."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/logo-full.png",
+          "imageWidth": 240
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c9628d1e-80c3-4a58-a2bd-f008542a71d2"
+      }
+    },
+    "owner": "abbacohen"
   }
 }

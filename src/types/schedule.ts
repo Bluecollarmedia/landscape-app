@@ -1,0 +1,82 @@
+import type { PersonSummary } from './company';
+
+export type AssignmentStatus =
+  | 'scheduled'
+  | 'confirmed'
+  | 'en_route'
+  | 'checked_in'
+  | 'working'
+  | 'completed'
+  | 'cancelled'
+  | 'reassigned';
+
+export type ConfirmationState =
+  | 'not_sent'
+  | 'awaiting'
+  | 'confirmed'
+  | 'updated_since'
+  | 'acknowledged';
+
+export interface Assignment {
+  id: string;
+  companyId: string;
+  projectId: string;
+  personId: string;
+  scheduledDate: string;
+  startTime?: string;
+  endTime?: string;
+  isFullDay: boolean;
+  sortOrder: number;
+  status: AssignmentStatus;
+  confirmationState: ConfirmationState;
+  truckId?: string;
+  notes?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancellationReason?: string;
+  reassignedFrom?: string;
+  reassignedTo?: string;
+  createdAt: string;
+  updatedAt: string;
+  person?: PersonSummary;
+  project?: { id: string; name: string; address?: string };
+  truck?: { id: string; name: string };
+}
+
+export type ScheduleChangeType =
+  | 'created'
+  | 'time_changed'
+  | 'project_changed'
+  | 'truck_changed'
+  | 'truck_removed'
+  | 'cancelled'
+  | 'reassigned'
+  | 'status_changed'
+  | 'emergency_override'
+  | 'notes_changed';
+
+export interface ScheduleChange {
+  id: string;
+  assignmentId: string;
+  companyId: string;
+  changedBy: string;
+  changeType: ScheduleChangeType;
+  previousValue?: string;
+  newValue?: string;
+  notes?: string;
+  createdAt: string;
+  changer?: PersonSummary;
+}
+
+export interface ScheduleConflict {
+  type: 'time_overlap' | 'truck_overlap';
+  assignment: Assignment;
+  message: string;
+}
+
+export interface TravelWarning {
+  fromAssignment: Assignment;
+  toAssignment: Assignment;
+  availableMinutes: number;
+  estimatedTravelMinutes?: number;
+}

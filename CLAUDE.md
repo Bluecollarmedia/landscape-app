@@ -50,3 +50,20 @@ Import from `@/theme`. Brand colors derived from the Brighton logos in `src/them
 - Path alias: `@/` maps to `src/`
 - Supabase credentials go in `.env` (see `.env.example`)
 - Logo files go in `assets/images/logo-full.png` and `assets/images/logo-icon.png`
+
+## Owner Navigation Architecture
+`app/(owner)/_layout.tsx` is a `Stack` (not the tab bar itself). It wraps two things:
+- `(tabs)` — a route group holding the actual 5-tab navigator (`index`, `projects/`, `workers/`, `customers/`, `more/`). Its `_layout.tsx` has the `Tabs`/`NativeTabs` code.
+- A handful of screens presented as **modals**, declared as siblings of `(tabs)`: `worker-new`, `project-new`, `schedule-create`, `search`, `notification-center`.
+
+Why: those 5 screens are opened from multiple tabs (e.g. Dashboard's quick actions, or a project detail's "Schedule worker" button). When a screen lives inside one tab's own folder, navigating to it from a *different* tab switches the selected bottom tab and breaks `Back`. Moving them above the tab navigator as modals means opening/closing them never touches tab-selection state — you always return to whatever tab/screen you were on.
+
+Rule of thumb: if you add a new screen that's reachable from more than one tab and is a "do a thing, then return" flow (not an intentional "go look at this record" navigation like viewing a project), put it here as a sibling modal route, not inside a tab's folder. Detail-view navigation (View Project, View Worker, View Customer) is intentionally left as normal cross-tab pushes — that's expected to switch tabs.
+
+`ScheduleProvider` wraps the whole `Stack` in `(owner)/_layout.tsx` (not inside `(tabs)/_layout.tsx`) so the tabs and the modal screens share the same schedule state.
+
+## EAS / Build State
+- EAS project: `@drakematcher/brighton-lawn-landscape` (expo.dev account `drakematcher`, not `abbacohen2` — an earlier EAS project existed under `abbacohen2` but this app's `owner`/`projectId` in `app.json` were repointed to a fresh project under `drakematcher`, which is the account with working Apple Developer Program access).
+- Apple Team: `93LDR9MQMF` (David Cohen, Individual).
+- `eas build`/`eas submit` need interactive Apple sign-in the first time (distribution certificate, provisioning profile, App Store Connect app lookup) — can't be run `--non-interactive` from a fresh environment.
+- As of the last iOS build (`eas build --platform ios --profile production`), the build succeeded but was **not yet submitted** to App Store Connect/TestFlight — check `eas submit:list --platform ios` before assuming it's live.

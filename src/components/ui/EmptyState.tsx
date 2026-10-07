@@ -8,6 +8,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from './Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, sizing } from '@/theme/spacing';
@@ -35,7 +36,7 @@ export function EmptyState({
   return (
     <View style={[styles.container, style]}>
       <View style={[styles.iconContainer, { backgroundColor: colors.backgroundTertiary }]}>
-        <Feather name={icon} size={sizing.iconXl} color={colors.textTertiary} />
+        <Icon name={icon} size={sizing.iconXl} color={colors.textTertiary} />
       </View>
       <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
       {description && (

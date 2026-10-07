@@ -10,6 +10,7 @@ export interface Truck {
   licensePlate?: string;
   vin?: string;
   color?: string;
+  photoUrl?: string;
   status: TruckStatus;
   notes?: string;
   createdAt: string;

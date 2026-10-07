@@ -16,6 +16,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from './Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { radius, spacing, sizing } from '@/theme/spacing';
@@ -58,7 +59,7 @@ export const Input = forwardRef<TextInput, InputProps>(
           ]}
         >
           {icon && (
-            <Feather
+            <Icon
               name={icon}
               size={sizing.iconMd}
               color={focused ? colors.primary : colors.textTertiary}
@@ -91,7 +92,7 @@ export const Input = forwardRef<TextInput, InputProps>(
               hitSlop={8}
               accessibilityLabel={secureVisible ? 'Hide password' : 'Show password'}
             >
-              <Feather
+              <Icon
                 name={secureVisible ? 'eye-off' : 'eye'}
                 size={sizing.iconMd}
                 color={colors.textTertiary}

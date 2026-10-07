@@ -1,16 +1,42 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useWorkerContext } from '@/providers/WorkerProvider';
-import { Card, Button, StatusBadge, EmptyState } from '@/components/ui';
+import { useAnnouncements } from '@/hooks/useAnnouncements';
+import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius } from '@/theme/spacing';
+import { spacing, radius, shadow } from '@/theme/spacing';
+import { semantic } from '@/theme/colors';
+import { haptics } from '@/lib/haptics';
 import type { Assignment } from '@/types/schedule';
 import type { ProjectTask } from '@/types/project';
-import { useWorkerReminders } from '@/hooks/useOperations';
+import type { Announcement } from '@/types/announcement';
+import type { WeatherActionType } from '@/types/operations';
+
+// Temporary placeholder — swap for the project's real photo once available.
+const HERO_IMAGE_URI =
+  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200&q=80';
+
+const HERO_HEIGHT = 400;
+const HERO_HEIGHT_COMPACT = 190;
+const PILL_OVERHANG = 26;
+const MAP_TINT = '#E4EAF0';
+
+function formatElapsed(startIso: string, now: Date): string {
+  const mins = Math.max(0, Math.round((now.getTime() - new Date(startIso).getTime()) / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function formatClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
 
 function formatTime(time?: string) {
   if (!time) return '';
@@ -21,193 +47,74 @@ function formatTime(time?: string) {
   return `${display}:${m} ${ampm}`;
 }
 
-function ScheduleConfirmation() {
-  const { colors } = useTheme();
-  const {
-    todayAssignments, scheduleConfirmed, hasScheduleChanges,
-    confirmSchedule, acknowledgeChanges,
-  } = useWorkerContext();
+const WEATHER_ACTION_META: Record<WeatherActionType, { label: string; icon: string }> = {
+  weather_warning: { label: 'Weather Warning', icon: 'cloud' },
+  delayed_start: { label: 'Delayed Start', icon: 'clock' },
+  no_work: { label: 'No Work Today', icon: 'x-circle' },
+  early_finish: { label: 'Early Finish', icon: 'sunset' },
+  project_cancel: { label: 'Project Cancelled', icon: 'x-circle' },
+};
 
-  if (todayAssignments.length === 0) return null;
-
-  if (hasScheduleChanges) {
-    return (
-      <Card style={[styles.confirmCard, { borderColor: colors.warning, borderWidth: 2 }]}>
-        <View style={styles.confirmHeader}>
-          <Feather name="alert-triangle" size={20} color={colors.warning} />
-          <Text style={[typeScale.headingSmall, { color: colors.warning, marginLeft: spacing.sm }]}>
-            Schedule Updated
-          </Text>
-        </View>
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-          Your schedule has changed since you last confirmed. Review and acknowledge.
-        </Text>
-        <Button
-          title="I've Seen the Changes"
-          onPress={acknowledgeChanges}
-          variant="secondary"
-          fullWidth
-          icon="check"
-          style={{ marginTop: spacing.md }}
-        />
-      </Card>
-    );
-  }
-
-  if (!scheduleConfirmed) {
-    return (
-      <Card style={[styles.confirmCard, { borderColor: colors.primary, borderWidth: 2 }]}>
-        <View style={styles.confirmHeader}>
-          <Feather name="check-circle" size={20} color={colors.primary} />
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-            Confirm Your Schedule
-          </Text>
-        </View>
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-          You have {todayAssignments.length} job{todayAssignments.length > 1 ? 's' : ''} today. Confirm to let the team know you're ready.
-        </Text>
-        <Button
-          title="Confirm Schedule"
-          onPress={confirmSchedule}
-          fullWidth
-          icon="check"
-          style={{ marginTop: spacing.md }}
-        />
-      </Card>
-    );
-  }
-
-  return null;
+function minutesUntil(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  const now = new Date();
+  const target = new Date();
+  target.setHours(h, m, 0, 0);
+  return Math.round((target.getTime() - now.getTime()) / 60000);
 }
 
-function TruckBanner() {
-  const { colors } = useTheme();
-  const { todayAssignments } = useWorkerContext();
-  const truck = todayAssignments.find(a => a.truck)?.truck;
-
-  if (!truck) return null;
-
-  return (
-    <View style={[styles.truckBanner, { backgroundColor: colors.primaryLight }]}>
-      <Feather name="truck" size={18} color={colors.primary} />
-      <Text style={[typeScale.bodyMedium, { color: colors.primary, fontWeight: '600', marginLeft: spacing.sm }]}>
-        {truck.name}
-      </Text>
-    </View>
-  );
-}
-
-function JobCard({ assignment, isCurrent, isNext }: { assignment: Assignment; isCurrent: boolean; isNext: boolean }) {
-  const { colors } = useTheme();
-  const { jobState, openMapsNavigation } = useWorkerContext();
-
-  const borderColor = isCurrent ? colors.primary : isNext ? colors.warning : colors.borderLight;
-  const borderWidth = isCurrent || isNext ? 2 : 1;
-
-  return (
-    <Card style={[styles.jobCard, { borderColor, borderWidth }]}>
-      <View style={styles.jobHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
-            {assignment.project?.name ?? 'Unknown Project'}
-          </Text>
-          {assignment.project?.address && (
-            <Pressable onPress={() => openMapsNavigation(assignment.project!.address!)}>
-              <Text style={[typeScale.bodySmall, { color: colors.primary, marginTop: 2 }]}>
-                <Feather name="map-pin" size={12} /> {assignment.project.address}
-              </Text>
-            </Pressable>
-          )}
-        </View>
-        {isCurrent && (
-          <StatusBadge label={jobState === 'working' ? 'Working' : 'Checked In'} status="success" />
-        )}
-        {isNext && !isCurrent && (
-          <StatusBadge label="Up Next" status="warning" />
-        )}
-      </View>
-
-      <View style={styles.jobTime}>
-        <Feather name="clock" size={14} color={colors.textTertiary} />
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-          {assignment.isFullDay
-            ? 'Full day'
-            : `${formatTime(assignment.startTime)} – ${formatTime(assignment.endTime)}`}
-        </Text>
-      </View>
-
-      {assignment.notes && (
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs, fontStyle: 'italic' }]}>
-          {assignment.notes}
-        </Text>
-      )}
-
-      {assignment.project?.address && !isCurrent && (
-        <Button
-          title="Navigate"
-          onPress={() => openMapsNavigation(assignment.project!.address!)}
-          variant="secondary"
-          icon="navigation"
-          style={{ marginTop: spacing.md }}
-        />
-      )}
-    </Card>
-  );
-}
-
-function WorkerRemindersSection() {
+export default function WorkerTodayScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
-  const { reminders } = useWorkerReminders(user?.id);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const {
+    todayAssignments, currentJob, jobState, checkIns, checkOuts, moveToNextJob,
+    scheduleConfirmed, confirmSchedule, checkIn, checkOut, openMapsNavigation,
+    projectTasks, projectSettings, taskPhotoCaptured,
+  } = useWorkerContext();
 
-  if (reminders.length === 0) return null;
+  const primaryAssignment = currentJob ?? todayAssignments[0];
+  const isCheckedIn = jobState === 'checked_in' || jobState === 'working';
+  const showWorking = isCheckedIn && !!primaryAssignment;
+  const showConfirmed = scheduleConfirmed && !!primaryAssignment && !isCheckedIn;
+  const showCheckedOut = jobState === 'completed' && !!primaryAssignment;
 
-  return (
-    <>
-      {reminders.map((r) => (
-        <View
-          key={r.id}
-          style={[
-            styles.reminderCard,
-            {
-              backgroundColor: r.reminderType === 'past_scheduled_end' ? '#FFF8E1' : '#E3F2FD',
-              borderColor: r.reminderType === 'past_scheduled_end' ? '#F9A825' : '#1976D2',
-            },
-          ]}
-        >
-          <Feather
-            name={r.reminderType === 'past_scheduled_end' ? 'clock' : r.reminderType === 'schedule_changed' ? 'calendar' : 'bell'}
-            size={18}
-            color={r.reminderType === 'past_scheduled_end' ? '#F9A825' : '#1976D2'}
-          />
-          <View style={{ flex: 1, marginLeft: spacing.sm }}>
-            <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>
-              {r.title}
-            </Text>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{r.body}</Text>
-            {r.nextAssignment && (
-              <Text style={[typeScale.caption, { color: colors.primary, marginTop: spacing['2xs'] }]}>
-                Next: {r.nextAssignment.projectName} at {r.nextAssignment.startTime}
-              </Text>
-            )}
-          </View>
-        </View>
-      ))}
-    </>
-  );
-}
+  const { getUnreadForWorker, markAnnouncementRead } = useAnnouncements();
+  const unreadAnnouncement: Announcement | null = user ? getUnreadForWorker(user.id) : null;
+  const [openAnnouncement, setOpenAnnouncement] = useState(false);
 
-function CheckInButton() {
-  const { colors } = useTheme();
-  const { jobState, checkIn, todayAssignments, currentJob, scheduleConfirmed } = useWorkerContext();
+  const [showCheckoutConfirm, setShowCheckoutConfirm] = useState(false);
+  const [tick, setTick] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setTick(new Date()), 60000);
+    return () => clearInterval(id);
+  }, []);
 
-  if (jobState === 'checked_in' || jobState === 'working' || jobState === 'completed') return null;
-  if (todayAssignments.length === 0) return null;
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const tagline = showConfirmed ? "You're all set for today." : "Let's get it done today.";
 
-  const targetJob = currentJob ?? todayAssignments.find(a => a.status !== 'completed');
-  if (!targetJob) return null;
+  const lastCheckIn = primaryAssignment
+    ? [...checkIns].reverse().find(c => c.assignmentId === primaryAssignment.id)
+    : undefined;
+  const lastCheckOut = primaryAssignment
+    ? [...checkOuts].reverse().find(c => c.assignmentId === primaryAssignment.id)
+    : undefined;
 
-  const handleCheckIn = () => {
+  const tasks = primaryAssignment ? projectTasks(primaryAssignment.projectId) : [];
+  const completedTasks = tasks.filter(t => t.status === 'completed');
+  const settings = primaryAssignment ? projectSettings(primaryAssignment.projectId) : undefined;
+  const photoRequired = settings?.completionPhotoRequired ?? false;
+
+  function handleConfirm() {
+    haptics.success();
+    confirmSchedule();
+  }
+
+  function handleCheckIn() {
+    haptics.success();
     const mockGps = {
       latitude: 41.4756 + (Math.random() - 0.5) * 0.001,
       longitude: -81.5558 + (Math.random() - 0.5) * 0.001,
@@ -215,141 +122,16 @@ function CheckInButton() {
       distanceFromSite: Math.floor(Math.random() * 100),
     };
     checkIn(mockGps);
-  };
+  }
 
-  return (
-    <Pressable
-      onPress={handleCheckIn}
-      style={[styles.bigActionButton, { backgroundColor: colors.primary }]}
-    >
-      <Feather name="log-in" size={28} color="#fff" />
-      <Text style={[typeScale.headingMedium, { color: '#fff', marginTop: spacing.xs }]}>
-        I'M HERE
-      </Text>
-      <Text style={[typeScale.caption, { color: 'rgba(255,255,255,0.8)' }]}>
-        {targetJob.project?.name}
-      </Text>
-    </Pressable>
-  );
-}
+  function handleCheckOutPress() {
+    haptics.select();
+    setShowCheckoutConfirm(true);
+  }
 
-function TaskList() {
-  const { colors } = useTheme();
-  const {
-    currentJob, projectTasks, startTask, completeTask,
-    projectSettings, taskPhotoCaptured, captureTaskPhoto,
-  } = useWorkerContext();
-
-  if (!currentJob) return null;
-
-  const tasks = projectTasks(currentJob.projectId);
-  const settings = projectSettings(currentJob.projectId);
-  const photoRequired = settings?.completionPhotoRequired ?? false;
-
-  const activeTasks = tasks.filter(t => t.status !== 'completed');
-  const completedTasks = tasks.filter(t => t.status === 'completed');
-
-  if (tasks.length === 0) return null;
-
-  const handleComplete = (task: ProjectTask) => {
-    if (photoRequired && !taskPhotoCaptured[task.id]) {
-      const doCapture = () => {
-        captureTaskPhoto(task.id);
-        completeTask(task.id);
-      };
-      if (Platform.OS === 'web') {
-        doCapture();
-      } else {
-        Alert.alert(
-          'Photo Required',
-          'A completion photo is required before marking this task complete.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Take Photo', onPress: doCapture },
-          ],
-        );
-      }
-      return;
-    }
-    completeTask(task.id);
-  };
-
-  return (
-    <Card title="Tasks" style={styles.taskSection}>
-      {photoRequired && (
-        <View style={[styles.photoNotice, { backgroundColor: colors.infoLight }]}>
-          <Feather name="camera" size={14} color={colors.info} />
-          <Text style={[typeScale.caption, { color: colors.info, marginLeft: spacing.xs }]}>
-            Completion photos required for this project
-          </Text>
-        </View>
-      )}
-
-      {activeTasks.map(task => (
-        <View key={task.id} style={[styles.taskRow, { borderBottomColor: colors.borderLight }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[typeScale.bodyMedium, { color: colors.textPrimary }]}>{task.title}</Text>
-            {task.status === 'in_progress' && (
-              <StatusBadge label="In Progress" status="warning" />
-            )}
-          </View>
-          <View style={styles.taskActions}>
-            {task.status === 'pending' && (
-              <Pressable
-                onPress={() => startTask(task.id)}
-                style={[styles.taskBtn, { backgroundColor: colors.primaryLight }]}
-              >
-                <Feather name="play" size={16} color={colors.primary} />
-              </Pressable>
-            )}
-            {task.status === 'in_progress' && (
-              <>
-                {photoRequired && !taskPhotoCaptured[task.id] && (
-                  <Pressable
-                    onPress={() => captureTaskPhoto(task.id)}
-                    style={[styles.taskBtn, { backgroundColor: colors.warningLight, marginRight: spacing.xs }]}
-                  >
-                    <Feather name="camera" size={16} color={colors.warning} />
-                  </Pressable>
-                )}
-                <Pressable
-                  onPress={() => handleComplete(task)}
-                  style={[styles.taskBtn, { backgroundColor: colors.successLight }]}
-                >
-                  <Feather name="check" size={16} color={colors.success} />
-                </Pressable>
-              </>
-            )}
-          </View>
-        </View>
-      ))}
-
-      {completedTasks.length > 0 && (
-        <View style={{ marginTop: spacing.md }}>
-          <Text style={[typeScale.caption, { color: colors.textTertiary, marginBottom: spacing.xs }]}>
-            Completed ({completedTasks.length})
-          </Text>
-          {completedTasks.slice(0, 3).map(task => (
-            <View key={task.id} style={[styles.taskRow, { borderBottomColor: colors.borderLight, opacity: 0.6 }]}>
-              <Feather name="check-circle" size={16} color={colors.success} />
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.sm, textDecorationLine: 'line-through' }]}>
-                {task.title}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </Card>
-  );
-}
-
-function CheckOutButton() {
-  const { colors } = useTheme();
-  const { jobState, checkOut, currentJob, nextJob, moveToNextJob } = useWorkerContext();
-
-  if (jobState !== 'checked_in' && jobState !== 'working') return null;
-
-  const handleCheckOut = () => {
+  function confirmCheckOut() {
+    setShowCheckoutConfirm(false);
+    haptics.success();
     const mockGps = {
       latitude: 41.4756 + (Math.random() - 0.5) * 0.001,
       longitude: -81.5558 + (Math.random() - 0.5) * 0.001,
@@ -357,260 +139,779 @@ function CheckOutButton() {
       distanceFromSite: Math.floor(Math.random() * 100),
     };
     checkOut(mockGps);
-  };
+  }
 
-  return (
-    <View style={styles.checkOutSection}>
-      <Pressable
-        onPress={handleCheckOut}
-        style={[styles.bigActionButton, { backgroundColor: colors.error }]}
-      >
-        <Feather name="log-out" size={28} color="#fff" />
-        <Text style={[typeScale.headingMedium, { color: '#fff', marginTop: spacing.xs }]}>
-          I'M LEAVING
+  function handleBackToToday() {
+    haptics.select();
+    moveToNextJob();
+  }
+
+  function handleTaskPress(task: ProjectTask) {
+    router.push(`/(worker)/task/${task.id}` as any);
+  }
+
+  function handleOpenAnnouncement() {
+    haptics.select();
+    setOpenAnnouncement(true);
+  }
+
+  function handleCloseAnnouncement() {
+    setOpenAnnouncement(false);
+    if (user && unreadAnnouncement) {
+      markAnnouncementRead(unreadAnnouncement.id, user.id);
+    }
+  }
+
+  if (showCheckedOut && primaryAssignment) {
+    const workedLabel = lastCheckIn && lastCheckOut
+      ? formatElapsed(lastCheckIn.timestamp, new Date(lastCheckOut.timestamp))
+      : lastCheckIn ? formatElapsed(lastCheckIn.timestamp, tick) : '—';
+
+    return (
+      <View style={[styles.screen, styles.checkedOutScreen, { backgroundColor: colors.background, paddingTop: insets.top + spacing['3xl'] }]}>
+        <View style={[styles.checkedOutIcon, { backgroundColor: colors.success }]}>
+          <Feather name="check" size={40} color="#FFFFFF" />
+        </View>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.xl }]}>
+          Checked Out
         </Text>
-        <Text style={[typeScale.caption, { color: 'rgba(255,255,255,0.8)' }]}>
-          {currentJob?.project?.name}
+        <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+          Great work today!
         </Text>
-      </Pressable>
-    </View>
-  );
-}
 
-function NextJobPrompt() {
-  const { colors } = useTheme();
-  const { jobState, nextJob, moveToNextJob, openMapsNavigation } = useWorkerContext();
+        <View style={[styles.card, styles.summaryCard, { backgroundColor: colors.surface }, shadow.md]}>
+          <View style={styles.labelRow}>
+            <View style={[styles.jobIcon, { backgroundColor: colors.primarySurface }]}>
+              <Feather name="home" size={14} color={colors.primaryDark} />
+            </View>
+            <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
+              {primaryAssignment.project?.name ?? 'Unknown Project'}
+            </Text>
+          </View>
+          {primaryAssignment.project?.address && (
+            <View style={[styles.metaRow, { marginLeft: 36 }]}>
+              <Feather name="map-pin" size={13} color={colors.textTertiary} />
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
+                {primaryAssignment.project.address}
+              </Text>
+            </View>
+          )}
 
-  if (jobState !== 'completed' || !nextJob) return null;
+          <View style={[styles.summaryDivider, { backgroundColor: colors.borderLight }]} />
 
-  return (
-    <Card style={[styles.nextJobCard, { borderColor: colors.primary, borderWidth: 2 }]}>
-      <View style={styles.confirmHeader}>
-        <Feather name="arrow-right-circle" size={20} color={colors.primary} />
-        <Text style={[typeScale.headingSmall, { color: colors.primary, marginLeft: spacing.sm }]}>
-          Next Job
-        </Text>
+          <View style={styles.summaryRow}>
+            <View style={styles.labelRow}>
+              <Feather name="clock" size={14} color={colors.textTertiary} />
+              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.xs }]}>Worked</Text>
+            </View>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{workedLabel}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <View style={styles.labelRow}>
+              <Feather name="check-square" size={14} color={colors.textTertiary} />
+              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.xs }]}>Tasks Completed</Text>
+            </View>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
+              {completedTasks.length} of {tasks.length}
+            </Text>
+          </View>
+        </View>
+
+        <Pressable onPress={handleBackToToday} style={{ width: '100%' }}>
+          <LinearGradient
+            colors={[colors.primary, colors.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.pillButton}
+          >
+            <Feather name="home" size={18} color="#FFFFFF" />
+            <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>
+              Back to Today
+            </Text>
+          </LinearGradient>
+        </Pressable>
       </View>
-      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginTop: spacing.sm }]}>
-        {nextJob.project?.name}
-      </Text>
-      <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-        {nextJob.isFullDay ? 'Full day' : `${formatTime(nextJob.startTime)} – ${formatTime(nextJob.endTime)}`}
-      </Text>
-      {nextJob.project?.address && (
-        <Button
-          title="Navigate to Next Job"
-          onPress={() => openMapsNavigation(nextJob.project!.address!)}
-          variant="secondary"
-          icon="navigation"
-          fullWidth
-          style={{ marginTop: spacing.md }}
-        />
-      )}
-      <Button
-        title="Start Next Job"
-        onPress={moveToNextJob}
-        fullWidth
-        icon="arrow-right"
-        style={{ marginTop: spacing.sm }}
-      />
-    </Card>
-  );
-}
-
-function DayComplete() {
-  const { colors } = useTheme();
-  const { jobState, nextJob, todayAssignments, completedAssignments } = useWorkerContext();
-  const todayCompleted = todayAssignments.filter(a => a.status === 'completed' || completedAssignments.some(c => c.id === a.id));
-
-  if (jobState !== 'completed' || nextJob) return null;
+    );
+  }
 
   return (
-    <View style={styles.dayComplete}>
-      <Feather name="check-circle" size={48} color={colors.success} />
-      <Text style={[typeScale.headingMedium, { color: colors.textPrimary, marginTop: spacing.md }]}>
-        Day Complete!
-      </Text>
-      <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-        Great work today. Drive safe!
-      </Text>
-    </View>
-  );
-}
-
-function OfflineIndicator() {
-  const { colors } = useTheme();
-  const { isOnline, offlineQueue } = useWorkerContext();
-
-  if (isOnline && offlineQueue.length === 0) return null;
-
-  return (
-    <View style={[styles.offlineBanner, { backgroundColor: isOnline ? colors.warningLight : colors.errorLight }]}>
-      <Feather name={isOnline ? 'upload-cloud' : 'wifi-off'} size={16} color={isOnline ? colors.warning : colors.error} />
-      <Text style={[typeScale.caption, { color: isOnline ? colors.warning : colors.error, marginLeft: spacing.xs }]}>
-        {isOnline
-          ? `Syncing ${offlineQueue.length} action${offlineQueue.length > 1 ? 's' : ''}...`
-          : 'Offline — actions will sync when connection returns'}
-      </Text>
-    </View>
-  );
-}
-
-export default function WorkerTodayScreen() {
-  const { colors } = useTheme();
-  const { user } = useAuth();
-  const insets = useSafeAreaInsets();
-  const { todayAssignments, currentJob, nextJob, jobState } = useWorkerContext();
-
-  const now = new Date();
-  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
-  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
-  return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={{ paddingBottom: spacing['5xl'] }}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{dateStr}</Text>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>
-          {greeting}, {user?.firstName ?? 'there'}
-        </Text>
-      </View>
-
-      <View style={styles.content}>
-        <OfflineIndicator />
-        <TruckBanner />
-        <ScheduleConfirmation />
-        <WorkerRemindersSection />
-
-        {todayAssignments.length === 0 ? (
-          <EmptyState
-            icon="sun"
-            title="No jobs today"
-            description="Enjoy your day off! Check back for upcoming assignments."
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
+        <View style={[styles.hero, { height: showWorking ? HERO_HEIGHT_COMPACT : HERO_HEIGHT }]}>
+          <Image source={{ uri: HERO_IMAGE_URI }} style={styles.heroImage} resizeMode="cover" />
+          <LinearGradient
+            colors={['transparent', 'transparent', colors.groupedBackground]}
+            locations={[0, 0.78, 1]}
+            style={StyleSheet.absoluteFillObject}
           />
-        ) : (
-          <>
-            <CheckInButton />
 
-            {todayAssignments.map(a => (
-              <JobCard
-                key={a.id}
-                assignment={a}
-                isCurrent={currentJob?.id === a.id}
-                isNext={nextJob?.id === a.id && currentJob?.id !== a.id}
-              />
-            ))}
+          <View style={[styles.avatarWrap, { top: insets.top + spacing.sm }]}>
+            <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={44} uri={user?.avatarUrl} />
+          </View>
 
-            <TaskList />
-            <CheckOutButton />
-            <NextJobPrompt />
-            <DayComplete />
-          </>
+          {showWorking ? (
+            <View style={[styles.onSitePill, { top: insets.top + spacing.sm, backgroundColor: 'rgba(255,255,255,0.9)' }]}>
+              <View style={[styles.onSiteDot, { backgroundColor: colors.success }]} />
+              <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginLeft: spacing.xs }]}>On Site</Text>
+            </View>
+          ) : (
+            <View style={styles.heroText}>
+              <Text style={[typeScale.bodyMedium, styles.heroTextShadow, { color: '#FFFFFF' }]}>{dateStr}</Text>
+              <Text style={[typeScale.displayLarge, styles.heroTextShadow, { color: '#FFFFFF', marginTop: 2 }]}>
+                {greeting},{'\n'}{user?.firstName ?? 'there'}
+              </Text>
+              <Text style={[typeScale.bodyLarge, styles.heroTextShadow, { color: '#FFFFFF', marginTop: spacing.xs }]}>
+                {tagline}
+              </Text>
+            </View>
+          )}
+
+          {!showWorking && primaryAssignment?.truck && (
+            <Pressable style={[styles.truckPill, { backgroundColor: colors.primarySurface, bottom: -PILL_OVERHANG }, shadow.md]}>
+              <Feather name="truck" size={18} color={colors.primaryDark} />
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
+                {primaryAssignment.truck.name}
+              </Text>
+              <Feather name="chevron-right" size={18} color={colors.primaryDark} />
+            </Pressable>
+          )}
+        </View>
+
+        <View style={[styles.content, { paddingTop: showWorking ? spacing.xl : PILL_OVERHANG + spacing.xl }]}>
+          {unreadAnnouncement && (() => {
+            const weatherMeta = unreadAnnouncement.weatherAction ? WEATHER_ACTION_META[unreadAnnouncement.weatherAction] : null;
+            const isStrong = unreadAnnouncement.priority === 'urgent' || !!weatherMeta;
+            return (
+              <Pressable
+                onPress={handleOpenAnnouncement}
+                style={[
+                  styles.card,
+                  styles.announcementCard,
+                  isStrong
+                    ? { backgroundColor: colors.errorLight, borderWidth: 1, borderColor: colors.error }
+                    : { backgroundColor: colors.surface },
+                  shadow.md,
+                ]}
+              >
+                <View style={[styles.announcementIcon, { backgroundColor: isStrong ? colors.error : colors.primarySurface }]}>
+                  <Feather name={(weatherMeta?.icon ?? 'volume-2') as any} size={16} color={isStrong ? '#FFFFFF' : colors.primaryDark} />
+                </View>
+                <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                  <View style={styles.announcementTopRow}>
+                    <Text style={[typeScale.labelSmall, { color: isStrong ? colors.error : colors.textSecondary, fontWeight: '700' }]}>
+                      {weatherMeta ? weatherMeta.label.toUpperCase() : unreadAnnouncement.priority === 'urgent' ? 'URGENT' : 'ANNOUNCEMENT'}
+                    </Text>
+                  </View>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700', marginTop: 2 }]} numberOfLines={1}>
+                    {unreadAnnouncement.title}
+                  </Text>
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]} numberOfLines={2}>
+                    {unreadAnnouncement.body}
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={isStrong ? colors.error : colors.textTertiary} />
+              </Pressable>
+            );
+          })()}
+
+          {!scheduleConfirmed && todayAssignments.length > 0 && (
+            <View style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
+              <Feather name="check-square" size={26} color={colors.primary} />
+              <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.md }]}>
+                Confirm Your Schedule
+              </Text>
+              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+                You have {todayAssignments.length} job{todayAssignments.length > 1 ? 's' : ''} today.
+                Confirm to let the team know you're ready.
+              </Text>
+              <Pressable onPress={handleConfirm} style={{ marginTop: spacing.lg }}>
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.pillButton}
+                >
+                  <Feather name="check" size={18} color="#FFFFFF" />
+                  <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>
+                    Confirm Schedule
+                  </Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          )}
+
+          {!scheduleConfirmed && primaryAssignment && (
+            <JobCard label="Today's Job" assignment={primaryAssignment} />
+          )}
+
+          {showConfirmed && primaryAssignment && (
+            <>
+              <View style={[styles.card, styles.mapCard, { backgroundColor: colors.surface }, shadow.md]}>
+                <JobCardBody label="Next Job" assignment={primaryAssignment} />
+
+                {primaryAssignment.project?.address && (
+                  <>
+                    <View style={[styles.mapArea, { backgroundColor: MAP_TINT }]}>
+                      <View style={[styles.mapPinDot, { backgroundColor: colors.surface }, shadow.sm]}>
+                        <Feather name="map-pin" size={20} color={colors.primary} />
+                      </View>
+                    </View>
+                    <Pressable
+                      style={styles.openMapsRow}
+                      onPress={() => openMapsNavigation(primaryAssignment.project!.address!)}
+                    >
+                      <Feather name="navigation" size={15} color={colors.primary} />
+                      <Text style={[typeScale.bodyMedium, { color: colors.primary, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
+                        Open in Maps
+                      </Text>
+                      <Feather name="chevron-right" size={16} color={colors.textTertiary} />
+                    </Pressable>
+                  </>
+                )}
+              </View>
+
+              {primaryAssignment.startTime && (
+                <View style={styles.countdownRow}>
+                  <Feather name="clock" size={14} color={colors.textSecondary} />
+                  <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
+                    {(() => {
+                      const mins = minutesUntil(primaryAssignment.startTime!);
+                      if (mins > 1) return `Starts in ${mins} minutes`;
+                      if (mins === 1) return 'Starts in 1 minute';
+                      return 'Starting now';
+                    })()}
+                  </Text>
+                </View>
+              )}
+
+              <Pressable onPress={handleCheckIn}>
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.pillButton, styles.checkInButton]}
+                >
+                  <View style={styles.checkInRow}>
+                    <Feather name="log-in" size={20} color="#FFFFFF" />
+                    <Text style={[typeScale.headingSmall, { color: '#FFFFFF', marginLeft: spacing.sm, fontWeight: '700' }]}>
+                      I'M HERE
+                    </Text>
+                  </View>
+                  <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]}>
+                    Check in to start this job
+                  </Text>
+                </LinearGradient>
+              </Pressable>
+            </>
+          )}
+
+          {showWorking && primaryAssignment && (
+            <>
+              <View>
+                <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>
+                  {primaryAssignment.project?.name ?? 'Unknown Project'}
+                </Text>
+                {primaryAssignment.project?.address && (
+                  <View style={[styles.metaRow, { marginTop: spacing.xs }]}>
+                    <Feather name="map-pin" size={13} color={colors.textTertiary} />
+                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
+                      {primaryAssignment.project.address}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.metaRow}>
+                  <Feather name="clock" size={13} color={colors.textTertiary} />
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
+                    {primaryAssignment.isFullDay ? 'Full day' : `${formatTime(primaryAssignment.startTime)} – ${formatTime(primaryAssignment.endTime)}`}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.card, styles.statCard, { backgroundColor: colors.surface }, shadow.md]}>
+                <View style={styles.statCol}>
+                  <View style={styles.labelRow}>
+                    <Feather name="check-circle" size={13} color={colors.success} />
+                    <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
+                      Checked In
+                    </Text>
+                  </View>
+                  <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.xs }]}>
+                    {lastCheckIn ? formatClock(lastCheckIn.timestamp) : '—'}
+                  </Text>
+                </View>
+                <View style={[styles.statDivider, { backgroundColor: colors.borderLight }]} />
+                <View style={styles.statCol}>
+                  <View style={styles.labelRow}>
+                    <Feather name="clock" size={13} color={colors.primary} />
+                    <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
+                      On site for
+                    </Text>
+                  </View>
+                  <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.xs }]}>
+                    {lastCheckIn ? formatElapsed(lastCheckIn.timestamp, tick) : '—'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.actionRow}>
+                {primaryAssignment.project?.address && (
+                  <Pressable
+                    style={[styles.actionPill, { backgroundColor: colors.primarySurface }]}
+                    onPress={() => openMapsNavigation(primaryAssignment.project!.address!)}
+                  >
+                    <Feather name="navigation" size={16} color={colors.primaryDark} />
+                    <Text style={[typeScale.bodyMedium, { color: colors.primaryDark, marginLeft: spacing.xs, fontWeight: '600' }]}>
+                      Open in Maps
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+
+              {tasks.length > 0 && (
+                <View style={[styles.card, styles.mapCard, { backgroundColor: colors.surface }, shadow.md]}>
+                  <View style={styles.tasksHeader}>
+                    <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>Today's Tasks</Text>
+                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                      {completedTasks.length} of {tasks.length} completed
+                    </Text>
+                  </View>
+                  <View style={{ paddingHorizontal: spacing.lg }}>
+                    <View style={[styles.progressTrack, { backgroundColor: colors.borderLight }]}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { backgroundColor: colors.primary, width: `${tasks.length > 0 ? (completedTasks.length / tasks.length) * 100 : 0}%` },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                  {tasks.map((task, i) => (
+                    <Pressable
+                      key={task.id}
+                      style={[
+                        styles.taskRow,
+                        { borderTopColor: colors.borderLight, marginTop: i === 0 ? spacing.md : 0 },
+                      ]}
+                      onPress={() => handleTaskPress(task)}
+                    >
+                      {task.status === 'completed' ? (
+                        <Feather name="check-circle" size={22} color={colors.success} />
+                      ) : (
+                        <Feather name="circle" size={22} color={colors.border} />
+                      )}
+                      <View style={{ flex: 1, marginLeft: spacing.md }}>
+                        <Text
+                          style={[
+                            typeScale.bodyLarge,
+                            { color: task.status === 'completed' ? colors.textSecondary : colors.textPrimary },
+                            task.status === 'completed' && { textDecorationLine: 'line-through' },
+                          ]}
+                        >
+                          {task.title}
+                        </Text>
+                        {task.status === 'in_progress' && (
+                          <View style={[styles.inProgressTag, { backgroundColor: colors.warningLight }]}>
+                            <Text style={[typeScale.caption, { color: colors.warning }]}>In Progress</Text>
+                          </View>
+                        )}
+                      </View>
+                      {photoRequired && task.status !== 'completed' && !taskPhotoCaptured[task.id] && (
+                        <Feather name="camera" size={17} color={colors.info} style={{ marginRight: spacing.sm }} />
+                      )}
+                      <Feather name="chevron-right" size={18} color={colors.textTertiary} />
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              {primaryAssignment.notes && (
+                <View style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
+                  <View style={styles.labelRow}>
+                    <Feather name="file-text" size={15} color={colors.primary} />
+                    <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
+                      Job Notes
+                    </Text>
+                  </View>
+                  <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, marginTop: spacing.xs }]}>
+                    {primaryAssignment.notes}
+                  </Text>
+                </View>
+              )}
+
+              <Pressable onPress={handleCheckOutPress}>
+                <LinearGradient
+                  colors={['#E1615D', '#C4453F']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.card, styles.leavingCard, { borderRadius: 28 }]}
+                >
+                  <Feather name="log-out" size={22} color="#FFFFFF" />
+                  <View style={{ marginLeft: spacing.md }}>
+                    <Text style={[typeScale.headingSmall, { color: '#FFFFFF', fontWeight: '700' }]}>
+                      I'M LEAVING
+                    </Text>
+                    <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)' }]}>
+                      Check out when you're done
+                    </Text>
+                  </View>
+                </LinearGradient>
+              </Pressable>
+            </>
+          )}
+        </View>
+      </ScrollView>
+
+      <Modal
+        visible={showCheckoutConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCheckoutConfirm(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setShowCheckoutConfirm(false)}
+        >
+          <Pressable style={[styles.modalCard, { backgroundColor: colors.surface }]} onPress={() => {}}>
+            <View style={[styles.modalIcon, { backgroundColor: colors.errorLight }]}>
+              <Feather name="log-out" size={24} color={colors.error} />
+            </View>
+            <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.lg, textAlign: 'center' }]}>
+              You're done for today?
+            </Text>
+            <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }]}>
+              This checks you out from {primaryAssignment?.project?.name ?? 'this job'} and ends your work session.
+            </Text>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={() => setShowCheckoutConfirm(false)}
+              >
+                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.modalButton} onPress={confirmCheckOut}>
+                <LinearGradient
+                  colors={['#E1615D', '#C4453F']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalButtonFill}
+                >
+                  <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Check Out</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={openAnnouncement}
+        transparent
+        animationType="slide"
+        onRequestClose={handleCloseAnnouncement}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={handleCloseAnnouncement}>
+          <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]} onPress={() => {}}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
+            {unreadAnnouncement && (() => {
+              const weatherMeta = unreadAnnouncement.weatherAction ? WEATHER_ACTION_META[unreadAnnouncement.weatherAction] : null;
+              const isStrong = unreadAnnouncement.priority === 'urgent' || !!weatherMeta;
+              return (
+                <>
+                  {isStrong && (
+                    <View style={[styles.sheetBadge, { backgroundColor: colors.errorLight }]}>
+                      <Feather name={(weatherMeta?.icon ?? 'alert-circle') as any} size={13} color={colors.error} />
+                      <Text style={[typeScale.labelSmall, { color: colors.error, fontWeight: '700', marginLeft: 4 }]}>
+                        {weatherMeta ? weatherMeta.label.toUpperCase() : 'URGENT'}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.sm }]}>
+                    {unreadAnnouncement.title}
+                  </Text>
+                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
+                    {unreadAnnouncement.author?.firstName} {unreadAnnouncement.author?.lastName}
+                  </Text>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginTop: spacing.md, lineHeight: 22 }]}>
+                    {unreadAnnouncement.body}
+                  </Text>
+                  <Pressable
+                    style={[styles.pillButton, { backgroundColor: colors.primary, marginTop: spacing.xl }]}
+                    onPress={handleCloseAnnouncement}
+                  >
+                    <Text style={[typeScale.labelLarge, { color: '#FFFFFF', fontWeight: '700' }]}>Got it</Text>
+                  </Pressable>
+                </>
+              );
+            })()}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+function JobCard({ label, assignment }: { label: string; assignment: Assignment }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable style={[styles.card, styles.mapCard, { backgroundColor: colors.surface }, shadow.md]}>
+      <JobCardBody label={label} assignment={assignment} />
+    </Pressable>
+  );
+}
+
+function JobCardBody({ label, assignment }: { label: string; assignment: Assignment }) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.jobCard}>
+      <View style={{ flex: 1 }}>
+        <View style={styles.labelRow}>
+          <Feather name="calendar" size={13} color={colors.primary} />
+          <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
+            {label}
+          </Text>
+        </View>
+
+        <View style={[styles.labelRow, { marginTop: spacing.sm }]}>
+          <View style={[styles.jobIcon, { backgroundColor: colors.primarySurface }]}>
+            <Feather name="home" size={14} color={colors.primaryDark} />
+          </View>
+          <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
+            {assignment.project?.name ?? 'Unknown Project'}
+          </Text>
+        </View>
+
+        {assignment.project?.address && (
+          <View style={[styles.metaRow, { marginLeft: 36 }]}>
+            <Feather name="map-pin" size={13} color={colors.textTertiary} />
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
+              {assignment.project.address}
+            </Text>
+          </View>
         )}
+        <View style={[styles.metaRow, { marginLeft: 36 }]}>
+          <Feather name="clock" size={13} color={colors.textTertiary} />
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
+            {assignment.isFullDay ? 'Full day' : `${formatTime(assignment.startTime)} – ${formatTime(assignment.endTime)}`}
+          </Text>
+        </View>
       </View>
-    </ScrollView>
+      <Feather name="chevron-right" size={20} color={colors.textTertiary} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
+  screen: { flex: 1 },
+  hero: { height: HERO_HEIGHT, width: '100%' },
+  heroImage: { width: '100%', height: '100%' },
+  avatarWrap: { position: 'absolute', right: spacing.lg },
+  heroText: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 100 },
+  heroTextShadow: {
+    textShadowColor: 'rgba(0, 0, 0, 0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
-  content: {
-    paddingHorizontal: spacing.lg,
-  },
-  confirmCard: {
-    marginBottom: spacing.lg,
-  },
-  confirmHeader: {
+  truckPill: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
+    borderRadius: radius.full,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
-  truckBanner: {
+  content: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  card: { borderRadius: radius.xl, padding: spacing.lg },
+  pillButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: radius.full,
+  },
+  jobCard: { flexDirection: 'row', alignItems: 'flex-start', padding: spacing.lg },
+  labelRow: { flexDirection: 'row', alignItems: 'center' },
+  jobIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  mapCard: { padding: 0, overflow: 'hidden' },
+  mapArea: {
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapPinDot: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  openMapsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  countdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkInButton: { height: 72, flexDirection: 'column' },
+  checkInRow: { flexDirection: 'row', alignItems: 'center' },
+  onSitePill: {
+    position: 'absolute',
+    left: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    marginBottom: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
   },
-  jobCard: {
-    marginBottom: spacing.md,
-  },
-  jobHeader: {
+  onSiteDot: { width: 7, height: 7, borderRadius: 4 },
+  statCard: { flexDirection: 'row', alignItems: 'center' },
+  statCol: { flex: 1 },
+  statDivider: { width: 1, height: 40, marginHorizontal: spacing.lg },
+  actionRow: { flexDirection: 'row', gap: spacing.sm },
+  actionPill: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  jobTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
-  bigActionButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing['2xl'],
-    borderRadius: radius.lg,
-    marginBottom: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.full,
   },
-  taskSection: {
-    marginBottom: spacing.lg,
+  tasksHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    padding: spacing.lg,
+    paddingBottom: spacing.sm,
   },
+  progressTrack: {
+    height: 5,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
+  progressFill: { height: 5, borderRadius: radius.full },
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  taskActions: {
-    flexDirection: 'row',
+  inProgressTag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.xs,
+    marginTop: 4,
+  },
+  leavingCard: { flexDirection: 'row', alignItems: 'center' },
+  checkedOutScreen: {
     alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
-  taskBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  checkedOutIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoNotice: {
+  summaryCard: { width: '100%' },
+  summaryDivider: { height: 1, marginVertical: spacing.md },
+  summaryRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: radius.xs,
-    marginBottom: spacing.sm,
   },
-  checkOutSection: {
-    marginTop: spacing.sm,
-  },
-  nextJobCard: {
-    marginBottom: spacing.lg,
-  },
-  dayComplete: {
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
-    paddingVertical: spacing['3xl'],
+    justifyContent: 'center',
+    padding: spacing.xl,
   },
-  offlineBanner: {
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  modalIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalActions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    marginBottom: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+    width: '100%',
   },
-  reminderCard: {
+  modalButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonFill: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  announcementCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    padding: spacing.md,
-    borderRadius: radius.sm,
-    borderLeftWidth: 3,
-    marginBottom: spacing.sm,
+  },
+  announcementIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  announcementTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.lg,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
+  sheetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.full,
   },
 });

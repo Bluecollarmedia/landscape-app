@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, TextInput, Pressable, StyleSheet, ViewStyle } from 'react-native';
+import { View, TextInput, Pressable, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from './Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { radius, spacing, sizing } from '@/theme/spacing';
@@ -9,15 +10,16 @@ interface SearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
+  autoFocus?: boolean;
 }
 
-export function SearchBar({ value, onChangeText, placeholder = 'Search...', style }: SearchBarProps) {
+export function SearchBar({ value, onChangeText, placeholder = 'Search...', style, autoFocus }: SearchBarProps) {
   const { colors } = useTheme();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.backgroundTertiary, borderColor: colors.borderLight }, style]}>
-      <Feather name="search" size={sizing.iconMd} color={colors.textTertiary} />
+      <Icon name="search" size={sizing.iconMd} color={colors.textTertiary} />
       <TextInput
         style={[styles.input, { color: colors.textPrimary }]}
         value={value}
@@ -27,10 +29,11 @@ export function SearchBar({ value, onChangeText, placeholder = 'Search...', styl
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
+        autoFocus={autoFocus}
       />
       {value.length > 0 && (
         <Pressable onPress={() => onChangeText('')} hitSlop={8} accessibilityLabel="Clear search">
-          <Feather name="x" size={sizing.iconSm} color={colors.textTertiary} />
+          <Icon name="x" size={sizing.iconSm} color={colors.textTertiary} />
         </Pressable>
       )}
     </View>

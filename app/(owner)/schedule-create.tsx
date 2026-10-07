@@ -1,0 +1,708 @@
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Alert, Platform, Modal } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { Icon } from '@/components/ui/Icon';
+import { useTheme } from '@/providers/ThemeProvider';
+import { useSchedule } from '@/hooks/useSchedule';
+import { Input, Avatar } from '@/components/ui';
+import { typeScale } from '@/theme/typography';
+import { spacing, radius, shadow } from '@/theme/spacing';
+import { semantic } from '@/theme/colors';
+import { mockMembers, mockProjects, mockTrucks } from '@/data/mock';
+
+const today = new Date().toISOString().split('T')[0];
+
+function formatDateFull(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatTime(time?: string): string {
+  if (!time) return '';
+  const [h, m] = time.split(':');
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+  return `${display}:${m} ${ampm}`;
+}
+
+function formatAssignmentTime(a: { isFullDay: boolean; startTime?: string; endTime?: string }): string {
+  return a.isFullDay ? 'Full Day' : `${formatTime(a.startTime)} – ${formatTime(a.endTime)}`;
+}
+
+function timeStrToDate(dateStr: string, time: string): Date {
+  const [h, m] = time.split(':').map(Number);
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+function dateToTimeStr(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+export default function ScheduleCreateScreen() {
+  const { colors } = useTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{
+    workerId?: string;
+    projectId?: string;
+    date?: string;
+    moveFrom?: string;
+  }>();
+  const isMove = !!params.moveFrom;
+
+  const schedule = useSchedule();
+
+  const activeWorkers = useMemo(() =>
+    mockMembers.filter(m => m.role === 'worker' && m.status === 'active'),
+  []);
+  const activeProjects = useMemo(() =>
+    mockProjects.filter(p => p.status === 'active'),
+  []);
+  const availableTrucks = useMemo(() =>
+    mockTrucks.filter(t => t.status !== 'out_of_service'),
+  []);
+
+  const [projectId, setProjectId] = useState(params.projectId ?? '');
+  const [workerIds, setWorkerIds] = useState<string[]>(params.workerId ? [params.workerId] : []);
+  const [date, setDate] = useState(params.date ?? today);
+  const [isFullDay, setIsFullDay] = useState(false);
+  const [startTime, setStartTime] = useState('07:00');
+  const [endTime, setEndTime] = useState('15:00');
+  const [truckId, setTruckId] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const [showProjectSheet, setShowProjectSheet] = useState(false);
+  const [showWorkerSheet, setShowWorkerSheet] = useState(false);
+  const [showTruckSheet, setShowTruckSheet] = useState(false);
+  const [showAndroidDate, setShowAndroidDate] = useState(false);
+  const [showAndroidStart, setShowAndroidStart] = useState(false);
+  const [showAndroidEnd, setShowAndroidEnd] = useState(false);
+
+  const dateObj = useMemo(() => new Date(date + 'T12:00:00'), [date]);
+  const startTimeObj = useMemo(() => timeStrToDate(date, startTime), [date, startTime]);
+  const endTimeObj = useMemo(() => timeStrToDate(date, endTime), [date, endTime]);
+
+  const selectedProject = activeProjects.find(p => p.id === projectId);
+  const selectedTruck = availableTrucks.find(t => t.id === truckId);
+  const selectedWorkers = workerIds
+    .map(id => activeWorkers.find(w => w.personId === id))
+    .filter((w): w is NonNullable<typeof w> => !!w);
+
+  const truckConflicts = useMemo(() => {
+    if (!truckId) return [];
+    return workerIds.flatMap(personId =>
+      schedule.detectConflicts({
+        personId,
+        scheduledDate: date,
+        startTime: isFullDay ? undefined : startTime,
+        endTime: isFullDay ? undefined : endTime,
+        isFullDay,
+        truckId,
+      }).filter(c => c.type === 'truck_overlap')
+    );
+  }, [truckId, workerIds, date, isFullDay, startTime, endTime, schedule]);
+
+  function toggleWorker(personId: string) {
+    setWorkerIds(prev => prev.includes(personId) ? prev.filter(id => id !== personId) : [...prev, personId]);
+  }
+
+  function handleCreate() {
+    if (isMove) {
+      if (!projectId) {
+        const msg = 'Please select a project.';
+        if (Platform.OS === 'web') alert(msg);
+        else Alert.alert('Required', msg);
+        return;
+      }
+      schedule.moveWorker(params.moveFrom!, projectId, notes || undefined);
+      router.back();
+      return;
+    }
+
+    if (!projectId || workerIds.length === 0) {
+      const msg = 'Please select a project and at least one worker.';
+      if (Platform.OS === 'web') alert(msg);
+      else Alert.alert('Required', msg);
+      return;
+    }
+
+    for (const personId of workerIds) {
+      schedule.createAssignment({
+        personId,
+        projectId,
+        scheduledDate: date,
+        startTime: isFullDay ? undefined : startTime,
+        endTime: isFullDay ? undefined : endTime,
+        isFullDay,
+        truckId: truckId || undefined,
+        notes: notes || undefined,
+      });
+    }
+
+    router.back();
+  }
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg }]} showsVerticalScrollIndicator={false}>
+        <View style={styles.titleRow}>
+          <Pressable
+            onPress={() => router.back()}
+            style={[styles.closeButton, { backgroundColor: colors.surface }, shadow.sm]}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <Icon name="x" size={20} color={colors.textPrimary} />
+          </Pressable>
+        </View>
+        <Text style={[typeScale.displayLarge, { color: colors.textPrimary, marginTop: spacing.md }]}>
+          {isMove ? 'Move Worker' : 'Schedule Work'}
+        </Text>
+        <Text style={[typeScale.bodyLarge, { color: colors.textTertiary, marginTop: 2 }]}>
+          {isMove ? 'Reassign this worker to a different project' : 'Assign your crew to a project'}
+        </Text>
+
+        {/* Project */}
+        <Section
+          icon="home"
+          title="Project"
+          required
+          accessoryLabel={selectedProject ? undefined : 'Select Project'}
+          onPressAccessory={() => setShowProjectSheet(true)}
+        >
+          {selectedProject ? (
+            <Pressable style={styles.projectPreview} onPress={() => setShowProjectSheet(true)}>
+              <View style={[styles.projectIconWrap, { backgroundColor: colors.primarySurface }]}>
+                <Icon name="home" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>
+                  {selectedProject.name}
+                </Text>
+                {selectedProject.address && (
+                  <View style={styles.inlineRow}>
+                    <Icon name="map-pin" size={11} color={colors.textTertiary} />
+                    <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>
+                      {selectedProject.address}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+            </Pressable>
+          ) : null}
+        </Section>
+
+        {!isMove && (
+          <>
+            {/* Date */}
+            <Section icon="calendar" title="Date" required>
+              <Pressable
+                style={styles.fieldRow}
+                onPress={() => { if (Platform.OS === 'android') setShowAndroidDate(true); }}
+                accessibilityRole="button"
+                accessibilityLabel="Choose date"
+              >
+                <Icon name="calendar" size={15} color={colors.textSecondary} />
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', flex: 1 }]}>
+                  {formatDateFull(date)}
+                </Text>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+                {Platform.OS === 'ios' && (
+                  <DateTimePicker
+                    value={dateObj}
+                    mode="date"
+                    display="compact"
+                    onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setDate(d.toISOString().split('T')[0]); }}
+                    style={styles.iosOverlay}
+                    accessibilityLabel="Choose date"
+                  />
+                )}
+              </Pressable>
+              {Platform.OS === 'android' && showAndroidDate && (
+                <DateTimePicker
+                  value={dateObj}
+                  mode="date"
+                  display="default"
+                  onChange={(_e: DateTimePickerEvent, d?: Date) => { setShowAndroidDate(false); if (d) setDate(d.toISOString().split('T')[0]); }}
+                />
+              )}
+            </Section>
+
+            {/* Time */}
+            <Section icon="clock" title="Time" required>
+              <SegmentedControl
+                values={['Set Time', 'Full Day']}
+                selectedIndex={isFullDay ? 1 : 0}
+                onChange={(event) => setIsFullDay(event.nativeEvent.selectedSegmentIndex === 1)}
+                tintColor={colors.primary}
+                appearance="light"
+                backgroundColor={colors.groupedBackground}
+                fontStyle={{ color: colors.textSecondary }}
+                activeFontStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+                style={styles.segmentControl}
+              />
+
+              {!isFullDay && (
+                <View style={styles.timeRow}>
+                  <Pressable
+                    style={[styles.timeField, { backgroundColor: colors.backgroundTertiary }]}
+                    onPress={() => { if (Platform.OS === 'android') setShowAndroidStart(true); }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose start time"
+                  >
+                    <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Start</Text>
+                    <View style={styles.inlineRow}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{formatTime(startTime)}</Text>
+                      <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+                    </View>
+                    {Platform.OS === 'ios' && (
+                      <DateTimePicker
+                        value={startTimeObj}
+                        mode="time"
+                        display="compact"
+                        onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setStartTime(dateToTimeStr(d)); }}
+                        style={styles.iosOverlay}
+                        accessibilityLabel="Choose start time"
+                      />
+                    )}
+                  </Pressable>
+                  <Pressable
+                    style={[styles.timeField, { backgroundColor: colors.backgroundTertiary }]}
+                    onPress={() => { if (Platform.OS === 'android') setShowAndroidEnd(true); }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose end time"
+                  >
+                    <Text style={[typeScale.caption, { color: colors.textTertiary }]}>End</Text>
+                    <View style={styles.inlineRow}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{formatTime(endTime)}</Text>
+                      <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+                    </View>
+                    {Platform.OS === 'ios' && (
+                      <DateTimePicker
+                        value={endTimeObj}
+                        mode="time"
+                        display="compact"
+                        onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setEndTime(dateToTimeStr(d)); }}
+                        style={styles.iosOverlay}
+                        accessibilityLabel="Choose end time"
+                      />
+                    )}
+                  </Pressable>
+                </View>
+              )}
+              {Platform.OS === 'android' && showAndroidStart && (
+                <DateTimePicker
+                  value={startTimeObj}
+                  mode="time"
+                  display="default"
+                  onChange={(_e: DateTimePickerEvent, d?: Date) => { setShowAndroidStart(false); if (d) setStartTime(dateToTimeStr(d)); }}
+                />
+              )}
+              {Platform.OS === 'android' && showAndroidEnd && (
+                <DateTimePicker
+                  value={endTimeObj}
+                  mode="time"
+                  display="default"
+                  onChange={(_e: DateTimePickerEvent, d?: Date) => { setShowAndroidEnd(false); if (d) setEndTime(dateToTimeStr(d)); }}
+                />
+              )}
+            </Section>
+          </>
+        )}
+
+        {/* Workers */}
+        <Section
+          icon="users"
+          title="Workers"
+          required={!isMove}
+          accessoryLabel={isMove ? undefined : (workerIds.length > 0 ? `${workerIds.length} selected` : 'Select Workers')}
+          onPressAccessory={() => setShowWorkerSheet(true)}
+        >
+          {selectedWorkers.length > 0 && (
+            <View style={styles.workerChips}>
+              {selectedWorkers.map(w => (
+                <View key={w.personId} style={[styles.workerChip, { backgroundColor: colors.backgroundTertiary }]}>
+                  <Avatar firstName={w.person!.firstName} lastName={w.person!.lastName} size={26} uri={w.person!.avatarUrl} />
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>{w.person!.firstName}</Text>
+                  {!isMove && (
+                    <Pressable onPress={() => toggleWorker(w.personId)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Remove ${w.person!.firstName}`}>
+                      <Icon name="x" size={14} color={colors.textTertiary} />
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+          {!isMove && (
+            <Pressable style={[styles.addWorkersPill, { backgroundColor: colors.backgroundTertiary }]} onPress={() => setShowWorkerSheet(true)}>
+              <Icon name="plus" size={14} color={colors.textPrimary} />
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Add Workers</Text>
+            </Pressable>
+          )}
+        </Section>
+
+        {!isMove && (
+          <>
+            {/* Truck */}
+            <Section
+              icon="truck"
+              title="Truck (optional)"
+              accessoryLabel={undefined}
+            >
+              <Pressable style={styles.fieldRow} onPress={() => setShowTruckSheet(true)} accessibilityRole="button">
+                {selectedTruck ? (
+                  <>
+                    <Icon name="truck" size={15} color={colors.textSecondary} />
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', flex: 1 }]}>{selectedTruck.name}</Text>
+                  </>
+                ) : (
+                  <Text style={[typeScale.bodyLarge, { color: colors.textTertiary, flex: 1 }]}>No truck assigned</Text>
+                )}
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              </Pressable>
+              {truckConflicts.length > 0 && (
+                <View style={[styles.conflictBox, { backgroundColor: semantic.warningLight, borderColor: semantic.warning }]}>
+                  <Icon name="alert-triangle" size={14} color={semantic.warning} />
+                  <Text style={[typeScale.caption, { color: colors.textPrimary, flex: 1 }]}>
+                    {truckConflicts[0].message}
+                  </Text>
+                </View>
+              )}
+            </Section>
+          </>
+        )}
+
+        {/* Instructions */}
+        <Section icon="file-text" title="Instructions (optional)">
+          <Input
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Add any notes for the workers..."
+            multiline
+            numberOfLines={3}
+          />
+        </Section>
+
+        <Pressable
+          onPress={handleCreate}
+          style={({ pressed }) => [
+            styles.primaryButton,
+            { backgroundColor: pressed ? colors.primaryDark : colors.primary },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={isMove ? 'Move Worker' : 'Schedule Work'}
+        >
+          <Icon name="calendar" size={18} color={colors.textOnPrimary} />
+          <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary, fontSize: 17 }]}>
+            {isMove ? 'Move Worker' : 'Schedule Work'}
+          </Text>
+        </Pressable>
+      </ScrollView>
+
+      {/* Project picker */}
+      <SheetModal visible={showProjectSheet} onClose={() => setShowProjectSheet(false)} title="Select Project">
+        {activeProjects.map(p => (
+          <Pressable
+            key={p.id}
+            style={[styles.sheetRow, p.id === projectId && { backgroundColor: colors.primarySurface }]}
+            onPress={() => { setProjectId(p.id); setShowProjectSheet(false); }}
+          >
+            <View style={[styles.projectIconWrap, { backgroundColor: colors.backgroundTertiary }]}>
+              <Icon name="home" size={16} color={colors.textSecondary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{p.name}</Text>
+              {p.address && <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{p.address}</Text>}
+            </View>
+            {p.id === projectId && <Icon name="check" size={18} color={colors.primary} />}
+          </Pressable>
+        ))}
+      </SheetModal>
+
+      {/* Truck picker */}
+      <SheetModal visible={showTruckSheet} onClose={() => setShowTruckSheet(false)} title="Select Truck">
+        <Pressable
+          style={[styles.sheetRow, !truckId && { backgroundColor: colors.primarySurface }]}
+          onPress={() => { setTruckId(''); setShowTruckSheet(false); }}
+        >
+          <Text style={[typeScale.bodyLarge, { color: colors.textTertiary, flex: 1 }]}>No truck</Text>
+          {!truckId && <Icon name="check" size={18} color={colors.primary} />}
+        </Pressable>
+        {availableTrucks.map(t => (
+          <Pressable
+            key={t.id}
+            style={[styles.sheetRow, t.id === truckId && { backgroundColor: colors.primarySurface }]}
+            onPress={() => { setTruckId(t.id); setShowTruckSheet(false); }}
+          >
+            <Icon name="truck" size={16} color={colors.textSecondary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{t.name}</Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{t.make} {t.model} · {t.status}</Text>
+            </View>
+            {t.id === truckId && <Icon name="check" size={18} color={colors.primary} />}
+          </Pressable>
+        ))}
+      </SheetModal>
+
+      {/* Worker picker (multi-select) */}
+      <SheetModal
+        visible={showWorkerSheet}
+        onClose={() => setShowWorkerSheet(false)}
+        title="Select Workers"
+        headerRight={
+          <Pressable onPress={() => setShowWorkerSheet(false)} accessibilityRole="button" accessibilityLabel="Done">
+            <Text style={[typeScale.bodyLarge, { color: colors.primary, fontWeight: '700' }]}>Done</Text>
+          </Pressable>
+        }
+      >
+        {activeWorkers.map(w => {
+          const p = w.person!;
+          const selected = workerIds.includes(w.personId);
+          const conflicts = schedule.detectConflicts({
+            personId: w.personId,
+            scheduledDate: date,
+            startTime: isFullDay ? undefined : startTime,
+            endTime: isFullDay ? undefined : endTime,
+            isFullDay,
+          }).filter(c => c.type === 'time_overlap');
+          const conflict = conflicts[0];
+          const showAsUnavailable = !!conflict && !selected;
+
+          return (
+            <Pressable
+              key={w.personId}
+              style={[styles.workerPickerRow, showAsUnavailable && { opacity: 0.55 }]}
+              onPress={() => toggleWorker(w.personId)}
+              accessibilityRole="button"
+              accessibilityLabel={`${p.firstName} ${p.lastName}${conflict ? ', unavailable' : ''}`}
+            >
+              <Avatar firstName={p.firstName} lastName={p.lastName} size={36} uri={p.avatarUrl} />
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
+                  {p.firstName} {p.lastName}
+                </Text>
+                {conflict && (
+                  <>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
+                      Scheduled {formatAssignmentTime(conflict.assignment)} · {conflict.assignment.project?.name}
+                    </Text>
+                    <Text style={[typeScale.caption, { color: semantic.warning, fontWeight: '700' }]}>Unavailable</Text>
+                  </>
+                )}
+              </View>
+              {showAsUnavailable ? (
+                <View style={[styles.overridePill, { borderColor: semantic.warning }]}>
+                  <Text style={[typeScale.caption, { color: semantic.warning, fontWeight: '700' }]}>Select Anyway</Text>
+                </View>
+              ) : (
+                <Icon name={selected ? 'check-circle' : 'circle'} size={24} color={selected ? colors.primary : colors.border} />
+              )}
+            </Pressable>
+          );
+        })}
+      </SheetModal>
+    </View>
+  );
+}
+
+function Section({
+  icon,
+  title,
+  required,
+  accessoryLabel,
+  onPressAccessory,
+  children,
+}: {
+  icon: React.ComponentProps<typeof Icon>['name'];
+  title: string;
+  required?: boolean;
+  accessoryLabel?: string;
+  onPressAccessory?: () => void;
+  children?: React.ReactNode;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.section, { backgroundColor: colors.surface }, shadow.sm]}>
+      <View style={styles.sectionHeaderRow}>
+        <View style={[styles.sectionIconWrap, { backgroundColor: colors.primarySurface }]}>
+          <Icon name={icon} size={15} color={colors.primary} />
+        </View>
+        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700', flex: 1 }]}>
+          {title}{required ? ' *' : ''}
+        </Text>
+        {accessoryLabel && (
+          <Pressable onPress={onPressAccessory} style={styles.sectionAccessory} hitSlop={8}>
+            <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>{accessoryLabel}</Text>
+            <Icon name="chevron-right" size={13} color={colors.primary} />
+          </Pressable>
+        )}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function SheetModal({
+  visible,
+  onClose,
+  title,
+  headerRight,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  headerRight?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const body = (
+    <>
+      <View style={styles.sheetHeaderRow}>
+        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>{title}</Text>
+        {headerRight ?? (
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
+            <Icon name="x" size={22} color={colors.textSecondary} />
+          </Pressable>
+        )}
+      </View>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.lg }}
+        showsVerticalScrollIndicator={false}
+      >
+        {children}
+      </ScrollView>
+    </>
+  );
+
+  if (Platform.OS === 'ios') {
+    return (
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+        <View style={[styles.sheetIosContainer, { backgroundColor: colors.surface }]}>{body}</View>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Pressable style={styles.sheetOverlay} onPress={onClose}>
+        <Pressable style={[styles.sheetCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
+          <View style={[styles.sheetGrabber, { backgroundColor: colors.border }]} />
+          {body}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing['5xl'] },
+  titleRow: { flexDirection: 'row' },
+  closeButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+
+  section: {
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionIconWrap: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  sectionAccessory: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+
+  inlineRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+
+  projectPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: 'transparent',
+  },
+  projectIconWrap: { width: 40, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+
+  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  iosOverlay: { position: 'absolute', top: 0, left: -40, right: -40, bottom: 0, opacity: 0.02 },
+
+  segmentControl: { height: 34 },
+  timeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  timeField: { flex: 1, borderRadius: radius.sm, padding: spacing.md },
+
+  workerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  workerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+  },
+  addWorkersPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+  },
+
+  conflictBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    borderLeftWidth: 2,
+  },
+
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    height: 56,
+    borderRadius: radius.full,
+    marginTop: spacing.xl,
+  },
+
+  sheetIosContainer: { flex: 1, paddingHorizontal: spacing.lg },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheetCard: {
+    maxHeight: '80%',
+    paddingHorizontal: spacing.lg,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    ...shadow.lg,
+  },
+  sheetGrabber: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: spacing.sm },
+  sheetHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
+  },
+  workerPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  overridePill: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+});

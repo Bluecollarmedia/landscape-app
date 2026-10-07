@@ -24,6 +24,10 @@ interface ScreenContainerProps {
   padded?: boolean;
   centered?: boolean;
   keyboardAvoiding?: boolean;
+  /** 'grouped' uses the iOS grouped-list background (light gray) so white
+   * ListSection/Card surfaces read clearly against it — use for
+   * settings/list-style screens. Defaults to the plain screen background. */
+  variant?: 'plain' | 'grouped';
   style?: ViewStyle;
   contentStyle?: ViewStyle;
 }
@@ -34,6 +38,7 @@ export function ScreenContainer({
   padded = true,
   centered = false,
   keyboardAvoiding = false,
+  variant = 'plain',
   style,
   contentStyle,
 }: ScreenContainerProps) {
@@ -42,7 +47,7 @@ export function ScreenContainer({
 
   const outerStyle: ViewStyle = {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: variant === 'grouped' ? colors.groupedBackground : colors.background,
   };
 
   const innerStyle: ViewStyle = {

@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import type {
   WorkSession,
   WorkerHourlyRate,
@@ -361,29 +362,42 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<AppNotification[]>(mockNotifications);
   const [preferences, setPreferences] = useState<NotificationPreference[]>(mockNotificationPreferences);
 
+  // Other screens (e.g. sending an announcement) push directly into the
+  // shared mockNotifications array — re-sync on focus so this list picks
+  // those up instead of only reflecting whatever existed at first mount.
+  useFocusEffect(
+    useCallback(() => {
+      setNotifications([...mockNotifications]);
+    }, []),
+  );
+
   const unreadCount = useMemo(
     () => notifications.filter((n) => n.status === 'unread').length,
     [notifications],
   );
 
   const markRead = useCallback((notificationId: string) => {
-    setNotifications((prev) =>
-      prev.map((n) =>
+    setNotifications((prev) => {
+      const next = prev.map((n) =>
         n.id === notificationId
           ? { ...n, status: 'read' as const, readAt: new Date().toISOString() }
           : n,
-      ),
-    );
+      );
+      mockNotifications.splice(0, mockNotifications.length, ...next);
+      return next;
+    });
   }, []);
 
   const markAllRead = useCallback(() => {
-    setNotifications((prev) =>
-      prev.map((n) =>
+    setNotifications((prev) => {
+      const next = prev.map((n) =>
         n.status === 'unread'
           ? { ...n, status: 'read' as const, readAt: new Date().toISOString() }
           : n,
-      ),
-    );
+      );
+      mockNotifications.splice(0, mockNotifications.length, ...next);
+      return next;
+    });
   }, []);
 
   const getCompanyDefault = useCallback(

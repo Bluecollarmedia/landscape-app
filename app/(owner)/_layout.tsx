@@ -1,146 +1,24 @@
-import { Platform } from 'react-native';
-import { Tabs } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
-import { useTheme } from '@/providers/ThemeProvider';
+import { Stack } from 'expo-router';
 import { ScheduleProvider } from '@/providers/ScheduleProvider';
-import { typeScale } from '@/theme/typography';
-import { sizing } from '@/theme/spacing';
 
-// Native tabs for iOS Liquid Glass — falls back to JS tabs on web/Android-if-needed
-let NativeTabs: any = null;
-try {
-  NativeTabs = require('expo-router/unstable-native-tabs').NativeTabs;
-} catch {}
-
-function OwnerNativeTabs() {
-  const { colors } = useTheme();
-
-  return (
-    <NativeTabs
-      tintColor={colors.primary}
-      minimizeBehavior="automatic"
-      sidebarAdaptable={Platform.OS === 'ios'}
-    >
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'house', selected: 'house.fill' }}
-          src={<NativeTabs.Trigger.VectorIcon family={Feather} name="home" />}
-        />
-        <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="projects">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'folder', selected: 'folder.fill' }}
-          src={<NativeTabs.Trigger.VectorIcon family={Feather} name="folder" />}
-        />
-        <NativeTabs.Trigger.Label>Projects</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="workers">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'person.2', selected: 'person.2.fill' }}
-          src={<NativeTabs.Trigger.VectorIcon family={Feather} name="users" />}
-        />
-        <NativeTabs.Trigger.Label>Workers</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="customers">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'person', selected: 'person.fill' }}
-          src={<NativeTabs.Trigger.VectorIcon family={Feather} name="user" />}
-        />
-        <NativeTabs.Trigger.Label>Customers</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="more">
-        <NativeTabs.Trigger.Icon
-          sf="ellipsis"
-          src={<NativeTabs.Trigger.VectorIcon family={Feather} name="menu" />}
-        />
-        <NativeTabs.Trigger.Label>More</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
-
-function OwnerJSTabs() {
-  const { colors } = useTheme();
-
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textTertiary,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.borderLight,
-          borderTopWidth: 1,
-          height: sizing.tabBarHeight + 20,
-          paddingTop: 6,
-        },
-        tabBarLabelStyle: {
-          ...typeScale.caption,
-          marginTop: 2,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="home" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="projects"
-        options={{
-          title: 'Projects',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="folder" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="workers"
-        options={{
-          title: 'Workers',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="users" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="customers"
-        options={{
-          title: 'Customers',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="user" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: 'More',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="menu" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
-  );
-}
-
+/**
+ * Stack that sits above the (tabs) navigator. Screens declared here with
+ * presentation: 'modal' are reachable from ANY tab (Dashboard quick actions,
+ * a detail screen's own actions, etc.) without switching the selected bottom
+ * tab, because they live outside the tab navigator's own route tree —
+ * dismissing one always returns to whatever tab/screen was underneath.
+ */
 export default function OwnerLayout() {
-  const useNative = NativeTabs != null && Platform.OS !== 'web';
-
   return (
     <ScheduleProvider>
-      {useNative ? <OwnerNativeTabs /> : <OwnerJSTabs />}
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="worker-new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="project-new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="schedule-create" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="search" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="notification-center" options={{ presentation: 'modal' }} />
+      </Stack>
     </ScheduleProvider>
   );
 }

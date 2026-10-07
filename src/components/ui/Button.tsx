@@ -21,6 +21,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from './Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { radius, spacing, sizing } from '@/theme/spacing';
@@ -87,9 +88,8 @@ export function Button({
         textColor = colors.textOnPrimary;
         break;
       case 'secondary':
-        bg = pressed ? colors.primarySurface : 'transparent';
+        bg = pressed ? colors.border : colors.primarySurface;
         textColor = colors.primary;
-        borderColor = colors.primary;
         break;
       case 'ghost':
         bg = pressed ? colors.primarySurface : 'transparent';
@@ -136,11 +136,11 @@ export function Button({
             ) : (
               <>
                 {icon && iconPosition === 'left' && (
-                  <Feather name={icon} size={sizeConfig.iconSize} color={styles.textColor} />
+                  <Icon name={icon} size={sizeConfig.iconSize} color={styles.textColor} />
                 )}
                 <Text style={styles.text}>{title}</Text>
                 {icon && iconPosition === 'right' && (
-                  <Feather name={icon} size={sizeConfig.iconSize} color={styles.textColor} />
+                  <Icon name={icon} size={sizeConfig.iconSize} color={styles.textColor} />
                 )}
               </>
             )}

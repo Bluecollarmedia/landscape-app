@@ -7,13 +7,14 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { ScreenContainer } from '@/components/layout';
 import { Button, Input } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
-import { spacing } from '@/theme/spacing';
+import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -58,7 +59,7 @@ export default function LoginScreen() {
     >
       {/* Back to welcome */}
       <Pressable onPress={() => router.back()} style={styles.backRow}>
-        <Feather name="arrow-left" size={20} color={colors.textSecondary} />
+        <Icon name="arrow-left" size={20} color={colors.textSecondary} />
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>Back</Text>
       </Pressable>
 
@@ -85,7 +86,8 @@ export default function LoginScreen() {
       <View style={styles.form}>
         {error ? (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
-            <Text style={[typeScale.bodySmall, { color: semantic.error }]}>{error}</Text>
+            <Icon name="alert-circle" size={16} color={semantic.error} />
+            <Text style={[typeScale.bodySmall, { color: semantic.error, flex: 1, marginLeft: spacing.sm }]}>{error}</Text>
           </View>
         ) : null}
 
@@ -161,8 +163,10 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: spacing.md,
-    borderRadius: 8,
+    borderRadius: radius.sm,
   },
   footer: {
     alignItems: 'center',

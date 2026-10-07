@@ -3,6 +3,7 @@ import { View, Text, Image, StyleSheet, Dimensions, Pressable } from 'react-nati
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -41,17 +42,17 @@ export default function WelcomeScreen() {
             style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
             onPress={() => router.push('/(auth)/login')}
           >
-            <Feather name="log-in" size={20} color="#FFFFFF" />
+            <Icon name="log-in" size={20} color="#FFFFFF" />
             <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>
               Sign In
             </Text>
           </Pressable>
 
           <Pressable
-            style={[styles.secondaryBtn, { backgroundColor: brand.primarySurface, borderColor: colors.primary }]}
+            style={[styles.secondaryBtn, { backgroundColor: brand.primarySurface }]}
             onPress={() => router.push('/(auth)/create-company')}
           >
-            <Feather name="briefcase" size={20} color={colors.primary} />
+            <Icon name="briefcase" size={20} color={colors.primary} />
             <View style={styles.btnTextGroup}>
               <Text style={[typeScale.labelLarge, { color: colors.primary }]}>
                 Create a Company
@@ -63,10 +64,10 @@ export default function WelcomeScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
             onPress={() => router.push('/(auth)/join-team')}
           >
-            <Feather name="users" size={20} color={brand.accent} />
+            <Icon name="users" size={20} color={brand.accent} />
             <View style={styles.btnTextGroup}>
               <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>
                 Join a Team
@@ -86,10 +87,10 @@ export default function WelcomeScreen() {
           </View>
 
           <Pressable
-            style={[styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
             onPress={() => router.push('/(auth)/customer-access' as any)}
           >
-            <Feather name="eye" size={20} color={brand.accent} />
+            <Icon name="eye" size={20} color={brand.accent} />
             <View style={styles.btnTextGroup}>
               <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>
                 Customer Project Access
@@ -145,7 +146,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.sm,
-    borderWidth: 1,
     gap: spacing.md,
   },
   btnTextGroup: {

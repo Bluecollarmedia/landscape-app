@@ -11,3 +11,6 @@ export { FilterChips } from './FilterChips';
 export { SectionTabs } from './SectionTabs';
 export { Avatar } from './Avatar';
 export { OptimizedImage } from './OptimizedImage';
+export { ListSection, ListRow } from './List';
+export { InlineNotice } from './InlineNotice';
+export { Icon } from './Icon';

@@ -2,11 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius } from '@/theme/spacing';
+import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -28,9 +29,9 @@ export default function DeclinedScreen() {
           />
         </View>
 
-        <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+        <View style={[styles.statusCard, { backgroundColor: colors.surface }, shadow.sm]}>
           <View style={[styles.iconCircle, { backgroundColor: semantic.errorLight }]}>
-            <Feather name="x-circle" size={32} color={semantic.error} />
+            <Icon name="x-circle" size={32} color={semantic.error} />
           </View>
 
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.lg }]}>
@@ -66,8 +67,7 @@ const styles = StyleSheet.create({
   },
   statusCard: {
     padding: spacing.xl,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
   iconCircle: {

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensi
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { Input, Button } from '@/components/ui';
@@ -111,7 +112,7 @@ export default function CreateCompanyScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={handleBack} hitSlop={12}>
-          <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
           Create a Company
@@ -140,7 +141,8 @@ export default function CreateCompanyScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {error ? (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
-            <Text style={[typeScale.bodySmall, { color: semantic.error }]}>{error}</Text>
+            <Icon name="alert-circle" size={16} color={semantic.error} />
+            <Text style={[typeScale.bodySmall, { color: semantic.error, flex: 1, marginLeft: spacing.sm }]}>{error}</Text>
           </View>
         ) : null}
 
@@ -198,7 +200,7 @@ export default function CreateCompanyScreen() {
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{email}</Text>
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{phone}</Text>
                 <View style={[styles.roleBadge, { backgroundColor: colors.primarySurface }]}>
-                  <Feather name="shield" size={12} color={colors.primary} />
+                  <Icon name="shield" size={12} color={colors.primary} />
                   <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '600', marginLeft: 4 }]}>
                     Company Owner
                   </Text>
@@ -207,7 +209,7 @@ export default function CreateCompanyScreen() {
             </View>
 
             <View style={[styles.infoBox, { backgroundColor: colors.primarySurface, borderColor: colors.primary }]}>
-              <Feather name="info" size={16} color={colors.primary} />
+              <Icon name="info" size={16} color={colors.primary} />
               <Text style={[typeScale.caption, { color: colors.textSecondary, flex: 1, marginLeft: spacing.sm }]}>
                 As the company owner, you'll have full control over your team, projects, and settings. You can invite workers and customers after setup.
               </Text>
@@ -246,8 +248,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing['5xl'],
   },
   errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.sm,
     marginBottom: spacing.lg,
   },
   form: {

@@ -3,12 +3,14 @@ import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Alert } from 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { SectionTabs, ProgressBar, Card, EmptyState, StatusBadge, Button, OptimizedImage } from '@/components/ui';
 import { useProject } from '@/hooks/useProject';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius } from '@/theme/spacing';
+import { spacing, radius, shadow } from '@/theme/spacing';
+import { semantic, brand } from '@/theme/colors';
 import type { ProjectStatus, CustomerTimelineType, RequestCategory } from '@/types/project';
 
 const SECTIONS = [
@@ -35,12 +37,12 @@ const timelineIcons: Record<CustomerTimelineType, keyof typeof Feather.glyphMap>
 };
 
 const timelineColors: Record<CustomerTimelineType, string> = {
-  update_shared: '#1976D2',
-  photo_shared: '#7CB342',
-  progress_updated: '#F9A825',
-  project_started: '#43A047',
-  project_completed: '#43A047',
-  request_responded: '#1976D2',
+  update_shared: semantic.info,
+  photo_shared: brand.primary,
+  progress_updated: semantic.warning,
+  project_started: semantic.success,
+  project_completed: semantic.success,
+  request_responded: semantic.info,
 };
 
 const categoryOptions: { key: RequestCategory; label: string; icon: keyof typeof Feather.glyphMap }[] = [
@@ -114,11 +116,11 @@ export default function CustomerProjectScreen() {
     return (
       <View style={styles.sectionContent}>
         {isCompleted && (
-          <View style={[styles.completedBanner, { backgroundColor: '#43A047' + '15', borderColor: '#43A047' + '40' }]}>
-            <Feather name="check-circle" size={18} color="#43A047" />
+          <View style={[styles.completedBanner, { backgroundColor: semantic.successLight }]}>
+            <Icon name="check-circle" size={18} color={semantic.success} />
             <View style={{ flex: 1, marginLeft: spacing.sm }}>
-              <Text style={[typeScale.bodySmall, { color: '#2E7D32', fontWeight: '600' }]}>Project Complete</Text>
-              <Text style={[typeScale.caption, { color: '#4CAF50', marginTop: 2 }]}>
+              <Text style={[typeScale.bodySmall, { color: semantic.success, fontWeight: '600' }]}>Project Complete</Text>
+              <Text style={[typeScale.caption, { color: semantic.success, marginTop: 2 }]}>
                 This project has been completed. You can view photos, timeline, and updates.
               </Text>
             </View>
@@ -138,7 +140,7 @@ export default function CustomerProjectScreen() {
         <Card title="Project Details" style={{ marginTop: spacing.lg }}>
           {project.address && (
             <View style={styles.detailRow}>
-              <Feather name="map-pin" size={16} color={colors.textTertiary} />
+              <Icon name="map-pin" size={16} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
                 {project.address}{project.city ? `, ${project.city}` : ''}{project.state ? ` ${project.state}` : ''} {project.zip ?? ''}
               </Text>
@@ -146,7 +148,7 @@ export default function CustomerProjectScreen() {
           )}
           {project.startDate && (
             <View style={styles.detailRow}>
-              <Feather name="calendar" size={16} color={colors.textTertiary} />
+              <Icon name="calendar" size={16} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
                 Started {formatDate(project.startDate)}
               </Text>
@@ -154,7 +156,7 @@ export default function CustomerProjectScreen() {
           )}
           {project.estimatedEndDate && (
             <View style={styles.detailRow}>
-              <Feather name="clock" size={16} color={colors.textTertiary} />
+              <Icon name="clock" size={16} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
                 Est. completion: {formatDate(project.estimatedEndDate)}
               </Text>
@@ -162,7 +164,7 @@ export default function CustomerProjectScreen() {
           )}
           {project.completedAt && (
             <View style={styles.detailRow}>
-              <Feather name="check-circle" size={16} color="#43A047" />
+              <Icon name="check-circle" size={16} color={semantic.success} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
                 Completed {formatDate(project.completedAt)}
               </Text>
@@ -185,18 +187,18 @@ export default function CustomerProjectScreen() {
         )}
 
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-            <Feather name="camera" size={18} color={colors.primary} />
+          <View style={[styles.statCard, { backgroundColor: colors.surface }, shadow.sm]}>
+            <Icon name="camera" size={18} color={colors.primary} />
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{sharedPhotos.length}</Text>
             <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Photos</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-            <Feather name="send" size={18} color={colors.primary} />
+          <View style={[styles.statCard, { backgroundColor: colors.surface }, shadow.sm]}>
+            <Icon name="send" size={18} color={colors.primary} />
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{visibleUpdates.length}</Text>
             <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Updates</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-            <Feather name="activity" size={18} color={colors.primary} />
+          <View style={[styles.statCard, { backgroundColor: colors.surface }, shadow.sm]}>
+            <Icon name="activity" size={18} color={colors.primary} />
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{customerTimeline.length}</Text>
             <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Events</Text>
           </View>
@@ -216,7 +218,7 @@ export default function CustomerProjectScreen() {
               <View key={event.id} style={styles.timelineItem}>
                 <View style={styles.timelineIconCol}>
                   <View style={[styles.timelineIcon, { backgroundColor: (timelineColors[event.eventType] ?? colors.primary) + '20' }]}>
-                    <Feather
+                    <Icon
                       name={timelineIcons[event.eventType] ?? 'activity'}
                       size={14}
                       color={timelineColors[event.eventType] ?? colors.primary}
@@ -270,7 +272,7 @@ export default function CustomerProjectScreen() {
                   </Text>
                   {photo.taskTitle && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs }}>
-                      <Feather name="check-square" size={12} color={colors.textTertiary} />
+                      <Icon name="check-square" size={12} color={colors.textTertiary} />
                       <Text style={[typeScale.caption, { color: colors.textTertiary, marginLeft: 4 }]}>
                         {photo.taskTitle}
                       </Text>
@@ -334,7 +336,7 @@ export default function CustomerProjectScreen() {
                       },
                     ]}
                   >
-                    <Feather name={cat.icon} size={14} color={selected ? colors.primary : colors.textTertiary} />
+                    <Icon name={cat.icon} size={14} color={selected ? colors.primary : colors.textTertiary} />
                     <Text style={[typeScale.caption, { color: selected ? colors.primary : colors.textSecondary, fontWeight: selected ? '600' : '400' }]}>
                       {cat.label}
                     </Text>
@@ -424,8 +426,8 @@ export default function CustomerProjectScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerTop}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+            <Icon name="arrow-left" size={24} color={colors.textPrimary} />
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -485,7 +487,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     borderRadius: radius.md,
-    borderWidth: 1,
     gap: spacing.xs,
   },
 
@@ -562,7 +563,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    fontSize: 14,
+    fontSize: typeScale.bodySmall.fontSize,
   },
   formTextarea: {
     minHeight: 80,
@@ -578,7 +579,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     padding: spacing.md,
     borderRadius: radius.md,
-    borderWidth: 1,
     marginBottom: spacing.lg,
   },
 });

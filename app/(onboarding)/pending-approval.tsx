@@ -2,11 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius } from '@/theme/spacing';
+import { spacing, radius, shadow } from '@/theme/spacing';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
@@ -27,9 +28,9 @@ export default function PendingApprovalScreen() {
           />
         </View>
 
-        <View style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+        <View style={[styles.statusCard, { backgroundColor: colors.surface }, shadow.sm]}>
           <View style={[styles.iconCircle, { backgroundColor: colors.primarySurface }]}>
-            <Feather name="clock" size={32} color={colors.primary} />
+            <Icon name="clock" size={32} color={colors.primary} />
           </View>
 
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.lg }]}>
@@ -46,14 +47,14 @@ export default function PendingApprovalScreen() {
           <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
 
           <View style={styles.infoRow}>
-            <Feather name="bell" size={16} color={colors.textTertiary} />
+            <Icon name="bell" size={16} color={colors.textTertiary} />
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1, marginLeft: spacing.sm }]}>
               We'll notify you when your account has been approved.
             </Text>
           </View>
 
           <View style={styles.infoRow}>
-            <Feather name="shield" size={16} color={colors.textTertiary} />
+            <Icon name="shield" size={16} color={colors.textTertiary} />
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1, marginLeft: spacing.sm }]}>
               Your information is secure and only visible to the company administrator.
             </Text>
@@ -61,7 +62,7 @@ export default function PendingApprovalScreen() {
         </View>
 
         {user && (
-          <View style={[styles.profileSummary, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+          <View style={[styles.profileSummary, { backgroundColor: colors.surface }, shadow.sm]}>
             <Text style={[typeScale.overline, { color: colors.textTertiary }]}>YOUR REQUEST</Text>
             <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '500', marginTop: spacing.xs }]}>
               {user.firstName} {user.lastName}
@@ -94,8 +95,7 @@ const styles = StyleSheet.create({
   },
   statusCard: {
     padding: spacing.xl,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    borderRadius: radius.md,
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
@@ -118,8 +118,7 @@ const styles = StyleSheet.create({
   },
   profileSummary: {
     padding: spacing.lg,
-    borderRadius: radius.xs,
-    borderWidth: 1,
+    borderRadius: radius.sm,
   },
   footer: {
     paddingHorizontal: spacing.xl,

@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { ScreenContainer } from '@/components/layout';
@@ -64,7 +65,7 @@ export default function CustomerHomeScreen() {
                   >
                     <Card style={styles.projectCard}>
                       <View style={styles.projectHeader}>
-                        <Text style={[typeScale.headingMedium, { color: colors.textPrimary, flex: 1 }]}>
+                        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>
                           {project.name}
                         </Text>
                         <StatusBadge label={config.label} status={config.type} />
@@ -72,7 +73,7 @@ export default function CustomerHomeScreen() {
 
                       {project.address && (
                         <View style={styles.detailRow}>
-                          <Feather name="map-pin" size={14} color={colors.textTertiary} />
+                          <Icon name="map-pin" size={14} color={colors.textTertiary} />
                           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
                             {project.address}{project.city ? `, ${project.city}` : ''}
                           </Text>
@@ -89,7 +90,7 @@ export default function CustomerHomeScreen() {
 
                       {project.estimatedEndDate && (
                         <View style={styles.detailRow}>
-                          <Feather name="calendar" size={14} color={colors.textTertiary} />
+                          <Icon name="calendar" size={14} color={colors.textTertiary} />
                           <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
                             Est. completion: {formatDate(project.estimatedEndDate)}
                           </Text>
@@ -100,7 +101,7 @@ export default function CustomerHomeScreen() {
                         <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>
                           View Project
                         </Text>
-                        <Feather name="chevron-right" size={16} color={colors.primary} />
+                        <Icon name="chevron-right" size={16} color={colors.primary} />
                       </View>
                     </Card>
                   </Pressable>
@@ -133,7 +134,7 @@ export default function CustomerHomeScreen() {
                     )}
                     <View style={[styles.viewMore, { borderTopColor: colors.borderLight }]}>
                       <Text style={[typeScale.bodySmall, { color: colors.primary }]}>View Project</Text>
-                      <Feather name="chevron-right" size={16} color={colors.primary} />
+                      <Icon name="chevron-right" size={16} color={colors.primary} />
                     </View>
                   </Card>
                 </Pressable>

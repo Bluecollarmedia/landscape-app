@@ -1,4 +1,5 @@
 import type { PersonSummary } from './company';
+import type { WeatherActionType } from './operations';
 
 export type AnnouncementAudience = 'all_workers' | 'all_members' | 'selected';
 export type AnnouncementPriority = 'normal' | 'urgent';
@@ -11,6 +12,7 @@ export interface Announcement {
   body: string;
   audience: AnnouncementAudience;
   priority: AnnouncementPriority;
+  weatherAction?: WeatherActionType;
   expiresAt?: string;
   createdAt: string;
   updatedAt: string;

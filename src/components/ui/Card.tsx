@@ -1,8 +1,11 @@
 /**
  * Card — Surface Container
  *
- * Clean elevated surface for grouping related content.
- * Supports optional header, footer, and press interaction.
+ * Plain elevated surface for grouping related content. No border by
+ * default — separation from the screen background comes from a subtle
+ * shadow, not a colored outline. Use `accentColor` for a restrained
+ * left-edge stripe when a card needs to signal priority/status; avoid
+ * full colored borders.
  */
 
 import React from 'react';
@@ -18,17 +21,18 @@ interface CardProps {
   onPress?: () => void;
   style?: ViewStyle;
   noPadding?: boolean;
+  /** Subtle left-edge stripe for priority/status signaling instead of a full border */
+  accentColor?: string;
 }
 
-export function Card({ children, title, subtitle, onPress, style, noPadding }: CardProps) {
+export function Card({ children, title, subtitle, onPress, style, noPadding, accentColor }: CardProps) {
   const { colors } = useTheme();
 
   const cardStyle: ViewStyle = {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
     ...shadow.sm,
+    ...(accentColor ? { borderLeftWidth: 3, borderLeftColor: accentColor } : {}),
     ...(noPadding ? {} : { padding: spacing.lg }),
   };
 

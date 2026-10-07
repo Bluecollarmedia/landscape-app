@@ -21,7 +21,10 @@
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/logo-icon.png"
       },
-      "package": "com.brightonlawn.app"
+      "package": "com.brightonlawn.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/images/logo-icon.png",
@@ -46,7 +49,8 @@
           "image": "./assets/images/logo-full.png",
           "imageWidth": 240
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
@@ -54,9 +58,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "c9628d1e-80c3-4a58-a2bd-f008542a71d2"
+        "projectId": "c096c836-738b-4ef2-b926-2a10bfbe3891"
       }
     },
-    "owner": "abbacohen"
+    "owner": "drakematcher"
   }
 }

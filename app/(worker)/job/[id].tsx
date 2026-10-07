@@ -1,0 +1,363 @@
+import React, { useState } from 'react';
+import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { useTheme } from '@/providers/ThemeProvider';
+import { useAuth } from '@/providers/AuthProvider';
+import { useWorkerContext } from '@/providers/WorkerProvider';
+import { StatusBadge } from '@/components/ui';
+import { PhotoViewer } from '@/components/worker/PhotoViewer';
+import { typeScale } from '@/theme/typography';
+import { spacing, radius, shadow } from '@/theme/spacing';
+import { mockProjectPhotos } from '@/data/mock';
+import type { ProjectPhoto } from '@/types/project';
+
+const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
+
+const HERO_IMAGE_URI =
+  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200&q=80';
+const HERO_HEIGHT = 220;
+
+function formatTime(time?: string) {
+  if (!time) return '';
+  const [h, m] = time.split(':');
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+  return `${display}:${m} ${ampm}`;
+}
+
+function formatClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const iso = (x: Date) => x.toISOString().split('T')[0];
+  if (dateStr === iso(today)) return 'Today';
+  if (dateStr === iso(tomorrow)) return 'Tomorrow';
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+export default function JobDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { colors } = useTheme();
+  const { user } = useAuth();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const {
+    todayAssignments, upcomingAssignments, completedAssignments,
+    checkIns, checkOuts, projectTasks, openMapsNavigation,
+  } = useWorkerContext();
+  const [viewer, setViewer] = useState<ProjectPhoto[] | null>(null);
+  const [viewerIndex, setViewerIndex] = useState(0);
+
+  const assignment = [...todayAssignments, ...upcomingAssignments, ...completedAssignments]
+    .find(a => a.id === id);
+
+  if (!assignment) {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <Header onBack={() => router.replace('/(worker)/jobs' as any)} colors={colors} insets={insets} />
+        <View style={styles.center}>
+          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Job not found</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const isPast = assignment.status === 'completed' || assignment.scheduledDate < new Date().toISOString().split('T')[0];
+
+  // Only this worker's own photos, scoped to this exact task — never another
+  // worker's upload, another task, or another project's photo library.
+  function getTaskPhotos(taskId: string): ProjectPhoto[] {
+    const projectPhotos = mockProjectPhotos[assignment!.projectId] ?? [];
+    return projectPhotos.filter(p => p.taskId === taskId && p.uploadedBy === user?.id);
+  }
+
+  function openViewer(photos: ProjectPhoto[]) {
+    setViewer(photos);
+    setViewerIndex(0);
+  }
+  const lastCheckIn = [...checkIns].reverse().find(c => c.assignmentId === assignment.id);
+  const lastCheckOut = [...checkOuts].reverse().find(c => c.assignmentId === assignment.id);
+  const tasks = projectTasks(assignment.projectId);
+
+  function handleOpenMaps() {
+    if (assignment!.project?.address) openMapsNavigation(assignment!.project.address);
+  }
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
+        <View style={styles.hero}>
+          <Image source={{ uri: HERO_IMAGE_URI }} style={styles.heroImage} resizeMode="cover" />
+          <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.sm }]}>
+            <Pressable onPress={() => router.replace('/(worker)/jobs' as any)} hitSlop={12}>
+              {HAS_LIQUID_GLASS ? (
+                <GlassView glassEffectStyle="regular" isInteractive style={styles.backChip}>
+                  <Feather name="chevron-left" size={20} color="#FFFFFF" />
+                  <Text style={[typeScale.bodyLarge, { color: '#FFFFFF', marginLeft: 2 }]}>My Jobs</Text>
+                </GlassView>
+              ) : (
+                <View style={[styles.backChip, styles.backChipFallback]}>
+                  <Feather name="chevron-left" size={20} color="#FFFFFF" />
+                  <Text style={[typeScale.bodyLarge, { color: '#FFFFFF', marginLeft: 2 }]}>My Jobs</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.content}>
+          <View style={[styles.card, { backgroundColor: colors.surface, marginTop: -28 }, shadow.md]}>
+            <View style={styles.titleRow}>
+              <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]}>
+                {assignment.project?.name ?? 'Unknown Project'}
+              </Text>
+              <StatusBadge label={isPast ? 'Past' : 'Upcoming'} status={isPast ? 'neutral' : 'success'} />
+            </View>
+
+            <View style={[styles.metaRow, { marginTop: spacing.md }]}>
+              <Feather name="calendar" size={14} color={colors.textTertiary} />
+              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
+                {formatDateLabel(assignment.scheduledDate)}
+              </Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Feather name="clock" size={14} color={colors.textTertiary} />
+              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
+                {assignment.isFullDay ? 'Full day' : `${formatTime(assignment.startTime)} – ${formatTime(assignment.endTime)}`}
+              </Text>
+            </View>
+            {assignment.project?.address && (
+              <View style={styles.metaRow}>
+                <Feather name="map-pin" size={14} color={colors.textTertiary} />
+                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm, flex: 1 }]}>
+                  {assignment.project.address}
+                </Text>
+                <Pressable
+                  onPress={handleOpenMaps}
+                  style={[styles.navDot, { backgroundColor: colors.primarySurface }]}
+                  hitSlop={8}
+                >
+                  <Feather name="navigation" size={14} color={colors.primary} />
+                </Pressable>
+              </View>
+            )}
+            {assignment.truck && (
+              <View style={styles.metaRow}>
+                <Feather name="truck" size={14} color={colors.textTertiary} />
+                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
+                  {assignment.truck.name}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {assignment.project?.address && (
+            <Pressable
+              style={[styles.card, styles.mapsRow, { backgroundColor: colors.primarySurface }]}
+              onPress={handleOpenMaps}
+            >
+              <Feather name="map" size={18} color={colors.primaryDark} />
+              <Text style={[typeScale.bodyLarge, { color: colors.primaryDark, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
+                Open in Maps
+              </Text>
+              <Feather name="chevron-right" size={18} color={colors.primaryDark} />
+            </Pressable>
+          )}
+
+          {isPast && (lastCheckIn || lastCheckOut) && (
+            <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
+              <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>SUMMARY</Text>
+              {lastCheckIn && (
+                <View style={[styles.summaryRow, { marginTop: spacing.sm }]}>
+                  <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>Checked In</Text>
+                  <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, fontWeight: '600' }]}>
+                    {formatClock(lastCheckIn.timestamp)}
+                  </Text>
+                </View>
+              )}
+              {lastCheckOut && (
+                <View style={styles.summaryRow}>
+                  <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>Checked Out</Text>
+                  <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, fontWeight: '600' }]}>
+                    {formatClock(lastCheckOut.timestamp)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {assignment.notes && (
+            <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
+              <View style={styles.labelRow}>
+                <Feather name="file-text" size={14} color={colors.primary} />
+                <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
+                  JOB NOTES
+                </Text>
+              </View>
+              <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, marginTop: spacing.xs }]}>
+                {assignment.notes}
+              </Text>
+            </View>
+          )}
+
+          {tasks.length > 0 && (
+            <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
+              <View style={styles.tasksHeader}>
+                <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Assigned Tasks</Text>
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                  {tasks.filter(t => t.status === 'completed').length} of {tasks.length} completed
+                </Text>
+              </View>
+              {tasks.map((task, i) => {
+                const taskPhotos = isPast && task.status === 'completed' ? getTaskPhotos(task.id) : [];
+                return (
+                  <View
+                    key={task.id}
+                    style={[styles.taskRow, i > 0 && { borderTopColor: colors.borderLight, borderTopWidth: StyleSheet.hairlineWidth }]}
+                  >
+                    {task.status === 'completed' ? (
+                      <Feather name="check-circle" size={18} color={colors.success} />
+                    ) : (
+                      <Feather name="circle" size={18} color={colors.border} />
+                    )}
+                    <Text
+                      style={[
+                        typeScale.bodyMedium,
+                        { color: task.status === 'completed' ? colors.textSecondary : colors.textPrimary, marginLeft: spacing.sm, flex: 1 },
+                      ]}
+                    >
+                      {task.title}
+                    </Text>
+                    {taskPhotos.length > 0 && (
+                      <Pressable onPress={() => openViewer(taskPhotos)} hitSlop={8} style={styles.viewPhotoRow}>
+                        <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>
+                          {taskPhotos.length === 1 ? 'View Photo' : `View Photos (${taskPhotos.length})`}
+                        </Text>
+                        <Feather name="chevron-right" size={14} color={colors.primary} />
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {assignment.project?.address && (
+            <Pressable onPress={handleOpenMaps}>
+              <LinearGradient
+                colors={[colors.primary, colors.primaryDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.pillButton}
+              >
+                <Feather name="navigation" size={18} color="#FFFFFF" />
+                <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>
+                  Get Directions
+                </Text>
+              </LinearGradient>
+            </Pressable>
+          )}
+        </View>
+      </ScrollView>
+
+      <Modal
+        visible={!!viewer}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewer(null)}
+      >
+        <PhotoViewer
+          photos={viewer ?? []}
+          index={viewerIndex}
+          onIndexChange={setViewerIndex}
+          onClose={() => setViewer(null)}
+          insets={insets}
+        />
+      </Modal>
+    </View>
+  );
+}
+
+function Header({ onBack, colors, insets }: { onBack: () => void; colors: any; insets: any }) {
+  return (
+    <View style={[styles.plainHeader, { paddingTop: insets.top + spacing.sm }]}>
+      <Pressable onPress={onBack} hitSlop={12} style={styles.backRow}>
+        <Feather name="chevron-left" size={22} color={colors.textPrimary} />
+        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>My Jobs</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  plainHeader: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  hero: { height: HERO_HEIGHT, width: '100%' },
+  heroImage: { width: '100%', height: '100%' },
+  headerOverlay: { position: 'absolute', left: 0, right: 0, paddingHorizontal: spacing.lg },
+  backRow: { flexDirection: 'row', alignItems: 'center' },
+  backChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
+  backChipFallback: {
+    backgroundColor: 'rgba(0,0,0,0.32)',
+  },
+  content: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  card: { borderRadius: radius.xl, padding: spacing.lg },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  navDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapsRow: { flexDirection: 'row', alignItems: 'center' },
+  labelRow: { flexDirection: 'row', alignItems: 'center' },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  tasksHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: spacing.sm,
+  },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  pillButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: radius.full,
+  },
+  viewPhotoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+  },
+});

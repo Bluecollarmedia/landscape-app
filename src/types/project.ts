@@ -89,6 +89,7 @@ export interface ProjectSettings {
   checkinRadiusMeters?: number;
   customerCanRequest: boolean;
   customerCanViewPhotos: boolean;
+  customerCanComment: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -50,8 +50,6 @@ function WorkerNativeTabs() {
         />
         <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="profile" hidden />
     </NativeTabs>
   );
 }
@@ -115,8 +113,39 @@ function WorkerJSTabs() {
         }}
       />
       <Tabs.Screen
-        name="profile"
-        options={{ href: null }}
+        name="task/[id]"
+        options={{
+          href: null,
+          tabBarStyle: { display: 'none' },
+        }}
+      />
+      <Tabs.Screen
+        name="job/[id]"
+        options={{
+          href: null,
+          tabBarStyle: { display: 'none' },
+        }}
+      />
+      <Tabs.Screen
+        name="day/[date]"
+        options={{
+          href: null,
+          tabBarStyle: { display: 'none' },
+        }}
+      />
+      <Tabs.Screen
+        name="edit-profile"
+        options={{
+          href: null,
+          tabBarStyle: { display: 'none' },
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+          tabBarStyle: { display: 'none' },
+        }}
       />
     </Tabs>
   );

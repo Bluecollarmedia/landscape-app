@@ -1,10 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import type { CompanyMember, PersonSummary } from '@/types/company';
+import type { Project } from '@/types/project';
 import { mockMembers, mockProjects } from '@/data/mock';
 
 export interface CustomerWithProjects {
   member: CompanyMember;
   person: PersonSummary;
+  projects: Project[];
   activeProjectCount: number;
   totalProjectCount: number;
 }
@@ -26,6 +28,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
         return {
           member: m,
           person,
+          projects: customerProjects,
           activeProjectCount: customerProjects.filter((p) => p.status === 'active').length,
           totalProjectCount: customerProjects.length,
         };
@@ -40,7 +43,8 @@ export function useCustomers(options: UseCustomersOptions = {}) {
         c.person.firstName.toLowerCase().includes(q) ||
         c.person.lastName.toLowerCase().includes(q) ||
         c.person.email.toLowerCase().includes(q) ||
-        c.person.phone?.includes(q),
+        c.person.phone?.includes(q) ||
+        c.projects.some((p) => p.name.toLowerCase().includes(q)),
     );
   }, [customers, search]);
 

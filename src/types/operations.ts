@@ -81,7 +81,8 @@ export type NotificationEventType =
   | 'photo_waiting_review'
   | 'customer_request_submitted'
   | 'schedule_changed'
-  | 'schedule_conflict';
+  | 'schedule_conflict'
+  | 'announcement_posted';
 
 export interface NotificationPreference {
   id: string;
@@ -103,7 +104,7 @@ export interface AppNotification {
   title: string;
   body: string;
   status: NotificationStatus;
-  linkedEntityType?: 'worker' | 'project' | 'assignment' | 'request' | 'photo' | 'checkin';
+  linkedEntityType?: 'worker' | 'project' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement';
   linkedEntityId?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;

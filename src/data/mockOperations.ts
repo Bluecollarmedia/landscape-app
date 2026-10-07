@@ -230,18 +230,18 @@ export const mockWorkSessions: WorkSession[] = [
 // ── Expanded Check-Ins ─────────────────────────────────────────
 
 export const mockExpandedCheckIns: CheckIn[] = [
-  // Today: worker1 checked in, worker3 checked in (late)
+  // Today: worker1 and worker3 both checked in on time (within the late-checkin grace window)
   {
     id: 'ci10', assignmentId: 'a1', personId: 'worker1', projectId: 'proj1', companyId: 'company1',
-    timestamp: today + 'T07:07:00Z',
+    timestamp: today + 'T07:03:00Z',
     gps: { latitude: 41.4756, longitude: -81.5558, accuracy: 12, distanceFromSite: 35 },
-    withinRadius: true, createdAt: today + 'T07:07:00Z',
+    withinRadius: true, createdAt: today + 'T07:03:00Z',
   },
   {
     id: 'ci11', assignmentId: 'a4', personId: 'worker3', projectId: 'proj2', companyId: 'company1',
-    timestamp: today + 'T07:47:00Z',
+    timestamp: today + 'T07:31:00Z',
     gps: { latitude: 41.4900, longitude: -81.5700, accuracy: 15, distanceFromSite: 42 },
-    withinRadius: true, createdAt: today + 'T07:47:00Z',
+    withinRadius: true, createdAt: today + 'T07:31:00Z',
   },
   // Yesterday
   {

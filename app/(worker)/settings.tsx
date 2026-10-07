@@ -1,13 +1,15 @@
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useWorkerContext } from '@/providers/WorkerProvider';
-import { Card, Button, Avatar } from '@/components/ui';
+import { Avatar, ListSection, ListRow } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius } from '@/theme/spacing';
+import { spacing, radius, shadow } from '@/theme/spacing';
 import { ScreenContainer } from '@/components/layout';
 import type { NavAppPreference } from '@/types/worker';
 
@@ -22,130 +24,205 @@ export default function WorkerSettingsScreen() {
   const { colors } = useTheme();
   const { user, signOut, switchDevRole } = useAuth();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { settings, updateNavApp } = useWorkerContext();
+  const [navSheetOpen, setNavSheetOpen] = useState(false);
+  const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
+
+  const currentNavLabel = NAV_OPTIONS.find(o => o.value === settings.navApp)?.label ?? 'System Default';
 
   return (
-    <ScreenContainer scrollable padded>
+    <ScreenContainer scrollable padded variant="grouped">
       <View style={{ paddingTop: insets.top + spacing.md, marginBottom: spacing.xl }}>
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Settings</Text>
+        <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>
+          Manage your account and preferences
+        </Text>
       </View>
 
-      <Card title="Profile" style={styles.section}>
+      <Pressable
+        style={[styles.profileCard, { backgroundColor: colors.surface }, shadow.sm]}
+        onPress={() => router.push('/(worker)/edit-profile' as any)}
+      >
         <View style={styles.profileRow}>
-          <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={56} uri={user?.avatarUrl} />
-          <View style={{ marginLeft: spacing.md }}>
+          <View style={styles.avatarWrap}>
+            <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={56} uri={user?.avatarUrl} />
+            <View style={[styles.cameraBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
+              <Feather name="camera" size={11} color="#FFFFFF" />
+            </View>
+          </View>
+          <View style={{ marginLeft: spacing.md, flex: 1 }}>
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
               {user?.firstName} {user?.lastName}
             </Text>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-              {user?.email}
-            </Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{user?.email}</Text>
             {user?.phone && (
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                {user.phone}
-              </Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{user.phone}</Text>
             )}
           </View>
+          <Feather name="chevron-right" size={18} color={colors.textTertiary} />
         </View>
-      </Card>
+        <Text style={[typeScale.bodyMedium, { color: colors.primary, fontWeight: '600', marginTop: spacing.sm }]}>
+          Edit Profile
+        </Text>
+      </Pressable>
 
-      <Card title="Navigation App" subtitle="Choose which maps app opens for directions" style={styles.section}>
-        {NAV_OPTIONS.map(opt => (
-          <Pressable
-            key={opt.value}
-            style={[
-              styles.navOption,
-              {
-                backgroundColor: settings.navApp === opt.value ? colors.primarySurface : 'transparent',
-                borderColor: settings.navApp === opt.value ? colors.primary : colors.borderLight,
-              },
-            ]}
-            onPress={() => updateNavApp(opt.value)}
-          >
-            <Feather name={opt.icon} size={20} color={settings.navApp === opt.value ? colors.primary : colors.textSecondary} />
-            <Text style={[
-              typeScale.bodyMedium,
-              {
-                color: settings.navApp === opt.value ? colors.primary : colors.textPrimary,
-                marginLeft: spacing.sm, flex: 1,
-              },
-            ]}>
-              {opt.label}
-            </Text>
-            {settings.navApp === opt.value && (
-              <Feather name="check" size={18} color={colors.primary} />
-            )}
-          </Pressable>
-        ))}
-      </Card>
+      <ListSection title="Preferences">
+        <ListRow
+          icon="navigation"
+          title="Navigation App"
+          subtitle="Choose which maps app opens for directions"
+          value={currentNavLabel}
+          showChevron
+          onPress={() => setNavSheetOpen(true)}
+        />
+        <ListRow
+          icon="bell"
+          title="Notifications"
+          subtitle="Manage your notification preferences"
+          showChevron
+          onPress={() => router.push('/(worker)/notifications' as any)}
+        />
+      </ListSection>
 
-      <Card title="App Info" style={styles.section}>
-        <View style={styles.infoRow}>
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Version</Text>
-          <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>1.0.0 (Phase 5)</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Role</Text>
-          <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>{user?.role}</Text>
-        </View>
-      </Card>
+      <ListSection title="App">
+        <ListRow title="Version" value="1.0.0" />
+      </ListSection>
 
-      <Card title="Dev Tools" subtitle="Switch between roles for testing" style={styles.section}>
-        <View style={styles.devRow}>
-          <Button
+      {__DEV__ && (
+        <ListSection title="Dev Tools" footer="Switch between roles for testing — not shown in production builds">
+          <ListRow
+            icon="briefcase"
             title="Owner"
+            selected={user?.role === 'owner'}
             onPress={() => switchDevRole('owner')}
-            variant={user?.role === 'owner' ? 'primary' : 'secondary'}
-            style={{ flex: 1 }}
           />
-          <Button
+          <ListRow
+            icon="tool"
             title="Worker"
+            selected={user?.role === 'worker'}
             onPress={() => switchDevRole('worker')}
-            variant={user?.role === 'worker' ? 'primary' : 'secondary'}
-            style={{ flex: 1 }}
           />
-          <Button
+          <ListRow
+            icon="user"
             title="Customer"
+            selected={user?.role === 'customer'}
             onPress={() => switchDevRole('customer')}
-            variant={user?.role === 'customer' ? 'primary' : 'secondary'}
-            style={{ flex: 1 }}
           />
-        </View>
-      </Card>
+        </ListSection>
+      )}
 
-      <Button
-        title="Sign Out"
-        onPress={signOut}
-        variant="secondary"
-        fullWidth
-        icon="log-out"
-        style={{ marginTop: spacing.md }}
-      />
+      <ListSection>
+        <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={() => setSignOutConfirmOpen(true)} />
+      </ListSection>
+
+      {/* Navigation App selection sheet */}
+      <Modal visible={navSheetOpen} transparent animationType="slide" onRequestClose={() => setNavSheetOpen(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setNavSheetOpen(false)}>
+          <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
+            <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.md }]}>
+              Navigation App
+            </Text>
+            {NAV_OPTIONS.map(opt => (
+              <Pressable
+                key={opt.value}
+                style={styles.sheetRow}
+                onPress={() => { updateNavApp(opt.value); setNavSheetOpen(false); }}
+              >
+                <Feather name={opt.icon} size={18} color={colors.textSecondary} />
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1, marginLeft: spacing.md }]}>
+                  {opt.label}
+                </Text>
+                {settings.navApp === opt.value && <Feather name="check" size={18} color={colors.primary} />}
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Sign out confirmation */}
+      <Modal visible={signOutConfirmOpen} transparent animationType="fade" onRequestClose={() => setSignOutConfirmOpen(false)}>
+        <View style={styles.confirmBackdrop}>
+          <View style={[styles.confirmCard, { backgroundColor: colors.surface }]}>
+            <View style={[styles.confirmIcon, { backgroundColor: colors.errorLight }]}>
+              <Feather name="log-out" size={22} color={colors.error} />
+            </View>
+            <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.lg, textAlign: 'center' }]}>
+              Sign Out?
+            </Text>
+            <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }]}>
+              Are you sure you want to sign out of your account?
+            </Text>
+            <View style={{ marginTop: spacing.xl, gap: spacing.sm, width: '100%' }}>
+              <Pressable onPress={() => { setSignOutConfirmOpen(false); signOut(); }}>
+                <LinearGradient
+                  colors={['#E1615D', '#C4453F']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.confirmButton}
+                >
+                  <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Sign Out</Text>
+                </LinearGradient>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmButton, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={() => setSignOutConfirmOpen(false)}
+              >
+                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { marginBottom: spacing.lg },
-  profileRow: {
+  profileCard: {
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  profileRow: { flexDirection: 'row', alignItems: 'center' },
+  avatarWrap: { position: 'relative' },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.lg,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
+  sheetRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: spacing.md,
   },
-  navOption: {
-    flexDirection: 'row',
+  confirmBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  confirmCard: { width: '100%', maxWidth: 340, borderRadius: radius.xl, padding: spacing.xl, alignItems: 'center' },
+  confirmIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  confirmButton: {
+    height: 48,
+    borderRadius: radius.full,
     alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    marginBottom: spacing.sm,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
-  },
-  devRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+    justifyContent: 'center',
   },
 });

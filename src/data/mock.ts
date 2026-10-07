@@ -12,7 +12,7 @@ import type {
 } from '@/types/project';
 import type { Assignment, ScheduleChange } from '@/types/schedule';
 import type { Truck } from '@/types/truck';
-import type { Announcement } from '@/types/announcement';
+import type { Announcement, AnnouncementRead } from '@/types/announcement';
 import type { WorkerActivity, CheckIn, CheckOut, WorkerSettings } from '@/types/worker';
 
 // ── People ──────────────────────────────────────────────────────
@@ -137,9 +137,9 @@ export const mockMembers: CompanyMember[] = [
 // ── Trucks ──────────────────────────────────────────────────────
 
 export const mockTrucks: Truck[] = [
-  { id: 'truck1', companyId: 'company1', name: 'Truck #1', make: 'Ford', model: 'F-250', year: 2022, licensePlate: 'OH-BLL-101', color: 'White', status: 'assigned', notes: 'Primary crew truck', createdAt: '2024-02-01T10:00:00Z', updatedAt: '2026-09-07T06:00:00Z', assignedTo: 'worker1', assigneeName: 'Marcus Rivera' },
-  { id: 'truck2', companyId: 'company1', name: 'Truck #2', make: 'Chevrolet', model: 'Silverado 1500', year: 2021, licensePlate: 'OH-BLL-102', color: 'Silver', status: 'assigned', createdAt: '2024-02-01T10:00:00Z', updatedAt: '2026-09-07T06:00:00Z', assignedTo: 'worker3', assigneeName: 'Deshawn Williams' },
-  { id: 'truck3', companyId: 'company1', name: 'Truck #3', make: 'Ram', model: '1500', year: 2023, licensePlate: 'OH-BLL-103', color: 'Black', status: 'available', createdAt: '2025-01-15T10:00:00Z', updatedAt: '2026-09-06T08:00:00Z' },
+  { id: 'truck1', companyId: 'company1', name: 'Truck #1', make: 'Ford', model: 'F-250', year: 2022, licensePlate: 'OH-BLL-101', color: 'White', photoUrl: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400&q=80', status: 'assigned', notes: 'Primary crew truck', createdAt: '2024-02-01T10:00:00Z', updatedAt: '2026-09-07T06:00:00Z', assignedTo: 'worker1', assigneeName: 'Marcus Rivera' },
+  { id: 'truck2', companyId: 'company1', name: 'Truck #2', make: 'Chevrolet', model: 'Silverado 1500', year: 2021, licensePlate: 'OH-BLL-102', color: 'Silver', photoUrl: 'https://images.unsplash.com/photo-1601362840469-51e4d8d58785?w=400&q=80', status: 'assigned', createdAt: '2024-02-01T10:00:00Z', updatedAt: '2026-09-07T06:00:00Z', assignedTo: 'worker3', assigneeName: 'Deshawn Williams' },
+  { id: 'truck3', companyId: 'company1', name: 'Truck #3', make: 'Ram', model: '1500', year: 2023, licensePlate: 'OH-BLL-103', color: 'Black', photoUrl: 'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?w=400&q=80', status: 'available', createdAt: '2025-01-15T10:00:00Z', updatedAt: '2026-09-06T08:00:00Z' },
   { id: 'truck4', companyId: 'company1', name: 'Trailer', make: 'Big Tex', model: '70PI-18', year: 2020, licensePlate: 'OH-BLL-T01', status: 'maintenance', notes: 'Axle repair — ETA back 9/10', createdAt: '2024-06-01T10:00:00Z', updatedAt: '2026-09-05T08:00:00Z' },
 ];
 
@@ -270,6 +270,36 @@ export const mockAssignments: Assignment[] = [
     person: mockPeople.worker2,
     project: { id: 'proj3', name: 'Greenwood Estate', address: '2100 Greenwood Ave' },
   },
+
+  // ── Earlier this week (completed) — for Worker Activity history ──
+  {
+    id: 'a13', companyId: 'company1', projectId: 'proj2', personId: 'worker1',
+    scheduledDate: offsetDate(-2), startTime: '08:00', endTime: '14:30',
+    isFullDay: false, sortOrder: 1, status: 'completed', confirmationState: 'confirmed',
+    truckId: 'truck1',
+    createdAt: '2026-09-04T18:00:00Z', updatedAt: '2026-09-16T14:25:00Z',
+    person: mockPeople.worker1,
+    project: { id: 'proj2', name: 'Chen Property', address: '890 Overlook Rd' },
+    truck: { id: 'truck1', name: 'Truck #1' },
+  },
+  {
+    id: 'a14', companyId: 'company1', projectId: 'proj3', personId: 'worker1',
+    scheduledDate: offsetDate(-3), startTime: '07:00', endTime: '11:00',
+    isFullDay: false, sortOrder: 1, status: 'completed', confirmationState: 'confirmed',
+    truckId: 'truck1',
+    createdAt: '2026-09-03T18:00:00Z', updatedAt: '2026-09-15T11:10:00Z',
+    person: mockPeople.worker1,
+    project: { id: 'proj3', name: 'Greenwood Estate', address: '2100 Greenwood Ave' },
+    truck: { id: 'truck1', name: 'Truck #1' },
+  },
+  {
+    id: 'a15', companyId: 'company1', projectId: 'proj1', personId: 'worker1',
+    scheduledDate: offsetDate(-3), startTime: '12:00', endTime: '16:15',
+    isFullDay: false, sortOrder: 2, status: 'completed', confirmationState: 'confirmed',
+    createdAt: '2026-09-03T18:00:00Z', updatedAt: '2026-09-15T16:20:00Z',
+    person: mockPeople.worker1,
+    project: { id: 'proj1', name: 'Beachwood Residence', address: '142 Beachwood Dr' },
+  },
 ];
 
 export const mockScheduleChanges: ScheduleChange[] = [
@@ -329,6 +359,22 @@ export const mockAnnouncements: Announcement[] = [
     createdAt: '2026-09-03T14:00:00Z', updatedAt: '2026-09-03T14:00:00Z',
     author: mockPeople.owner1, readCount: 4, totalRecipients: 4,
   },
+];
+
+// Per-worker read receipts backing each announcement's readCount above.
+// worker1 (Marcus) has not read ann1 yet, so Worker Today has something to surface.
+export const mockAnnouncementReads: AnnouncementRead[] = [
+  { id: 'ar1', announcementId: 'ann1', personId: 'worker2', readAt: '2026-09-06T20:30:00Z' },
+  { id: 'ar2', announcementId: 'ann1', personId: 'worker3', readAt: '2026-09-06T21:00:00Z' },
+  { id: 'ar3', announcementId: 'ann1', personId: 'worker4', readAt: '2026-09-07T06:00:00Z' },
+  { id: 'ar4', announcementId: 'ann2', personId: 'worker1', readAt: '2026-09-05T09:00:00Z' },
+  { id: 'ar5', announcementId: 'ann2', personId: 'worker2', readAt: '2026-09-05T09:10:00Z' },
+  { id: 'ar6', announcementId: 'ann2', personId: 'worker3', readAt: '2026-09-05T09:20:00Z' },
+  { id: 'ar7', announcementId: 'ann2', personId: 'worker4', readAt: '2026-09-05T09:30:00Z' },
+  { id: 'ar8', announcementId: 'ann3', personId: 'worker1', readAt: '2026-09-03T15:00:00Z' },
+  { id: 'ar9', announcementId: 'ann3', personId: 'worker2', readAt: '2026-09-03T15:10:00Z' },
+  { id: 'ar10', announcementId: 'ann3', personId: 'worker3', readAt: '2026-09-03T15:20:00Z' },
+  { id: 'ar11', announcementId: 'ann3', personId: 'worker4', readAt: '2026-09-03T15:30:00Z' },
 ];
 
 // ── Projects ────────────────────────────────────────────────────
@@ -621,25 +667,25 @@ export const mockSettings: Record<string, ProjectSettings> = {
   proj1: {
     id: 'ps1', projectId: 'proj1', customerInteractionEnabled: true,
     completionPhotoRequired: true, checkinRadiusMeters: 150,
-    customerCanRequest: true, customerCanViewPhotos: true,
+    customerCanRequest: true, customerCanViewPhotos: true, customerCanComment: true,
     createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-07-10T10:00:00Z',
   },
   proj2: {
     id: 'ps2', projectId: 'proj2', customerInteractionEnabled: true,
     completionPhotoRequired: false, customerCanRequest: true,
-    customerCanViewPhotos: true,
+    customerCanViewPhotos: true, customerCanComment: true,
     createdAt: '2026-08-01T09:00:00Z', updatedAt: '2026-08-01T09:00:00Z',
   },
   proj3: {
     id: 'ps3', projectId: 'proj3', customerInteractionEnabled: true,
     completionPhotoRequired: true, checkinRadiusMeters: 200,
-    customerCanRequest: true, customerCanViewPhotos: false,
+    customerCanRequest: true, customerCanViewPhotos: false, customerCanComment: true,
     createdAt: '2026-05-20T13:00:00Z', updatedAt: '2026-05-20T13:00:00Z',
   },
   proj6: {
     id: 'ps6', projectId: 'proj6', customerInteractionEnabled: false,
     completionPhotoRequired: false, customerCanRequest: false,
-    customerCanViewPhotos: true,
+    customerCanViewPhotos: true, customerCanComment: false,
     createdAt: '2026-02-15T10:00:00Z', updatedAt: '2026-04-28T15:00:00Z',
   },
 };
@@ -701,6 +747,229 @@ export const mockWorkerActivities: WorkerActivity[] = [
     activityType: 'schedule_confirmed', description: 'Confirmed schedule for today',
     timestamp: offsetDate(-1) + 'T20:30:00Z',
   },
+
+  // ── Tuesday: Chen Property (a13) ──
+  {
+    id: 'wa9', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'checked_in', description: 'Checked in at Chen Property',
+    timestamp: offsetDate(-2) + 'T08:05:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa10', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'task_started', description: 'Started: Remove old sod and shrubs',
+    timestamp: offsetDate(-2) + 'T08:15:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa11', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'task_completed', description: 'Completed: Remove old sod and shrubs',
+    timestamp: offsetDate(-2) + 'T09:30:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa12', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'photo_taken', description: 'Photo: Old sod removed',
+    timestamp: offsetDate(-2) + 'T09:32:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa13', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'task_started', description: 'Started: Trench for irrigation lines',
+    timestamp: offsetDate(-2) + 'T10:00:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa14', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'task_completed', description: 'Completed: Trench for irrigation lines',
+    timestamp: offsetDate(-2) + 'T12:00:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa15', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'photo_taken', description: 'Photo: Irrigation trenches dug',
+    timestamp: offsetDate(-2) + 'T12:05:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa16', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'task_started', description: 'Started: Install irrigation system',
+    timestamp: offsetDate(-2) + 'T12:30:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa17', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'task_completed', description: 'Completed: Install irrigation system',
+    timestamp: offsetDate(-2) + 'T13:45:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa18', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'photo_taken', description: 'Photo: Irrigation system installed',
+    timestamp: offsetDate(-2) + 'T13:50:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa19', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'task_started', description: 'Started: Amend soil and grade',
+    timestamp: offsetDate(-2) + 'T14:00:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa20', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'task_completed', description: 'Completed: Amend soil and grade',
+    timestamp: offsetDate(-2) + 'T14:20:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+  {
+    id: 'wa21', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a13', projectId: 'proj2',
+    activityType: 'checked_out', description: 'Checked out from Chen Property',
+    timestamp: offsetDate(-2) + 'T14:25:00Z',
+    project: { id: 'proj2', name: 'Chen Property' },
+  },
+
+  // ── Monday morning: Greenwood Estate (a14) ──
+  {
+    id: 'wa22', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'checked_in', description: 'Checked in at Greenwood Estate',
+    timestamp: offsetDate(-3) + 'T07:05:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+  {
+    id: 'wa23', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'task_started', description: 'Started: Plant foundation shrubs',
+    timestamp: offsetDate(-3) + 'T07:15:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+  {
+    id: 'wa24', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'task_completed', description: 'Completed: Plant foundation shrubs',
+    timestamp: offsetDate(-3) + 'T08:30:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+  {
+    id: 'wa25', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'photo_taken', description: 'Photo: Shrubs planted',
+    timestamp: offsetDate(-3) + 'T08:32:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+  {
+    id: 'wa26', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'task_started', description: 'Started: Edge beds and mulch',
+    timestamp: offsetDate(-3) + 'T09:00:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+  {
+    id: 'wa27', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'task_completed', description: 'Completed: Edge beds and mulch',
+    timestamp: offsetDate(-3) + 'T10:30:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+  {
+    id: 'wa28', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'photo_taken', description: 'Photo: Beds edged and mulched',
+    timestamp: offsetDate(-3) + 'T10:32:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+  {
+    id: 'wa29', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'task_started', description: 'Started: Final walkthrough',
+    timestamp: offsetDate(-3) + 'T10:45:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+  {
+    id: 'wa30', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'task_completed', description: 'Completed: Final walkthrough',
+    timestamp: offsetDate(-3) + 'T11:05:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+  {
+    id: 'wa31', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a14', projectId: 'proj3',
+    activityType: 'checked_out', description: 'Checked out from Greenwood Estate',
+    timestamp: offsetDate(-3) + 'T11:10:00Z',
+    project: { id: 'proj3', name: 'Greenwood Estate' },
+  },
+
+  // ── Monday afternoon: Beachwood Residence (a15) — second job, same day ──
+  {
+    id: 'wa32', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a15', projectId: 'proj1',
+    activityType: 'checked_in', description: 'Checked in at Beachwood Residence',
+    timestamp: offsetDate(-3) + 'T12:05:00Z',
+    project: { id: 'proj1', name: 'Beachwood Residence' },
+  },
+  {
+    id: 'wa33', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a15', projectId: 'proj1',
+    activityType: 'task_started', description: 'Started: Install landscape lighting',
+    timestamp: offsetDate(-3) + 'T12:15:00Z',
+    project: { id: 'proj1', name: 'Beachwood Residence' },
+  },
+  {
+    id: 'wa34', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a15', projectId: 'proj1',
+    activityType: 'task_completed', description: 'Completed: Install landscape lighting',
+    timestamp: offsetDate(-3) + 'T14:00:00Z',
+    project: { id: 'proj1', name: 'Beachwood Residence' },
+  },
+  {
+    id: 'wa35', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a15', projectId: 'proj1',
+    activityType: 'photo_taken', description: 'Photo: Landscape lighting installed',
+    timestamp: offsetDate(-3) + 'T14:02:00Z',
+    project: { id: 'proj1', name: 'Beachwood Residence' },
+  },
+  {
+    id: 'wa36', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a15', projectId: 'proj1',
+    activityType: 'task_started', description: 'Started: Plant perennial border',
+    timestamp: offsetDate(-3) + 'T14:15:00Z',
+    project: { id: 'proj1', name: 'Beachwood Residence' },
+  },
+  {
+    id: 'wa37', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a15', projectId: 'proj1',
+    activityType: 'task_completed', description: 'Completed: Plant perennial border',
+    timestamp: offsetDate(-3) + 'T16:00:00Z',
+    project: { id: 'proj1', name: 'Beachwood Residence' },
+  },
+  {
+    id: 'wa38', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a15', projectId: 'proj1',
+    activityType: 'photo_taken', description: 'Photo: Perennial border planted',
+    timestamp: offsetDate(-3) + 'T16:02:00Z',
+    project: { id: 'proj1', name: 'Beachwood Residence' },
+  },
+  {
+    id: 'wa39', personId: 'worker1', companyId: 'company1',
+    assignmentId: 'a15', projectId: 'proj1',
+    activityType: 'checked_out', description: 'Checked out from Beachwood Residence',
+    timestamp: offsetDate(-3) + 'T16:20:00Z',
+    project: { id: 'proj1', name: 'Beachwood Residence' },
+  },
 ];
 
 // ── Worker Check-in History ────────────────────────────────────
@@ -712,6 +981,24 @@ export const mockCheckIns: CheckIn[] = [
     gps: { latitude: 41.4756, longitude: -81.5558, accuracy: 12, distanceFromSite: 35 },
     withinRadius: true, createdAt: offsetDate(-1) + 'T07:05:00Z',
   },
+  {
+    id: 'ci2', assignmentId: 'a13', personId: 'worker1', projectId: 'proj2', companyId: 'company1',
+    timestamp: offsetDate(-2) + 'T08:05:00Z',
+    gps: { latitude: 41.4802, longitude: -81.5601, accuracy: 10, distanceFromSite: 18 },
+    withinRadius: true, createdAt: offsetDate(-2) + 'T08:05:00Z',
+  },
+  {
+    id: 'ci3', assignmentId: 'a14', personId: 'worker1', projectId: 'proj3', companyId: 'company1',
+    timestamp: offsetDate(-3) + 'T07:05:00Z',
+    gps: { latitude: 41.4901, longitude: -81.5710, accuracy: 9, distanceFromSite: 22 },
+    withinRadius: true, createdAt: offsetDate(-3) + 'T07:05:00Z',
+  },
+  {
+    id: 'ci4', assignmentId: 'a15', personId: 'worker1', projectId: 'proj1', companyId: 'company1',
+    timestamp: offsetDate(-3) + 'T12:05:00Z',
+    gps: { latitude: 41.4756, longitude: -81.5558, accuracy: 11, distanceFromSite: 28 },
+    withinRadius: true, createdAt: offsetDate(-3) + 'T12:05:00Z',
+  },
 ];
 
 export const mockCheckOuts: CheckOut[] = [
@@ -720,6 +1007,24 @@ export const mockCheckOuts: CheckOut[] = [
     timestamp: offsetDate(-1) + 'T15:02:00Z',
     gps: { latitude: 41.4758, longitude: -81.5556, accuracy: 8, distanceFromSite: 20 },
     createdAt: offsetDate(-1) + 'T15:02:00Z',
+  },
+  {
+    id: 'co2', assignmentId: 'a13', personId: 'worker1', projectId: 'proj2', companyId: 'company1',
+    timestamp: offsetDate(-2) + 'T14:25:00Z',
+    gps: { latitude: 41.4803, longitude: -81.5602, accuracy: 9, distanceFromSite: 15 },
+    createdAt: offsetDate(-2) + 'T14:25:00Z',
+  },
+  {
+    id: 'co3', assignmentId: 'a14', personId: 'worker1', projectId: 'proj3', companyId: 'company1',
+    timestamp: offsetDate(-3) + 'T11:10:00Z',
+    gps: { latitude: 41.4902, longitude: -81.5711, accuracy: 8, distanceFromSite: 19 },
+    createdAt: offsetDate(-3) + 'T11:10:00Z',
+  },
+  {
+    id: 'co4', assignmentId: 'a15', personId: 'worker1', projectId: 'proj1', companyId: 'company1',
+    timestamp: offsetDate(-3) + 'T16:20:00Z',
+    gps: { latitude: 41.4757, longitude: -81.5557, accuracy: 10, distanceFromSite: 24 },
+    createdAt: offsetDate(-3) + 'T16:20:00Z',
   },
 ];
 
@@ -818,6 +1123,22 @@ export const mockProjectPhotos: Record<string, ProjectPhoto[]> = {
       photoType: 'issue', takenAt: '2026-09-05T09:00:00Z', createdAt: '2026-09-05T09:05:00Z',
       uploader: mockPeople.worker2, taskTitle: 'Install landscape lighting',
     },
+    {
+      id: 'ph11', projectId: 'proj1', taskId: 't9', uploadedBy: 'worker1',
+      fileKey: 'proj1/lighting-installed.jpg', fileUrl: 'https://placehold.co/800x600/2e4a3a/ffffff?text=Lighting+Installed',
+      caption: 'Landscape lighting installed',
+      isCustomerVisible: false,
+      photoType: 'after', takenAt: offsetDate(-3) + 'T14:02:00Z', createdAt: offsetDate(-3) + 'T14:02:00Z',
+      uploader: mockPeople.worker1, taskTitle: 'Install landscape lighting',
+    },
+    {
+      id: 'ph12', projectId: 'proj1', taskId: 't10', uploadedBy: 'worker1',
+      fileKey: 'proj1/border-planted.jpg', fileUrl: 'https://placehold.co/800x600/6b8f5a/ffffff?text=Border+Planted',
+      caption: 'Perennial border planted',
+      isCustomerVisible: false,
+      photoType: 'after', takenAt: offsetDate(-3) + 'T16:02:00Z', createdAt: offsetDate(-3) + 'T16:02:00Z',
+      uploader: mockPeople.worker1, taskTitle: 'Plant perennial border',
+    },
   ],
   proj2: [
     {
@@ -837,6 +1158,30 @@ export const mockProjectPhotos: Record<string, ProjectPhoto[]> = {
       photoType: 'progress', takenAt: '2026-08-18T15:00:00Z', createdAt: '2026-08-18T15:05:00Z',
       uploader: mockPeople.worker3, sharer: mockPeople.owner1, taskTitle: 'Trench for irrigation lines',
     },
+    {
+      id: 'ph22', projectId: 'proj2', taskId: 't20', uploadedBy: 'worker1',
+      fileKey: 'proj2/sod-removed-2.jpg', fileUrl: 'https://placehold.co/800x600/8b7d6b/ffffff?text=Old+Sod+Removed',
+      caption: 'Old sod removed',
+      isCustomerVisible: false,
+      photoType: 'after', takenAt: offsetDate(-2) + 'T09:32:00Z', createdAt: offsetDate(-2) + 'T09:32:00Z',
+      uploader: mockPeople.worker1, taskTitle: 'Remove old sod and shrubs',
+    },
+    {
+      id: 'ph23', projectId: 'proj2', taskId: 't21', uploadedBy: 'worker1',
+      fileKey: 'proj2/trench-2.jpg', fileUrl: 'https://placehold.co/800x600/6b5b3e/ffffff?text=Irrigation+Trench',
+      caption: 'Irrigation trenches dug',
+      isCustomerVisible: false,
+      photoType: 'progress', takenAt: offsetDate(-2) + 'T12:05:00Z', createdAt: offsetDate(-2) + 'T12:05:00Z',
+      uploader: mockPeople.worker1, taskTitle: 'Trench for irrigation lines',
+    },
+    {
+      id: 'ph24', projectId: 'proj2', taskId: 't22', uploadedBy: 'worker1',
+      fileKey: 'proj2/irrigation-installed.jpg', fileUrl: 'https://placehold.co/800x600/5a7a6b/ffffff?text=Irrigation+Installed',
+      caption: 'Irrigation system installed',
+      isCustomerVisible: false,
+      photoType: 'after', takenAt: offsetDate(-2) + 'T13:50:00Z', createdAt: offsetDate(-2) + 'T13:50:00Z',
+      uploader: mockPeople.worker1, taskTitle: 'Install irrigation system',
+    },
   ],
   proj3: [
     {
@@ -846,6 +1191,22 @@ export const mockProjectPhotos: Record<string, ProjectPhoto[]> = {
       isCustomerVisible: false,
       photoType: 'progress', takenAt: '2026-08-20T11:00:00Z', createdAt: '2026-08-20T11:05:00Z',
       uploader: mockPeople.worker2,
+    },
+    {
+      id: 'ph31', projectId: 'proj3', uploadedBy: 'worker1',
+      fileKey: 'proj3/shrubs-planted.jpg', fileUrl: 'https://placehold.co/800x600/6b8f5a/ffffff?text=Shrubs+Planted',
+      caption: 'Shrubs planted',
+      isCustomerVisible: false,
+      photoType: 'after', takenAt: offsetDate(-3) + 'T08:32:00Z', createdAt: offsetDate(-3) + 'T08:32:00Z',
+      uploader: mockPeople.worker1, taskTitle: 'Plant foundation shrubs',
+    },
+    {
+      id: 'ph32', projectId: 'proj3', uploadedBy: 'worker1',
+      fileKey: 'proj3/beds-mulched.jpg', fileUrl: 'https://placehold.co/800x600/8b7355/ffffff?text=Beds+Mulched',
+      caption: 'Beds edged and mulched',
+      isCustomerVisible: false,
+      photoType: 'after', takenAt: offsetDate(-3) + 'T10:32:00Z', createdAt: offsetDate(-3) + 'T10:32:00Z',
+      uploader: mockPeople.worker1, taskTitle: 'Edge beds and mulch',
     },
   ],
 };

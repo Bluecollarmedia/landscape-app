@@ -12,14 +12,14 @@
 
 // ── Brand Palette (extracted from Brighton logos) ────────────────
 export const brand = {
-  /** Primary — fresh leaf green from the icon mark */
-  primary: '#7CB342',
+  /** Primary — true grass green (updated per approved reference) */
+  primary: '#4CAF50',
   /** Lighter tint for hover / selected backgrounds */
-  primaryLight: '#9CCC65',
-  /** Darker for pressed states — closer to main logo's medium green */
-  primaryDark: '#689F38',
+  primaryLight: '#81C784',
+  /** Darker for pressed states / gradients */
+  primaryDark: '#2E7D32',
   /** Very light tint for subtle backgrounds */
-  primarySurface: '#F1F8E9',
+  primarySurface: '#E8F5E9',
   /** Deep forest green from the main wordmark — for headings & strong text */
   accent: '#1B3A2D',
   /** Medium green from the main logo lettering */
@@ -62,6 +62,7 @@ export const lightTheme = {
   backgroundTertiary: neutral.gray100,
   surface: neutral.white,
   surfaceElevated: neutral.white,
+  surfacePressed: neutral.gray100,
 
   // Text
   textPrimary: neutral.gray900,
@@ -74,6 +75,10 @@ export const lightTheme = {
   border: neutral.gray200,
   borderLight: neutral.gray100,
   borderFocus: brand.primary,
+  /** Hairline row/list separators — iOS system separator */
+  separator: 'rgba(60, 60, 67, 0.29)',
+  /** Screen background behind grouped list sections — iOS systemGroupedBackground */
+  groupedBackground: '#F2F2F7',
 
   // Interactive
   primary: brand.primary,
@@ -106,6 +111,7 @@ export const darkTheme = {
   backgroundTertiary: '#2C2C2C',
   surface: '#1E1E1E',
   surfaceElevated: '#2C2C2C',
+  surfacePressed: '#2A2A2A',
 
   textPrimary: '#F5F5F5',
   textSecondary: '#BDBDBD',
@@ -116,11 +122,13 @@ export const darkTheme = {
   border: '#333333',
   borderLight: '#2C2C2C',
   borderFocus: brand.primaryLight,
+  separator: 'rgba(84, 84, 88, 0.6)',
+  groupedBackground: '#000000',
 
   primary: brand.primaryLight,
   primaryLight: brand.primary,
   primaryDark: brand.primaryDark,
-  primarySurface: 'rgba(124, 179, 66, 0.12)',
+  primarySurface: 'rgba(76, 175, 80, 0.12)',
 
   // Semantic
   success: semantic.success,

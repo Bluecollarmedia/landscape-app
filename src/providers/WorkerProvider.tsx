@@ -50,11 +50,13 @@ interface WorkerContextValue {
   completeTask: (taskId: string) => void;
   projectSettings: (projectId: string) => ProjectSettings | undefined;
   taskPhotoCaptured: Record<string, boolean>;
-  captureTaskPhoto: (taskId: string) => void;
+  taskPhotoUris: Record<string, string>;
+  captureTaskPhoto: (taskId: string, uri?: string) => void;
 
   activities: WorkerActivity[];
   settings: WorkerSettings;
   updateNavApp: (app: NavAppPreference) => void;
+  updateNotificationsEnabled: (enabled: boolean) => void;
 
   offlineQueue: OfflineAction[];
   isOnline: boolean;
@@ -93,6 +95,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
   );
   const [taskStates, setTaskStates] = useState<Record<string, ProjectTask['status']>>({});
   const [taskPhotos, setTaskPhotos] = useState<Record<string, boolean>>({});
+  const [taskPhotoUris, setTaskPhotoUris] = useState<Record<string, string>>({});
   const [activityList, setActivityList] = useState<WorkerActivity[]>(
     mockWorkerActivities.filter(a => a.personId === workerId),
   );
@@ -305,8 +308,9 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
   const projectSettingsFn = useCallback((projectId: string) =>
     mockSettings[projectId], []);
 
-  const captureTaskPhoto = useCallback((taskId: string) => {
+  const captureTaskPhoto = useCallback((taskId: string, uri?: string) => {
     setTaskPhotos(prev => ({ ...prev, [taskId]: true }));
+    if (uri) setTaskPhotoUris(prev => ({ ...prev, [taskId]: uri }));
     const now = new Date().toISOString();
     setActivityList(prev => [{
       id: `wa-ph-${Date.now()}`, personId: workerId, companyId: 'company1',
@@ -320,6 +324,10 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
 
   const updateNavApp = useCallback((app: NavAppPreference) => {
     setWorkerSettings(prev => ({ ...prev, navApp: app }));
+  }, []);
+
+  const updateNotificationsEnabled = useCallback((enabled: boolean) => {
+    setWorkerSettings(prev => ({ ...prev, notificationsEnabled: enabled }));
   }, []);
 
   const openMapsNavigation = useCallback((address: string) => {
@@ -366,10 +374,12 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     completeTask,
     projectSettings: projectSettingsFn,
     taskPhotoCaptured: taskPhotos,
+    taskPhotoUris,
     captureTaskPhoto,
     activities: activityList,
     settings: workerSettings,
     updateNavApp,
+    updateNotificationsEnabled,
     offlineQueue,
     isOnline,
     openMapsNavigation,
@@ -380,8 +390,8 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     changesAcknowledged, confirmSchedule, acknowledgeChanges,
     checkIn, checkOut, isWithinRadius, checkInList, checkOutList,
     projectTasksFn, startTask, completeTask, projectSettingsFn,
-    taskPhotos, captureTaskPhoto, activityList, workerSettings,
-    updateNavApp, offlineQueue, isOnline, openMapsNavigation, moveToNextJob,
+    taskPhotos, taskPhotoUris, captureTaskPhoto, activityList, workerSettings,
+    updateNavApp, updateNotificationsEnabled, offlineQueue, isOnline, openMapsNavigation, moveToNextJob,
   ]);
 
   return <WorkerContext.Provider value={value}>{children}</WorkerContext.Provider>;

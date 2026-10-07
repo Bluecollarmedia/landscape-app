@@ -13,9 +13,10 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { ScreenContainer } from '@/components/layout';
 import { Button, Input } from '@/components/ui';
+import { Icon } from '@/components/ui/Icon';
 import { semantic } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
-import { spacing } from '@/theme/spacing';
+import { spacing, radius } from '@/theme/spacing';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
@@ -88,7 +89,8 @@ export default function SignUpScreen() {
       <View style={styles.form}>
         {error ? (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
-            <Text style={[typeScale.bodySmall, { color: semantic.error }]}>{error}</Text>
+            <Icon name="alert-circle" size={16} color={semantic.error} />
+            <Text style={[typeScale.bodySmall, { color: semantic.error, flex: 1, marginLeft: spacing.sm }]}>{error}</Text>
           </View>
         ) : null}
 
@@ -192,8 +194,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: spacing.md,
-    borderRadius: 8,
+    borderRadius: radius.sm,
   },
   footer: {
     alignItems: 'center',

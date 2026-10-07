@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { radius, spacing, shadow } from '@/theme/spacing';
-import { ProgressBar } from '@/components/ui/ProgressBar';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { getProjectImageUri } from '@/lib/projectImages';
 import type { Project, ProjectStatus } from '@/types/project';
 
 interface ProjectCardProps {
@@ -26,118 +27,144 @@ export function ProjectCard({ project, onPress }: ProjectCardProps) {
   const customerName = project.customer
     ? `${project.customer.firstName} ${project.customer.lastName}`
     : undefined;
+  const completedTasks = (project.taskCount ?? 0) - (project.openTaskCount ?? 0);
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.borderLight,
-          ...shadow.sm,
-        },
+        { backgroundColor: colors.surface, ...shadow.sm },
         pressed && { opacity: 0.92 },
       ]}
       accessibilityRole="button"
       accessibilityLabel={`${project.name}, ${config.label}, ${project.progress}% complete`}
     >
-      <View style={styles.header}>
+      <OptimizedImage source={getProjectImageUri(project, 300)} style={styles.image} />
+
+      <View style={styles.content}>
         <View style={styles.titleRow}>
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]} numberOfLines={1}>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700', flexShrink: 1 }]} numberOfLines={1}>
             {project.name}
           </Text>
-          <StatusBadge label={config.label} status={config.type} />
+          <StatusBadge label={config.label} status={config.type} style={styles.statusBadge} />
         </View>
+
         {customerName && (
-          <View style={styles.customerRow}>
-            <Feather name="user" size={13} color={colors.textTertiary} />
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+          <View style={styles.metaRow}>
+            <Icon name="user" size={12} color={colors.textTertiary} />
+            <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
               {customerName}
             </Text>
           </View>
         )}
-      </View>
 
-      {project.address && (
-        <View style={styles.addressRow}>
-          <Feather name="map-pin" size={13} color={colors.textTertiary} />
-          <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>
-            {project.address}{project.city ? `, ${project.city}` : ''}
+        {project.address && (
+          <View style={styles.metaRow}>
+            <Icon name="map-pin" size={12} color={colors.textTertiary} />
+            <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>
+              {project.address}{project.city ? `, ${project.city}` : ''}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.progressRow}>
+          <View style={[styles.progressTrack, { backgroundColor: colors.backgroundTertiary }]}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${Math.max(0, Math.min(100, project.progress))}%`, backgroundColor: colors.primary },
+              ]}
+            />
+          </View>
+          <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>
+            {project.progress}%
           </Text>
         </View>
-      )}
 
-      <View style={styles.progressSection}>
-        <ProgressBar progress={project.progress} showLabel height={6} />
+        <View style={styles.footerRow}>
+          {project.teamCount !== undefined && (
+            <View style={styles.metaItem}>
+              <Icon name="users" size={12} color={colors.textTertiary} />
+              <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                {project.teamCount} crew
+              </Text>
+            </View>
+          )}
+          {project.taskCount !== undefined && (
+            <View style={styles.metaItem}>
+              <Icon name="check-square" size={12} color={colors.textTertiary} />
+              <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                {completedTasks}/{project.taskCount} tasks
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      <View style={styles.metaRow}>
-        {project.teamCount !== undefined && (
-          <View style={styles.metaItem}>
-            <Feather name="users" size={13} color={colors.textTertiary} />
-            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-              {project.teamCount}
-            </Text>
-          </View>
-        )}
-        {project.taskCount !== undefined && (
-          <View style={styles.metaItem}>
-            <Feather name="check-square" size={13} color={colors.textTertiary} />
-            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-              {(project.taskCount ?? 0) - (project.openTaskCount ?? 0)}/{project.taskCount}
-            </Text>
-          </View>
-        )}
-        <View style={styles.metaSpacer} />
-        <Feather name="chevron-right" size={18} color={colors.textTertiary} />
-      </View>
+      <Icon name="chevron-right" size={18} color={colors.textTertiary} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: radius.md,
-    borderWidth: 1,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  header: {
+    padding: spacing.sm,
     marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  image: {
+    width: 76,
+    height: 92,
+    borderRadius: radius.sm,
+  },
+  content: {
+    flex: 1,
+    gap: 3,
   },
   titleRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  customerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.xs,
-    marginTop: spacing.xs,
   },
-  addressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  progressSection: {
-    marginBottom: spacing.md,
+  statusBadge: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+    gap: spacing.xs,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: 2,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 5,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: radius.full,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: 2,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-  },
-  metaSpacer: {
-    flex: 1,
+    gap: 3,
   },
 });

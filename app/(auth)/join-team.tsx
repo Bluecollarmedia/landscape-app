@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { Input, Button } from '@/components/ui';
@@ -150,7 +151,7 @@ export default function JoinTeamScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={handleBack} hitSlop={12}>
-          <Feather name="arrow-left" size={24} color={colors.textPrimary} />
+          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
           Join a Team
@@ -170,7 +171,7 @@ export default function JoinTeamScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {error ? (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
-            <Feather name="alert-circle" size={16} color={semantic.error} />
+            <Icon name="alert-circle" size={16} color={semantic.error} />
             <Text style={[typeScale.bodySmall, { color: semantic.error, flex: 1, marginLeft: spacing.sm }]}>{error}</Text>
           </View>
         ) : null}
@@ -190,13 +191,13 @@ export default function JoinTeamScreen() {
             />
             {codeError ? (
               <View style={[styles.codeResult, { backgroundColor: semantic.errorLight, borderColor: semantic.error }]}>
-                <Feather name="x-circle" size={16} color={semantic.error} />
+                <Icon name="x-circle" size={16} color={semantic.error} />
                 <Text style={[typeScale.bodySmall, { color: semantic.error, marginLeft: spacing.sm }]}>{codeError}</Text>
               </View>
             ) : null}
             {codeValid ? (
               <View style={[styles.codeResult, { backgroundColor: semantic.successLight, borderColor: semantic.success }]}>
-                <Feather name="check-circle" size={16} color={semantic.success} />
+                <Icon name="check-circle" size={16} color={semantic.success} />
                 <View style={{ marginLeft: spacing.sm, flex: 1 }}>
                   <Text style={[typeScale.bodySmall, { color: semantic.success, fontWeight: '600' }]}>Code verified!</Text>
                   <Text style={[typeScale.caption, { color: colors.textSecondary }]}>You're joining {companyName}</Text>
@@ -216,7 +217,7 @@ export default function JoinTeamScreen() {
         {step === 'account' && (
           <View style={styles.form}>
             <View style={[styles.companyBanner, { backgroundColor: colors.primarySurface }]}>
-              <Feather name="briefcase" size={16} color={colors.primary} />
+              <Icon name="briefcase" size={16} color={colors.primary} />
               <Text style={[typeScale.labelSmall, { color: colors.primary, marginLeft: spacing.sm }]}>
                 Joining {companyName}
               </Text>
@@ -239,7 +240,7 @@ export default function JoinTeamScreen() {
         {step === 'profile' && (
           <View style={styles.form}>
             <View style={[styles.companyBanner, { backgroundColor: colors.primarySurface }]}>
-              <Feather name="briefcase" size={16} color={colors.primary} />
+              <Icon name="briefcase" size={16} color={colors.primary} />
               <Text style={[typeScale.labelSmall, { color: colors.primary, marginLeft: spacing.sm }]}>
                 Joining {companyName}
               </Text>
@@ -271,12 +272,12 @@ export default function JoinTeamScreen() {
                       contentFit="cover"
                     />
                     <View style={[styles.photoCheck, { backgroundColor: colors.primary }]}>
-                      <Feather name="check" size={12} color="#FFFFFF" />
+                      <Icon name="check" size={12} color="#FFFFFF" />
                     </View>
                   </View>
                 ) : (
                   <View style={styles.photoPlaceholder}>
-                    <Feather name="camera" size={32} color={colors.textTertiary} />
+                    <Icon name="camera" size={32} color={colors.textTertiary} />
                     <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>
                       Add a clear photo of yourself
                     </Text>
@@ -296,8 +297,8 @@ export default function JoinTeamScreen() {
             </View>
             <Input label="Phone *" placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
 
-            <View style={[styles.infoBox, { backgroundColor: '#FFF8E1', borderColor: '#F9A825' }]}>
-              <Feather name="info" size={14} color="#F9A825" />
+            <View style={[styles.infoBox, { backgroundColor: semantic.warningLight, borderColor: semantic.warning }]}>
+              <Icon name="info" size={14} color={semantic.warning} />
               <Text style={[typeScale.caption, { color: colors.textSecondary, flex: 1, marginLeft: spacing.sm }]}>
                 After submitting, the company owner will review your request. You'll be notified when approved.
               </Text>
@@ -339,7 +340,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.sm,
     marginBottom: spacing.lg,
   },
   form: {

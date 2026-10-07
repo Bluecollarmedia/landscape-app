@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { ScreenContainer } from '@/components/layout';
-import { Button, Input, Card } from '@/components/ui';
+import { Button, Input, Card, LoadingSpinner } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic, brand } from '@/theme/colors';
@@ -96,7 +97,7 @@ export default function CustomerAccessScreen() {
       <>
         <View style={styles.header}>
           <View style={[styles.iconCircle, { backgroundColor: brand.primarySurface }]}>
-            <Feather name="key" size={28} color={colors.primary} />
+            <Icon name="key" size={28} color={colors.primary} />
           </View>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>
             Project Access
@@ -109,7 +110,7 @@ export default function CustomerAccessScreen() {
         <View style={styles.form}>
           {error ? (
             <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
-              <Feather name="alert-circle" size={16} color={semantic.error} />
+              <Icon name="alert-circle" size={16} color={semantic.error} />
               <Text style={[typeScale.bodySmall, { color: semantic.error, marginLeft: spacing.sm, flex: 1 }]}>
                 {error}
               </Text>
@@ -145,7 +146,7 @@ export default function CustomerAccessScreen() {
       <>
         <View style={styles.header}>
           <View style={[styles.iconCircle, { backgroundColor: semantic.successLight }]}>
-            <Feather name="check-circle" size={28} color={semantic.success} />
+            <Icon name="check-circle" size={28} color={semantic.success} />
           </View>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>
             Project Found
@@ -154,8 +155,8 @@ export default function CustomerAccessScreen() {
 
         <Card style={styles.projectCard}>
           <View style={styles.projectInfo}>
-            <Feather name="layers" size={20} color={colors.primary} />
-            <Text style={[typeScale.headingMedium, { color: colors.textPrimary, marginLeft: spacing.md, flex: 1 }]}>
+            <Icon name="layers" size={20} color={colors.primary} />
+            <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginLeft: spacing.md, flex: 1 }]}>
               {projectName}
             </Text>
           </View>
@@ -200,7 +201,7 @@ export default function CustomerAccessScreen() {
         <View style={styles.form}>
           {error ? (
             <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
-              <Feather name="alert-circle" size={16} color={semantic.error} />
+              <Icon name="alert-circle" size={16} color={semantic.error} />
               <Text style={[typeScale.bodySmall, { color: semantic.error, marginLeft: spacing.sm, flex: 1 }]}>
                 {error}
               </Text>
@@ -255,10 +256,7 @@ export default function CustomerAccessScreen() {
   function renderClaiming() {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.lg, textAlign: 'center' }]}>
-          Claiming your project...
-        </Text>
+        <LoadingSpinner message="Claiming your project..." />
       </View>
     );
   }
@@ -268,7 +266,7 @@ export default function CustomerAccessScreen() {
       <>
         <View style={styles.header}>
           <View style={[styles.iconCircle, { backgroundColor: semantic.successLight }]}>
-            <Feather name="check-circle" size={36} color={semantic.success} />
+            <Icon name="check-circle" size={36} color={semantic.success} />
           </View>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>
             You're All Set
@@ -302,7 +300,7 @@ export default function CustomerAccessScreen() {
   return (
     <ScreenContainer scrollable padded keyboardAvoiding contentStyle={styles.content}>
       <Pressable onPress={() => router.back()} style={styles.backRow}>
-        <Feather name="arrow-left" size={20} color={colors.textSecondary} />
+        <Icon name="arrow-left" size={20} color={colors.textSecondary} />
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
           Back
         </Text>
@@ -340,7 +338,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: 8,
+    borderRadius: radius.sm,
   },
   projectCard: {
     marginBottom: spacing.xl,

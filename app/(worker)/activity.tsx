@@ -1,168 +1,248 @@
-import React from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Pressable, StyleSheet, ScrollView, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
-import { useWorkerContext } from '@/providers/WorkerProvider';
 import { EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius } from '@/theme/spacing';
-import { semantic } from '@/theme/colors';
-import type { WorkerActivity, WorkerActivityType } from '@/types/worker';
+import { spacing, radius, shadow } from '@/theme/spacing';
+import { useWorkerActivitySummary, formatWorkedDuration, type DayGroup } from '@/hooks/useWorkerActivitySummary';
 
-const ACTIVITY_CONFIG: Record<WorkerActivityType, { icon: keyof typeof Feather.glyphMap; color: string }> = {
-  schedule_confirmed: { icon: 'check-circle', color: semantic.success },
-  checked_in: { icon: 'log-in', color: semantic.info },
-  task_started: { icon: 'play', color: semantic.warning },
-  task_completed: { icon: 'check-square', color: semantic.success },
-  photo_taken: { icon: 'camera', color: '#8E24AA' },
-  checked_out: { icon: 'log-out', color: semantic.error },
-  schedule_acknowledged: { icon: 'eye', color: semantic.info },
-  overtime_flagged: { icon: 'alert-circle', color: semantic.warning },
-};
+// Temporary placeholder — matches the header treatment used on Jobs.
+const HEADER_IMAGE_URI =
+  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200&q=80';
 
-function formatTimestamp(ts: string) {
-  const date = new Date(ts);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffHrs = diffMs / (1000 * 60 * 60);
-
-  if (diffHrs < 1) {
-    const mins = Math.floor(diffMs / (1000 * 60));
-    return mins <= 1 ? 'Just now' : `${mins}m ago`;
-  }
-  if (diffHrs < 24) return `${Math.floor(diffHrs)}h ago`;
-
-  const yesterday = new Date(now);
+function formatDayHeading(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const today = new Date();
+  const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) {
-    return `Yesterday ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-  }
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
-    ' ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (sameDay(date, today)) return 'Today';
+  if (sameDay(date, yesterday)) return 'Yesterday';
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
-function groupByDate(activities: WorkerActivity[]) {
-  const groups: { date: string; label: string; items: WorkerActivity[] }[] = [];
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+function DayCard({ day, onPress }: { day: DayGroup; onPress: () => void }) {
+  const { colors } = useTheme();
+  const isMultiJob = day.sessions.length > 1;
 
-  for (const a of activities) {
-    const dateStr = a.timestamp.split('T')[0];
-    let label = new Date(a.timestamp).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    if (dateStr === today) label = 'Today';
-    else if (dateStr === yesterdayStr) label = 'Yesterday';
+  return (
+    <Pressable style={[styles.dayCard, { backgroundColor: colors.surface }, shadow.sm]} onPress={onPress}>
+      <View style={styles.dayCardTop}>
+        <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
+          {formatDayHeading(day.date)}
+        </Text>
+        <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, fontWeight: '600' }]}>
+          {formatWorkedDuration(day.totalWorkedMs)}
+        </Text>
+      </View>
 
-    const existing = groups.find(g => g.date === dateStr);
-    if (existing) {
-      existing.items.push(a);
-    } else {
-      groups.push({ date: dateStr, label, items: [a] });
-    }
-  }
-  return groups;
+      <View style={styles.dayCardBody}>
+        {!isMultiJob && day.thumbnailUri && (
+          <Image source={{ uri: day.thumbnailUri }} style={styles.thumb} resizeMode="cover" />
+        )}
+        <View style={{ flex: 1, marginLeft: !isMultiJob && day.thumbnailUri ? spacing.md : 0 }}>
+          {isMultiJob ? (
+            day.sessions.map(s => (
+              <View key={s.assignmentId} style={styles.propertyRow}>
+                <Feather name="home" size={12} color={colors.textTertiary} />
+                <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, marginLeft: spacing.xs }]} numberOfLines={1}>
+                  {s.projectName}
+                </Text>
+              </View>
+            ))
+          ) : (
+            <>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
+                {day.sessions[0].projectName}
+              </Text>
+              {day.sessions[0].address && (
+                <View style={styles.propertyRow}>
+                  <Feather name="map-pin" size={12} color={colors.textTertiary} />
+                  <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs }]} numberOfLines={1}>
+                    {day.sessions[0].address}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+
+          <View style={styles.statsRow}>
+            <StatChip icon="briefcase" label={`${day.jobs} job${day.jobs > 1 ? 's' : ''}`} colors={colors} />
+            <StatChip icon="check-square" label={`${day.tasksCompleted} task${day.tasksCompleted !== 1 ? 's' : ''}`} colors={colors} />
+            {day.photosUploaded > 0 && (
+              <StatChip icon="camera" label={`${day.photosUploaded} photo${day.photosUploaded > 1 ? 's' : ''}`} colors={colors} />
+            )}
+          </View>
+        </View>
+        <Feather name="chevron-right" size={18} color={colors.textTertiary} />
+      </View>
+    </Pressable>
+  );
+}
+
+function StatChip({ icon, label, colors }: { icon: keyof typeof Feather.glyphMap; label: string; colors: any }) {
+  return (
+    <View style={styles.statChip}>
+      <Feather name={icon} size={12} color={colors.textTertiary} />
+      <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: 4 }]}>{label}</Text>
+    </View>
+  );
 }
 
 export default function WorkerActivityScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { activities } = useWorkerContext();
-
-  const groups = groupByDate(activities);
+  const router = useRouter();
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const summary = useWorkerActivitySummary(weekOffset);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Activity</Text>
+      <View style={styles.hero}>
+        <Image source={{ uri: HEADER_IMAGE_URI }} style={[styles.heroImage, { opacity: 0.16 }]} resizeMode="cover" />
+        <View style={[styles.headerContent, { paddingTop: insets.top + spacing.md }]}>
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Activity</Text>
+              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>
+                Your work history and progress
+              </Text>
+            </View>
+            <View>
+              <Pressable
+                style={[styles.periodChip, { backgroundColor: colors.groupedBackground }]}
+                onPress={() => setPickerOpen(v => !v)}
+              >
+                <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontWeight: '600' }]}>
+                  {weekOffset === 0 ? 'This Week' : 'Last Week'}
+                </Text>
+                <Feather name="chevron-down" size={14} color={colors.textSecondary} style={{ marginLeft: 4 }} />
+              </Pressable>
+              {pickerOpen && (
+                <View style={[styles.periodMenu, { backgroundColor: colors.surface }, shadow.md]}>
+                  {[0, 1].map(offset => (
+                    <Pressable
+                      key={offset}
+                      style={styles.periodMenuItem}
+                      onPress={() => { setWeekOffset(offset); setPickerOpen(false); }}
+                    >
+                      <Text style={[typeScale.bodyMedium, { color: weekOffset === offset ? colors.primary : colors.textPrimary }]}>
+                        {offset === 0 ? 'This Week' : 'Last Week'}
+                      </Text>
+                      {weekOffset === offset && <Feather name="check" size={16} color={colors.primary} />}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
       </View>
 
-      {activities.length === 0 ? (
-        <View style={styles.emptyContainer}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }]}>
+          <Text style={[typeScale.overline, { color: colors.primaryDark }]}>{summary.rangeLabel.toUpperCase()}</Text>
+          <Text style={[typeScale.displayLarge, { color: colors.textPrimary, marginTop: 2 }]}>
+            {formatWorkedDuration(summary.totalWorkedMs)}
+          </Text>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Total hours worked</Text>
+
+          <View style={[styles.summaryDivider, { backgroundColor: colors.primary, opacity: 0.15 }]} />
+
+          <View style={styles.summaryStatsRow}>
+            <SummaryStat icon="briefcase" value={summary.jobs} label="Jobs" colors={colors} />
+            <SummaryStat icon="check-circle" value={summary.tasksCompleted} label="Tasks completed" colors={colors} />
+            <SummaryStat icon="camera" value={summary.photosUploaded} label="Photos uploaded" colors={colors} />
+          </View>
+        </View>
+
+        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xl, marginBottom: spacing.md }]}>
+          Recent Activity
+        </Text>
+
+        {summary.days.length === 0 ? (
           <EmptyState
             icon="activity"
-            title="No activity yet"
+            title="No activity this week"
             description="Your check-ins, tasks, and photos will appear here."
           />
-        </View>
-      ) : (
-        <FlatList
-          data={groups}
-          keyExtractor={item => item.date}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item: group }) => (
-            <View style={styles.dateGroup}>
-              <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginBottom: spacing.sm }]}>
-                {group.label}
-              </Text>
-              {group.items.map((activity, idx) => {
-                const config = ACTIVITY_CONFIG[activity.activityType];
-                return (
-                  <View
-                    key={activity.id}
-                    style={[styles.activityRow, { borderLeftColor: config.color }]}
-                  >
-                    <View style={[styles.iconCircle, { backgroundColor: config.color + '18' }]}>
-                      <Feather name={config.icon} size={16} color={config.color} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[typeScale.bodyMedium, { color: colors.textPrimary }]}>
-                        {activity.description}
-                      </Text>
-                      <View style={styles.metaRow}>
-                        {activity.project && (
-                          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                            {activity.project.name}
-                          </Text>
-                        )}
-                        <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-                          {formatTimestamp(activity.timestamp)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        />
-      )}
+        ) : (
+          summary.days.map(day => (
+            <DayCard key={day.date} day={day} onPress={() => router.push(`/(worker)/day/${day.date}` as any)} />
+          ))
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+function SummaryStat({ icon, value, label, colors }: { icon: keyof typeof Feather.glyphMap; value: number; label: string; colors: any }) {
+  return (
+    <View style={styles.summaryStat}>
+      <Feather name={icon} size={16} color={colors.primaryDark} />
+      <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: 4 }]}>{value}</Text>
+      <Text style={[typeScale.caption, { color: colors.textSecondary, textAlign: 'center' }]}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  emptyContainer: { flex: 1, justifyContent: 'center' },
-  listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing['3xl'] },
-  dateGroup: { marginBottom: spacing.xl },
-  activityRow: {
+  hero: { overflow: 'hidden' },
+  heroImage: { position: 'absolute', width: '100%', height: '100%' },
+  headerContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  periodChip: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: spacing.sm,
-    paddingLeft: spacing.sm,
-    borderLeftWidth: 3,
-    marginBottom: spacing.xs,
-    gap: spacing.sm,
-  },
-  iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
   },
-  metaRow: {
+  periodMenu: {
+    position: 'absolute',
+    top: 40,
+    right: 0,
+    borderRadius: radius.md,
+    paddingVertical: spacing.xs,
+    minWidth: 140,
+    zIndex: 10,
+  },
+  periodMenuItem: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: 2,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
+  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing['4xl'] },
+  summaryCard: {
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+  },
+  summaryDivider: { height: 1, marginVertical: spacing.md },
+  summaryStatsRow: { flexDirection: 'row' },
+  summaryStat: { flex: 1, alignItems: 'center' },
+  dayCard: {
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  dayCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: spacing.sm,
+  },
+  dayCardBody: { flexDirection: 'row', alignItems: 'center' },
+  thumb: { width: 52, height: 52, borderRadius: radius.md },
+  propertyRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  statsRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.xs },
+  statChip: { flexDirection: 'row', alignItems: 'center' },
 });

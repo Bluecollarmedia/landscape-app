@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useWorkerContext } from '@/providers/WorkerProvider';
-import { mockProjectPhotos } from '@/data/mock';
+import { db } from '@/data/store';
 import type { Assignment } from '@/types/schedule';
 import type { WorkerActivity, WorkerActivityType, CheckIn, CheckOut } from '@/types/worker';
 import type { ProjectPhoto } from '@/types/project';
@@ -115,7 +115,7 @@ function groupSessionsByDay(sessions: WorkSession[]): DayGroup[] {
         jobs: daySessions.length,
         tasksCompleted: daySessions.reduce((sum, s) => sum + s.tasksCompleted, 0),
         photosUploaded: daySessions.reduce((sum, s) => sum + s.photosUploaded, 0),
-        thumbnailUri: (mockProjectPhotos[daySessions[0].projectId] ?? [])[0]?.fileUrl,
+        thumbnailUri: (db.photos[daySessions[0].projectId] ?? [])[0]?.fileUrl,
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -128,7 +128,9 @@ function groupSessionsByDay(sessions: WorkSession[]): DayGroup[] {
  * metadata to avoid relying on timestamp equality. */
 export function findPhotoForActivity(activity: WorkerActivity, workerId?: string): ProjectPhoto | undefined {
   if (activity.activityType !== 'photo_taken' || !activity.projectId) return undefined;
-  const photos = mockProjectPhotos[activity.projectId] ?? [];
+  const photos = db.photos[activity.projectId] ?? [];
+  const photoId = (activity.metadata as { photoId?: string } | undefined)?.photoId;
+  if (photoId) return photos.find(p => p.id === photoId);
   return photos.find(p => p.uploadedBy === workerId && p.takenAt === activity.timestamp);
 }
 

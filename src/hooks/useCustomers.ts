@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import type { CompanyMember, PersonSummary } from '@/types/company';
 import type { Project } from '@/types/project';
-import { mockMembers, mockProjects } from '@/data/mock';
+import { db, useDb, insertRow, rowsOf } from '@/data/store';
 
 export interface CustomerWithProjects {
   member: CompanyMember;
@@ -17,14 +17,14 @@ interface UseCustomersOptions {
 
 export function useCustomers(options: UseCustomersOptions = {}) {
   const { search = '' } = options;
-  const [members, setMembers] = useState<CompanyMember[]>(mockMembers);
+  const v = useDb();
 
   const customers = useMemo<CustomerWithProjects[]>(() => {
-    return members
-      .filter((m) => m.role === 'customer')
+    return db.members
+      .filter((m) => m.role === 'customer' && m.status !== 'inactive' && m.person)
       .map((m) => {
         const person = m.person!;
-        const customerProjects = mockProjects.filter((p) => p.customerId === m.personId);
+        const customerProjects = db.projects.filter((p) => p.customerId === m.personId);
         return {
           member: m,
           person,
@@ -33,7 +33,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           totalProjectCount: customerProjects.length,
         };
       });
-  }, [members]);
+  }, [v]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return customers;
@@ -48,18 +48,35 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     );
   }, [customers, search]);
 
-  const addCustomer = useCallback((person: PersonSummary) => {
-    const newMember: CompanyMember = {
-      id: `cm_${Date.now()}`,
-      companyId: 'company1',
-      personId: person.id,
-      role: 'customer',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      person,
-    };
-    setMembers((prev) => [...prev, newMember]);
+  /**
+   * Adds a customer to the company. They show up right away; when they later
+   * create an account with the same email, it links to this record and they
+   * see the projects assigned to them.
+   */
+  const addCustomer = useCallback((input: { firstName: string; lastName: string; email?: string; phone?: string }) => {
+    const email = (input.email ?? '').trim().toLowerCase();
+    // Reuse an existing person with this email (e.g. already a customer elsewhere).
+    const existing = email
+      ? rowsOf('people').find((p) => (p.email ?? '').toLowerCase() === email)
+      : undefined;
+    const personId: string = existing?.id ?? insertRow('people', {
+      email,
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
+      phone: input.phone?.trim() || undefined,
+    }).id;
+    const alreadyMember = db.members.find((m) => m.personId === personId);
+    if (!alreadyMember) {
+      insertRow('company_members', {
+        personId,
+        role: 'customer',
+        status: existing?.userId ? 'active' : 'invited',
+        joinMethod: 'email_invitation',
+        approvedBy: db.personId || undefined,
+        approvedAt: new Date().toISOString(),
+      });
+    }
+    return personId;
   }, []);
 
   const getCustomer = useCallback(

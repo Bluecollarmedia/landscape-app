@@ -9,24 +9,26 @@ import { PhotoViewer } from '@/components/worker/PhotoViewer';
 import { useTheme } from '@/providers/ThemeProvider';
 import { SectionTabs, StatusBadge, ProgressBar, Card, EmptyState, Divider, Avatar, Button, OptimizedImage } from '@/components/ui';
 import { useProject } from '@/hooks/useProject';
+import { useAuth } from '@/providers/AuthProvider';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
 import { getProjectImageUri } from '@/lib/projectImages';
 import { getMockPhotoImageUri } from '@/lib/mockPhotoImages';
 import { haptics } from '@/lib/haptics';
+import { todayKey, localDateKey, isoToLocalDateKey } from '@/lib/ids';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import type { ProjectStatus, TaskStatus, HistoryEventType, ProjectPhoto, ProjectTask, PhotoType } from '@/types/project';
 import type { Assignment } from '@/types/schedule';
 
-const today = new Date().toISOString().split('T')[0];
+const today = todayKey();
 
 function offsetDateStr(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 function formatTimeLabel(time?: string): string {
@@ -173,7 +175,8 @@ export default function ProjectDetailScreen() {
   const [moreSubSection, setMoreSubSection] = useState<'people' | 'activity' | 'settings' | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
-  const { project, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, requests, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
+  const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
+  const { user } = useAuth();
   const schedule = useSchedule();
   const customerAccess = useCustomerAccess();
   const { workers: companyWorkers } = useWorkers();
@@ -239,8 +242,7 @@ export default function ProjectDetailScreen() {
   }
 
   function handleSaveNotes() {
-    p.notes = notesDraft.trim() || undefined;
-    p.updatedAt = new Date().toISOString();
+    updateProject({ notes: notesDraft.trim() || undefined });
     setEditingNotes(false);
   }
 
@@ -1261,7 +1263,7 @@ export default function ProjectDetailScreen() {
     updatePhoto(reviewPhoto.id, {
       isCustomerVisible: true,
       customerDescription: customerDesc,
-      sharedBy: 'owner1',
+      sharedBy: user?.id,
       sharedAt: new Date().toISOString(),
     });
     setReviewPhoto(null);
@@ -1337,15 +1339,12 @@ export default function ProjectDetailScreen() {
     const task = tasks.find(t => t.id === newPhotoTaskId);
     addPhoto({
       taskId: newPhotoTaskId || undefined,
-      taskTitle: task?.title,
-      uploadedBy: 'owner1',
-      fileKey: `${p.id}/owner-${Date.now()}.jpg`,
+      uploadedBy: user?.id ?? '',
       fileUrl: newPhotoUri,
       caption: newPhotoCaption.trim() || undefined,
       isCustomerVisible: false,
       photoType: newPhotoType,
       takenAt: new Date().toISOString(),
-      uploader: { id: 'owner1', firstName: 'Joey', lastName: 'Angeloco', email: 'joey@brightonlawn.com' },
     });
     setShowAddPhoto(false);
     setNewPhotoUri(null);
@@ -1461,14 +1460,7 @@ export default function ProjectDetailScreen() {
 
   function handlePostUpdate() {
     if (!updateTitle.trim()) return;
-    const newUpdate = {
-      id: `u${Date.now()}`, projectId: id, createdBy: 'owner1',
-      title: updateTitle.trim(), body: updateBody.trim(),
-      isCustomerVisible: updateVisible,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      author: { id: 'owner1', firstName: 'Joey', lastName: 'Angeloco', email: 'joey@brightonlawn.com' },
-    };
-    updates.unshift(newUpdate);
+    postUpdate({ title: updateTitle.trim(), body: updateBody.trim(), isCustomerVisible: updateVisible });
     setUpdateTitle('');
     setUpdateBody('');
     setUpdateVisible(true);
@@ -1559,9 +1551,11 @@ export default function ProjectDetailScreen() {
   function handleRequestAction(reqId: string, action: 'acknowledged' | 'declined' | 'converted') {
     const req = requests.find(r => r.id === reqId);
     if (!req) return;
-    req.status = action;
-    req.respondedAt = new Date().toISOString();
-    req.responseNote = responseNote.trim() || undefined;
+    // "Convert to task" adds the request to the project's task list.
+    const task = action === 'converted'
+      ? addTask({ title: req.title, description: req.description, status: 'pending', sortOrder: tasks.length })
+      : undefined;
+    respondToRequest(reqId, action, responseNote.trim() || undefined, task?.id);
     setRespondingTo(null);
     setResponseNote('');
   }
@@ -1718,7 +1712,7 @@ export default function ProjectDetailScreen() {
     const groups: { dateKey: string; entries: typeof history }[] = [];
     const groupIndex = new Map<string, number>();
     for (const entry of history) {
-      const dateKey = entry.createdAt.split('T')[0];
+      const dateKey = isoToLocalDateKey(entry.createdAt);
       if (!groupIndex.has(dateKey)) {
         groupIndex.set(dateKey, groups.length);
         groups.push({ dateKey, entries: [] });
@@ -2177,6 +2171,15 @@ export default function ProjectDetailScreen() {
       <Modal visible={showMoreMenu} animationType="fade" transparent onRequestClose={() => setShowMoreMenu(false)}>
         <Pressable style={styles.moreMenuOverlay} onPress={() => setShowMoreMenu(false)}>
           <View style={[styles.moreMenuCard, { backgroundColor: colors.surface, top: insets.top + 56 }]}>
+            <Pressable
+              style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
+              onPress={() => { setShowMoreMenu(false); router.push({ pathname: '/(owner)/project-new', params: { editId: p.id } } as any); }}
+            >
+              <Icon name="edit-2" size={18} color={colors.textSecondary} />
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>
+                Edit Project
+              </Text>
+            </Pressable>
             {MORE_ITEMS.map((item) => (
               <Pressable
                 key={item.key}

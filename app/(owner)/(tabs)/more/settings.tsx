@@ -11,12 +11,14 @@ import type { AppState } from '@/providers/AuthProvider';
 import { ListSection, ListRow } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
-import { mockCompany } from '@/data/mock';
+import { db, useDb } from '@/data/store';
 import type { UserRole } from '@/types';
 
 export default function SettingsScreen() {
   const { colors } = useTheme();
   const { user, signOut, switchDevRole, switchDevState, appState } = useAuth();
+  useDb();
+  const company = db.company;
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -54,13 +56,13 @@ export default function SettingsScreen() {
         </ListSection>
 
         <ListSection title="Company">
-          <ListRow icon="briefcase" title="Name" value={mockCompany.name} />
-          <ListRow icon="phone" title="Phone" value={mockCompany.phone ?? '—'} />
-          <ListRow icon="mail" title="Email" value={mockCompany.email ?? '—'} />
+          <ListRow icon="briefcase" title="Name" value={company?.name ?? '—'} />
+          <ListRow icon="phone" title="Phone" value={company?.phone || '—'} />
+          <ListRow icon="mail" title="Email" value={company?.email || '—'} />
           <ListRow
             icon="map-pin"
             title="Address"
-            subtitle={`${mockCompany.address}, ${mockCompany.city}, ${mockCompany.state} ${mockCompany.zip}`}
+            subtitle={[company?.address, company?.city, [company?.state, company?.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'}
           />
         </ListSection>
 

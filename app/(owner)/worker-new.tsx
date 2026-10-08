@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Share } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Share, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -51,6 +51,7 @@ export default function AddWorkerScreen() {
   function handleSendInvite() {
     if (!invEmail.trim() || !invEmail.includes('@')) {
       if (Platform.OS === 'web') alert('Please enter a valid email address.');
+      else Alert.alert('Check the email', 'Please enter a valid email address.');
       return;
     }
     const result = createInvitation({
@@ -67,9 +68,10 @@ export default function AddWorkerScreen() {
         setInvName('');
         setInvEmail('');
         setInvPhone('');
-      }, 2000);
+      }, 6000);
     } else {
-      if (Platform.OS === 'web') alert('An invitation has already been sent to this email.');
+      if (Platform.OS === 'web') alert('This email has already been invited.');
+      else Alert.alert('Already invited', 'This email has already been invited.');
     }
   }
 
@@ -93,7 +95,7 @@ export default function AddWorkerScreen() {
             <View style={[styles.successBanner, { backgroundColor: semantic.successLight }]}>
               <Icon name="check-circle" size={20} color={semantic.success} />
               <Text style={[typeScale.bodySmall, { color: semantic.success, marginLeft: spacing.sm }]}>
-                Invitation sent!
+                Invite saved. No email goes out yet, so let them know to open the app and tap "Invited by email? Create your account" using this email.
               </Text>
             </View>
           ) : (

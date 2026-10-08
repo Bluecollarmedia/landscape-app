@@ -10,7 +10,7 @@ import { ScreenContainer } from '@/components/layout';
 import { Card, ProgressBar, StatusBadge, EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import { mockProjects } from '@/data/mock';
+import { db, useDb } from '@/data/store';
 import type { ProjectStatus } from '@/types/project';
 
 const statusConfig: Record<ProjectStatus, { label: string; type: 'success' | 'warning' | 'info' | 'neutral' }> = {
@@ -26,7 +26,8 @@ export default function CustomerHomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const customerProjects = mockProjects.filter(p => p.customerId === user?.id);
+  useDb();
+  const customerProjects = db.projects.filter(p => p.customerId === user?.id || p.customerClaimedBy === user?.id);
   const activeProjects = customerProjects.filter(p => p.status === 'active' || p.status === 'on_hold');
   const completedProjects = customerProjects.filter(p => p.status === 'completed');
 

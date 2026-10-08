@@ -13,8 +13,9 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import type { Assignment } from '@/types/schedule';
 import { haptics } from '@/lib/haptics';
+import { todayKey, localDateKey } from '@/lib/ids';
 
-const today = new Date().toISOString().split('T')[0];
+const today = todayKey();
 
 function formatDateTop(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -47,14 +48,14 @@ function formatTimeRange(a: Assignment): string {
 function offsetDateStr(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 function getWeekStart(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
   const day = d.getDay();
   d.setDate(d.getDate() - day);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 const confirmBadge = (state: string) => {
@@ -118,7 +119,7 @@ export default function ScheduleScreen() {
   function handleDatePicked(event: DateTimePickerEvent, date?: Date) {
     if (Platform.OS === 'android') setShowAndroidPicker(false);
     if (event.type === 'dismissed' || !date) return;
-    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedDate(localDateKey(date));
   }
 
   function renderDayView() {

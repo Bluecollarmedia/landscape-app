@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { db } from '@/data/store';
+import { attachImage } from '@/data/actions';
 import { useTrucks } from '@/hooks/useTrucks';
 import { OptimizedImage } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -70,8 +72,8 @@ export default function AddTruckScreen() {
       else Alert.alert('Required', msg);
       return;
     }
-    addTruck({
-      companyId: 'company1',
+    const truck = addTruck({
+      companyId: db.companyId,
       name: name.trim(),
       make: make.trim() || undefined,
       model: model.trim() || undefined,
@@ -79,8 +81,8 @@ export default function AddTruckScreen() {
       licensePlate: plate.trim() || undefined,
       status,
       notes: notes.trim() || undefined,
-      photoUrl: photoUri,
     });
+    attachImage('trucks', truck.id, 'photoUrl', photoUri, 'trucks');
     router.back();
   }
 

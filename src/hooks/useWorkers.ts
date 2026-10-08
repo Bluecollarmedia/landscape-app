@@ -1,7 +1,8 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import type { CompanyMember, PersonSummary } from '@/types/company';
 import type { Assignment } from '@/types/schedule';
-import { mockMembers, mockAssignments, mockTrucks, mockProjects } from '@/data/mock';
+import { db, useDb, updateRow, refresh } from '@/data/store';
+import { todayKey } from '@/lib/ids';
 
 export type WorkerTodayStatus = 'confirmed' | 'scheduled' | 'not_scheduled' | 'inactive';
 
@@ -21,33 +22,30 @@ interface UseWorkersOptions {
   includeInactive?: boolean;
 }
 
-const today = new Date().toISOString().split('T')[0];
-
 export function useWorkers(options: UseWorkersOptions = {}) {
   const { search = '', statusFilter = 'all', includeInactive = false } = options;
-  const [members, setMembers] = useState<CompanyMember[]>(() => mockMembers);
-  const [, forceUpdate] = useState(0);
+  const v = useDb();
 
   const refreshMembers = useCallback(() => {
-    setMembers([...mockMembers]);
-    forceUpdate((n) => n + 1);
+    refresh('company_members', 'people');
   }, []);
 
   const workers = useMemo<WorkerWithStatus[]>(() => {
-    const workerMembers = members.filter(
-      (m) => m.role === 'worker' && (includeInactive || m.status !== 'inactive'),
+    const today = todayKey();
+    const workerMembers = db.members.filter(
+      (m) => m.role === 'worker' && !!m.person && (includeInactive || m.status !== 'inactive'),
     );
 
     return workerMembers.map((m) => {
       const person = m.person!;
-      const todayAssignments = mockAssignments.filter(
+      const todayAssignments = db.assignments.filter(
         (a) => a.personId === m.personId && a.scheduledDate === today &&
                a.status !== 'cancelled' && a.status !== 'reassigned'
       );
-      const truck = mockTrucks.find((t) => t.assignedTo === m.personId);
+      const truck = db.trucks.find((t) => t.assignedTo === m.personId);
 
-      const activeProjects = mockProjects.filter(
-        (p) => p.status === 'active',
+      const activeProjects = db.projects.filter(
+        (p) => p.status === 'active' && (db.team[p.id] ?? []).some((tm) => tm.personId === m.personId),
       ).length;
 
       let todayStatus: WorkerTodayStatus;
@@ -71,7 +69,7 @@ export function useWorkers(options: UseWorkersOptions = {}) {
         activeProjectCount: activeProjects,
       };
     });
-  }, [members, includeInactive]);
+  }, [v, includeInactive]);
 
   const filtered = useMemo(() => {
     let result = workers;
@@ -102,26 +100,15 @@ export function useWorkers(options: UseWorkersOptions = {}) {
     return c;
   }, [workers]);
 
-  const addWorker = useCallback((person: PersonSummary) => {
-    const newMember: CompanyMember = {
-      id: `cm_${Date.now()}`,
-      companyId: 'company1',
-      personId: person.id,
-      role: 'worker',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      person,
-    };
-    setMembers((prev) => [...prev, newMember]);
-  }, []);
-
+  /** Changes a worker's membership (e.g. deactivate). */
   const updateWorker = useCallback((personId: string, updates: Partial<CompanyMember>) => {
-    setMembers((prev) =>
-      prev.map((m) =>
-        m.personId === personId ? { ...m, ...updates, updatedAt: new Date().toISOString() } : m,
-      ),
-    );
+    const m = db.members.find((x) => x.personId === personId);
+    if (!m) return;
+    const { person, ...changes } = updates;
+    if (changes.status === 'inactive' && m.status !== 'inactive') {
+      Object.assign(changes, { deactivatedAt: new Date().toISOString(), deactivatedBy: db.personId || undefined });
+    }
+    updateRow('company_members', m.id, changes);
   }, []);
 
   const getWorker = useCallback(
@@ -129,5 +116,5 @@ export function useWorkers(options: UseWorkersOptions = {}) {
     [workers],
   );
 
-  return { workers: filtered, allWorkers: workers, counts, addWorker, updateWorker, getWorker, refreshMembers };
+  return { workers: filtered, allWorkers: workers, counts, updateWorker, getWorker, refreshMembers };
 }

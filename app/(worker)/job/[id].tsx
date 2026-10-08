@@ -12,7 +12,8 @@ import { StatusBadge } from '@/components/ui';
 import { PhotoViewer } from '@/components/worker/PhotoViewer';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
-import { mockProjectPhotos } from '@/data/mock';
+import { db } from '@/data/store';
+import { todayKey, localDateKey } from '@/lib/ids';
 import type { ProjectPhoto } from '@/types/project';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
@@ -39,7 +40,7 @@ function formatDateLabel(dateStr: string): string {
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const iso = (x: Date) => x.toISOString().split('T')[0];
+  const iso = (x: Date) => localDateKey(x);
   if (dateStr === iso(today)) return 'Today';
   if (dateStr === iso(tomorrow)) return 'Tomorrow';
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -72,12 +73,12 @@ export default function JobDetailScreen() {
     );
   }
 
-  const isPast = assignment.status === 'completed' || assignment.scheduledDate < new Date().toISOString().split('T')[0];
+  const isPast = assignment.status === 'completed' || assignment.scheduledDate < todayKey();
 
   // Only this worker's own photos, scoped to this exact task — never another
   // worker's upload, another task, or another project's photo library.
   function getTaskPhotos(taskId: string): ProjectPhoto[] {
-    const projectPhotos = mockProjectPhotos[assignment!.projectId] ?? [];
+    const projectPhotos = db.photos[assignment!.projectId] ?? [];
     return projectPhotos.filter(p => p.taskId === taskId && p.uploadedBy === user?.id);
   }
 

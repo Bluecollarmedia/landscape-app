@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensions } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensions, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { Input, Button } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.4, 180);
@@ -20,7 +21,9 @@ export default function CreateCompanyScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { switchDevRole } = useAuth();
+  const { switchDevRole, signUp, isAuthenticated, user, refreshContext } = useAuth();
+  // Already signed in (came from "Finish setting up"): skip the account step.
+  const signedIn = isSupabaseConfigured && isAuthenticated && !!user;
 
   const [step, setStep] = useState<Step>('company');
 
@@ -79,7 +82,7 @@ export default function CreateCompanyScreen() {
 
   function handleNext() {
     if (step === 'company' && validateCompany()) {
-      setStep('owner');
+      setStep(signedIn ? 'review' : 'owner');
     } else if (step === 'owner' && validateOwner()) {
       setStep('review');
     }
@@ -87,17 +90,66 @@ export default function CreateCompanyScreen() {
 
   function handleBack() {
     if (step === 'owner') setStep('company');
-    else if (step === 'review') setStep('owner');
+    else if (step === 'review') setStep(signedIn ? 'company' : 'owner');
     else router.back();
   }
 
   async function handleCreate() {
+    if (!isSupabaseConfigured) {
+      // Demo mode: no backend, just show the owner screens.
+      setLoading(true);
+      await new Promise((r) => setTimeout(r, 800));
+      switchDevRole('owner');
+      setLoading(false);
+      return;
+    }
+
+    const company = {
+      name: companyName.trim(),
+      phone: companyPhone.trim() || undefined,
+      address: companyAddress.trim() || undefined,
+      city: companyCity.trim() || undefined,
+      state: companyState.trim() || undefined,
+      zip: companyZip.trim() || undefined,
+    };
+
+    setError('');
     setLoading(true);
-    // In production: create company + owner membership via Supabase
-    // For now: switch to owner role in dev mode
-    await new Promise((r) => setTimeout(r, 800));
-    switchDevRole('owner');
-    setLoading(false);
+    try {
+      if (signedIn) {
+        const { error: rpcError } = await supabase.rpc('create_company', {
+          data: {
+            company_name: company.name,
+            company_phone: company.phone ?? '',
+            company_address: company.address ?? '',
+            company_city: company.city ?? '',
+            company_state: company.state ?? '',
+            company_zip: company.zip ?? '',
+          },
+        });
+        if (rpcError) throw rpcError;
+        await refreshContext();
+        return;
+      }
+
+      const result = await signUp(
+        email.trim(),
+        password,
+        { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() },
+        { company: { ...company, email: email.trim() } },
+      );
+      if (result.needsEmailConfirmation) {
+        const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in. Your company is already set up.`;
+        if (Platform.OS === 'web') alert(msg);
+        else Alert.alert('Check your email', msg);
+        router.replace('/(auth)/login');
+      }
+      // Otherwise the new session routes straight to the owner screens.
+    } catch (err: any) {
+      setError(err?.message ?? 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const stepLabels: Record<Step, string> = {
@@ -195,10 +247,10 @@ export default function CreateCompanyScreen() {
               <View style={styles.reviewSection}>
                 <Text style={[typeScale.overline, { color: colors.textTertiary }]}>OWNER</Text>
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', marginTop: spacing.xs }]}>
-                  {firstName} {lastName}
+                  {signedIn ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}` : `${firstName} ${lastName}`}
                 </Text>
-                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{email}</Text>
-                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{phone}</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{signedIn ? user?.email : email}</Text>
+                {!signedIn && <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{phone}</Text>}
                 <View style={[styles.roleBadge, { backgroundColor: colors.primarySurface }]}>
                   <Icon name="shield" size={12} color={colors.primary} />
                   <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '600', marginLeft: 4 }]}>

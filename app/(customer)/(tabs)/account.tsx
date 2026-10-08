@@ -8,11 +8,12 @@ import { ScreenContainer } from '@/components/layout';
 import { Avatar, ListSection, ListRow } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
-import { mockCompany } from '@/data/mock';
+import { db, useDb } from '@/data/store';
 
 export default function CustomerAccountScreen() {
   const { colors } = useTheme();
   const { user, signOut, switchDevRole } = useAuth();
+  useDb();
   const insets = useSafeAreaInsets();
 
   return (
@@ -36,8 +37,8 @@ export default function CustomerAccountScreen() {
       </ListSection>
 
       <ListSection title="Your Company">
-        <ListRow icon="briefcase" title={mockCompany.name} />
-        <ListRow icon="phone" title="Phone" value={mockCompany.phone ?? '—'} />
+        <ListRow icon="briefcase" title={db.company?.name ?? '—'} />
+        <ListRow icon="phone" title="Phone" value={db.company?.phone || '—'} />
       </ListSection>
 
       {!isSupabaseConfigured && (

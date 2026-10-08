@@ -10,7 +10,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { useNotifications } from '@/hooks/useOperations';
 import type { NotificationEventType } from '@/types/operations';
-import { mockMembers } from '@/data/mock';
+import { db, useDb } from '@/data/store';
 
 const EVENT_LABELS: Record<NotificationEventType, { label: string; icon: string; description: string }> = {
   worker_checked_in: { label: 'Worker Checked In', icon: 'log-in', description: 'When a worker checks in at a job site' },
@@ -46,7 +46,8 @@ export default function NotificationPreferencesScreen() {
   const [tab, setTab] = useState<Tab>('defaults');
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
 
-  const workers = mockMembers.filter((m) => m.role === 'worker' && m.status === 'active');
+  useDb();
+  const workers = db.members.filter((m) => m.role === 'worker' && m.status === 'active' && !!m.person);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>

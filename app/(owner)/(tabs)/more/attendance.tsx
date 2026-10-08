@@ -11,6 +11,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { useAttendance, type WorkerAttendance } from '@/hooks/useOperations';
 import type { AttendanceStatus } from '@/types/operations';
+import { todayKey, localDateKey } from '@/lib/ids';
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -18,8 +19,8 @@ function formatTime(iso: string): string {
 
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00Z');
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = (() => { const y = new Date(); y.setDate(y.getDate() - 1); return y.toISOString().split('T')[0]; })();
+  const today = todayKey();
+  const yesterday = (() => { const y = new Date(); y.setDate(y.getDate() - 1); return localDateKey(y); })();
   if (dateStr === today) return 'Today';
   if (dateStr === yesterday) return 'Yesterday';
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -46,7 +47,7 @@ export default function AttendanceScreen() {
   const currentDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + dayOffset);
-    return d.toISOString().split('T')[0];
+    return localDateKey(d);
   }, [dayOffset]);
 
   const attendance = useMemo(

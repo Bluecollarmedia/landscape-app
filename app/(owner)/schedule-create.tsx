@@ -11,9 +11,10 @@ import { Input, Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { mockMembers, mockProjects, mockTrucks } from '@/data/mock';
+import { db, useDb } from '@/data/store';
+import { todayKey, localDateKey } from '@/lib/ids';
 
-const today = new Date().toISOString().split('T')[0];
+const today = todayKey();
 
 function formatDateFull(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -58,15 +59,16 @@ export default function ScheduleCreateScreen() {
 
   const schedule = useSchedule();
 
+  const v = useDb();
   const activeWorkers = useMemo(() =>
-    mockMembers.filter(m => m.role === 'worker' && m.status === 'active'),
-  []);
+    db.members.filter(m => m.role === 'worker' && m.status === 'active' && !!m.person),
+  [v]);
   const activeProjects = useMemo(() =>
-    mockProjects.filter(p => p.status === 'active'),
-  []);
+    db.projects.filter(p => p.status === 'active'),
+  [v]);
   const availableTrucks = useMemo(() =>
-    mockTrucks.filter(t => t.status !== 'out_of_service'),
-  []);
+    db.trucks.filter(t => t.status !== 'out_of_service'),
+  [v]);
 
   const [projectId, setProjectId] = useState(params.projectId ?? '');
   const [workerIds, setWorkerIds] = useState<string[]>(params.workerId ? [params.workerId] : []);
@@ -219,7 +221,7 @@ export default function ScheduleCreateScreen() {
                     value={dateObj}
                     mode="date"
                     display="compact"
-                    onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setDate(d.toISOString().split('T')[0]); }}
+                    onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setDate(localDateKey(d)); }}
                     style={styles.iosOverlay}
                     accessibilityLabel="Choose date"
                   />
@@ -230,7 +232,7 @@ export default function ScheduleCreateScreen() {
                   value={dateObj}
                   mode="date"
                   display="default"
-                  onChange={(_e: DateTimePickerEvent, d?: Date) => { setShowAndroidDate(false); if (d) setDate(d.toISOString().split('T')[0]); }}
+                  onChange={(_e: DateTimePickerEvent, d?: Date) => { setShowAndroidDate(false); if (d) setDate(localDateKey(d)); }}
                 />
               )}
             </Section>

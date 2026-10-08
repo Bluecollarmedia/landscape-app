@@ -44,8 +44,13 @@ function RootNavigator() {
     }
 
     if (appState === 'onboarding') {
-      if (!inOnboardingGroup) {
-        router.replace('/(onboarding)/join-team');
+      // Signed in but not part of a company yet. The setup hub links to the
+      // create-company / join-team / project-code screens, which also work
+      // for an already-signed-in user, so those are allowed here too.
+      const setupScreens = ['create-company', 'join-team', 'customer-access'];
+      const onSetupScreen = inAuthGroup && setupScreens.includes((segments as string[])[1] ?? '');
+      if (!inOnboardingGroup && !onSetupScreen) {
+        router.replace('/(onboarding)/setup');
       }
       return;
     }

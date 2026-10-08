@@ -8,11 +8,13 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { Button, Input, Card } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
+import { useCustomers } from '@/hooks/useCustomers';
 
 export default function NewCustomerScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { addCustomer } = useCustomers();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -28,6 +30,13 @@ export default function NewCustomerScreen() {
       }
       return;
     }
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+      if (Platform.OS === 'web') alert('Please enter a valid email address.');
+      else Alert.alert('Check the email', 'Please enter a valid email address.');
+      return;
+    }
+    addCustomer({ firstName, lastName, email: trimmedEmail, phone });
     router.back();
   }
 
@@ -69,6 +78,7 @@ export default function NewCustomerScreen() {
               value={email}
               onChangeText={setEmail}
               icon="mail"
+              hint="If they create an account with this email, they'll see the projects you assign to them."
               keyboardType="email-address"
               autoCapitalize="none"
               containerStyle={styles.fieldGap}

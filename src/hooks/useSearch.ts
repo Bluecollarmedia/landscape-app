@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { mockProjects, mockMembers } from '@/data/mock';
+import { db, useDb } from '@/data/store';
 
 export interface SearchResult {
   id: string;
@@ -58,12 +58,13 @@ function scoreField(value: string | undefined | null, query: string): number {
 }
 
 export function useSearch(query: string) {
+  const v = useDb();
   const results = useMemo<SearchResult[]>(() => {
     if (!query.trim() || query.length < 2) return [];
 
     const scored: (SearchResult & { score: number })[] = [];
 
-    for (const p of mockProjects) {
+    for (const p of db.projects) {
       const customerName = p.customer ? `${p.customer.firstName} ${p.customer.lastName}` : '';
       const score = Math.max(
         scoreField(p.name, query),
@@ -83,7 +84,7 @@ export function useSearch(query: string) {
       }
     }
 
-    for (const m of mockMembers) {
+    for (const m of db.members) {
       if (!m.person) continue;
       const p = m.person;
       const name = `${p.firstName} ${p.lastName}`;
@@ -103,7 +104,7 @@ export function useSearch(query: string) {
 
     scored.sort((a, b) => b.score - a.score);
     return scored.map(({ score, ...item }) => item);
-  }, [query]);
+  }, [query, v]);
 
   return { results };
 }

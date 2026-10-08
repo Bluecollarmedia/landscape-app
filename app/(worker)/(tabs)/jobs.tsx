@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import type { Assignment } from '@/types/schedule';
+import { localDateKey } from '@/lib/ids';
 
 // Temporary placeholders — swap for real per-project photos once available.
 const THUMBNAIL_URIS = [
@@ -43,7 +44,7 @@ function formatDateHeading(dateStr: string): string {
   const y = new Date(today);
   y.setDate(y.getDate() - 1);
 
-  const iso = (x: Date) => x.toISOString().split('T')[0];
+  const iso = (x: Date) => localDateKey(x);
   if (dateStr === iso(today)) return 'Today';
   if (dateStr === iso(tomorrow)) return 'Tomorrow';
   if (dateStr === iso(y)) return 'Yesterday';

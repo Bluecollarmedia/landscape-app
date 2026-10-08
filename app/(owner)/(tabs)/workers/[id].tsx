@@ -11,13 +11,14 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { haptics } from '@/lib/haptics';
+import { todayKey, localDateKey } from '@/lib/ids';
 
-const today = new Date().toISOString().split('T')[0];
+const today = todayKey();
 
 function offsetDate(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 function formatTime(time?: string): string {

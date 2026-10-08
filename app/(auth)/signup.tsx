@@ -1,13 +1,13 @@
 /**
  * Sign Up Screen — Brighton Lawn + Landscape
  *
- * New account creation. For this phase, it creates owner accounts.
- * Worker and customer accounts will be created through invitations
- * from the owner in a later phase.
+ * Plain account creation (no company yet). Used by people the owner invited
+ * by email: signing up with the invited email adds them to the company
+ * automatically. Anyone else lands on "Finish setting up" afterwards.
  */
 
 import React, { useState, useRef } from 'react';
-import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -51,7 +51,13 @@ export default function SignUpScreen() {
     setLoading(true);
 
     try {
-      await signUp(email.trim(), password, 'owner', firstName.trim(), lastName.trim());
+      const result = await signUp(email.trim(), password, { firstName: firstName.trim(), lastName: lastName.trim() });
+      if (result.needsEmailConfirmation) {
+        const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in.`;
+        if (Platform.OS === 'web') alert(msg);
+        else Alert.alert('Check your email', msg);
+        router.replace('/(auth)/login');
+      }
     } catch (err: any) {
       setError(err?.message ?? 'Something went wrong. Please try again.');
     } finally {
@@ -81,7 +87,7 @@ export default function SignUpScreen() {
           Create your account
         </Text>
         <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-          Get started managing your business
+          Invited by your company? Use the email they invited.
         </Text>
       </View>
 

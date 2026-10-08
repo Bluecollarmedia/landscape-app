@@ -9,7 +9,7 @@ import { Card, Button, StatusBadge, Avatar, OptimizedImage } from '@/components/
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { useJoinRequests, useMemberships } from '@/hooks/useOnboarding';
+import { useJoinRequests } from '@/hooks/useOnboarding';
 import type { JoinRequest } from '@/types/onboarding';
 import { haptics } from '@/lib/haptics';
 
@@ -46,22 +46,13 @@ export default function PendingRequestsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { pendingRequests, allRequests, approveRequest, declineRequest } = useJoinRequests();
-  const { createMembership } = useMemberships();
   const [activeTab, setActiveTab] = useState<Tab>('pending');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   function handleApprove(request: JoinRequest) {
     haptics.success();
+    // Also makes them an active worker (see approve_join_request in supabase/schema.sql).
     approveRequest(request.id, 'worker');
-    if (request.person) {
-      createMembership({
-        personId: request.personId,
-        role: 'worker',
-        joinMethod: request.joinMethod,
-        joinRequestId: request.id,
-        person: request.person,
-      });
-    }
   }
 
   function handleDecline(request: JoinRequest) {

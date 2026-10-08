@@ -62,6 +62,11 @@ Rule of thumb: if you add a new screen that's reachable from more than one tab a
 
 `ScheduleProvider` wraps the whole `Stack` in `(owner)/_layout.tsx` (not inside `(tabs)/_layout.tsx`) so the tabs and the modal screens share the same schedule state.
 
+## Worker & Customer Navigation
+`app/(worker)/_layout.tsx` and `app/(customer)/_layout.tsx` are also a `Stack` over a `(tabs)` group. Detail screens (worker `task/[id]`, `job/[id]`, `day/[date]`, `edit-profile`, `notifications`; customer `project`) sit beside `(tabs)` in the Stack. Don't move them back into the tab navigator with `href: null`/`hidden`: native tabs can't navigate to routes that aren't tab triggers, so those taps silently do nothing on iOS (works on web, which uses JS tabs).
+
+Scrollable tab screens need `useTabBarClearance()` (`src/hooks/`) as bottom padding so the last item clears the floating Liquid Glass tab bar; `ScreenContainer` already applies it.
+
 ## EAS / Build State
 - EAS project: `@drakematcher/brighton-lawn-landscape` (expo.dev account `drakematcher`, not `abbacohen2` — an earlier EAS project existed under `abbacohen2` but this app's `owner`/`projectId` in `app.json` were repointed to a fresh project under `drakematcher`, which is the account with working Apple Developer Program access).
 - Apple Team: `93LDR9MQMF` (David Cohen, Individual).

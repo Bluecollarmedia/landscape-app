@@ -64,7 +64,7 @@ export default function JobDetailScreen() {
   if (!assignment) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <Header onBack={() => router.replace('/(worker)/jobs' as any)} colors={colors} insets={insets} />
+        <Header onBack={() => router.back()} colors={colors} insets={insets} />
         <View style={styles.center}>
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Job not found</Text>
         </View>
@@ -99,7 +99,7 @@ export default function JobDetailScreen() {
         <View style={styles.hero}>
           <Image source={{ uri: HERO_IMAGE_URI }} style={styles.heroImage} resizeMode="cover" />
           <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.sm }]}>
-            <Pressable onPress={() => router.replace('/(worker)/jobs' as any)} hitSlop={12}>
+            <Pressable onPress={() => router.back()} hitSlop={12}>
               {HAS_LIQUID_GLASS ? (
                 <GlassView glassEffectStyle="regular" isInteractive style={styles.backChip}>
                   <Feather name="chevron-left" size={20} color="#FFFFFF" />

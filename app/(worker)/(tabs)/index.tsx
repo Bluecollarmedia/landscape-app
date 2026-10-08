@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -68,6 +69,7 @@ export default function WorkerTodayScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const {
     todayAssignments, currentJob, jobState, checkIns, checkOuts, moveToNextJob,
     scheduleConfirmed, confirmSchedule, checkIn, checkOut, openMapsNavigation,
@@ -105,6 +107,9 @@ export default function WorkerTodayScreen() {
 
   const tasks = primaryAssignment ? projectTasks(primaryAssignment.projectId) : [];
   const completedTasks = tasks.filter(t => t.status === 'completed');
+  // Completed tasks fold away under a toggle so the list shows only what's left to do.
+  const openTasks = tasks.filter(t => t.status !== 'completed');
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
   const settings = primaryAssignment ? projectSettings(primaryAssignment.projectId) : undefined;
   const photoRequired = settings?.completionPhotoRequired ?? false;
 
@@ -148,6 +153,45 @@ export default function WorkerTodayScreen() {
 
   function handleTaskPress(task: ProjectTask) {
     router.push(`/(worker)/task/${task.id}` as any);
+  }
+
+  function renderTaskRow(task: ProjectTask, first: boolean) {
+    return (
+      <Pressable
+        key={task.id}
+        style={[
+          styles.taskRow,
+          { borderTopColor: colors.borderLight, marginTop: first ? spacing.md : 0 },
+        ]}
+        onPress={() => handleTaskPress(task)}
+      >
+        {task.status === 'completed' ? (
+          <Feather name="check-circle" size={22} color={colors.success} />
+        ) : (
+          <Feather name="circle" size={22} color={colors.border} />
+        )}
+        <View style={{ flex: 1, marginLeft: spacing.md }}>
+          <Text
+            style={[
+              typeScale.bodyLarge,
+              { color: task.status === 'completed' ? colors.textSecondary : colors.textPrimary },
+              task.status === 'completed' && { textDecorationLine: 'line-through' },
+            ]}
+          >
+            {task.title}
+          </Text>
+          {task.status === 'in_progress' && (
+            <View style={[styles.inProgressTag, { backgroundColor: colors.warningLight }]}>
+              <Text style={[typeScale.caption, { color: colors.warning }]}>In Progress</Text>
+            </View>
+          )}
+        </View>
+        {photoRequired && task.status !== 'completed' && !taskPhotoCaptured[task.id] && (
+          <Feather name="camera" size={17} color={colors.info} style={{ marginRight: spacing.sm }} />
+        )}
+        <Feather name="chevron-right" size={18} color={colors.textTertiary} />
+      </Pressable>
+    );
   }
 
   function handleOpenAnnouncement() {
@@ -236,7 +280,7 @@ export default function WorkerTodayScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         <View style={[styles.hero, { height: showWorking ? HERO_HEIGHT_COMPACT : HERO_HEIGHT }]}>
           <Image source={{ uri: HERO_IMAGE_URI }} style={styles.heroImage} resizeMode="cover" />
           <LinearGradient
@@ -485,42 +529,27 @@ export default function WorkerTodayScreen() {
                       />
                     </View>
                   </View>
-                  {tasks.map((task, i) => (
+                  {openTasks.map((task, i) => renderTaskRow(task, i === 0))}
+                  {openTasks.length === 0 && (
+                    <View style={[styles.allDoneRow, { marginTop: spacing.md }]}>
+                      <Feather name="check-circle" size={18} color={colors.success} />
+                      <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
+                        All tasks done
+                      </Text>
+                    </View>
+                  )}
+                  {completedTasks.length > 0 && (
                     <Pressable
-                      key={task.id}
-                      style={[
-                        styles.taskRow,
-                        { borderTopColor: colors.borderLight, marginTop: i === 0 ? spacing.md : 0 },
-                      ]}
-                      onPress={() => handleTaskPress(task)}
+                      style={[styles.completedToggle, { borderTopColor: colors.borderLight }]}
+                      onPress={() => { haptics.select(); setShowCompletedTasks(v => !v); }}
                     >
-                      {task.status === 'completed' ? (
-                        <Feather name="check-circle" size={22} color={colors.success} />
-                      ) : (
-                        <Feather name="circle" size={22} color={colors.border} />
-                      )}
-                      <View style={{ flex: 1, marginLeft: spacing.md }}>
-                        <Text
-                          style={[
-                            typeScale.bodyLarge,
-                            { color: task.status === 'completed' ? colors.textSecondary : colors.textPrimary },
-                            task.status === 'completed' && { textDecorationLine: 'line-through' },
-                          ]}
-                        >
-                          {task.title}
-                        </Text>
-                        {task.status === 'in_progress' && (
-                          <View style={[styles.inProgressTag, { backgroundColor: colors.warningLight }]}>
-                            <Text style={[typeScale.caption, { color: colors.warning }]}>In Progress</Text>
-                          </View>
-                        )}
-                      </View>
-                      {photoRequired && task.status !== 'completed' && !taskPhotoCaptured[task.id] && (
-                        <Feather name="camera" size={17} color={colors.info} style={{ marginRight: spacing.sm }} />
-                      )}
-                      <Feather name="chevron-right" size={18} color={colors.textTertiary} />
+                      <Text style={[typeScale.bodyLarge, { color: colors.primary, fontWeight: '600', flex: 1 }]}>
+                        {showCompletedTasks ? 'Hide completed' : `Show completed (${completedTasks.length})`}
+                      </Text>
+                      <Feather name={showCompletedTasks ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
                     </Pressable>
-                  ))}
+                  )}
+                  {showCompletedTasks && completedTasks.map(task => renderTaskRow(task, false))}
                 </View>
               )}
 
@@ -817,6 +846,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   leavingCard: { flexDirection: 'row', alignItems: 'center' },
+  allDoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  completedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   checkedOutScreen: {
     alignItems: 'center',
     paddingHorizontal: spacing.lg,

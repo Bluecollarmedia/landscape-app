@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { useWorkerContext } from '@/providers/WorkerProvider';
 import { Avatar, ListSection, ListRow } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -89,8 +90,8 @@ export default function WorkerSettingsScreen() {
         <ListRow title="Version" value="1.0.0" />
       </ListSection>
 
-      {__DEV__ && (
-        <ListSection title="Dev Tools" footer="Switch between roles for testing — not shown in production builds">
+      {!isSupabaseConfigured && (
+        <ListSection title="Dev Tools" footer="Switch between roles for testing — hidden once the app is connected to a real backend">
           <ListRow
             icon="briefcase"
             title="Owner"

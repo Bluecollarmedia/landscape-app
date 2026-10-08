@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -97,6 +98,7 @@ function StatChip({ icon, label, colors }: { icon: keyof typeof Feather.glyphMap
 export default function WorkerActivityScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const router = useRouter();
   const [weekOffset, setWeekOffset] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -145,7 +147,7 @@ export default function WorkerActivityScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }]}>
           <Text style={[typeScale.overline, { color: colors.primaryDark }]}>{summary.rangeLabel.toUpperCase()}</Text>
           <Text style={[typeScale.displayLarge, { color: colors.textPrimary, marginTop: 2 }]}>
@@ -194,7 +196,7 @@ function SummaryStat({ icon, value, label, colors }: { icon: keyof typeof Feathe
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  hero: { overflow: 'hidden' },
+  hero: { zIndex: 10 },
   heroImage: { position: 'absolute', width: '100%', height: '100%' },
   headerContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start' },

@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import type { AppState } from '@/providers/AuthProvider';
 import { ListSection, ListRow } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -95,8 +96,8 @@ export default function SettingsScreen() {
           <ListRow icon="database" title="Backend" subtitle="Mock data (Supabase not configured)" />
         </ListSection>
 
-        {__DEV__ && (
-          <ListSection title="Dev Tools" footer="Switch between roles and states for testing — not shown in production builds">
+        {!isSupabaseConfigured && (
+          <ListSection title="Dev Tools" footer="Switch between roles and states for testing — hidden once the app is connected to a real backend">
             {devStates.map((item) => {
               const isActive =
                 (item.role && appState === 'active' && user?.role === item.role) ||

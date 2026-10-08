@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { ScreenContainer } from '@/components/layout';
 import { Avatar, ListSection, ListRow } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -39,8 +40,8 @@ export default function CustomerAccountScreen() {
         <ListRow icon="phone" title="Phone" value={mockCompany.phone ?? '—'} />
       </ListSection>
 
-      {__DEV__ && (
-        <ListSection title="Dev Tools" footer="Switch between roles for testing — not shown in production builds">
+      {!isSupabaseConfigured && (
+        <ListSection title="Dev Tools" footer="Switch between roles for testing — hidden once the app is connected to a real backend">
           <ListRow
             icon="briefcase"
             title="Owner"

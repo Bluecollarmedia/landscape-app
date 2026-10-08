@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/ThemeProvider';
 import { spacing, sizing } from '@/theme/spacing';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 interface ScreenContainerProps {
   children: React.ReactNode;
@@ -44,6 +45,7 @@ export function ScreenContainer({
 }: ScreenContainerProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
 
   const outerStyle: ViewStyle = {
     flex: 1,
@@ -60,7 +62,9 @@ export function ScreenContainer({
           alignSelf: 'center' as const,
         }
       : {}),
-    paddingBottom: insets.bottom || spacing.lg,
+    // Scrollable screens get extra room so their last item can scroll out
+    // from under the floating tab bar.
+    paddingBottom: scrollable ? tabBarClearance : insets.bottom || spacing.lg,
     ...contentStyle,
   };
 

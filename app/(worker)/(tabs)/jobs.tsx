@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Image } from 'react-native';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -102,6 +103,7 @@ function JobCard({ assignment, onPress }: { assignment: Assignment; onPress: () 
 export default function WorkerJobsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const router = useRouter();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const { upcomingAssignments, completedAssignments } = useWorkerContext();
@@ -148,7 +150,7 @@ export default function WorkerJobsScreen() {
           />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.listContent, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
           {groups.map(group => (
             <View key={group.date} style={styles.dateGroup}>
               <View style={styles.dateHeaderRow}>

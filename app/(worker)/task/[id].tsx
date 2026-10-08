@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,13 +54,35 @@ export default function TaskDetailScreen() {
     startTask(task!.id);
   }
 
-  async function handleTakePhoto() {
+  function handleTakePhoto() {
+    if (Platform.OS === 'web') {
+      pickPhoto('library');
+      return;
+    }
+    Alert.alert('Add Photo', undefined, [
+      { text: 'Take Photo', onPress: () => pickPhoto('camera') },
+      { text: 'Choose from Library', onPress: () => pickPhoto('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  async function pickPhoto(source: 'camera' | 'library') {
     setBusy(true);
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.7,
-      });
+      const permission = source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          source === 'camera' ? 'Camera access needed' : 'Photo access needed',
+          'Turn it on for Brighton Lawn in the Settings app to add task photos.',
+        );
+        return;
+      }
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
       if (!result.canceled && result.assets[0]) {
         haptics.success();
         captureTaskPhoto(task!.id, result.assets[0].uri);

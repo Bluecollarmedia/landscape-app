@@ -55,7 +55,7 @@ export default function DayDetailScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.replace('/(worker)/activity' as any)} hitSlop={12} style={styles.backRow}>
+        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backRow}>
           <Feather name="chevron-left" size={22} color={colors.textPrimary} />
           <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Activity</Text>
         </Pressable>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import { useAuth } from './AuthProvider';
 import {
   mockAssignments,
@@ -350,7 +350,13 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     }
     if (Platform.OS === 'web') {
       window.open(url, '_blank');
+      return;
     }
+    // https links hand off to the installed app (Google Maps, Waze, Apple
+    // Maps) via universal links, or fall back to the browser if it's missing.
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Could not open maps', address);
+    });
   }, [workerSettings.navApp]);
 
   const value = useMemo<WorkerContextValue>(() => ({

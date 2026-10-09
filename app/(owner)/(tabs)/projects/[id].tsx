@@ -179,7 +179,7 @@ export default function ProjectDetailScreen() {
   const [moreSubSection, setMoreSubSection] = useState<'people' | 'activity' | 'settings' | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
-  const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
+  const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, editRequestResponse, reopenRequest, deleteRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
   const { user } = useAuth();
   const schedule = useSchedule();
   const customerAccess = useCustomerAccess();
@@ -194,6 +194,8 @@ export default function ProjectDetailScreen() {
   const [updateBody, setUpdateBody] = useState('');
   const [updateVisible, setUpdateVisible] = useState(true);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
+  const [editingResponseFor, setEditingResponseFor] = useState<string | null>(null);
+  const [responseDraft, setResponseDraft] = useState('');
   const [responseNote, setResponseNote] = useState('');
   const [codeCopied, setCodeCopied] = useState(false);
   const [accessVersion, setAccessVersion] = useState(0);
@@ -1589,6 +1591,21 @@ export default function ProjectDetailScreen() {
     setResponseNote('');
   }
 
+  function confirmAction(title: string, message: string, ok: string, onOk: () => void) {
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) onOk();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: ok, style: 'destructive', onPress: onOk },
+    ]);
+  }
+
+  function handleDeleteRequest(reqId: string) {
+    confirmAction('Delete this request?', 'It will be removed for you and the customer. This can\u2019t be undone.', 'Delete', () => deleteRequest(reqId));
+  }
+
   function renderRequests() {
     const statusBadge = (status: string) => {
       switch (status) {
@@ -1664,14 +1681,17 @@ export default function ProjectDetailScreen() {
                           </View>
                         </View>
                       ) : (
-                        <Button
-                          title="Respond"
-                          onPress={() => { setRespondingTo(req.id); setResponseNote(''); }}
-                          variant="secondary"
-                          size="sm"
-                          icon="message-square"
-                          style={{ marginTop: spacing.md }}
-                        />
+                        <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md }}>
+                          <Button
+                            title="Respond"
+                            onPress={() => { setRespondingTo(req.id); setResponseNote(''); }}
+                            variant="secondary"
+                            size="sm"
+                            icon="message-square"
+                            style={{ flex: 1 }}
+                          />
+                          <Button title="Delete" onPress={() => handleDeleteRequest(req.id)} variant="ghost" size="sm" icon="trash-2" />
+                        </View>
                       )}
                     </Card>
                   );
@@ -1716,6 +1736,39 @@ export default function ProjectDetailScreen() {
                   <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.md }]}>
                     {req.requester ? `${req.requester.firstName} ${req.requester.lastName}` : 'Customer'} · {formatDateTime(req.createdAt)}
                   </Text>
+
+                  {editingResponseFor === req.id ? (
+                    <View style={{ marginTop: spacing.md }}>
+                      <TextInput
+                        style={[styles.composerInput, { backgroundColor: colors.surface, borderColor: colors.borderLight, color: colors.textPrimary }]}
+                        value={responseDraft}
+                        onChangeText={setResponseDraft}
+                        placeholder="Response to the customer"
+                        placeholderTextColor={colors.textTertiary}
+                        multiline
+                        autoFocus
+                      />
+                      <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm }}>
+                        <Button title="Save" onPress={() => { editRequestResponse(req.id, responseDraft); setEditingResponseFor(null); }} size="sm" icon="check" style={{ flex: 1 }} />
+                        <Button title="Cancel" onPress={() => setEditingResponseFor(null)} variant="secondary" size="sm" style={{ flex: 1 }} />
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md, flexWrap: 'wrap' }}>
+                      <Button
+                        title={req.responseNote ? 'Edit Response' : 'Add Response'}
+                        onPress={() => { setEditingResponseFor(req.id); setResponseDraft(req.responseNote ?? ''); }}
+                        variant="secondary"
+                        size="sm"
+                        icon="edit-2"
+                      />
+                      {req.status !== 'completed' && (
+                        <Button title="Mark Done" onPress={() => respondToRequest(req.id, 'completed', req.responseNote)} variant="secondary" size="sm" icon="check-circle" />
+                      )}
+                      <Button title="Reopen" onPress={() => reopenRequest(req.id)} variant="secondary" size="sm" icon="rotate-ccw" />
+                      <Button title="Delete" onPress={() => handleDeleteRequest(req.id)} variant="ghost" size="sm" icon="trash-2" />
+                    </View>
+                  )}
                 </Card>
               );
             })}

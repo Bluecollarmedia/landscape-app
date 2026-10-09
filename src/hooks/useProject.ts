@@ -209,6 +209,24 @@ export function useProject(projectId: string) {
     }
   }, [projectId]);
 
+  /** Owner fixes the wording of a response already sent. */
+  const editRequestResponse = useCallback((requestId: string, responseNote: string) => {
+    updateRow('project_requests', requestId, { responseNote: responseNote.trim() || undefined });
+  }, []);
+
+  /** Puts a handled request back in the pending list. */
+  const reopenRequest = useCallback((requestId: string) => {
+    const before = findRow('project_requests', requestId);
+    updateRow('project_requests', requestId, { status: 'pending', respondedAt: undefined });
+    logProjectHistory(projectId, 'request_responded', `Request reopened: ${before?.title ?? 'Request'}`, { requestId, status: 'pending' });
+  }, [projectId]);
+
+  const deleteRequest = useCallback((requestId: string) => {
+    const before = findRow('project_requests', requestId);
+    deleteRow('project_requests', requestId);
+    logProjectHistory(projectId, 'request_responded', `Request deleted: ${before?.title ?? 'Request'}`, { requestId });
+  }, [projectId]);
+
   // ── Stats ──
 
   const photoStats = useMemo(() => {
@@ -230,7 +248,7 @@ export function useProject(projectId: string) {
     tasks, addTask, updateTask,
     team, addTeamMember, removeTeamMember,
     settings, updateSettings,
-    history, updates, postUpdate, requests, submitRequest, respondToRequest,
+    history, updates, postUpdate, requests, submitRequest, respondToRequest, editRequestResponse, reopenRequest, deleteRequest,
     photos, addPhoto, updatePhoto, deletePhoto,
     customerTimeline, taskStats, photoStats,
   };

@@ -1,0 +1,25 @@
+import type { NotificationEventType } from '@/types/operations';
+
+export const EVENT_LABELS: Record<NotificationEventType, { label: string; icon: string; description: string }> = {
+  worker_checked_in: { label: 'Worker Checked In', icon: 'log-in', description: 'When a worker checks in at a job site' },
+  worker_checked_out: { label: 'Worker Checked Out', icon: 'log-out', description: 'When a worker checks out from a job site' },
+  worker_checked_in_late: { label: 'Late Check-In', icon: 'alert-circle', description: 'When a worker checks in after the scheduled time' },
+  worker_outside_radius: { label: 'Outside Job Radius', icon: 'map-pin', description: 'When a worker checks in far from the job site' },
+  worker_not_checked_in: { label: 'Missing Check-In', icon: 'x-circle', description: 'When a worker hasn\'t checked in after grace period' },
+  worker_past_scheduled_end: { label: 'Past Scheduled End', icon: 'clock', description: 'When a worker is still checked in past their end time' },
+  worker_completed_task: { label: 'Task Completed', icon: 'check-square', description: 'When a worker marks a task as done' },
+  worker_completed_job: { label: 'Job Completed', icon: 'check-circle', description: 'When all tasks at a job site are finished' },
+  photo_waiting_review: { label: 'Photos Pending', icon: 'camera', description: 'When new photos need your review' },
+  customer_request_submitted: { label: 'Customer Request', icon: 'message-square', description: 'When a customer submits a request' },
+  schedule_changed: { label: 'Schedule Changed', icon: 'calendar', description: 'When the schedule is modified' },
+  announcement_posted: { label: 'Announcement', icon: 'volume-2', description: 'When an announcement is posted' },
+  schedule_conflict: { label: 'Schedule Conflict', icon: 'alert-triangle', description: 'When a scheduling conflict is detected' },
+};
+
+export const ALL_EVENTS: NotificationEventType[] = [
+  'worker_checked_in', 'worker_checked_out', 'worker_checked_in_late',
+  'worker_outside_radius', 'worker_not_checked_in', 'worker_past_scheduled_end',
+  'worker_completed_task', 'worker_completed_job',
+  'photo_waiting_review', 'customer_request_submitted',
+  'schedule_changed', 'schedule_conflict',
+];

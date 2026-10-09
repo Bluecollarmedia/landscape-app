@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -14,8 +14,12 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { getProjectImageUri, getCompanyImageUri } from '@/lib/projectImages';
+import { useCompanySetup } from '@/hooks/useCompanySetup';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
+
+/** The setup walkthrough opens by itself once per app launch until it's been gone through. */
+let setupOpenedThisLaunch = false;
 
 
 function getGreeting(): string {
@@ -52,6 +56,14 @@ export default function OwnerDashboard() {
     todayStats, attentionItems, attentionTotalCount,
     crewToday, crewTodayTotal, activeProjects, activeProjectsTotal,
   } = useOwnerDashboard();
+  const setup = useCompanySetup();
+
+  useEffect(() => {
+    if (setup.needsWalkthrough && !setupOpenedThisLaunch) {
+      setupOpenedThisLaunch = true;
+      router.push('/(owner)/setup' as any);
+    }
+  }, [setup.needsWalkthrough, router]);
 
   function renderHeroStat(icon: React.ReactNode, value: number, label: string) {
     return (
@@ -281,6 +293,32 @@ export default function OwnerDashboard() {
             </View>
           </View>
 
+          {/* Recommended setup checklist, until every step is done */}
+          {setup.showChecklist && (
+            <View style={[styles.setupCard, { backgroundColor: colors.surface, borderColor: colors.primaryLight }, shadow.sm]}>
+              <View style={styles.sectionTitleRow}>
+                <Icon name="check-square" size={18} color={colors.primary} />
+                <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Finish your setup</Text>
+                <Text style={[typeScale.labelSmall, { color: colors.primary }]}>{setup.doneCount} of {setup.total}</Text>
+              </View>
+              <ProgressBar progress={Math.round((setup.doneCount / setup.total) * 100)} height={6} style={{ marginVertical: spacing.sm }} />
+              {setup.steps.map((s) => (
+                <Pressable
+                  key={s.key}
+                  style={styles.setupRow}
+                  onPress={() => router.push({ pathname: '/(owner)/setup', params: { step: s.key } } as any)}
+                  disabled={s.done}
+                >
+                  <Icon name={s.done ? 'check-circle' : 'circle'} size={18} color={s.done ? semantic.success : colors.textTertiary} />
+                  <Text style={[typeScale.bodySmall, { flex: 1, color: s.done ? colors.textTertiary : colors.textPrimary, textDecorationLine: s.done ? 'line-through' : 'none' }]}>
+                    {s.title}
+                  </Text>
+                  {!s.done && <Icon name="chevron-right" size={16} color={colors.textTertiary} />}
+                </Pressable>
+              ))}
+            </View>
+          )}
+
           {/* Needs Attention */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -400,6 +438,18 @@ export default function OwnerDashboard() {
 }
 
 const styles = StyleSheet.create({
+  setupCard: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  setupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
   screen: { flex: 1 },
   scrollContent: { paddingBottom: spacing['5xl'] },
   header: {

@@ -64,6 +64,24 @@ export default function SettingsScreen() {
             title="Address"
             subtitle={[company?.address, company?.city, [company?.state, company?.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'}
           />
+          {!db.demo && (
+            <>
+              <ListRow
+                icon="image"
+                iconColor={colors.primary}
+                title="Company Info & Dashboard Photo"
+                showChevron
+                onPress={() => router.push({ pathname: '/(owner)/setup', params: { step: 'company' } } as any)}
+              />
+              <ListRow
+                icon="check-square"
+                iconColor={colors.primary}
+                title="Recommended Setup"
+                showChevron
+                onPress={() => router.push('/(owner)/setup' as any)}
+              />
+            </>
+          )}
         </ListSection>
 
         <ListSection title="Team & Joining">
@@ -95,7 +113,7 @@ export default function SettingsScreen() {
 
         <ListSection title="App">
           <ListRow icon="info" title="Version" value="1.0.0" />
-          <ListRow icon="database" title="Backend" subtitle="Mock data (Supabase not configured)" />
+          <ListRow icon="database" title="Backend" subtitle={isSupabaseConfigured ? 'Supabase (live data)' : 'Mock data (Supabase not configured)'} />
         </ListSection>
 
         {!isSupabaseConfigured && (

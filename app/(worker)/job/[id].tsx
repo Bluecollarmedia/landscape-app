@@ -90,7 +90,7 @@ export default function JobDetailScreen() {
   const tasks = projectTasks(assignment.projectId);
 
   function handleOpenMaps() {
-    if (assignment!.project?.address) openMapsNavigation(assignment!.project.address);
+    if (assignment!.project?.address) openMapsNavigation(assignment!.project);
   }
 
   return (

@@ -11,6 +11,7 @@ import { SectionTabs, StatusBadge, ProgressBar, Card, EmptyState, Divider, Avata
 import { useProject } from '@/hooks/useProject';
 import { useAuth } from '@/providers/AuthProvider';
 import { attachImage } from '@/data/actions';
+import { openDirections } from '@/lib/maps';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
@@ -323,13 +324,16 @@ export default function ProjectDetailScreen() {
             {fullAddress && (
               <>
                 <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
-                <View style={styles.infoRow}>
+                <Pressable style={styles.infoRow} onPress={() => openDirections(p)} accessibilityRole="button" accessibilityLabel="Open address in Maps">
                   <Icon name="map-pin" size={16} color={colors.textTertiary} />
                   <View style={styles.infoText}>
-                    <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Address</Text>
+                    <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                      {p.latitude != null && p.longitude != null ? 'Address · found on the map' : 'Address'}
+                    </Text>
                     <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{fullAddress}</Text>
                   </View>
-                </View>
+                  <Icon name="navigation" size={16} color={colors.primary} />
+                </Pressable>
               </>
             )}
 

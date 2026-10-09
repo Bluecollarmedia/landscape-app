@@ -10,7 +10,8 @@ import { useCustomers } from '@/hooks/useCustomers';
 import { generateProjectCode } from '@/hooks/useCustomerAccess';
 import { useProject } from '@/hooks/useProject';
 import { insertRow } from '@/data/store';
-import { AddressFields, missingAddressPart } from '@/components/ui/AddressFields';
+import { AddressFields, missingAddressPart, type AddressCheck } from '@/components/ui/AddressFields';
+import { verifyAddress } from '@/lib/maps';
 import { logProjectHistory, attachImage } from '@/data/actions';
 import { getProjectImageUri } from '@/lib/projectImages';
 import { typeScale } from '@/theme/typography';
@@ -46,6 +47,10 @@ export default function NewProjectScreen() {
   const [city, setCity] = useState(existing?.city ?? '');
   const [state, setState] = useState(existing?.state ?? '');
   const [zip, setZip] = useState(existing?.zip ?? '');
+  const [addressCheck, setAddressCheck] = useState<AddressCheck>(
+    existing?.latitude != null && existing?.longitude != null ? { latitude: existing.latitude, longitude: existing.longitude } : {},
+  );
+  const [checking, setChecking] = useState(false);
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId);
   const [startDate, setStartDate] = useState(existing?.startDate ?? '');
@@ -69,7 +74,7 @@ export default function NewProjectScreen() {
     [allCustomers],
   );
 
-  function handleSave() {
+  async function handleSave() {
     if (!name.trim()) {
       showAlert('Required', 'Please enter a project name.');
       return;
@@ -86,6 +91,33 @@ export default function NewProjectScreen() {
       }
     }
 
+    // Look the address up on the map so Open Maps goes to the exact spot.
+    if (Platform.OS !== 'web' && addressCheck.latitude == null && !addressCheck.overridden) {
+      setChecking(true);
+      const r = await verifyAddress({ address, city, state, zip });
+      setChecking(false);
+      if (r.status === 'found') {
+        const found = { latitude: r.latitude, longitude: r.longitude };
+        setAddressCheck(found);
+        save(found);
+        return;
+      }
+      if (r.status === 'not_found') {
+        Alert.alert(
+          'Address not found on the map',
+          'Double-check the address. If it\u2019s right (a new build, for example), you can save it as typed.',
+          [
+            { text: 'Fix Address', style: 'cancel' },
+            { text: 'Save As Typed', onPress: () => { setAddressCheck({ overridden: true }); save({ overridden: true }); } },
+          ],
+        );
+        return;
+      }
+    }
+    save(addressCheck);
+  }
+
+  function save(check: AddressCheck) {
     const fields = {
       name: name.trim(),
       address: address.trim() || undefined,
@@ -96,6 +128,8 @@ export default function NewProjectScreen() {
       customerId,
       startDate: startDate.trim() || undefined,
       estimatedEndDate: endDate.trim() || undefined,
+      latitude: check.latitude,
+      longitude: check.longitude,
     };
 
     if (isEdit) {
@@ -221,6 +255,8 @@ export default function NewProjectScreen() {
               style={styles.fieldGap}
               value={{ address, city, state, zip }}
               onChange={(v) => { setAddress(v.address); setCity(v.city); setState(v.state); setZip(v.zip); }}
+              check={addressCheck}
+              onCheckChange={setAddressCheck}
             />
             <View style={styles.row}>
               <Input
@@ -292,6 +328,7 @@ export default function NewProjectScreen() {
             <Button
               title={isEdit ? 'Save Changes' : 'Create Project'}
               onPress={handleSave}
+              loading={checking}
               icon={isEdit ? 'check' : 'plus'}
               fullWidth
               size="lg"

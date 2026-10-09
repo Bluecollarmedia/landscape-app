@@ -1,3 +1,4 @@
+import { openDirections, type Place } from '@/lib/maps';
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { useAuth } from './AuthProvider';
@@ -54,7 +55,7 @@ interface WorkerContextValue {
   offlineQueue: OfflineAction[];
   isOnline: boolean;
 
-  openMapsNavigation: (address: string) => void;
+  openMapsNavigation: (place: Place) => void;
   moveToNextJob: () => void;
 }
 
@@ -325,33 +326,8 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     upsertRow('worker_settings', { personId: workerId, navApp: db.workerSettings.navApp, notificationsEnabled: enabled });
   }, [workerId]);
 
-  const openMapsNavigation = useCallback((address: string) => {
-    const encoded = encodeURIComponent(address);
-    let url = '';
-    switch (workerSettings.navApp) {
-      case 'google_maps':
-        url = `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-        break;
-      case 'waze':
-        url = `https://waze.com/ul?q=${encoded}&navigate=yes`;
-        break;
-      case 'apple_maps':
-        url = `https://maps.apple.com/?daddr=${encoded}`;
-        break;
-      default:
-        url = Platform.OS === 'ios'
-          ? `https://maps.apple.com/?daddr=${encoded}`
-          : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-    }
-    if (Platform.OS === 'web') {
-      window.open(url, '_blank');
-      return;
-    }
-    // https links hand off to the installed app (Google Maps, Waze, Apple
-    // Maps) via universal links, or fall back to the browser if it's missing.
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Could not open maps', address);
-    });
+  const openMapsNavigation = useCallback((place: Place) => {
+    openDirections(place, workerSettings.navApp);
   }, [workerSettings.navApp]);
 
   const value = useMemo<WorkerContextValue>(() => ({

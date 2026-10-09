@@ -400,7 +400,7 @@ export default function WorkerTodayScreen() {
                     </View>
                     <Pressable
                       style={styles.openMapsRow}
-                      onPress={() => openMapsNavigation(primaryAssignment.project!.address!)}
+                      onPress={() => openMapsNavigation(primaryAssignment.project!)}
                     >
                       <Feather name="navigation" size={15} color={colors.primary} />
                       <Text style={[typeScale.bodyMedium, { color: colors.primary, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
@@ -499,7 +499,7 @@ export default function WorkerTodayScreen() {
                 {primaryAssignment.project?.address && (
                   <Pressable
                     style={[styles.actionPill, { backgroundColor: colors.primarySurface }]}
-                    onPress={() => openMapsNavigation(primaryAssignment.project!.address!)}
+                    onPress={() => openMapsNavigation(primaryAssignment.project!)}
                   >
                     <Feather name="navigation" size={16} color={colors.primaryDark} />
                     <Text style={[typeScale.bodyMedium, { color: colors.primaryDark, marginLeft: spacing.xs, fontWeight: '600' }]}>

@@ -8,7 +8,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
-import { useWorkerActivitySummary, formatWorkedDuration, type DayGroup } from '@/hooks/useWorkerActivitySummary';
+import { useWorkerActivitySummary, formatWorkedDuration, ACTIVITY_PERIODS, type ActivityPeriod, type DayGroup } from '@/hooks/useWorkerActivitySummary';
 import { getCompanyImageUri } from '@/lib/projectImages';
 
 
@@ -98,9 +98,9 @@ export default function WorkerActivityScreen() {
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
   const router = useRouter();
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [period, setPeriod] = useState<ActivityPeriod>('this_week');
   const [pickerOpen, setPickerOpen] = useState(false);
-  const summary = useWorkerActivitySummary(weekOffset);
+  const summary = useWorkerActivitySummary(period);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -120,22 +120,22 @@ export default function WorkerActivityScreen() {
                 onPress={() => setPickerOpen(v => !v)}
               >
                 <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontWeight: '600' }]}>
-                  {weekOffset === 0 ? 'This Week' : 'Last Week'}
+                  {summary.rangeLabel}
                 </Text>
                 <Feather name="chevron-down" size={14} color={colors.textSecondary} style={{ marginLeft: 4 }} />
               </Pressable>
               {pickerOpen && (
                 <View style={[styles.periodMenu, { backgroundColor: colors.surface }, shadow.md]}>
-                  {[0, 1].map(offset => (
+                  {ACTIVITY_PERIODS.map(p => (
                     <Pressable
-                      key={offset}
+                      key={p.key}
                       style={styles.periodMenuItem}
-                      onPress={() => { setWeekOffset(offset); setPickerOpen(false); }}
+                      onPress={() => { setPeriod(p.key); setPickerOpen(false); }}
                     >
-                      <Text style={[typeScale.bodyMedium, { color: weekOffset === offset ? colors.primary : colors.textPrimary }]}>
-                        {offset === 0 ? 'This Week' : 'Last Week'}
+                      <Text style={[typeScale.bodyMedium, { color: period === p.key ? colors.primary : colors.textPrimary }]}>
+                        {p.label}
                       </Text>
-                      {weekOffset === offset && <Feather name="check" size={16} color={colors.primary} />}
+                      {period === p.key && <Feather name="check" size={16} color={colors.primary} />}
                     </Pressable>
                   ))}
                 </View>
@@ -169,7 +169,7 @@ export default function WorkerActivityScreen() {
         {summary.days.length === 0 ? (
           <EmptyState
             icon="activity"
-            title="No activity this week"
+            title={`No activity ${period === 'all_time' ? 'yet' : summary.rangeLabel.toLowerCase()}`}
             description="Your check-ins, tasks, and photos will appear here."
           />
         ) : (
@@ -209,9 +209,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 40,
     right: 0,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     paddingVertical: spacing.xs,
-    minWidth: 140,
+    minWidth: 160,
     zIndex: 10,
   },
   periodMenuItem: {

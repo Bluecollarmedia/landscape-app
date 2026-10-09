@@ -125,7 +125,7 @@ export default function WorkerSettingsScreen() {
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.md }]}>
-              Navigation App
+              Maps App
             </Text>
             {NAV_OPTIONS.map(opt => (
               <Pressable

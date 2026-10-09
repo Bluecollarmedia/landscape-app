@@ -301,6 +301,10 @@ export default function CustomerAccessScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+            autoCapitalize="none"
+            autoCorrect={false}
             returnKeyType="done"
             onSubmitEditing={handleAuthenticate}
             icon="lock"

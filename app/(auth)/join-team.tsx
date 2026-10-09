@@ -270,8 +270,8 @@ export default function JoinTeamScreen() {
               Create your account or sign in if you already have one.
             </Text>
             <Input label="Email *" placeholder="you@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />
-            <Input label="Password *" placeholder="At least 6 characters" value={password} onChangeText={setPassword} secureTextEntry icon="lock" />
-            <Input label="Confirm Password *" placeholder="Re-enter password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry icon="lock" />
+            <Input label="Password *" placeholder="At least 6 characters" value={password} onChangeText={setPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
+            <Input label="Confirm Password *" placeholder="Re-enter password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
             <Button title="Next" onPress={handleAccountNext} fullWidth size="lg" icon="arrow-right" />
             <Pressable onPress={() => router.push('/(auth)/login')}>
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>

@@ -15,6 +15,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { SplashScreen } from '@/components/branding/SplashScreen';
+import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
 
 ExpoSplashScreen.preventAutoHideAsync();
 
@@ -96,7 +97,12 @@ function RootNavigator() {
     return <SplashScreen onFinish={handleSplashFinish} />;
   }
 
-  return <Slot />;
+  return (
+    <>
+      <Slot />
+      <SignInWelcome />
+    </>
+  );
 }
 
 export default function RootLayout() {

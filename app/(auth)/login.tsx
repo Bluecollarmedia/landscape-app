@@ -17,6 +17,7 @@ import { Button, Input } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
+import { startWelcome, cancelWelcome } from '@/lib/welcomeAnimation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 240);
@@ -43,9 +44,11 @@ export default function LoginScreen() {
     setError('');
     setLoading(true);
 
+    startWelcome();
     try {
       await signIn(email.trim(), password);
     } catch (err: any) {
+      cancelWelcome();
       setError(err?.message ?? 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);

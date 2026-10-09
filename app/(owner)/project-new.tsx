@@ -10,6 +10,7 @@ import { useCustomers } from '@/hooks/useCustomers';
 import { generateProjectCode } from '@/hooks/useCustomerAccess';
 import { useProject } from '@/hooks/useProject';
 import { insertRow } from '@/data/store';
+import { AddressFields, missingAddressPart } from '@/components/ui/AddressFields';
 import { logProjectHistory, attachImage } from '@/data/actions';
 import { getProjectImageUri } from '@/lib/projectImages';
 import { typeScale } from '@/theme/typography';
@@ -71,6 +72,11 @@ export default function NewProjectScreen() {
   function handleSave() {
     if (!name.trim()) {
       showAlert('Required', 'Please enter a project name.');
+      return;
+    }
+    const missingAddress = missingAddressPart({ address, city, state, zip });
+    if (missingAddress) {
+      showAlert('Address needed', missingAddress);
       return;
     }
     for (const [label, value] of [['Start date', startDate], ['Estimated end date', endDate]] as const) {
@@ -210,41 +216,12 @@ export default function NewProjectScreen() {
               icon="folder"
               containerStyle={styles.fieldGap}
             />
-            <Input
-              label="Street Address"
-              placeholder="123 Main St"
-              value={address}
-              onChangeText={setAddress}
-              icon="map-pin"
-              containerStyle={styles.fieldGap}
+            <AddressFields
+              required
+              style={styles.fieldGap}
+              value={{ address, city, state, zip }}
+              onChange={(v) => { setAddress(v.address); setCity(v.city); setState(v.state); setZip(v.zip); }}
             />
-            <View style={styles.row}>
-              <Input
-                label="City"
-                placeholder="Cleveland"
-                value={city}
-                onChangeText={setCity}
-                containerStyle={{ ...styles.fieldGap, flex: 2 }}
-              />
-              <Input
-                label="State"
-                placeholder="OH"
-                value={state}
-                onChangeText={setState}
-                containerStyle={{ ...styles.fieldGap, flex: 1 }}
-                maxLength={2}
-                autoCapitalize="characters"
-              />
-              <Input
-                label="ZIP"
-                placeholder="44122"
-                value={zip}
-                onChangeText={setZip}
-                containerStyle={{ ...styles.fieldGap, flex: 1 }}
-                maxLength={5}
-                keyboardType="number-pad"
-              />
-            </View>
             <View style={styles.row}>
               <Input
                 label="Start Date"

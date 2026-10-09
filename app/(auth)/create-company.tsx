@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { Input, Button } from '@/components/ui';
+import { AddressFields, missingAddressPart } from '@/components/ui/AddressFields';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -49,6 +50,15 @@ export default function CreateCompanyScreen() {
   function validateCompany() {
     if (!companyName.trim()) {
       setError('Please enter your company name.');
+      return false;
+    }
+    if (companyPhone.replace(/\D/g, '').length < 10) {
+      setError('Please enter the company phone number.');
+      return false;
+    }
+    const missing = missingAddressPart({ address: companyAddress, city: companyCity, state: companyState, zip: companyZip });
+    if (missing) {
+      setError(missing);
       return false;
     }
     setError('');
@@ -201,13 +211,12 @@ export default function CreateCompanyScreen() {
         {step === 'company' && (
           <View style={styles.form}>
             <Input label="Company Name *" placeholder="e.g. Brighton Lawn + Landscape" value={companyName} onChangeText={setCompanyName} icon="briefcase" />
-            <Input label="Company Phone" placeholder="(555) 555-0100" value={companyPhone} onChangeText={setCompanyPhone} keyboardType="phone-pad" icon="phone" />
-            <Input label="Street Address" placeholder="123 Main St" value={companyAddress} onChangeText={setCompanyAddress} icon="map-pin" />
-            <View style={styles.row}>
-              <Input label="City" placeholder="Cleveland" value={companyCity} onChangeText={setCompanyCity} containerStyle={styles.flex2} />
-              <Input label="State" placeholder="OH" value={companyState} onChangeText={setCompanyState} containerStyle={styles.flex1} />
-              <Input label="ZIP" placeholder="44101" value={companyZip} onChangeText={setCompanyZip} keyboardType="number-pad" containerStyle={styles.flex1} />
-            </View>
+            <Input label="Company Phone *" placeholder="(555) 555-0100" value={companyPhone} onChangeText={setCompanyPhone} keyboardType="phone-pad" icon="phone" textContentType="telephoneNumber" />
+            <AddressFields
+              required
+              value={{ address: companyAddress, city: companyCity, state: companyState, zip: companyZip }}
+              onChange={(a) => { setCompanyAddress(a.address); setCompanyCity(a.city); setCompanyState(a.state); setCompanyZip(a.zip); }}
+            />
             <Button title="Next" onPress={handleNext} fullWidth size="lg" icon="arrow-right" />
           </View>
         )}

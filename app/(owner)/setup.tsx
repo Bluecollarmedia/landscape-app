@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Button, Input, Card } from '@/components/ui';
+import { AddressFields } from '@/components/ui/AddressFields';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -415,12 +416,7 @@ function CompanyStep({ onSaved }: { onSaved: () => void }) {
         <View style={styles.form}>
           <Input label="Business phone" placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
           <Input label="Business email" placeholder="office@company.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />
-          <Input label="Address" placeholder="Street address" value={address} onChangeText={setAddress} icon="map-pin" />
-          <Input label="City" value={city} onChangeText={setCity} />
-          <View style={styles.row}>
-            <Input label="State" value={state} onChangeText={setState} autoCapitalize="characters" containerStyle={{ flex: 1 }} />
-            <Input label="ZIP" value={zip} onChangeText={setZip} keyboardType="number-pad" containerStyle={{ flex: 1 }} />
-          </View>
+          <AddressFields value={{ address, city, state, zip }} onChange={(v) => { setAddress(v.address); setCity(v.city); setState(v.state); setZip(v.zip); }} />
         </View>
       </Card>
       <Button title="Save & Finish Setup" onPress={handleSave} icon="check" fullWidth />

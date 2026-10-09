@@ -105,8 +105,9 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
 
   const upcomingAssignments = useMemo(() =>
     allAssignments
-      .filter(a => a.scheduledDate > today)
-      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || a.sortOrder - b.sortOrder),
+      // Today's unfinished jobs count as upcoming too, so My Jobs never looks empty on the day of a job.
+      .filter(a => a.scheduledDate > today || (a.scheduledDate === today && a.status !== 'completed'))
+      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || (a.startTime ?? '').localeCompare(b.startTime ?? '') || a.sortOrder - b.sortOrder),
     [allAssignments, today],
   );
 

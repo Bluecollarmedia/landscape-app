@@ -54,7 +54,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Brighton Lawn uses your location to check job site addresses on the map."
+          "locationWhenInUsePermission": "Brighton Lawn uses your location to check you in when you arrive at a job site."
         }
       ]
     ],

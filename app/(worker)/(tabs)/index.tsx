@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal, Alert, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -70,7 +70,7 @@ export default function WorkerTodayScreen() {
   const tabBarClearance = useTabBarClearance();
   const {
     todayAssignments, currentJob, jobState, checkIns, checkOuts, moveToNextJob,
-    scheduleConfirmed, confirmSchedule, checkIn, checkOut, openMapsNavigation,
+    scheduleConfirmed, confirmSchedule, checkIn, checkOut, locateForCheckIn, locateForCheckOut, openMapsNavigation,
     projectTasks, projectSettings, taskPhotoCaptured,
   } = useWorkerContext();
 
@@ -120,15 +120,27 @@ export default function WorkerTodayScreen() {
     confirmSchedule();
   }
 
-  function handleCheckIn() {
+  const [locating, setLocating] = useState(false);
+
+  async function handleCheckIn() {
+    if (locating) return;
+    haptics.select();
+    setLocating(true);
+    const result = await locateForCheckIn(primaryAssignment?.id);
+    setLocating(false);
+    if (!result.ok) {
+      haptics.warning();
+      if (Platform.OS === 'web') {
+        alert(`${result.title}\n\n${result.message}`);
+      } else {
+        Alert.alert(result.title, result.message, result.openSettings
+          ? [{ text: 'Cancel', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }]
+          : [{ text: 'OK' }]);
+      }
+      return;
+    }
     haptics.success();
-    const mockGps = {
-      latitude: 41.4756 + (Math.random() - 0.5) * 0.001,
-      longitude: -81.5558 + (Math.random() - 0.5) * 0.001,
-      accuracy: 8 + Math.random() * 20,
-      distanceFromSite: Math.floor(Math.random() * 100),
-    };
-    checkIn(mockGps, primaryAssignment?.id);
+    checkIn(result.gps, primaryAssignment?.id);
   }
 
   function handleCheckOutPress() {
@@ -136,16 +148,11 @@ export default function WorkerTodayScreen() {
     setShowCheckoutConfirm(true);
   }
 
-  function confirmCheckOut() {
+  async function confirmCheckOut() {
     setShowCheckoutConfirm(false);
     haptics.success();
-    const mockGps = {
-      latitude: 41.4756 + (Math.random() - 0.5) * 0.001,
-      longitude: -81.5558 + (Math.random() - 0.5) * 0.001,
-      accuracy: 8 + Math.random() * 20,
-      distanceFromSite: Math.floor(Math.random() * 100),
-    };
-    checkOut(mockGps);
+    // Location is recorded for the owner's records; it never blocks checking out.
+    checkOut(await locateForCheckOut());
   }
 
   function handleBackToToday() {
@@ -277,7 +284,7 @@ export default function WorkerTodayScreen() {
           </LinearGradient>
         </Pressable>
         <Pressable onPress={handleCheckIn} hitSlop={8} style={{ marginTop: spacing.lg }} accessibilityRole="button">
-          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Left by mistake? Check back in</Text>
+          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{locating ? 'Finding your location…' : 'Left by mistake? Check back in'}</Text>
         </Pressable>
       </View>
     );
@@ -445,7 +452,7 @@ export default function WorkerTodayScreen() {
                     </Text>
                   </View>
                   <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]}>
-                    Check in to start this job
+                    {locating ? 'Finding your location…' : 'Check in to start this job'}
                   </Text>
                 </LinearGradient>
               </Pressable>

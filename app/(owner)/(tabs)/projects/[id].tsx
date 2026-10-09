@@ -13,7 +13,7 @@ import { SectionTabs, StatusBadge, ProgressBar, Card, EmptyState, Divider, Avata
 import { useProject } from '@/hooks/useProject';
 import { useAuth } from '@/providers/AuthProvider';
 import { attachImage } from '@/data/actions';
-import { openDirections } from '@/lib/maps';
+import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M, CHECKIN_RADIUS_OPTIONS } from '@/lib/maps';
 import { MessageThread } from '@/components/messages/MessageThread';
 import { db } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
@@ -1995,7 +1995,7 @@ export default function ProjectDetailScreen() {
     }
 
     const access = customerAccess.getAccessForProject(p.id);
-    const radiusOptions = [50, 100, 150, 200, 300, 500];
+    const radiusOptions = CHECKIN_RADIUS_OPTIONS;
 
     return (
       <View style={styles.sectionContent}>
@@ -2163,17 +2163,17 @@ export default function ProjectDetailScreen() {
             />
           </View>
 
-          {settings.checkinRadiusMeters != null && (
+          {(
             <>
               <Divider style={{ marginVertical: spacing.xs }} />
               <Pressable style={styles.settingsDetailRow} onPress={() => setShowRadiusPicker(true)}>
                 <View style={{ flex: 1, marginRight: spacing.sm }}>
-                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Check-in radius</Text>
-                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Distance from project address for on-site check-in.</Text>
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Check-in distance</Text>
+                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Workers can only tap I'm here within this distance of the address.</Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginRight: spacing.xs }]}>
-                    {settings.checkinRadiusMeters}m
+                    {formatDistance(settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M)}
                   </Text>
                   <Icon name="chevron-right" size={16} color={colors.textTertiary} />
                 </View>
@@ -2186,7 +2186,7 @@ export default function ProjectDetailScreen() {
           <Pressable style={styles.moreMenuOverlay} onPress={() => setShowRadiusPicker(false)}>
             <View style={[styles.moreMenuCard, { backgroundColor: colors.surface, right: spacing.xl, left: spacing.xl, top: '38%' }]}>
               <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
-                <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Check-in Radius</Text>
+                <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Check-in Distance</Text>
               </View>
               {radiusOptions.map((meters) => (
                 <Pressable
@@ -2194,8 +2194,8 @@ export default function ProjectDetailScreen() {
                   style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
                   onPress={() => handleSetRadius(meters)}
                 >
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{meters}m</Text>
-                  {settings.checkinRadiusMeters === meters && <Icon name="check" size={18} color={colors.primary} />}
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{formatDistance(meters)}</Text>
+                  {(settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M) === meters && <Icon name="check" size={18} color={colors.primary} />}
                 </Pressable>
               ))}
             </View>

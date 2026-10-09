@@ -13,7 +13,7 @@ import { generateProjectCode } from '@/hooks/useCustomerAccess';
 import { useProject } from '@/hooks/useProject';
 import { insertRow } from '@/data/store';
 import { AddressFields, missingAddressPart, type AddressCheck } from '@/components/ui/AddressFields';
-import { verifyAddress } from '@/lib/maps';
+import { verifyAddress, DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
 import { logProjectHistory, attachImage } from '@/data/actions';
 import { getProjectImageUri } from '@/lib/projectImages';
 import { typeScale } from '@/theme/typography';
@@ -151,7 +151,7 @@ export default function NewProjectScreen() {
       projectId: project.id,
       customerInteractionEnabled: true,
       completionPhotoRequired: false,
-      checkinRadiusMeters: 150,
+      checkinRadiusMeters: DEFAULT_CHECKIN_RADIUS_M,
       customerCanRequest: true,
       customerCanViewPhotos: true,
       customerCanComment: true,

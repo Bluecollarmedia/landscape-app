@@ -79,3 +79,53 @@ export function previewOnMap(place: Place) {
   if (Platform.OS === 'web') window.open(url, '_blank');
   else Linking.openURL(url).catch(() => {});
 }
+
+type Coords = { latitude: number; longitude: number };
+
+/** Addresses already looked up this session. */
+const coordsCache = new Map<string, Coords | null>();
+
+/** The place's map spot: its saved coordinates, or a (cached) lookup of its address. Null if not found. */
+export async function findCoords(place: Place): Promise<Coords | null> {
+  if (place.latitude != null && place.longitude != null) return { latitude: place.latitude, longitude: place.longitude };
+  const key = formatAddress(place);
+  if (!key) return null;
+  if (coordsCache.has(key)) return coordsCache.get(key)!;
+  const r = await verifyAddress({ address: place.address ?? '', city: place.city ?? '', state: place.state ?? '', zip: place.zip ?? '' });
+  const c = r.status === 'found' ? { latitude: r.latitude, longitude: r.longitude } : null;
+  // Don't remember "unavailable" (e.g. offline) so it's retried next time.
+  if (r.status !== 'unavailable') coordsCache.set(key, c);
+  return c;
+}
+
+/** Cached result of findCoords, without looking anything up. */
+export function cachedCoords(place: Place): Coords | null | undefined {
+  if (place.latitude != null && place.longitude != null) return { latitude: place.latitude, longitude: place.longitude };
+  return coordsCache.get(formatAddress(place));
+}
+
+/** Straight-line distance in meters. */
+export function distanceMeters(a: Coords, b: Coords): number {
+  const R = 6371000;
+  const dLat = (b.latitude - a.latitude) * Math.PI / 180;
+  const dLon = (b.longitude - a.longitude) * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(a.latitude * Math.PI / 180) * Math.cos(b.latitude * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+/** How close a worker must be to check in when the project doesn't set its own distance: half a mile. */
+export const DEFAULT_CHECKIN_RADIUS_M = 805;
+
+/** Check-in distances the owner can pick, in meters (500 ft, ¼ mi, ½ mi, 1 mi). */
+export const CHECKIN_RADIUS_OPTIONS = [152, 400, 805, 1609];
+
+/** "350 ft" / "0.4 mi" (½ mi and 1 mi read as such). */
+export function formatDistance(meters: number): string {
+  const feet = meters * 3.281;
+  if (feet < 1000) return `${Math.max(10, Math.round(feet / 10) * 10)} ft`;
+  const miles = meters / 1609.34;
+  if (Math.abs(miles - 0.25) < 0.01) return '¼ mi';
+  if (Math.abs(miles - 0.5) < 0.01) return '½ mi';
+  return `${Number.isInteger(Math.round(miles * 10) / 10) ? Math.round(miles) : miles.toFixed(1)} mi`;
+}

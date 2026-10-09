@@ -1,4 +1,6 @@
-import { openDirections, type Place } from '@/lib/maps';
+import { openDirections, findCoords, distanceMeters, formatDistance, DEFAULT_CHECKIN_RADIUS_M, type Place } from '@/lib/maps';
+import { getCurrentGps } from '@/lib/location';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { useAuth } from './AuthProvider';
@@ -18,6 +20,16 @@ import type {
   OfflineSyncStatus,
 } from '@/types/worker';
 
+export type CheckInLocation =
+  | { ok: true; gps: GPSCoordinates | null }
+  | { ok: false; title: string; message: string; openSettings?: boolean };
+
+/** Demo mode has no real phone location; pretend the worker is on site. */
+const DEMO_GPS: GPSCoordinates = { latitude: 41.4756, longitude: -81.5558, accuracy: 10, distanceFromSite: 20 };
+
+/** GPS readings near trees and buildings drift; never count more than this much of the phone's error margin. */
+const MAX_ACCURACY_ALLOWANCE_M = 75;
+
 type JobState = 'not_started' | 'confirmed' | 'en_route' | 'checked_in' | 'working' | 'completed';
 
 interface WorkerContextValue {
@@ -34,9 +46,12 @@ interface WorkerContextValue {
   acknowledgeChanges: () => void;
 
   /** Checks in to the given job (or the current/next one). Works again after checking out, to resume a job. */
-  checkIn: (gps: GPSCoordinates, assignmentId?: string) => void;
-  checkOut: (gps: GPSCoordinates) => void;
-  isWithinRadius: (gps: GPSCoordinates, projectId: string) => boolean;
+  checkIn: (gps: GPSCoordinates | null, assignmentId?: string) => void;
+  checkOut: (gps: GPSCoordinates | null) => void;
+  /** Reads the phone's location and checks it against the job site. Check-in is only allowed when ok. */
+  locateForCheckIn: (assignmentId?: string) => Promise<CheckInLocation>;
+  /** Reads the phone's location for check-out (never blocks). */
+  locateForCheckOut: () => Promise<GPSCoordinates | null>;
   checkIns: CheckIn[];
   checkOuts: CheckOut[];
 
@@ -174,35 +189,74 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     logActivity({ activityType: 'schedule_acknowledged', description: 'Acknowledged schedule changes' });
   }, [todayAssignments, logActivity]);
 
-  const isWithinRadius = useCallback((gps: GPSCoordinates, projectId: string) => {
-    const settings = db.settings[projectId];
-    if (!settings?.checkinRadiusMeters) return true;
-    const project = db.projects.find(p => p.id === projectId);
-    if (!project?.latitude || !project?.longitude) return true;
-    const R = 6371000;
-    const dLat = (project.latitude - gps.latitude) * Math.PI / 180;
-    const dLon = (project.longitude - gps.longitude) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(gps.latitude * Math.PI / 180) *
-      Math.cos(project.latitude * Math.PI / 180) *
-      Math.sin(dLon / 2) ** 2;
-    const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return distance <= settings.checkinRadiusMeters;
-  }, []);
-
-  const checkIn = useCallback((gps: GPSCoordinates, assignmentId?: string) => {
-    const job = (assignmentId && allAssignments.find(a => a.id === assignmentId))
+  /** The job "I'm here" applies to: the given one, else the current/next unfinished one, else the last (to resume). */
+  const resolveCheckInJob = useCallback((assignmentId?: string) =>
+    (assignmentId && allAssignments.find(a => a.id === assignmentId))
       || (currentJob && currentJob.status !== 'completed' ? currentJob : undefined)
       || todayAssignments.find(a => a.status !== 'completed')
       // Everything's checked out: let them check back in to the job they just left.
       || currentJob
-      || todayAssignments[todayAssignments.length - 1];
+      || todayAssignments[todayAssignments.length - 1],
+  [allAssignments, currentJob, todayAssignments]);
+
+  const locateForCheckIn = useCallback(async (assignmentId?: string): Promise<CheckInLocation> => {
+    if (!isSupabaseConfigured) return { ok: true, gps: DEMO_GPS };
+    const job = resolveCheckInJob(assignmentId);
+    if (!job) return { ok: true, gps: null };
+
+    const here = await getCurrentGps();
+    if (here.status === 'denied') {
+      return {
+        ok: false,
+        title: 'Turn on location',
+        message: 'Brighton Lawn needs your location to check you in at the job site. Turn it on in Settings, then try again.',
+        openSettings: true,
+      };
+    }
+    if (here.status === 'unavailable') {
+      return {
+        ok: false,
+        title: 'Can’t find your location',
+        message: 'Your phone couldn’t get a GPS fix. Step outside or wait a moment, then try again.',
+      };
+    }
+
+    const gps = here.gps;
+    const radius = db.settings[job.projectId]?.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M;
+    const site = job.project ? await findCoords(job.project) : null;
+    // If the job's address can't be found on the map there's nothing to compare against, so allow it.
+    if (!site) return { ok: true, gps };
+
+    const distance = Math.round(distanceMeters(gps, site));
+    const withDistance = { ...gps, distanceFromSite: distance };
+
+    const allowance = Math.min(gps.accuracy || 0, MAX_ACCURACY_ALLOWANCE_M);
+    if (distance - allowance <= radius) return { ok: true, gps: withDistance };
+
+    return {
+      ok: false,
+      title: 'You’re not at the job site yet',
+      message: `You’re about ${formatDistance(distance)} from ${job.project?.name ?? 'the job site'}. Check in once you get there.`,
+    };
+  }, [resolveCheckInJob]);
+
+  const locateForCheckOut = useCallback(async (): Promise<GPSCoordinates | null> => {
+    if (!isSupabaseConfigured) return DEMO_GPS;
+    const here = await getCurrentGps();
+    if (here.status !== 'ok') return null;
+    const site = currentJob?.project ? await findCoords(currentJob.project) : null;
+    return site ? { ...here.gps, distanceFromSite: Math.round(distanceMeters(here.gps, site)) } : here.gps;
+  }, [currentJob]);
+
+  const checkIn = useCallback((gps: GPSCoordinates | null, assignmentId?: string) => {
+    const job = resolveCheckInJob(assignmentId);
     if (!job) return;
     const resuming = job.status === 'completed';
 
     const now = new Date();
     const nowIso = now.toISOString();
-    const withinRadius = isWithinRadius(gps, job.projectId);
+    // locateForCheckIn already refused anyone outside the job's distance.
+    const withinRadius = true;
     const projectName = job.project?.name ?? 'job site';
 
     insertRow('check_ins', {
@@ -229,12 +283,9 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     } else {
       notifyStaff('worker_checked_in', 'Worker checked in', `${workerName} checked in at ${projectName}.`, link, undefined, workerId);
     }
-    if (!withinRadius) {
-      notifyStaff('worker_outside_radius', 'Check-in outside job site', `${workerName} checked in away from ${projectName}.`, link, undefined, workerId);
-    }
-  }, [allAssignments, currentJob, todayAssignments, workerId, isWithinRadius, logActivity, workerName]);
+  }, [resolveCheckInJob, workerId, logActivity, workerName]);
 
-  const checkOut = useCallback((gps: GPSCoordinates) => {
+  const checkOut = useCallback((gps: GPSCoordinates | null) => {
     const job = currentJob;
     if (!job) return;
 
@@ -351,7 +402,8 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     acknowledgeChanges,
     checkIn,
     checkOut,
-    isWithinRadius,
+    locateForCheckIn,
+    locateForCheckOut,
     checkIns: checkInList,
     checkOuts: checkOutList,
     projectTasks: projectTasksFn,
@@ -373,7 +425,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     todayAssignments, upcomingAssignments, completedAssignments,
     currentJob, nextJob, jobState, scheduleConfirmed, hasScheduleChanges,
     confirmSchedule, acknowledgeChanges,
-    checkIn, checkOut, isWithinRadius, checkInList, checkOutList,
+    checkIn, checkOut, locateForCheckIn, locateForCheckOut, checkInList, checkOutList,
     projectTasksFn, startTask, completeTask, projectSettingsFn,
     taskPhotos, taskPhotoUris, captureTaskPhoto, activityList, workerSettings,
     updateNavApp, updateNotificationsEnabled, offlineQueue, isOnline, openMapsNavigation, moveToNextJob,

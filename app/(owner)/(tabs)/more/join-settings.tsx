@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   codeBox: {
     alignItems: 'center',
     padding: spacing.lg,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     marginBottom: spacing.md,
   },
   successBanner: {

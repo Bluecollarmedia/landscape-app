@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -16,7 +16,7 @@ export default function NotificationsScreen() {
   const { settings, updateNotificationsEnabled } = useWorkerContext();
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backRow}>
           <Feather name="chevron-left" size={22} color={colors.textPrimary} />
@@ -29,26 +29,18 @@ export default function NotificationsScreen() {
           Notifications
         </Text>
 
-        <ListSection footer="Push notifications require device permission and a connected notification service, which aren't set up yet. This switch is saved but doesn't send anything until that's in place.">
+        <ListSection footer="Lock-screen alerts aren't switched on in the app yet. Your choice is saved and will apply once they are.">
           <ListRow
             icon="bell"
             title="Push Notifications"
-            subtitle="Job updates, schedule changes, and reminders"
+            subtitle="Job updates, schedule changes and reminders"
             rightElement={
-              <Pressable
-                onPress={() => updateNotificationsEnabled(!settings.notificationsEnabled)}
-                style={[
-                  styles.toggle,
-                  { backgroundColor: settings.notificationsEnabled ? colors.primary : colors.borderLight },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.toggleKnob,
-                    { transform: [{ translateX: settings.notificationsEnabled ? 18 : 2 }] },
-                  ]}
-                />
-              </Pressable>
+              <Switch
+                value={settings.notificationsEnabled}
+                onValueChange={updateNotificationsEnabled}
+                trackColor={{ true: colors.primary, false: colors.borderLight }}
+                accessibilityLabel="Push Notifications"
+              />
             }
           />
         </ListSection>
@@ -62,16 +54,4 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   backRow: { flexDirection: 'row', alignItems: 'center' },
   content: { paddingHorizontal: spacing.lg },
-  toggle: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
-    justifyContent: 'center',
-  },
-  toggleKnob: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-  },
 });

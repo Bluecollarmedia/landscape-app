@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     ...shadow.sm,
   },
 });

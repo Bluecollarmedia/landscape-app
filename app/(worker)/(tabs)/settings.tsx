@@ -72,8 +72,7 @@ export default function WorkerSettingsScreen() {
       <ListSection title="Preferences">
         <ListRow
           icon="navigation"
-          title="Navigation App"
-          subtitle="Choose which maps app opens for directions"
+          title="Maps App"
           value={currentNavLabel}
           showChevron
           onPress={() => setNavSheetOpen(true)}
@@ -184,7 +183,7 @@ export default function WorkerSettingsScreen() {
 
 const styles = StyleSheet.create({
   profileCard: {
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.lg,
   },

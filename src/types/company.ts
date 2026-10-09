@@ -8,8 +8,20 @@ export interface Company {
   city?: string;
   state?: string;
   zip?: string;
+  /** Owner's own photo for the dashboard header. */
+  coverPhotoUrl?: string;
+  /** First-time setup progress: which steps were finished or skipped. */
+  setupState?: CompanySetupState;
+  setupCompletedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type SetupStepKey = 'trucks' | 'workers' | 'payRates' | 'notifications' | 'company';
+
+export interface CompanySetupState {
+  done?: Partial<Record<SetupStepKey, boolean>>;
+  skipped?: Partial<Record<SetupStepKey, boolean>>;
 }
 
 export type CompanyRole = 'owner' | 'admin' | 'worker' | 'customer';

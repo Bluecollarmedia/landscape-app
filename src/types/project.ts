@@ -37,6 +37,8 @@ export interface Project {
   estimatedEndDate?: string;
   completedAt?: string;
   notes?: string;
+  /** Owner-uploaded cover photo (falls back to a stock photo). */
+  coverPhotoUrl?: string;
   createdAt: string;
   updatedAt: string;
   customer?: PersonSummary;

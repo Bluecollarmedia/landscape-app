@@ -9,6 +9,7 @@
     "@react-native-segmented-control/segmented-control": "2.5.7",
     "@supabase/supabase-js": "^2.116.0",
     "expo": "~57.0.20",
+    "expo-clipboard": "~57.0.1",
     "expo-constants": "~57.0.17",
     "expo-dev-client": "~57.0.18",
     "expo-font": "~57.0.3",

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Share, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Button, Input, Card } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { useTeamCode, useJoinRequests, useInvitations } from '@/hooks/useOnboarding';
+import { useTeamCode, useJoinRequests } from '@/hooks/useOnboarding';
+import { inviteMessage, textInvite, copyText } from '@/lib/invite';
+import { db, useDb } from '@/data/store';
 
 export default function AddWorkerScreen() {
   const { colors } = useTheme();
@@ -17,25 +18,29 @@ export default function AddWorkerScreen() {
   const insets = useSafeAreaInsets();
   const { activeCode, regenerateCode } = useTeamCode();
   const { pendingRequests } = useJoinRequests();
-  const { createInvitation } = useInvitations();
+  useDb();
 
-  const [showInvite, setShowInvite] = useState(false);
   const [invName, setInvName] = useState('');
-  const [invEmail, setInvEmail] = useState('');
   const [invPhone, setInvPhone] = useState('');
   const [copied, setCopied] = useState(false);
-  const [inviteSent, setInviteSent] = useState(false);
 
   async function handleCopyCode() {
     if (activeCode) {
-      try {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          await navigator.clipboard.writeText(activeCode.code);
-        }
-      } catch {}
+      await copyText(activeCode.code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  }
+
+  async function handleTextInvite() {
+    if (!activeCode) return;
+    const message = inviteMessage(activeCode.code, db.company?.name, invName);
+    await textInvite(message, invPhone);
+    if (Platform.OS === 'web') {
+      alert('Invite message copied. Paste it into a text to your worker.');
+    }
+    setInvName('');
+    setInvPhone('');
   }
 
   function handleRegenerate() {
@@ -48,32 +53,7 @@ export default function AddWorkerScreen() {
     }
   }
 
-  function handleSendInvite() {
-    if (!invEmail.trim() || !invEmail.includes('@')) {
-      if (Platform.OS === 'web') alert('Please enter a valid email address.');
-      else Alert.alert('Check the email', 'Please enter a valid email address.');
-      return;
-    }
-    const result = createInvitation({
-      email: invEmail.trim(),
-      name: invName.trim() || undefined,
-      phone: invPhone.trim() || undefined,
-      type: 'worker',
-    });
-    if (result.success) {
-      setInviteSent(true);
-      setTimeout(() => {
-        setInviteSent(false);
-        setShowInvite(false);
-        setInvName('');
-        setInvEmail('');
-        setInvPhone('');
-      }, 6000);
-    } else {
-      if (Platform.OS === 'web') alert('This email has already been invited.');
-      else Alert.alert('Already invited', 'This email has already been invited.');
-    }
-  }
+
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -87,28 +67,16 @@ export default function AddWorkerScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Invite by Email */}
-        <Card title="Invite Directly" style={styles.section}>
-          {!showInvite ? (
-            <Button title="Invite by Email" onPress={() => setShowInvite(true)} icon="mail" fullWidth variant="secondary" />
-          ) : inviteSent ? (
-            <View style={[styles.successBanner, { backgroundColor: semantic.successLight }]}>
-              <Icon name="check-circle" size={20} color={semantic.success} />
-              <Text style={[typeScale.bodySmall, { color: semantic.success, marginLeft: spacing.sm }]}>
-                Invite saved. No email goes out yet, so let them know to open the app and tap "Invited by email? Create your account" using this email.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.inviteForm}>
-              <Input label="Name (optional)" placeholder="Worker's name" value={invName} onChangeText={setInvName} icon="user" />
-              <Input label="Email *" placeholder="worker@email.com" value={invEmail} onChangeText={setInvEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />
-              <Input label="Phone (optional)" placeholder="(555) 555-0100" value={invPhone} onChangeText={setInvPhone} keyboardType="phone-pad" icon="phone" />
-              <View style={styles.inviteActions}>
-                <Button title="Send Invitation" onPress={handleSendInvite} icon="send" size="sm" />
-                <Button title="Cancel" onPress={() => setShowInvite(false)} variant="ghost" size="sm" />
-              </View>
-            </View>
-          )}
+        {/* Invite by text */}
+        <Card title="Text an Invite" style={styles.section}>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.md }]}>
+            Sends your worker a text with the team code. They download the app, tap Join a Team, enter the code, and you approve them.
+          </Text>
+          <View style={styles.inviteForm}>
+            <Input label="Name (optional)" placeholder="Worker's name" value={invName} onChangeText={setInvName} icon="user" />
+            <Input label="Phone (optional)" placeholder="(555) 555-0100" value={invPhone} onChangeText={setInvPhone} keyboardType="phone-pad" icon="phone" />
+            <Button title="Send Text Invite" onPress={handleTextInvite} icon="message-circle" fullWidth disabled={!activeCode} />
+          </View>
         </Card>
 
         {/* Team Code */}
@@ -136,7 +104,7 @@ export default function AddWorkerScreen() {
                 handleCopyCode();
               } else {
                 try {
-                  await Share.share({ message: `Join our team on Brighton Lawn + Landscape! Use team code: ${activeCode.code}` });
+                  await Share.share({ message: inviteMessage(activeCode.code, db.company?.name) });
                 } catch {}
               }
             }}>
@@ -203,17 +171,6 @@ const styles = StyleSheet.create({
   },
   inviteForm: {
     gap: spacing.md,
-  },
-  inviteActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  successBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
-    borderRadius: radius.xs,
   },
   codeDisplay: {
     alignItems: 'center',

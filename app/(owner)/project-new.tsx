@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Platform, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -9,7 +10,8 @@ import { useCustomers } from '@/hooks/useCustomers';
 import { generateProjectCode } from '@/hooks/useCustomerAccess';
 import { useProject } from '@/hooks/useProject';
 import { insertRow } from '@/data/store';
-import { logProjectHistory } from '@/data/actions';
+import { logProjectHistory, attachImage } from '@/data/actions';
+import { getProjectImageUri } from '@/lib/projectImages';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { ProjectStatus } from '@/types/project';
@@ -49,6 +51,17 @@ export default function NewProjectScreen() {
   const [endDate, setEndDate] = useState(existing?.estimatedEndDate ?? '');
   const [status, setStatus] = useState<ProjectStatus>(existing?.status ?? 'active');
   const [progress, setProgress] = useState(existing?.progress ?? 0);
+  const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
+
+  async function handlePickPhoto() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showAlert('Permission Needed', 'Photo library access is needed to choose a project photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+    if (!result.canceled && result.assets?.[0]) setPhotoUri(result.assets[0].uri);
+  }
 
   const customers = useMemo(
     () => allCustomers.slice().sort((a, b) => `${a.person.firstName} ${a.person.lastName}`.localeCompare(`${b.person.firstName} ${b.person.lastName}`)),
@@ -81,6 +94,7 @@ export default function NewProjectScreen() {
 
     if (isEdit) {
       updateProject({ ...fields, status, progress });
+      if (photoUri) attachImage('projects', existing!.id, 'coverPhotoUrl', photoUri, `projects/${existing!.id}`);
       router.back();
       return;
     }
@@ -101,6 +115,7 @@ export default function NewProjectScreen() {
       customerCanComment: true,
     });
     logProjectHistory(project.id, 'project_created', `Project created: ${fields.name}`);
+    if (photoUri) attachImage('projects', project.id, 'coverPhotoUrl', photoUri, `projects/${project.id}`);
     router.back();
   }
 
@@ -163,6 +178,28 @@ export default function NewProjectScreen() {
               </Text>
             </Card>
           )}
+
+          <Card title="Project Photo" style={{ marginBottom: spacing.lg }}>
+            <Pressable onPress={handlePickPhoto} accessibilityRole="button" accessibilityLabel="Choose project photo">
+              {photoUri || existing?.coverPhotoUrl ? (
+                <Image
+                  source={{ uri: photoUri ?? (existing ? getProjectImageUri(existing, 900) : undefined) }}
+                  style={styles.photoPreview}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.photoPreview, styles.photoEmpty, { borderColor: colors.border, backgroundColor: colors.backgroundTertiary }]}>
+                  <Icon name="camera" size={24} color={colors.textTertiary} />
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+                    Add a photo of the property (optional)
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+            {(photoUri || existing?.coverPhotoUrl) && (
+              <Button title="Choose a different photo" onPress={handlePickPhoto} variant="ghost" size="sm" />
+            )}
+          </Card>
 
           <Card title="Project Info">
             <Input
@@ -304,4 +341,6 @@ const styles = StyleSheet.create({
   progressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg, marginVertical: spacing.md },
   stepButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   actions: { marginTop: spacing['2xl'], gap: spacing.sm },
+  photoPreview: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.md },
+  photoEmpty: { borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
 });

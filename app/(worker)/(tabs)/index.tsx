@@ -18,10 +18,8 @@ import type { Assignment } from '@/types/schedule';
 import type { ProjectTask } from '@/types/project';
 import type { Announcement } from '@/types/announcement';
 import type { WeatherActionType } from '@/types/operations';
+import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages';
 
-// Temporary placeholder — swap for the project's real photo once available.
-const HERO_IMAGE_URI =
-  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200&q=80';
 
 const HERO_HEIGHT = 400;
 const HERO_HEIGHT_COMPACT = 190;
@@ -282,7 +280,7 @@ export default function WorkerTodayScreen() {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         <View style={[styles.hero, { height: showWorking ? HERO_HEIGHT_COMPACT : HERO_HEIGHT }]}>
-          <Image source={{ uri: HERO_IMAGE_URI }} style={styles.heroImage} resizeMode="cover" />
+          <Image source={{ uri: primaryAssignment ? getProjectImageUriById(primaryAssignment.projectId, 1200) : getCompanyImageUri() }} style={styles.heroImage} resizeMode="cover" />
           <LinearGradient
             colors={['transparent', 'transparent', colors.groupedBackground]}
             locations={[0, 0.78, 1]}

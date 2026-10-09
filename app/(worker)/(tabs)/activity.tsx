@@ -9,10 +9,8 @@ import { EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { useWorkerActivitySummary, formatWorkedDuration, type DayGroup } from '@/hooks/useWorkerActivitySummary';
+import { getCompanyImageUri } from '@/lib/projectImages';
 
-// Temporary placeholder — matches the header treatment used on Jobs.
-const HEADER_IMAGE_URI =
-  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200&q=80';
 
 function formatDayHeading(dateKey: string): string {
   const [y, m, d] = dateKey.split('-').map(Number);
@@ -107,7 +105,7 @@ export default function WorkerActivityScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={styles.hero}>
-        <Image source={{ uri: HEADER_IMAGE_URI }} style={[styles.heroImage, { opacity: 0.16 }]} resizeMode="cover" />
+        <Image source={{ uri: getCompanyImageUri() }} style={[styles.heroImage, { opacity: 0.16 }]} resizeMode="cover" />
         <View style={[styles.headerContent, { paddingTop: insets.top + spacing.md }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>

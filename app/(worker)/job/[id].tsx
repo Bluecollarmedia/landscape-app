@@ -15,11 +15,10 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { db } from '@/data/store';
 import { todayKey, localDateKey } from '@/lib/ids';
 import type { ProjectPhoto } from '@/types/project';
+import { getProjectImageUriById } from '@/lib/projectImages';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
-const HERO_IMAGE_URI =
-  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200&q=80';
 const HERO_HEIGHT = 220;
 
 function formatTime(time?: string) {
@@ -98,7 +97,7 @@ export default function JobDetailScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
         <View style={styles.hero}>
-          <Image source={{ uri: HERO_IMAGE_URI }} style={styles.heroImage} resizeMode="cover" />
+          <Image source={{ uri: getProjectImageUriById(assignment.projectId, 1200) }} style={styles.heroImage} resizeMode="cover" />
           <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.sm }]}>
             <Pressable onPress={() => router.back()} hitSlop={12}>
               {HAS_LIQUID_GLASS ? (

@@ -42,6 +42,9 @@ create table public.companies (
   city text,
   state text,
   zip text,
+  cover_photo_url text,
+  setup_state jsonb not null default '{}'::jsonb,
+  setup_completed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -94,6 +97,7 @@ create table public.projects (
   estimated_end_date date,
   completed_at timestamptz,
   notes text,
+  cover_photo_url text,
   customer_project_code text unique,
   customer_claimed_by uuid references public.people(id) on delete set null,
   customer_claimed_at timestamptz,
@@ -1218,3 +1222,34 @@ create policy media_authenticated_upload on storage.objects for insert to authen
   with check (bucket_id = 'media');
 create policy media_owner_delete on storage.objects for delete to authenticated
   using (bucket_id = 'media' and owner = auth.uid());
+
+-- ── Updates (also shipped separately in supabase/updates/) ──────────────────
+
+
+alter table public.projects  add column if not exists cover_photo_url text;
+alter table public.companies add column if not exists cover_photo_url text;
+alter table public.companies add column if not exists setup_state jsonb not null default '{}'::jsonb;
+alter table public.companies add column if not exists setup_completed_at timestamptz;
+
+-- Block deleting a company. The only way around it is a deliberate reset
+-- script that first runs: set local app.allow_company_delete = 'on';
+create or replace function public.prevent_company_delete()
+returns trigger language plpgsql as $$
+begin
+  if coalesce(current_setting('app.allow_company_delete', true), '') <> 'on' then
+    raise exception 'Companies cannot be deleted.';
+  end if;
+  return old;
+end;
+$$;
+
+drop trigger if exists companies_no_delete on public.companies;
+create trigger companies_no_delete
+  before delete on public.companies
+  for each row execute function public.prevent_company_delete();
+
+-- Same for wiping the whole table at once.
+drop trigger if exists companies_no_truncate on public.companies;
+create trigger companies_no_truncate
+  before truncate on public.companies
+  for each statement execute function public.prevent_company_delete();

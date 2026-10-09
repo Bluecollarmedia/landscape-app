@@ -10,6 +10,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { SectionTabs, StatusBadge, ProgressBar, Card, EmptyState, Divider, Avatar, Button, OptimizedImage } from '@/components/ui';
 import { useProject } from '@/hooks/useProject';
 import { useAuth } from '@/providers/AuthProvider';
+import { attachImage } from '@/data/actions';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
@@ -241,6 +242,19 @@ export default function ProjectDetailScreen() {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
 
+  async function handleChangeCoverPhoto() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      const msg = 'Photo library access is needed to choose a project photo.';
+      if (Platform.OS === 'web') alert(msg);
+      else Alert.alert('Permission Needed', msg);
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+    if (result.canceled || !result.assets?.[0]) return;
+    attachImage('projects', p.id, 'coverPhotoUrl', result.assets[0].uri, `projects/${p.id}`);
+  }
+
   function handleSaveNotes() {
     updateProject({ notes: notesDraft.trim() || undefined });
     setEditingNotes(false);
@@ -260,6 +274,15 @@ export default function ProjectDetailScreen() {
             <View style={[styles.coverStatusDot, { backgroundColor: statusDotColors[p.status] }]} />
             <Text style={[typeScale.labelSmall, { color: '#FFFFFF' }]}>{config.label}</Text>
           </View>
+          <Pressable
+            onPress={handleChangeCoverPhoto}
+            style={[styles.coverChangeButton, { backgroundColor: 'rgba(20,20,20,0.55)' }]}
+            accessibilityRole="button"
+            accessibilityLabel="Change project photo"
+          >
+            <Icon name="camera" size={14} color="#FFFFFF" />
+            <Text style={[typeScale.labelSmall, { color: '#FFFFFF' }]}>Change photo</Text>
+          </Pressable>
         </View>
 
         <View style={styles.overviewBody}>
@@ -2893,6 +2916,17 @@ const styles = StyleSheet.create({
   coverImage: {
     width: '100%',
     height: '100%',
+  },
+  coverChangeButton: {
+    position: 'absolute',
+    right: spacing.lg,
+    bottom: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    gap: spacing.xs,
   },
   coverStatusPill: {
     position: 'absolute',

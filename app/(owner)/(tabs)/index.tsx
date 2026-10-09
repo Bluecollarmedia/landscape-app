@@ -13,16 +13,10 @@ import { Avatar, OptimizedImage, ProgressBar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
+import { getProjectImageUri, getCompanyImageUri } from '@/lib/projectImages';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
-const HERO_IMAGE_URI = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80';
-const PROJECT_IMAGES = [
-  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=600&q=80',
-  'https://images.unsplash.com/photo-1558904541-efa843a96f01?w=600&q=80',
-  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=600&q=80',
-  'https://images.unsplash.com/photo-1571939228382-b2f2b585ce15?w=600&q=80',
-];
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -155,7 +149,7 @@ export default function OwnerDashboard() {
         onPress={() => router.push(`/(owner)/projects/${project.id}` as any)}
       >
         <OptimizedImage
-          source={PROJECT_IMAGES[index % PROJECT_IMAGES.length]}
+          source={getProjectImageUri(project, 600)}
           style={styles.projectImage}
         />
         <View style={styles.projectInfo}>
@@ -261,7 +255,7 @@ export default function OwnerDashboard() {
         <View style={styles.content}>
           {/* Today hero */}
           <View style={[styles.heroCard, shadow.md]}>
-            <OptimizedImage source={HERO_IMAGE_URI} style={StyleSheet.absoluteFill} />
+            <OptimizedImage source={getCompanyImageUri()} style={StyleSheet.absoluteFill} />
             <LinearGradient
               colors={['rgba(10,20,15,0.25)', 'rgba(8,16,12,0.85)']}
               style={StyleSheet.absoluteFill}

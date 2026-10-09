@@ -8,6 +8,7 @@
 
 import React, { useState, useRef } from 'react';
 import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions, Platform, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -23,6 +24,7 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
 
 export default function SignUpScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { signUp } = useAuth();
   const router = useRouter();
 
@@ -70,7 +72,7 @@ export default function SignUpScreen() {
       scrollable
       padded
       keyboardAvoiding
-      contentStyle={styles.content}
+      contentStyle={{ ...styles.content, paddingTop: insets.top + spacing.lg }}
     >
       {/* Logo */}
       <View style={styles.logoSection}>

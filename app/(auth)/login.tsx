@@ -6,6 +6,7 @@
 
 import React, { useState, useRef } from 'react';
 import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,7 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 240);
 
 export default function LoginScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { signIn } = useAuth();
   const router = useRouter();
 
@@ -55,7 +57,7 @@ export default function LoginScreen() {
       scrollable
       padded
       keyboardAvoiding
-      contentStyle={styles.content}
+      contentStyle={{ ...styles.content, paddingTop: insets.top + spacing.lg }}
     >
       {/* Back to welcome */}
       <Pressable onPress={() => router.back()} style={styles.backRow}>

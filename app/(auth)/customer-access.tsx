@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, Platform, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
@@ -17,6 +18,7 @@ type Step = 'enter_code' | 'code_valid' | 'authenticate' | 'claiming' | 'success
 
 export default function CustomerAccessScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { signIn, signUp, switchDevRole, isAuthenticated, user, refreshContext } = useAuth();
   // Already signed in (came from "Finish setting up"): no need to sign in again.
   const signedIn = isSupabaseConfigured && isAuthenticated && !!user;
@@ -376,7 +378,7 @@ export default function CustomerAccessScreen() {
   };
 
   return (
-    <ScreenContainer scrollable padded keyboardAvoiding contentStyle={styles.content}>
+    <ScreenContainer scrollable padded keyboardAvoiding contentStyle={{ ...styles.content, paddingTop: insets.top + spacing.lg }}>
       <Pressable onPress={() => router.back()} style={styles.backRow}>
         <Icon name="arrow-left" size={20} color={colors.textSecondary} />
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>

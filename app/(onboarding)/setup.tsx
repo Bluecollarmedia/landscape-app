@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.sm,
+    borderRadius: radius.xl,
     gap: spacing.md,
   },
   optionText: {

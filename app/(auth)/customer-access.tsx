@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
   },
   projectCard: {
     marginBottom: spacing.xl,

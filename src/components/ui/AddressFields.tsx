@@ -64,7 +64,7 @@ export function AddressFields({ value, onChange, required, streetLabel = 'Street
         value={value.address}
         onChangeText={handleStreet}
         icon="map-pin"
-        textContentType="streetAddressLine1"
+        textContentType="fullStreetAddress"
         autoComplete="street-address"
       />
       <View style={styles.row}>

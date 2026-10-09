@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     marginBottom: spacing.lg,
   },
   form: {
@@ -394,14 +394,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
     borderLeftWidth: 3,
   },
   companyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
   },
   row: {
     flexDirection: 'row',
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
     borderLeftWidth: 3,
   },
 });

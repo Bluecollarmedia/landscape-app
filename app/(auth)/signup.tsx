@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
   },
   footer: {
     alignItems: 'center',

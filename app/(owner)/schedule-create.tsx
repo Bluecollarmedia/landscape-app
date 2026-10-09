@@ -85,6 +85,7 @@ export default function ScheduleCreateScreen() {
   const [showWorkerSheet, setShowWorkerSheet] = useState(false);
   const [showTruckSheet, setShowTruckSheet] = useState(false);
   const [showAndroidDate, setShowAndroidDate] = useState(false);
+  const [iosPicker, setIosPicker] = useState<'date' | 'start' | 'end' | null>(null);
   const [showAndroidStart, setShowAndroidStart] = useState(false);
   const [showAndroidEnd, setShowAndroidEnd] = useState(false);
 
@@ -209,7 +210,7 @@ export default function ScheduleCreateScreen() {
             <Section icon="calendar" title="Date" required>
               <Pressable
                 style={styles.fieldRow}
-                onPress={() => { if (Platform.OS === 'android') setShowAndroidDate(true); }}
+                onPress={() => (Platform.OS === 'android' ? setShowAndroidDate(true) : setIosPicker('date'))}
                 accessibilityRole="button"
                 accessibilityLabel="Choose date"
               >
@@ -218,16 +219,6 @@ export default function ScheduleCreateScreen() {
                   {formatDateFull(date)}
                 </Text>
                 <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-                {Platform.OS === 'ios' && (
-                  <DateTimePicker
-                    value={dateObj}
-                    mode="date"
-                    display="compact"
-                    onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setDate(localDateKey(d)); }}
-                    style={styles.iosOverlay}
-                    accessibilityLabel="Choose date"
-                  />
-                )}
               </Pressable>
               {Platform.OS === 'android' && showAndroidDate && (
                 <DateTimePicker
@@ -257,7 +248,7 @@ export default function ScheduleCreateScreen() {
                 <View style={styles.timeRow}>
                   <Pressable
                     style={[styles.timeField, { backgroundColor: colors.backgroundTertiary }]}
-                    onPress={() => { if (Platform.OS === 'android') setShowAndroidStart(true); }}
+                    onPress={() => (Platform.OS === 'android' ? setShowAndroidStart(true) : setIosPicker('start'))}
                     accessibilityRole="button"
                     accessibilityLabel="Choose start time"
                   >
@@ -266,20 +257,10 @@ export default function ScheduleCreateScreen() {
                       <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{formatTime(startTime)}</Text>
                       <Icon name="chevron-right" size={14} color={colors.textTertiary} />
                     </View>
-                    {Platform.OS === 'ios' && (
-                      <DateTimePicker
-                        value={startTimeObj}
-                        mode="time"
-                        display="compact"
-                        onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setStartTime(dateToTimeStr(d)); }}
-                        style={styles.iosOverlay}
-                        accessibilityLabel="Choose start time"
-                      />
-                    )}
                   </Pressable>
                   <Pressable
                     style={[styles.timeField, { backgroundColor: colors.backgroundTertiary }]}
-                    onPress={() => { if (Platform.OS === 'android') setShowAndroidEnd(true); }}
+                    onPress={() => (Platform.OS === 'android' ? setShowAndroidEnd(true) : setIosPicker('end'))}
                     accessibilityRole="button"
                     accessibilityLabel="Choose end time"
                   >
@@ -288,16 +269,6 @@ export default function ScheduleCreateScreen() {
                       <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{formatTime(endTime)}</Text>
                       <Icon name="chevron-right" size={14} color={colors.textTertiary} />
                     </View>
-                    {Platform.OS === 'ios' && (
-                      <DateTimePicker
-                        value={endTimeObj}
-                        mode="time"
-                        display="compact"
-                        onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setEndTime(dateToTimeStr(d)); }}
-                        style={styles.iosOverlay}
-                        accessibilityLabel="Choose end time"
-                      />
-                    )}
                   </Pressable>
                 </View>
               )}
@@ -411,6 +382,47 @@ export default function ScheduleCreateScreen() {
       </KeyboardAwareScrollView>
 
       {/* Project picker */}
+      {/* iOS date/time picker: opens on the first tap anywhere on the row */}
+      {Platform.OS === 'ios' && (
+        <Modal visible={iosPicker !== null} transparent animationType="slide" onRequestClose={() => setIosPicker(null)}>
+          <Pressable style={styles.sheetOverlay} onPress={() => setIosPicker(null)}>
+            <Pressable style={[styles.pickerCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.pickerHeader}>
+                <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
+                  {iosPicker === 'date' ? 'Date' : iosPicker === 'start' ? 'Start Time' : 'End Time'}
+                </Text>
+                <Pressable onPress={() => setIosPicker(null)} hitSlop={12} accessibilityRole="button">
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Done</Text>
+                </Pressable>
+              </View>
+              {iosPicker === 'date' && (
+                <DateTimePicker
+                  value={dateObj}
+                  mode="date"
+                  display="inline"
+                  accentColor={colors.primary}
+                  onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setDate(localDateKey(d)); }}
+                />
+              )}
+              {(iosPicker === 'start' || iosPicker === 'end') && (
+                <DateTimePicker
+                  value={iosPicker === 'start' ? startTimeObj : endTimeObj}
+                  mode="time"
+                  display="spinner"
+                  minuteInterval={5}
+                  onChange={(_e: DateTimePickerEvent, d?: Date) => {
+                    if (!d) return;
+                    if (iosPicker === 'start') setStartTime(dateToTimeStr(d));
+                    else setEndTime(dateToTimeStr(d));
+                  }}
+                  style={{ alignSelf: 'center' }}
+                />
+              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
+
       <SheetModal visible={showProjectSheet} onClose={() => setShowProjectSheet(false)} title="Select Project">
         {activeProjects.map(p => (
           <Pressable
@@ -636,7 +648,8 @@ const styles = StyleSheet.create({
   projectIconWrap: { width: 40, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
 
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
-  iosOverlay: { position: 'absolute', top: 0, left: -40, right: -40, bottom: 0, opacity: 0.02 },
+  pickerCard: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
 
   segmentControl: { height: 34 },
   timeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },

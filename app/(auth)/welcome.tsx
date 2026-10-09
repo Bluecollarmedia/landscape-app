@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { useCompanySlotOpen } from '@/hooks/useCompanySlot';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { brand } from '@/theme/colors';
@@ -15,6 +16,7 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 240);
 export default function WelcomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const canCreateCompany = useCompanySlotOpen();
   const insets = useSafeAreaInsets();
 
   return (
@@ -48,20 +50,22 @@ export default function WelcomeScreen() {
             </Text>
           </Pressable>
 
-          <Pressable
-            style={[styles.secondaryBtn, { backgroundColor: brand.primarySurface }]}
-            onPress={() => router.push('/(auth)/create-company')}
-          >
-            <Icon name="briefcase" size={20} color={colors.primary} />
-            <View style={styles.btnTextGroup}>
-              <Text style={[typeScale.labelLarge, { color: colors.primary }]}>
-                Create a Company
-              </Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                Start managing your business
-              </Text>
-            </View>
-          </Pressable>
+          {canCreateCompany && (
+            <Pressable
+              style={[styles.secondaryBtn, { backgroundColor: brand.primarySurface }]}
+              onPress={() => router.push('/(auth)/create-company')}
+            >
+              <Icon name="briefcase" size={20} color={colors.primary} />
+              <View style={styles.btnTextGroup}>
+                <Text style={[typeScale.labelLarge, { color: colors.primary }]}>
+                  Create a Company
+                </Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                  Start managing your business
+                </Text>
+              </View>
+            </Pressable>
+          )}
 
           <Pressable
             style={[styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}

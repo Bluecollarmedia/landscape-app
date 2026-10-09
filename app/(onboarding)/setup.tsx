@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
+import { useCompanySlotOpen } from '@/hooks/useCompanySlot';
 import { useAuth } from '@/providers/AuthProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -25,6 +26,7 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
 export default function SetupScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const canCreateCompany = useCompanySlotOpen();
   const insets = useSafeAreaInsets();
   const { user, signOut, refreshContext } = useAuth();
   const [checking, setChecking] = useState(false);
@@ -68,16 +70,18 @@ export default function SetupScreen() {
             </View>
           </Pressable>
 
-          <Pressable
-            style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
-            onPress={() => router.push('/(auth)/create-company' as any)}
-          >
-            <Icon name="briefcase" size={20} color={brand.accent} />
-            <View style={styles.optionText}>
-              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Create a Company</Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>I run the business</Text>
-            </View>
-          </Pressable>
+          {canCreateCompany && (
+            <Pressable
+              style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
+              onPress={() => router.push('/(auth)/create-company' as any)}
+            >
+              <Icon name="briefcase" size={20} color={brand.accent} />
+              <View style={styles.optionText}>
+                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Create a Company</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>I run the business</Text>
+              </View>
+            </Pressable>
+          )}
 
           <Pressable
             style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}

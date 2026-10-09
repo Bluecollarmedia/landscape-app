@@ -12,6 +12,7 @@ import { useAnnouncements } from '@/hooks/useAnnouncements';
 import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
+import { JobMap } from '@/components/maps/JobMap';
 import { semantic } from '@/theme/colors';
 import { haptics } from '@/lib/haptics';
 import type { Assignment } from '@/types/schedule';
@@ -24,7 +25,6 @@ import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages'
 const HERO_HEIGHT = 400;
 const HERO_HEIGHT_COMPACT = 190;
 const PILL_OVERHANG = 26;
-const MAP_TINT = '#E4EAF0';
 
 function formatElapsed(startIso: string, now: Date): string {
   const mins = Math.max(0, Math.round((now.getTime() - new Date(startIso).getTime()) / 60000));
@@ -400,11 +400,9 @@ export default function WorkerTodayScreen() {
 
                 {primaryAssignment.project?.address && (
                   <>
-                    <View style={[styles.mapArea, { backgroundColor: MAP_TINT }]}>
-                      <View style={[styles.mapPinDot, { backgroundColor: colors.surface }, shadow.sm]}>
-                        <Feather name="map-pin" size={20} color={colors.primary} />
-                      </View>
-                    </View>
+                    <Pressable onPress={() => openMapsNavigation(primaryAssignment.project!)} accessibilityLabel="Open in Maps">
+                      <JobMap place={primaryAssignment.project} />
+                    </Pressable>
                     <Pressable
                       style={styles.openMapsRow}
                       onPress={() => openMapsNavigation(primaryAssignment.project!)}
@@ -776,18 +774,6 @@ const styles = StyleSheet.create({
   },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   mapCard: { padding: 0, overflow: 'hidden' },
-  mapArea: {
-    height: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapPinDot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   openMapsRow: {
     flexDirection: 'row',
     alignItems: 'center',

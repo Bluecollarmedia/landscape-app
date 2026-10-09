@@ -33,7 +33,8 @@ interface WorkerContextValue {
   confirmSchedule: () => void;
   acknowledgeChanges: () => void;
 
-  checkIn: (gps: GPSCoordinates) => void;
+  /** Checks in to the given job (or the current/next one). Works again after checking out, to resume a job. */
+  checkIn: (gps: GPSCoordinates, assignmentId?: string) => void;
   checkOut: (gps: GPSCoordinates) => void;
   isWithinRadius: (gps: GPSCoordinates, projectId: string) => boolean;
   checkIns: CheckIn[];
@@ -189,11 +190,15 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     return distance <= settings.checkinRadiusMeters;
   }, []);
 
-  const checkIn = useCallback((gps: GPSCoordinates) => {
-    const job = currentJob && currentJob.status !== 'completed'
-      ? currentJob
-      : todayAssignments.find(a => a.status !== 'completed');
+  const checkIn = useCallback((gps: GPSCoordinates, assignmentId?: string) => {
+    const job = (assignmentId && allAssignments.find(a => a.id === assignmentId))
+      || (currentJob && currentJob.status !== 'completed' ? currentJob : undefined)
+      || todayAssignments.find(a => a.status !== 'completed')
+      // Everything's checked out: let them check back in to the job they just left.
+      || currentJob
+      || todayAssignments[todayAssignments.length - 1];
     if (!job) return;
+    const resuming = job.status === 'completed';
 
     const now = new Date();
     const nowIso = now.toISOString();
@@ -210,14 +215,16 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     });
     updateRow('assignments', job.id, { status: 'checked_in' });
     setCurrentJobId(job.id);
-    logActivity({ assignmentId: job.id, projectId: job.projectId, activityType: 'checked_in', description: `Checked in at ${projectName}` });
+    logActivity({ assignmentId: job.id, projectId: job.projectId, activityType: 'checked_in', description: `${resuming ? 'Checked back in' : 'Checked in'} at ${projectName}` });
 
     // Tell the owner.
     const link = { type: 'assignment' as const, id: job.id };
     const late = !job.isFullDay && job.startTime
       ? now.getTime() > localDateTime(job.scheduledDate, job.startTime).getTime() + (db.operationsSettings.lateCheckinThresholdMinutes ?? 0) * 60000
       : false;
-    if (late) {
+    if (resuming) {
+      notifyStaff('worker_checked_in', 'Worker checked back in', `${workerName} checked back in at ${projectName}.`, link, undefined, workerId);
+    } else if (late) {
       notifyStaff('worker_checked_in_late', 'Late check-in', `${workerName} checked in late at ${projectName} (scheduled ${job.startTime}).`, link, undefined, workerId);
     } else {
       notifyStaff('worker_checked_in', 'Worker checked in', `${workerName} checked in at ${projectName}.`, link, undefined, workerId);
@@ -225,7 +232,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     if (!withinRadius) {
       notifyStaff('worker_outside_radius', 'Check-in outside job site', `${workerName} checked in away from ${projectName}.`, link, undefined, workerId);
     }
-  }, [currentJob, todayAssignments, workerId, isWithinRadius, logActivity, workerName]);
+  }, [allAssignments, currentJob, todayAssignments, workerId, isWithinRadius, logActivity, workerName]);
 
   const checkOut = useCallback((gps: GPSCoordinates) => {
     const job = currentJob;

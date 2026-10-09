@@ -74,7 +74,11 @@ export default function WorkerTodayScreen() {
     projectTasks, projectSettings, taskPhotoCaptured,
   } = useWorkerContext();
 
-  const primaryAssignment = currentJob ?? todayAssignments[0];
+  // The job on screen: the one in progress, else the next unfinished one, else the last one
+  // (so a worker who checked out by mistake can check back in).
+  const primaryAssignment = currentJob
+    ?? todayAssignments.find(a => a.status !== 'completed')
+    ?? todayAssignments[todayAssignments.length - 1];
   const isCheckedIn = jobState === 'checked_in' || jobState === 'working';
   const showWorking = isCheckedIn && !!primaryAssignment;
   const showConfirmed = scheduleConfirmed && !!primaryAssignment && !isCheckedIn;
@@ -124,7 +128,7 @@ export default function WorkerTodayScreen() {
       accuracy: 8 + Math.random() * 20,
       distanceFromSite: Math.floor(Math.random() * 100),
     };
-    checkIn(mockGps);
+    checkIn(mockGps, primaryAssignment?.id);
   }
 
   function handleCheckOutPress() {
@@ -271,6 +275,9 @@ export default function WorkerTodayScreen() {
               Back to Today
             </Text>
           </LinearGradient>
+        </Pressable>
+        <Pressable onPress={handleCheckIn} hitSlop={8} style={{ marginTop: spacing.lg }} accessibilityRole="button">
+          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Left by mistake? Check back in</Text>
         </Pressable>
       </View>
     );

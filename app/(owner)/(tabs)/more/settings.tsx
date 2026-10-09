@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useAuth } from '@/providers/AuthProvider';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import type { AppState } from '@/providers/AuthProvider';
@@ -16,6 +17,7 @@ import type { UserRole } from '@/types';
 
 export default function SettingsScreen() {
   const { colors } = useTheme();
+  const tabBarClearance = useTabBarClearance();
   const { user, signOut, switchDevRole, switchDevState, appState } = useAuth();
   useDb();
   const company = db.company;
@@ -48,7 +50,7 @@ export default function SettingsScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>Settings</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance + spacing.lg }]} showsVerticalScrollIndicator={false}>
         <ListSection title="Your Account">
           <ListRow icon="user" title="Name" value={`${user?.firstName} ${user?.lastName}`} />
           <ListRow icon="mail" title="Email" value={user?.email ?? '—'} />

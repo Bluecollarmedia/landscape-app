@@ -14,6 +14,7 @@ import { semantic } from '@/theme/colors';
 import type { Assignment } from '@/types/schedule';
 import { haptics } from '@/lib/haptics';
 import { todayKey, localDateKey } from '@/lib/ids';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const today = todayKey();
 
@@ -329,7 +330,7 @@ export default function ScheduleScreen() {
         <DateTimePicker value={selectedDateObj} mode="date" display="default" onChange={handleDatePicked} />
       )}
       {Platform.OS === 'ios' && (
-        <Modal visible={showIosPicker} transparent animationType="slide" onRequestClose={() => setShowIosPicker(false)}>
+        <BottomSheetModal visible={showIosPicker} onRequestClose={() => setShowIosPicker(false)}>
           <Pressable style={styles.pickerOverlay} onPress={() => setShowIosPicker(false)}>
             <Pressable style={[styles.pickerCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={(e) => e.stopPropagation()}>
               <View style={styles.pickerHeader}>
@@ -347,7 +348,7 @@ export default function ScheduleScreen() {
               />
             </Pressable>
           </Pressable>
-        </Modal>
+        </BottomSheetModal>
       )}
 
       <View style={styles.segmentWrap}>
@@ -478,14 +479,14 @@ function AssignmentSheet({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <BottomSheetModal visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.sheetOverlay} onPress={onClose}>
         <Pressable style={[styles.sheetCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.sheetGrabber, { backgroundColor: colors.border }]} />
           {body}
         </Pressable>
       </Pressable>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 

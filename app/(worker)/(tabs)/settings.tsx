@@ -14,6 +14,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { ScreenContainer } from '@/components/layout';
 import type { NavAppPreference } from '@/types/worker';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const NAV_OPTIONS: { value: NavAppPreference; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { value: 'google_maps', label: 'Google Maps', icon: 'map' },
@@ -119,7 +120,7 @@ export default function WorkerSettingsScreen() {
       </ListSection>
 
       {/* Navigation App selection sheet */}
-      <Modal visible={navSheetOpen} transparent animationType="slide" onRequestClose={() => setNavSheetOpen(false)}>
+      <BottomSheetModal visible={navSheetOpen} onRequestClose={() => setNavSheetOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setNavSheetOpen(false)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -141,7 +142,7 @@ export default function WorkerSettingsScreen() {
             ))}
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Sign out confirmation */}
       <Modal visible={signOutConfirmOpen} transparent animationType="fade" onRequestClose={() => setSignOutConfirmOpen(false)}>

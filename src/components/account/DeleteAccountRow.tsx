@@ -10,6 +10,7 @@ import { db } from '@/data/store';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const CONFIRM_WORD = 'DELETE';
 
@@ -61,7 +62,7 @@ export function DeleteAccountRow() {
     <>
       <ListRow icon="trash-2" iconColor={colors.error} title="Delete Account" destructive onPress={() => setOpen(true)} />
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
+      <BottomSheetModal visible={open} onRequestClose={close}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={styles.overlay} onPress={close}>
           <Pressable
@@ -106,13 +107,14 @@ export function DeleteAccountRow() {
           </Pressable>
         </Pressable>
         </KeyboardAvoidingView>
-      </Modal>
+      </BottomSheetModal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+  // The dimmed backdrop comes from BottomSheetModal.
+  overlay: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,

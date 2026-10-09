@@ -15,6 +15,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { db, useDb } from '@/data/store';
 import { todayKey, localDateKey } from '@/lib/ids';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const today = todayKey();
 
@@ -384,7 +385,7 @@ export default function ScheduleCreateScreen() {
       {/* Project picker */}
       {/* iOS date/time picker: opens on the first tap anywhere on the row */}
       {Platform.OS === 'ios' && (
-        <Modal visible={iosPicker !== null} transparent animationType="slide" onRequestClose={() => setIosPicker(null)}>
+        <BottomSheetModal visible={iosPicker !== null} onRequestClose={() => setIosPicker(null)}>
           <Pressable style={styles.sheetOverlay} onPress={() => setIosPicker(null)}>
             <Pressable style={[styles.pickerCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={(e) => e.stopPropagation()}>
               <View style={styles.pickerHeader}>
@@ -420,7 +421,7 @@ export default function ScheduleCreateScreen() {
               )}
             </Pressable>
           </Pressable>
-        </Modal>
+        </BottomSheetModal>
       )}
 
       <SheetModal visible={showProjectSheet} onClose={() => setShowProjectSheet(false)} title="Select Project">
@@ -610,14 +611,14 @@ function SheetModal({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <BottomSheetModal visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.sheetOverlay} onPress={onClose}>
         <Pressable style={[styles.sheetCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.sheetGrabber, { backgroundColor: colors.border }]} />
           {body}
         </Pressable>
       </Pressable>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 

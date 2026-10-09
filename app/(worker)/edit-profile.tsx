@@ -11,6 +11,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 export default function EditProfileScreen() {
   const { colors } = useTheme();
@@ -156,7 +157,7 @@ export default function EditProfileScreen() {
       </KeyboardAwareScrollView>
 
       {/* Change Profile Photo sheet */}
-      <Modal visible={photoSheetOpen} transparent animationType="slide" onRequestClose={() => setPhotoSheetOpen(false)}>
+      <BottomSheetModal visible={photoSheetOpen} onRequestClose={() => setPhotoSheetOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setPhotoSheetOpen(false)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -189,7 +190,7 @@ export default function EditProfileScreen() {
             </Pressable>
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Permission error */}
       <Modal visible={!!permissionError} transparent animationType="fade" onRequestClose={() => setPermissionError(null)}>

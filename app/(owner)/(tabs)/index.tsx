@@ -15,6 +15,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { getProjectImageUri, getCompanyImageUri } from '@/lib/projectImages';
 import { useCompanySetup } from '@/hooks/useCompanySetup';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
@@ -401,7 +402,7 @@ export default function OwnerDashboard() {
       </ScrollView>
 
       {/* Quick Actions sheet */}
-      <Modal visible={quickActionsOpen} transparent animationType="slide" onRequestClose={() => setQuickActionsOpen(false)}>
+      <BottomSheetModal visible={quickActionsOpen} onRequestClose={() => setQuickActionsOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setQuickActionsOpen(false)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -432,7 +433,7 @@ export default function OwnerDashboard() {
             </Pressable>
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 }

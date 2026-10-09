@@ -20,6 +20,7 @@ import type { ProjectTask } from '@/types/project';
 import type { Announcement } from '@/types/announcement';
 import type { WeatherActionType } from '@/types/operations';
 import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 
 const HERO_HEIGHT = 400;
@@ -643,12 +644,7 @@ export default function WorkerTodayScreen() {
         </Pressable>
       </Modal>
 
-      <Modal
-        visible={openAnnouncement}
-        transparent
-        animationType="slide"
-        onRequestClose={handleCloseAnnouncement}
-      >
+      <BottomSheetModal visible={openAnnouncement} onRequestClose={handleCloseAnnouncement}>
         <Pressable style={styles.sheetBackdrop} onPress={handleCloseAnnouncement}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -685,7 +681,7 @@ export default function WorkerTodayScreen() {
             })()}
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 }

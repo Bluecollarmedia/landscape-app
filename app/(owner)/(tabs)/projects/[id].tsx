@@ -28,6 +28,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import type { ProjectStatus, TaskStatus, HistoryEventType, ProjectPhoto, ProjectTask, PhotoType } from '@/types/project';
 import type { Assignment } from '@/types/schedule';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const today = todayKey();
 
@@ -676,7 +677,7 @@ export default function ProjectDetailScreen() {
           </Text>
         </View>
 
-        <Modal visible={showAddTeamMember} animationType="slide" transparent onRequestClose={() => setShowAddTeamMember(false)}>
+        <BottomSheetModal visible={showAddTeamMember} onRequestClose={() => setShowAddTeamMember(false)}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -712,7 +713,7 @@ export default function ProjectDetailScreen() {
               </ScrollView>
             </View>
           </View>
-        </Modal>
+        </BottomSheetModal>
       </View>
     );
   }
@@ -2314,7 +2315,7 @@ export default function ProjectDetailScreen() {
       </Modal>
 
       {/* Task Detail Modal */}
-      <Modal visible={!!selectedTask} animationType="slide" transparent onRequestClose={() => setSelectedTask(null)}>
+      <BottomSheetModal visible={!!selectedTask} onRequestClose={() => setSelectedTask(null)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2434,10 +2435,10 @@ export default function ProjectDetailScreen() {
             )}
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Add Task Modal */}
-      <Modal visible={showAddTask} animationType="slide" transparent onRequestClose={() => setShowAddTask(false)}>
+      <BottomSheetModal visible={showAddTask} onRequestClose={() => setShowAddTask(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2498,10 +2499,10 @@ export default function ProjectDetailScreen() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Add Photo Modal */}
-      <Modal visible={showAddPhoto} animationType="slide" transparent onRequestClose={() => setShowAddPhoto(false)}>
+      <BottomSheetModal visible={showAddPhoto} onRequestClose={() => setShowAddPhoto(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2582,10 +2583,10 @@ export default function ProjectDetailScreen() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Photo Details Modal */}
-      <Modal visible={!!reviewPhoto} animationType="slide" transparent onRequestClose={() => setReviewPhoto(null)}>
+      <BottomSheetModal visible={!!reviewPhoto} onRequestClose={() => setReviewPhoto(null)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={styles.dragHandleWrap}>
@@ -2768,7 +2769,7 @@ export default function ProjectDetailScreen() {
             )}
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Photo Details full-screen viewer */}
       <Modal visible={showPhotoViewer && !!reviewPhoto} transparent animationType="fade" onRequestClose={() => setShowPhotoViewer(false)}>
@@ -2784,7 +2785,7 @@ export default function ProjectDetailScreen() {
       </Modal>
 
       {/* Manage Access Modal */}
-      <Modal visible={showManageAccess} animationType="slide" transparent onRequestClose={() => setShowManageAccess(false)}>
+      <BottomSheetModal visible={showManageAccess} onRequestClose={() => setShowManageAccess(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2861,10 +2862,10 @@ export default function ProjectDetailScreen() {
             })()}
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Preview Customer View Modal */}
-      <Modal visible={showCustomerPreview} animationType="slide" transparent onRequestClose={() => setShowCustomerPreview(false)}>
+      <BottomSheetModal visible={showCustomerPreview} onRequestClose={() => setShowCustomerPreview(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background, maxHeight: '92%' }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2940,7 +2941,7 @@ export default function ProjectDetailScreen() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 }

@@ -15,6 +15,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import type { TruckStatus } from '@/types/truck';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const STATUS_OPTIONS: { key: TruckStatus; label: string; dot: string }[] = [
   { key: 'available', label: 'Available', dot: semantic.success },
@@ -228,7 +229,7 @@ export default function AddTruckScreen() {
       </KeyboardAwareScrollView>
 
       {/* Photo source sheet */}
-      <Modal visible={showPhotoSheet} transparent animationType="slide" onRequestClose={() => setShowPhotoSheet(false)}>
+      <BottomSheetModal visible={showPhotoSheet} onRequestClose={() => setShowPhotoSheet(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setShowPhotoSheet(false)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -258,7 +259,7 @@ export default function AddTruckScreen() {
             </Pressable>
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Permission error */}
       <Modal visible={!!permissionError} transparent animationType="fade" onRequestClose={() => setPermissionError(null)}>

@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert, Switch, Image, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert, Switch, Image } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -79,7 +81,7 @@ export default function CompanySetupScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={{ flex: 1 }}>
           <Text style={[typeScale.overline, { color: colors.primary }]}>
@@ -107,13 +109,13 @@ export default function CompanySetupScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {step.key === 'trucks' && <TrucksStep />}
         {step.key === 'workers' && <WorkersStep />}
         {step.key === 'payRates' && <PayRatesStep onGoToWorkers={() => setIndex(1)} />}
         {step.key === 'notifications' && <NotificationsStep />}
         {step.key === 'company' && <CompanyStep onSaved={() => handleContinue('company')} />}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {step.key !== 'company' && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md, borderTopColor: colors.borderLight, backgroundColor: colors.background }]}>
@@ -137,7 +139,7 @@ export default function CompanySetupScreen() {
           </Pressable>
         </View>
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

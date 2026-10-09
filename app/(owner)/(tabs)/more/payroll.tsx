@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Platform, Alert } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -91,7 +93,7 @@ export default function PayrollScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryRow, { gap: spacing.md }]}>
           <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }, shadow.sm]}>
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>ESTIMATED TOTAL</Text>
@@ -136,7 +138,7 @@ export default function PayrollScreen() {
             colors={colors}
           />
         ))}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

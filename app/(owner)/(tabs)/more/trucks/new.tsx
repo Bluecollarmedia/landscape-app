@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Modal, Alert, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -97,7 +99,7 @@ export default function AddTruckScreen() {
         <View style={{ width: 70 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <Pressable
           style={[styles.photoBox, { borderColor: colors.borderLight }]}
           onPress={() => setShowPhotoSheet(true)}
@@ -223,7 +225,7 @@ export default function AddTruckScreen() {
           <Icon name="plus" size={18} color="#FFFFFF" />
           <Text style={[typeScale.labelLarge, { color: '#FFFFFF', fontWeight: '700', marginLeft: spacing.xs }]}>Add Truck</Text>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* Photo source sheet */}
       <Modal visible={showPhotoSheet} transparent animationType="slide" onRequestClose={() => setShowPhotoSheet(false)}>

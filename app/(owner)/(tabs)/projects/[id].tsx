@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Switch, Alert, Linking } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -2187,12 +2189,12 @@ export default function ProjectDetailScreen() {
         />
       )}
 
-      <ScrollView
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {sectionRenderers[activeSection]?.()}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* More Menu */}
       <Modal visible={showMoreMenu} animationType="fade" transparent onRequestClose={() => setShowMoreMenu(false)}>

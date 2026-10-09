@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, TextInput, Modal, Alert, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -90,7 +92,7 @@ export default function EditProfileScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      <View style={styles.content}>
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.photoSection}>
           <Pressable style={styles.avatarWrap} onPress={() => setPhotoSheetOpen(true)}>
             <Avatar firstName={firstName} lastName={lastName} size={96} uri={avatarUrl} />
@@ -151,7 +153,7 @@ export default function EditProfileScreen() {
         >
           <Text style={[typeScale.labelLarge, { color: hasChanges ? '#FFFFFF' : colors.textTertiary }]}>Save Changes</Text>
         </Pressable>
-      </View>
+      </KeyboardAwareScrollView>
 
       {/* Change Profile Photo sheet */}
       <Modal visible={photoSheetOpen} transparent animationType="slide" onRequestClose={() => setPhotoSheetOpen(false)}>
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   backRow: { flexDirection: 'row', alignItems: 'center', width: 90 },
-  content: { flex: 1, paddingHorizontal: spacing.lg },
+  content: { flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing['3xl'] },
   photoSection: { alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.xl },
   avatarWrap: { position: 'relative' },
   cameraBadgeLarge: {

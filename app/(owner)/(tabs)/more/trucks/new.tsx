@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.md },
   input: {
     borderWidth: 1,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typeScale.bodyLarge.fontSize,
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     paddingVertical: spacing.md,
     marginTop: spacing.lg,
     ...shadow.sm,
@@ -360,5 +360,5 @@ const styles = StyleSheet.create({
   sheetCancel: { marginTop: spacing.sm, borderRadius: radius.sm, paddingVertical: spacing.md, alignItems: 'center' },
   confirmBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   confirmCard: { width: '100%', borderRadius: radius.md, padding: spacing.lg },
-  confirmButton: { marginTop: spacing.lg, borderRadius: radius.sm, paddingVertical: spacing.md, alignItems: 'center' },
+  confirmButton: { marginTop: spacing.lg, borderRadius: radius.full, paddingVertical: spacing.md, alignItems: 'center' },
 });

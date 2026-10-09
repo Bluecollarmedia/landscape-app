@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   timeCol: { width: 64 },
   travelWarning: {

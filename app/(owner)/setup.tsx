@@ -463,12 +463,12 @@ const styles = StyleSheet.create({
   codeBox: {
     alignItems: 'center',
     padding: spacing.lg,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     marginBottom: spacing.md,
   },
   photoBox: {
     height: 160,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     overflow: 'hidden',
     marginBottom: spacing.sm,
     justifyContent: 'flex-end',

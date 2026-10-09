@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
 
   segmentControl: { height: 34 },
   timeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  timeField: { flex: 1, borderRadius: radius.sm, padding: spacing.md },
+  timeField: { flex: 1, borderRadius: radius.lg, padding: spacing.md },
 
   workerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   workerChip: {
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
     padding: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     borderLeftWidth: 2,
   },
 
@@ -709,7 +709,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   workerPickerRow: {
     flexDirection: 'row',

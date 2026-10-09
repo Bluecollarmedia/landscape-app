@@ -122,6 +122,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
   },
   iconWrap: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
-  warnBox: { padding: spacing.md, borderRadius: radius.sm, marginTop: spacing.md },
-  input: { borderWidth: 1.5, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, letterSpacing: 2 },
+  warnBox: { padding: spacing.md, borderRadius: radius.md, marginTop: spacing.md },
+  input: { borderWidth: 1.5, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, letterSpacing: 2 },
 });

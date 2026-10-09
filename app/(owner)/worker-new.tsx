@@ -191,14 +191,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
     borderWidth: 1,
   },
   noteBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.lg,
     borderLeftWidth: 3,
   },
   requestsLink: {

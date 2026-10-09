@@ -204,8 +204,8 @@ const styles = StyleSheet.create({
   },
   field: { marginBottom: spacing.lg },
   input: {
-    borderWidth: 1,
-    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typeScale.bodyLarge.fontSize,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
   },
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     paddingVertical: spacing.md,
   },
   cancelLink: {

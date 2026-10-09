@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     marginTop: 2,
   },
   detailRow: {

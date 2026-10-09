@@ -212,14 +212,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
     borderWidth: 1,
   },
   statRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.lg,
     borderWidth: 1,
   },
   overviewRow: {

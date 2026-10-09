@@ -296,6 +296,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: spacing.lg,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
 });

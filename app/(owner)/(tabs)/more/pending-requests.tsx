@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
   },
   declineBtn: {
     flex: 1,
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
     borderWidth: 1,
   },
   reviewInfo: {

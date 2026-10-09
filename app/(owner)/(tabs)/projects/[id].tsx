@@ -3202,7 +3202,7 @@ const styles = StyleSheet.create({
   taskFilterRow: {
     flexDirection: 'row',
     backgroundColor: '#0000000A',
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: 3,
     marginBottom: spacing.lg,
   },
@@ -3210,7 +3210,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
   },
   taskSection: {
     borderRadius: radius.md,
@@ -3251,7 +3251,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   taskPhotoNote: {
     flexDirection: 'row',
@@ -3278,11 +3278,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   selectedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   pickerList: {
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     marginTop: spacing.xs,
     maxHeight: 240,
     overflow: 'hidden',
@@ -3316,7 +3316,7 @@ const styles = StyleSheet.create({
   // Requests
   responseBox: {
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     marginTop: spacing.md,
   },
 
@@ -3379,7 +3379,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
     marginTop: spacing.md,
   },
@@ -3388,14 +3388,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
   },
   dangerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
     marginTop: spacing.md,
   },
   outlineBtn: {
@@ -3403,7 +3403,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
     marginTop: spacing.md,
   },
 
@@ -3530,8 +3530,8 @@ const styles = StyleSheet.create({
   descInput: {
     marginTop: spacing.sm,
     padding: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
     minHeight: 80,
     textAlignVertical: 'top',
     fontSize: typeScale.bodySmall.fontSize,
@@ -3614,7 +3614,7 @@ const styles = StyleSheet.create({
   descBox: {
     marginTop: spacing.sm,
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     borderWidth: 1,
   },
   descEditActions: {
@@ -3656,8 +3656,8 @@ const styles = StyleSheet.create({
   // Update composer
   composerInput: {
     padding: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
     fontSize: typeScale.bodySmall.fontSize,
     marginBottom: spacing.sm,
   },
@@ -3698,7 +3698,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
   },
   accessCard: {
     borderRadius: radius.md,
@@ -3713,7 +3713,7 @@ const styles = StyleSheet.create({
   accessDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.sm,
     marginTop: spacing.md,
   },
@@ -3782,7 +3782,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   previewUpdateCard: {
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: spacing.sm,
     marginBottom: spacing.sm,

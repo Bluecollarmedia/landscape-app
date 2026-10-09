@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
   },
   sectionCard: {
     borderRadius: radius.md,

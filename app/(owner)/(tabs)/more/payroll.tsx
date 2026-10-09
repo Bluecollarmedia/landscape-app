@@ -360,6 +360,6 @@ const styles = StyleSheet.create({
   rateHistory: { borderTopWidth: 1, marginTop: spacing.md, paddingTop: spacing.md },
   rateRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs },
   rateInputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rateInput: { flex: 1, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 16 },
-  rateSave: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.sm },
+  rateInput: { flex: 1, borderWidth: 1.5, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 16 },
+  rateSave: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.full },
 });

@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   // Requests
   responseBox: {
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     marginTop: spacing.md,
   },
   categoryGrid: {
@@ -566,8 +566,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   formInput: {
-    borderWidth: 1,
-    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typeScale.bodySmall.fontSize,

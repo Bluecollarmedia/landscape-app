@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useAuth } from '@/providers/AuthProvider';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useWorkerContext } from '@/providers/WorkerProvider';
@@ -115,6 +116,7 @@ export default function WorkerSettingsScreen() {
 
       <ListSection>
         <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={() => setSignOutConfirmOpen(true)} />
+        <DeleteAccountRow />
       </ListSection>
 
       {/* Navigation App selection sheet */}

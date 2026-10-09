@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/ThemeProvider';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useAuth } from '@/providers/AuthProvider';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { ScreenContainer } from '@/components/layout';
@@ -90,6 +91,7 @@ export default function CustomerAccountScreen() {
 
       <ListSection>
         <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={signOut} />
+        <DeleteAccountRow />
       </ListSection>
     </ScreenContainer>
   );

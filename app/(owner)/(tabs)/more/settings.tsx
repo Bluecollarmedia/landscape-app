@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useAuth } from '@/providers/AuthProvider';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -138,6 +139,7 @@ export default function SettingsScreen() {
 
         <ListSection>
           <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={signOut} />
+          <DeleteAccountRow />
         </ListSection>
       </ScrollView>
     </View>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -9,6 +9,7 @@ import { Avatar, ListSection, ListRow } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import { db, useDb } from '@/data/store';
+import { formatAddress } from '@/lib/address';
 
 export default function CustomerAccountScreen() {
   const { colors } = useTheme();
@@ -36,9 +37,32 @@ export default function CustomerAccountScreen() {
         </View>
       </ListSection>
 
-      <ListSection title="Your Company">
-        <ListRow icon="briefcase" title={db.company?.name ?? '—'} />
-        <ListRow icon="phone" title="Phone" value={db.company?.phone || '—'} />
+      <ListSection title="Your Project Team">
+        <ListRow
+          icon="briefcase"
+          title={db.company?.name ?? '—'}
+          subtitle={db.company ? formatAddress({ address: db.company.address, city: db.company.city, state: db.company.state, zip: db.company.zip }) || undefined : undefined}
+        />
+        {db.company?.phone ? (
+          <ListRow
+            icon="phone"
+            iconColor={colors.primary}
+            title="Call"
+            value={db.company.phone}
+            showChevron
+            onPress={() => Linking.openURL(`tel:${db.company!.phone!.replace(/[^\d+]/g, '')}`)}
+          />
+        ) : null}
+        {db.company?.email ? (
+          <ListRow
+            icon="mail"
+            iconColor={colors.primary}
+            title="Email"
+            value={db.company.email}
+            showChevron
+            onPress={() => Linking.openURL(`mailto:${db.company!.email}`)}
+          />
+        ) : null}
       </ListSection>
 
       {!isSupabaseConfigured && (

@@ -24,7 +24,7 @@ import { uuid } from '@/lib/ids';
 import type { Company, CompanyMember, PersonSummary } from '@/types/company';
 import type {
   Project, ProjectTask, ProjectTeamMember, ProjectSettings, ProjectPhoto, ProjectUpdate,
-  ProjectRequest, ProjectHistoryEntry, CustomerTimelineEvent,
+  ProjectRequest, ProjectHistoryEntry, CustomerTimelineEvent, ProjectMessage,
 } from '@/types/project';
 import type { Assignment, ScheduleChange } from '@/types/schedule';
 import type { Truck } from '@/types/truck';
@@ -60,6 +60,7 @@ const TABLES = {
   project_settings: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'customerInteractionEnabled', 'completionPhotoRequired', 'checkinRadiusMeters', 'customerCanRequest', 'customerCanViewPhotos', 'customerCanComment', 'createdAt', 'updatedAt'] },
   project_photos: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'taskId', 'assignmentId', 'uploadedBy', 'fileKey', 'fileUrl', 'caption', 'customerDescription', 'isCustomerVisible', 'sharedBy', 'sharedAt', 'photoType', 'takenAt', 'createdAt'] },
   project_updates: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'createdBy', 'title', 'body', 'isCustomerVisible', 'photoIds', 'createdAt', 'updatedAt'] },
+  project_messages: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'senderId', 'body', 'createdAt'] },
   project_requests: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'requestedBy', 'title', 'description', 'category', 'attachmentUrl', 'status', 'linkedTaskId', 'respondedAt', 'responseNote', 'createdAt', 'updatedAt'] },
   project_history: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'actorId', 'eventType', 'description', 'metadata', 'createdAt'] },
   customer_timeline: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'eventType', 'title', 'description', 'photoUrl', 'timestamp'] },
@@ -161,6 +162,8 @@ export interface Db {
   photos: Record<string, ProjectPhoto[]>;
   updates: Record<string, ProjectUpdate[]>;
   requests: Record<string, ProjectRequest[]>;
+  /** Customer ↔ owner messages per project, oldest first. */
+  messages: Record<string, ProjectMessage[]>;
   history: Record<string, ProjectHistoryEntry[]>;
   customerTimeline: Record<string, CustomerTimelineEvent[]>;
   trucks: Truck[];
@@ -213,6 +216,7 @@ export const db: Db = {
   photos: {},
   updates: {},
   requests: {},
+  messages: {},
   history: {},
   customerTimeline: {},
   trucks: [],
@@ -317,6 +321,13 @@ function derive() {
   db.photos = photos as Record<string, ProjectPhoto[]>;
   db.updates = groupBy(raw.project_updates.map((u) => ({ ...u, author: person(u.createdBy) })), 'projectId') as Record<string, ProjectUpdate[]>;
   db.requests = groupBy(raw.project_requests.map((r) => ({ ...r, requester: person(r.requestedBy) })), 'projectId') as Record<string, ProjectRequest[]>;
+  db.messages = groupBy(
+    raw.project_messages
+      .slice()
+      .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
+      .map((m) => ({ ...m, sender: person(m.senderId) })),
+    'projectId',
+  ) as Record<string, ProjectMessage[]>;
   db.history = groupBy(raw.project_history.map((h) => ({ ...h, actor: person(h.actorId) })), 'projectId') as Record<string, ProjectHistoryEntry[]>;
   db.customerTimeline = groupBy(raw.customer_timeline, 'projectId') as Record<string, CustomerTimelineEvent[]>;
 

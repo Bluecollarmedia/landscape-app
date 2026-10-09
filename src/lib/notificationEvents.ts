@@ -11,6 +11,7 @@ export const EVENT_LABELS: Record<NotificationEventType, { label: string; icon: 
   worker_completed_job: { label: 'Job Completed', icon: 'check-circle', description: 'When all tasks at a job site are finished' },
   photo_waiting_review: { label: 'Photos Pending', icon: 'camera', description: 'When new photos need your review' },
   customer_request_submitted: { label: 'Customer Request', icon: 'message-square', description: 'When a customer submits a request' },
+  customer_message: { label: 'Customer Message', icon: 'message-circle', description: 'When a customer sends you a message' },
   schedule_changed: { label: 'Schedule Changed', icon: 'calendar', description: 'When the schedule is modified' },
   announcement_posted: { label: 'Announcement', icon: 'volume-2', description: 'When an announcement is posted' },
   schedule_conflict: { label: 'Schedule Conflict', icon: 'alert-triangle', description: 'When a scheduling conflict is detected' },
@@ -20,6 +21,6 @@ export const ALL_EVENTS: NotificationEventType[] = [
   'worker_checked_in', 'worker_checked_out', 'worker_checked_in_late',
   'worker_outside_radius', 'worker_not_checked_in', 'worker_past_scheduled_end',
   'worker_completed_task', 'worker_completed_job',
-  'photo_waiting_review', 'customer_request_submitted',
+  'photo_waiting_review', 'customer_request_submitted', 'customer_message',
   'schedule_changed', 'schedule_conflict',
 ];

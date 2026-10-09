@@ -14,6 +14,8 @@ import { useProject } from '@/hooks/useProject';
 import { useAuth } from '@/providers/AuthProvider';
 import { attachImage } from '@/data/actions';
 import { openDirections } from '@/lib/maps';
+import { MessageThread } from '@/components/messages/MessageThread';
+import { db } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
@@ -167,13 +169,13 @@ export default function ProjectDetailScreen() {
   // Customer tab rather than as their own top-level section.
   const initialSection = SECTIONS.some(s => s.key === section)
     ? section!
-    : (section === 'requests' || section === 'updates') ? 'customer' : 'overview';
+    : (section === 'requests' || section === 'updates' || section === 'messages') ? 'customer' : 'overview';
 
   const [activeSection, setActiveSection] = useState(initialSection);
-  const [customerSubTab, setCustomerSubTab] = useState<'updates' | 'requests'>(
-    section === 'requests' ? 'requests' : 'updates',
+  const [customerSubTab, setCustomerSubTab] = useState<'updates' | 'requests' | 'messages'>(
+    section === 'requests' ? 'requests' : section === 'messages' ? 'messages' : 'updates',
   );
-  const [customerDrilldown, setCustomerDrilldown] = useState(section === 'requests' || section === 'updates');
+  const [customerDrilldown, setCustomerDrilldown] = useState(section === 'requests' || section === 'updates' || section === 'messages');
   const [showManageAccess, setShowManageAccess] = useState(false);
   const [showCustomerPreview, setShowCustomerPreview] = useState(false);
   const [moreSubSection, setMoreSubSection] = useState<'people' | 'activity' | 'settings' | null>(null);
@@ -717,6 +719,7 @@ export default function ProjectDetailScreen() {
 
   function renderCustomerUpdatesRequests() {
     const pendingCount = requests.filter(r => r.status === 'pending').length;
+    const messageCount = db.messages[p.id]?.length ?? 0;
     return (
       <View>
         <View style={styles.pillToggleRow}>
@@ -736,8 +739,23 @@ export default function ProjectDetailScreen() {
               Requests{pendingCount > 0 ? ` (${pendingCount})` : ''}
             </Text>
           </Pressable>
+          <Pressable
+            style={[styles.pillToggle, { backgroundColor: customerSubTab === 'messages' ? colors.primary : colors.backgroundTertiary }]}
+            onPress={() => setCustomerSubTab('messages')}
+          >
+            <Text style={[typeScale.labelSmall, { color: customerSubTab === 'messages' ? colors.textOnPrimary : colors.textSecondary }]}>
+              Messages{messageCount > 0 ? ` (${messageCount})` : ''}
+            </Text>
+          </Pressable>
         </View>
-        {customerSubTab === 'updates' ? renderUpdates() : renderRequests()}
+        {customerSubTab === 'updates' ? renderUpdates() : customerSubTab === 'requests' ? renderRequests() : (
+          <View style={styles.sectionContent}>
+            <MessageThread
+              projectId={p.id}
+              emptyText={p.customerId ? 'Send your customer a message. They\u2019ll see it in their app under Messages.' : 'Add a customer to this project to message them.'}
+            />
+          </View>
+        )}
       </View>
     );
   }
@@ -973,6 +991,23 @@ export default function ProjectDetailScreen() {
                   <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Customer Requests</Text>
                   <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
                     {requests.length === 0 ? 'No requests' : `${requests.length} request${requests.length === 1 ? '' : 's'} from customer`}
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              </Pressable>
+              <Divider style={{ marginVertical: spacing.xs }} />
+
+              <Pressable
+                style={styles.customerContentRow}
+                onPress={() => { setCustomerSubTab('messages'); setCustomerDrilldown(true); }}
+              >
+                <View style={[styles.customerContentIcon, { backgroundColor: colors.primarySurface }]}>
+                  <Icon name="send" size={16} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Messages</Text>
+                  <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                    {(db.messages[p.id]?.length ?? 0) === 0 ? 'No messages yet' : `${db.messages[p.id].length} message${db.messages[p.id].length === 1 ? '' : 's'}`}
                   </Text>
                 </View>
                 <Icon name="chevron-right" size={16} color={colors.textTertiary} />

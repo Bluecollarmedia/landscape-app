@@ -23,6 +23,7 @@ const EVENT_ICONS: Record<NotificationEventType, { icon: string; color: string }
   worker_completed_job: { icon: 'check-circle', color: semantic.success },
   photo_waiting_review: { icon: 'camera', color: semantic.info },
   customer_request_submitted: { icon: 'message-square', color: semantic.info },
+  customer_message: { icon: 'message-circle', color: semantic.info },
   schedule_changed: { icon: 'calendar', color: brand.primary },
   schedule_conflict: { icon: 'alert-triangle', color: semantic.error },
   announcement_posted: { icon: 'volume-2', color: brand.primary },

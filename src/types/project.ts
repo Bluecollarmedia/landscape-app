@@ -147,6 +147,17 @@ export interface ProjectRequest {
   requester?: PersonSummary;
 }
 
+/** One message in the customer ↔ owner conversation on a project. */
+export interface ProjectMessage {
+  id: string;
+  companyId?: string;
+  projectId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  sender?: PersonSummary;
+}
+
 export type CustomerTimelineType =
   | 'update_shared'
   | 'photo_shared'

@@ -13,7 +13,8 @@ import { SectionTabs, StatusBadge, ProgressBar, Card, EmptyState, Divider, Avata
 import { useProject } from '@/hooks/useProject';
 import { useAuth } from '@/providers/AuthProvider';
 import { attachImage } from '@/data/actions';
-import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M, CHECKIN_RADIUS_OPTIONS } from '@/lib/maps';
+import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
+import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
 import { MessageThread } from '@/components/messages/MessageThread';
 import { db } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
@@ -1996,7 +1997,6 @@ export default function ProjectDetailScreen() {
     }
 
     const access = customerAccess.getAccessForProject(p.id);
-    const radiusOptions = CHECKIN_RADIUS_OPTIONS;
 
     return (
       <View style={styles.sectionContent}>
@@ -2183,25 +2183,13 @@ export default function ProjectDetailScreen() {
           )}
         </View>
 
-        <Modal visible={showRadiusPicker} animationType="fade" transparent onRequestClose={() => setShowRadiusPicker(false)}>
-          <Pressable style={styles.moreMenuOverlay} onPress={() => setShowRadiusPicker(false)}>
-            <View style={[styles.moreMenuCard, { backgroundColor: colors.surface, right: spacing.xl, left: spacing.xl, top: '38%' }]}>
-              <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
-                <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Check-in Distance</Text>
-              </View>
-              {radiusOptions.map((meters) => (
-                <Pressable
-                  key={meters}
-                  style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
-                  onPress={() => handleSetRadius(meters)}
-                >
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{formatDistance(meters)}</Text>
-                  {(settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M) === meters && <Icon name="check" size={18} color={colors.primary} />}
-                </Pressable>
-              ))}
-            </View>
-          </Pressable>
-        </Modal>
+        <CheckInRadiusSheet
+          visible={showRadiusPicker}
+          place={p}
+          radiusMeters={settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M}
+          onClose={() => setShowRadiusPicker(false)}
+          onSave={handleSetRadius}
+        />
       </View>
     );
   }

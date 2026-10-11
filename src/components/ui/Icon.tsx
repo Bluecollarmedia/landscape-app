@@ -23,6 +23,14 @@ type FeatherName = ComponentProps<typeof Feather>['name'];
 
 const FEATHER_TO_SF: Partial<Record<string, string>> = {
   'activity': 'chart.xyaxis.line',
+  'slash': 'nosign',
+  'edit-2': 'pencil',
+  'file-plus': 'doc.badge.plus',
+  'printer': 'printer',
+  'trash-2': 'trash',
+  'copy': 'doc.on.doc',
+  'arrow-down': 'arrow.down',
+  'arrow-up': 'arrow.up',
   'alert-circle': 'exclamationmark.circle',
   'alert-triangle': 'exclamationmark.triangle',
   'arrow-left': 'arrow.left',
@@ -45,6 +53,7 @@ const FEATHER_TO_SF: Partial<Record<string, string>> = {
   'clock': 'clock',
   'cloud': 'cloud',
   'compass': 'location.circle',
+  'credit-card': 'creditcard',
   'dollar-sign': 'dollarsign.circle',
   'edit': 'pencil',
   'edit-3': 'pencil',

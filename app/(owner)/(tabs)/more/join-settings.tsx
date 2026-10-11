@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Switch, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
+import { Switch } from '@/components/ui/Switch';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -56,8 +57,6 @@ export default function JoinSettingsScreen() {
             <Switch
               value={settings.joinByCodeEnabled}
               onValueChange={(v) => updateSettings({ joinByCodeEnabled: v })}
-              trackColor={{ false: colors.borderLight, true: colors.primary + '60' }}
-              thumbColor={settings.joinByCodeEnabled ? colors.primary : colors.textTertiary}
             />
           </View>
 
@@ -109,8 +108,6 @@ export default function JoinSettingsScreen() {
             <Switch
               value={settings.directInvitationsEnabled}
               onValueChange={(v) => updateSettings({ directInvitationsEnabled: v })}
-              trackColor={{ false: colors.borderLight, true: colors.primary + '60' }}
-              thumbColor={settings.directInvitationsEnabled ? colors.primary : colors.textTertiary}
             />
           </View>
 
@@ -138,8 +135,6 @@ export default function JoinSettingsScreen() {
             <Switch
               value={settings.requireEmailVerification}
               onValueChange={(v) => updateSettings({ requireEmailVerification: v })}
-              trackColor={{ false: colors.borderLight, true: colors.primary + '60' }}
-              thumbColor={settings.requireEmailVerification ? colors.primary : colors.textTertiary}
             />
           </View>
         </Card>

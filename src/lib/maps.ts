@@ -117,15 +117,43 @@ export function distanceMeters(a: Coords, b: Coords): number {
 /** How close a worker must be to check in when the project doesn't set its own distance: half a mile. */
 export const DEFAULT_CHECKIN_RADIUS_M = 805;
 
-/** Check-in distances the owner can pick, in meters (500 ft, ¼ mi, ½ mi, 1 mi). */
-export const CHECKIN_RADIUS_OPTIONS = [152, 400, 805, 1609];
+/**
+ * Check-in distances the owner can slide between, in feet (stored in meters).
+ * Fine steps up close, then ¼ / ½ / ¾ / 1 mile.
+ */
+export const CHECKIN_RADIUS_STOPS_FT = [100, 150, 200, 300, 400, 500, 750, 1000, 1320, 2640, 3960, 5280];
 
-/** "350 ft" / "0.4 mi" (½ mi and 1 mi read as such). */
+export const feetToMeters = (feet: number) => Math.round(feet * 0.3048);
+
+/** Index of the stop closest to a saved distance, so older meter values land on the nearest one. */
+export function nearestRadiusStop(meters: number): number {
+  const feet = meters / 0.3048;
+  let best = 0;
+  CHECKIN_RADIUS_STOPS_FT.forEach((ft, i) => {
+    if (Math.abs(ft - feet) < Math.abs(CHECKIN_RADIUS_STOPS_FT[best] - feet)) best = i;
+  });
+  return best;
+}
+
+/** Plain-language picture of a check-in distance. */
+export function describeRadius(feet: number): string {
+  if (feet <= 150) return 'Just the house and driveway';
+  if (feet <= 300) return 'The lot plus the street out front';
+  if (feet <= 500) return 'A few houses either way';
+  if (feet <= 1000) return 'About the whole block';
+  if (feet <= 1320) return 'A few blocks around the property';
+  if (feet <= 2640) return 'The surrounding neighborhood';
+  return 'Very loose, for estates and acreage';
+}
+
+/** "350 ft" / "0.4 mi" (¼, ½ and ¾ mi read as such). */
 export function formatDistance(meters: number): string {
   const feet = meters * 3.281;
-  if (feet < 1000) return `${Math.max(10, Math.round(feet / 10) * 10)} ft`;
+  const roundedFeet = Math.max(10, Math.round(feet / 10) * 10);
+  if (roundedFeet <= 1000) return `${roundedFeet.toLocaleString('en-US')} ft`;
   const miles = meters / 1609.34;
   if (Math.abs(miles - 0.25) < 0.01) return '¼ mi';
   if (Math.abs(miles - 0.5) < 0.01) return '½ mi';
+  if (Math.abs(miles - 0.75) < 0.01) return '¾ mi';
   return `${Number.isInteger(Math.round(miles * 10) / 10) ? Math.round(miles) : miles.toFixed(1)} mi`;
 }

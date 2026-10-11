@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Switch, Alert, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking } from 'react-native';
+import { Switch } from '@/components/ui/Switch';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,13 +14,15 @@ import { SectionTabs, StatusBadge, ProgressBar, Card, EmptyState, Divider, Avata
 import { useProject } from '@/hooks/useProject';
 import { useAuth } from '@/providers/AuthProvider';
 import { attachImage } from '@/data/actions';
-import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M, CHECKIN_RADIUS_OPTIONS } from '@/lib/maps';
+import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
+import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
 import { MessageThread } from '@/components/messages/MessageThread';
 import { db } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
 import { getProjectImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 import { getMockPhotoImageUri } from '@/lib/mockPhotoImages';
 import { haptics } from '@/lib/haptics';
 import { todayKey, localDateKey, isoToLocalDateKey } from '@/lib/ids';
@@ -29,6 +32,7 @@ import { semantic } from '@/theme/colors';
 import type { ProjectStatus, TaskStatus, HistoryEventType, ProjectPhoto, ProjectTask, PhotoType } from '@/types/project';
 import type { Assignment } from '@/types/schedule';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { ProjectFinancials } from '@/components/financials/ProjectFinancials';
 
 const today = todayKey();
 
@@ -74,6 +78,11 @@ const SECTIONS = [
 
 const MORE_ITEMS = [
   {
+    key: 'financials', label: 'Financials', icon: 'file-text' as const,
+    description: 'Quotes, change orders and invoices for this project',
+    iconBg: '#E3F1E4', iconColor: '#2E7D32',
+  },
+  {
     key: 'people', label: 'People', icon: 'users' as const,
     description: 'View and manage the customer and project team members',
     iconBg: '#DCE9FB', iconColor: '#2E6BD6',
@@ -89,6 +98,8 @@ const MORE_ITEMS = [
     iconBg: '#E9E9EC', iconColor: '#5B5B63',
   },
 ];
+
+type MoreSubSection = 'financials' | 'people' | 'activity' | 'settings';
 
 const PHOTO_TYPE_LABEL: Record<string, string> = {
   before: 'Before', after: 'After', progress: 'Progress', issue: 'Issue', general: 'General',
@@ -170,7 +181,8 @@ export default function ProjectDetailScreen() {
   // Customer tab rather than as their own top-level section.
   const initialSection = SECTIONS.some(s => s.key === section)
     ? section!
-    : (section === 'requests' || section === 'updates' || section === 'messages') ? 'customer' : 'overview';
+    : (section === 'requests' || section === 'updates' || section === 'messages') ? 'customer'
+    : section === 'financials' ? 'more' : 'overview';
 
   const [activeSection, setActiveSection] = useState(initialSection);
   const [customerSubTab, setCustomerSubTab] = useState<'updates' | 'requests' | 'messages'>(
@@ -179,7 +191,7 @@ export default function ProjectDetailScreen() {
   const [customerDrilldown, setCustomerDrilldown] = useState(section === 'requests' || section === 'updates' || section === 'messages');
   const [showManageAccess, setShowManageAccess] = useState(false);
   const [showCustomerPreview, setShowCustomerPreview] = useState(false);
-  const [moreSubSection, setMoreSubSection] = useState<'people' | 'activity' | 'settings' | null>(null);
+  const [moreSubSection, setMoreSubSection] = useState<MoreSubSection | null>(section === 'financials' ? 'financials' : null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, editRequestResponse, reopenRequest, deleteRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
@@ -277,7 +289,7 @@ export default function ProjectDetailScreen() {
     return (
       <View>
         <View style={styles.coverWrap}>
-          <OptimizedImage source={getProjectImageUri(p, 900)} style={styles.coverImage} />
+          <BrandCover uri={getProjectImageUri(p)} style={styles.coverImage} />
           <View style={[styles.coverStatusPill, { backgroundColor: 'rgba(20,20,20,0.55)' }]}>
             <View style={[styles.coverStatusDot, { backgroundColor: statusDotColors[p.status] }]} />
             <Text style={[typeScale.labelSmall, { color: '#FFFFFF' }]}>{config.label}</Text>
@@ -599,7 +611,7 @@ export default function ProjectDetailScreen() {
     return (
       <View style={styles.sectionContent}>
         <View style={[styles.moreSummaryCard, { backgroundColor: colors.surface }, shadow.sm]}>
-          <OptimizedImage source={getProjectImageUri(p, 200)} style={styles.moreSummaryImage} />
+          <BrandCover uri={getProjectImageUri(p)} style={styles.moreSummaryImage} variant="tile" />
           <View style={{ marginLeft: spacing.md, flex: 1 }}>
             <StatusBadge label={config.label} status={config.type} style={{ alignSelf: 'flex-start' }} />
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
@@ -918,7 +930,6 @@ export default function ProjectDetailScreen() {
                   <Switch
                     value={settings.customerCanComment}
                     onValueChange={handleToggleComments}
-                    trackColor={{ true: colors.primary, false: colors.borderLight }}
                   />
                 </View>
 
@@ -934,7 +945,6 @@ export default function ProjectDetailScreen() {
                   <Switch
                     value={settings.customerCanRequest}
                     onValueChange={handleToggleRequests}
-                    trackColor={{ true: colors.primary, false: colors.borderLight }}
                   />
                 </View>
               </View>
@@ -1039,7 +1049,7 @@ export default function ProjectDetailScreen() {
       return (
         <View style={styles.sectionContent}>
           <View style={[styles.moreSummaryCard, { backgroundColor: colors.surface }, shadow.sm]}>
-            <OptimizedImage source={getProjectImageUri(p, 200)} style={styles.moreSummaryImage} />
+            <BrandCover uri={getProjectImageUri(p)} style={styles.moreSummaryImage} variant="tile" />
             <View style={{ marginLeft: spacing.md, flex: 1 }}>
               <StatusBadge label={config.label} status={config.type} style={{ alignSelf: 'flex-start' }} />
               <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
@@ -1060,7 +1070,7 @@ export default function ProjectDetailScreen() {
             <Pressable
               key={item.key}
               style={[styles.moreCardRow, { backgroundColor: colors.surface }, shadow.sm]}
-              onPress={() => setMoreSubSection(item.key as 'people' | 'activity' | 'settings')}
+              onPress={() => setMoreSubSection(item.key as MoreSubSection)}
             >
               <View style={[styles.moreCardIcon, { backgroundColor: item.iconBg }]}>
                 <Icon name={item.icon} size={18} color={item.iconColor} />
@@ -1082,6 +1092,7 @@ export default function ProjectDetailScreen() {
 
     return (
       <View>
+        {moreSubSection === 'financials' && <ProjectFinancials projectId={p.id} />}
         {moreSubSection === 'people' && renderPeople()}
         {moreSubSection === 'activity' && renderActivity()}
         {moreSubSection === 'settings' && renderSettings()}
@@ -1856,7 +1867,7 @@ export default function ProjectDetailScreen() {
     return (
       <View style={styles.sectionContent}>
         <View style={[styles.moreSummaryCard, { backgroundColor: colors.surface }, shadow.sm]}>
-          <OptimizedImage source={getProjectImageUri(p, 200)} style={styles.moreSummaryImage} />
+          <BrandCover uri={getProjectImageUri(p)} style={styles.moreSummaryImage} variant="tile" />
           <View style={{ marginLeft: spacing.md, flex: 1 }}>
             <StatusBadge label={config.label} status={config.type} style={{ alignSelf: 'flex-start' }} />
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
@@ -1996,7 +2007,6 @@ export default function ProjectDetailScreen() {
     }
 
     const access = customerAccess.getAccessForProject(p.id);
-    const radiusOptions = CHECKIN_RADIUS_OPTIONS;
 
     return (
       <View style={styles.sectionContent}>
@@ -2108,7 +2118,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerInteractionEnabled}
               onValueChange={(v) => updateSettings({ customerInteractionEnabled: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
           <Divider style={{ marginVertical: spacing.xs }} />
@@ -2121,7 +2130,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerCanRequest}
               onValueChange={(v) => updateSettings({ customerCanRequest: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
           <Divider style={{ marginVertical: spacing.xs }} />
@@ -2134,7 +2142,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerCanViewPhotos}
               onValueChange={(v) => updateSettings({ customerCanViewPhotos: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
         </View>
@@ -2160,7 +2167,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.completionPhotoRequired}
               onValueChange={(v) => updateSettings({ completionPhotoRequired: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
 
@@ -2183,25 +2189,13 @@ export default function ProjectDetailScreen() {
           )}
         </View>
 
-        <Modal visible={showRadiusPicker} animationType="fade" transparent onRequestClose={() => setShowRadiusPicker(false)}>
-          <Pressable style={styles.moreMenuOverlay} onPress={() => setShowRadiusPicker(false)}>
-            <View style={[styles.moreMenuCard, { backgroundColor: colors.surface, right: spacing.xl, left: spacing.xl, top: '38%' }]}>
-              <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
-                <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Check-in Distance</Text>
-              </View>
-              {radiusOptions.map((meters) => (
-                <Pressable
-                  key={meters}
-                  style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
-                  onPress={() => handleSetRadius(meters)}
-                >
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{formatDistance(meters)}</Text>
-                  {(settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M) === meters && <Icon name="check" size={18} color={colors.primary} />}
-                </Pressable>
-              ))}
-            </View>
-          </Pressable>
-        </Modal>
+        <CheckInRadiusSheet
+          visible={showRadiusPicker}
+          place={p}
+          radiusMeters={settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M}
+          onClose={() => setShowRadiusPicker(false)}
+          onSave={handleSetRadius}
+        />
       </View>
     );
   }
@@ -2302,7 +2296,7 @@ export default function ProjectDetailScreen() {
               <Pressable
                 key={item.key}
                 style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
-                onPress={() => { setActiveSection('more'); setMoreSubSection(item.key as 'people' | 'activity' | 'settings'); setShowMoreMenu(false); }}
+                onPress={() => { setActiveSection('more'); setMoreSubSection(item.key as MoreSubSection); setShowMoreMenu(false); }}
               >
                 <Icon name={item.icon} size={18} color={colors.textSecondary} />
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>

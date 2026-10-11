@@ -83,7 +83,12 @@ export type NotificationEventType =
   | 'customer_message'
   | 'schedule_changed'
   | 'schedule_conflict'
-  | 'announcement_posted';
+  | 'announcement_posted'
+  | 'quote_approved'
+  | 'quote_declined'
+  // To the customer
+  | 'quote_sent'
+  | 'invoice_issued';
 
 export interface NotificationPreference {
   id: string;
@@ -105,7 +110,7 @@ export interface AppNotification {
   title: string;
   body: string;
   status: NotificationStatus;
-  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement';
+  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement' | 'quote' | 'change_order' | 'invoice';
   linkedEntityId?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;

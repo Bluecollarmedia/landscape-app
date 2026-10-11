@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal, Alert, Linking, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Modal, Alert, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -9,6 +9,9 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useWorkerContext } from '@/providers/WorkerProvider';
 import { useAnnouncements } from '@/hooks/useAnnouncements';
+import { useCompanyYard } from '@/hooks/useCompanyYard';
+import { formatAddress } from '@/lib/address';
+import { useResources } from '@/hooks/useResources';
 import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -19,11 +22,12 @@ import type { Assignment } from '@/types/schedule';
 import type { ProjectTask } from '@/types/project';
 import type { Announcement } from '@/types/announcement';
 import type { WeatherActionType } from '@/types/operations';
-import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages';
+import { getProjectImageUriById, getWorkerHeaderImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
+import { WORKER_HERO_HEIGHT as HERO_HEIGHT } from '@/components/media/HeaderPhotoField';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 
-const HERO_HEIGHT = 400;
 const HERO_HEIGHT_COMPACT = 190;
 const PILL_OVERHANG = 26;
 
@@ -69,6 +73,7 @@ export default function WorkerTodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
+  const { resources } = useResources();
   const {
     todayAssignments, currentJob, jobState, checkIns, checkOuts, moveToNextJob,
     scheduleConfirmed, confirmSchedule, checkIn, checkOut, locateForCheckIn, locateForCheckOut, openMapsNavigation,
@@ -84,6 +89,9 @@ export default function WorkerTodayScreen() {
   const showWorking = isCheckedIn && !!primaryAssignment;
   const showConfirmed = scheduleConfirmed && !!primaryAssignment && !isCheckedIn;
   const showCheckedOut = jobState === 'completed' && !!primaryAssignment;
+
+  // The company yard: its own destination, never the jobsite.
+  const { yard, label: yardName } = useCompanyYard();
 
   const { getUnreadForWorker, markAnnouncementRead } = useAnnouncements();
   const unreadAnnouncement: Announcement | null = user ? getUnreadForWorker(user.id) : null;
@@ -204,6 +212,12 @@ export default function WorkerTodayScreen() {
     );
   }
 
+  function handleYardPress() {
+    if (!yard) return;
+    haptics.select();
+    openMapsNavigation(yard);
+  }
+
   function handleOpenAnnouncement() {
     haptics.select();
     setOpenAnnouncement(true);
@@ -295,7 +309,7 @@ export default function WorkerTodayScreen() {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         <View style={[styles.hero, { height: showWorking ? HERO_HEIGHT_COMPACT : HERO_HEIGHT }]}>
-          <Image source={{ uri: primaryAssignment ? getProjectImageUriById(primaryAssignment.projectId, 1200) : getCompanyImageUri() }} style={styles.heroImage} resizeMode="cover" />
+          <BrandCover uri={(primaryAssignment && getProjectImageUriById(primaryAssignment.projectId)) || getWorkerHeaderImageUri()} style={styles.heroImage} />
           <LinearGradient
             colors={['transparent', 'transparent', colors.groupedBackground]}
             locations={[0, 0.78, 1]}
@@ -317,6 +331,27 @@ export default function WorkerTodayScreen() {
               <Text style={[typeScale.displayLarge, styles.heroTextShadow, { color: '#FFFFFF', marginTop: 2 }]}>
                 {greeting},{'\n'}{user?.firstName ?? 'there'}
               </Text>
+              {yard && (
+                <Pressable
+                  onPress={handleYardPress}
+                  hitSlop={{ top: 8, bottom: 8 }}
+                  style={({ pressed }) => [styles.yardRow, pressed && { opacity: 0.7 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${yardName}, ${formatAddress(yard)}`}
+                  accessibilityHint="Opens directions to the yard"
+                >
+                  <View style={[styles.yardPin, { backgroundColor: colors.primary }]}>
+                    <Feather name="map-pin" size={11} color="#FFFFFF" />
+                  </View>
+                  <Text
+                    style={[typeScale.labelLarge, styles.heroTextShadow, styles.yardText]}
+                    numberOfLines={1}
+                  >
+                    {yardName} · {yard.address}
+                  </Text>
+                  <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.85)" />
+                </Pressable>
+              )}
               <Text style={[typeScale.bodyLarge, styles.heroTextShadow, { color: '#FFFFFF', marginTop: spacing.xs }]}>
                 {tagline}
               </Text>
@@ -324,7 +359,13 @@ export default function WorkerTodayScreen() {
           )}
 
           {!showWorking && primaryAssignment?.truck && (
-            <Pressable style={[styles.truckPill, { backgroundColor: colors.primarySurface, bottom: -PILL_OVERHANG }, shadow.md]}>
+            <Pressable
+              style={[styles.truckPill, { backgroundColor: colors.primarySurface, bottom: -PILL_OVERHANG }, shadow.md]}
+              // Opens this truck's codes when the owner has shared any with this worker.
+              onPress={resources.some((r) => r.truckId === primaryAssignment.truck!.id)
+                ? () => router.push(`/(worker)/my-resources?truckId=${primaryAssignment.truck!.id}` as any)
+                : undefined}
+            >
               <Feather name="truck" size={18} color={colors.primaryDark} />
               <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
                 {primaryAssignment.truck.name}
@@ -742,6 +783,9 @@ const styles = StyleSheet.create({
   heroImage: { width: '100%', height: '100%' },
   avatarWrap: { position: 'absolute', right: spacing.lg },
   heroText: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 100 },
+  yardRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', maxWidth: '100%', marginTop: spacing.sm, minHeight: 28 },
+  yardPin: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
+  yardText: { color: '#FFFFFF', flexShrink: 1, marginRight: spacing.xs },
   heroTextShadow: {
     textShadowColor: 'rgba(0, 0, 0, 0.35)',
     textShadowOffset: { width: 0, height: 1 },

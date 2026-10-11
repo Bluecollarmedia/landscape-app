@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { Switch } from '@/components/ui/Switch';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -83,8 +84,6 @@ export default function NotificationPreferencesScreen() {
                     onValueChange={(val) => {
                       if (pref) updatePreference(pref.id, val);
                     }}
-                    trackColor={{ false: colors.border, true: colors.primaryLight }}
-                    thumbColor={enabled ? colors.primary : colors.textTertiary}
                   />
                 </View>
               );
@@ -171,8 +170,6 @@ export default function NotificationPreferencesScreen() {
                   <Switch
                     value={currentEnabled}
                     onValueChange={(val) => setWorkerOverride(selectedWorker, eventType, val)}
-                    trackColor={{ false: colors.border, true: colors.primaryLight }}
-                    thumbColor={currentEnabled ? colors.primary : colors.textTertiary}
                   />
                 </View>
               );

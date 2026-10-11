@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Switch } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Switch } from '@/components/ui/Switch';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -38,7 +39,6 @@ export default function NotificationsScreen() {
               <Switch
                 value={settings.notificationsEnabled}
                 onValueChange={updateNotificationsEnabled}
-                trackColor={{ true: colors.primary, false: colors.borderLight }}
                 accessibilityLabel="Push Notifications"
               />
             }

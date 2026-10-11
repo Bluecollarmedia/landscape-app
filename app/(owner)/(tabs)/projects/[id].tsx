@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Switch, Alert, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking } from 'react-native';
+import { Switch } from '@/components/ui/Switch';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,7 +14,8 @@ import { SectionTabs, StatusBadge, ProgressBar, Card, EmptyState, Divider, Avata
 import { useProject } from '@/hooks/useProject';
 import { useAuth } from '@/providers/AuthProvider';
 import { attachImage } from '@/data/actions';
-import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M, CHECKIN_RADIUS_OPTIONS } from '@/lib/maps';
+import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
+import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
 import { MessageThread } from '@/components/messages/MessageThread';
 import { db } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
@@ -918,7 +920,6 @@ export default function ProjectDetailScreen() {
                   <Switch
                     value={settings.customerCanComment}
                     onValueChange={handleToggleComments}
-                    trackColor={{ true: colors.primary, false: colors.borderLight }}
                   />
                 </View>
 
@@ -934,7 +935,6 @@ export default function ProjectDetailScreen() {
                   <Switch
                     value={settings.customerCanRequest}
                     onValueChange={handleToggleRequests}
-                    trackColor={{ true: colors.primary, false: colors.borderLight }}
                   />
                 </View>
               </View>
@@ -1996,7 +1996,6 @@ export default function ProjectDetailScreen() {
     }
 
     const access = customerAccess.getAccessForProject(p.id);
-    const radiusOptions = CHECKIN_RADIUS_OPTIONS;
 
     return (
       <View style={styles.sectionContent}>
@@ -2108,7 +2107,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerInteractionEnabled}
               onValueChange={(v) => updateSettings({ customerInteractionEnabled: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
           <Divider style={{ marginVertical: spacing.xs }} />
@@ -2121,7 +2119,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerCanRequest}
               onValueChange={(v) => updateSettings({ customerCanRequest: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
           <Divider style={{ marginVertical: spacing.xs }} />
@@ -2134,7 +2131,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerCanViewPhotos}
               onValueChange={(v) => updateSettings({ customerCanViewPhotos: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
         </View>
@@ -2160,7 +2156,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.completionPhotoRequired}
               onValueChange={(v) => updateSettings({ completionPhotoRequired: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
 
@@ -2183,25 +2178,13 @@ export default function ProjectDetailScreen() {
           )}
         </View>
 
-        <Modal visible={showRadiusPicker} animationType="fade" transparent onRequestClose={() => setShowRadiusPicker(false)}>
-          <Pressable style={styles.moreMenuOverlay} onPress={() => setShowRadiusPicker(false)}>
-            <View style={[styles.moreMenuCard, { backgroundColor: colors.surface, right: spacing.xl, left: spacing.xl, top: '38%' }]}>
-              <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
-                <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Check-in Distance</Text>
-              </View>
-              {radiusOptions.map((meters) => (
-                <Pressable
-                  key={meters}
-                  style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
-                  onPress={() => handleSetRadius(meters)}
-                >
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{formatDistance(meters)}</Text>
-                  {(settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M) === meters && <Icon name="check" size={18} color={colors.primary} />}
-                </Pressable>
-              ))}
-            </View>
-          </Pressable>
-        </Modal>
+        <CheckInRadiusSheet
+          visible={showRadiusPicker}
+          place={p}
+          radiusMeters={settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M}
+          onClose={() => setShowRadiusPicker(false)}
+          onSave={handleSetRadius}
+        />
       </View>
     );
   }

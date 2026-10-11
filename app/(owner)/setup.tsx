@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert, Switch, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert, Image } from 'react-native';
+import { Switch } from '@/components/ui/Switch';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -347,7 +348,6 @@ function NotificationsStep() {
               value={pref?.enabled ?? true}
               disabled={!pref}
               onValueChange={(on) => pref && updatePreference(pref.id, on)}
-              trackColor={{ true: colors.primary, false: colors.border }}
             />
           </View>
         );

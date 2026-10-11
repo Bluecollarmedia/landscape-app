@@ -87,7 +87,7 @@ const TABLES = {
   membership_audit_log: { scope: 'company', cols: ['id', 'companyId', 'eventType', 'actorId', 'targetId', 'metadata', 'createdAt'] },
   // Company Resources. hasSecret/createdBy/updatedBy are set by the database
   // only, so they aren't listed as writable columns. Codes never come through
-  // here — see reveal_resource_secret() in supabase/updates/005.
+  // here — see reveal_resource_secret() in supabase/updates/006.
   company_resources: { scope: 'company', cols: ['id', 'companyId', 'category', 'name', 'description', 'truckId', 'itemName', 'cardLastFour', 'cardHolderId', 'createdAt', 'updatedAt'] },
   resource_access: { scope: 'company', cols: ['id', 'companyId', 'resourceId', 'personId', 'createdAt'] },
   resource_audit_log: { scope: 'company', cols: ['id', 'companyId', 'resourceId', 'resourceName', 'actorId', 'eventType', 'targetPersonId', 'metadata', 'createdAt'] },

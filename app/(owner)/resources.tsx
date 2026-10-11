@@ -44,7 +44,7 @@ export default function CompanyResourcesScreen() {
         icon="alert-circle"
         title="Couldn't load resources"
         description={missingTable
-          ? 'The database is missing the Company Resources update. Run supabase/updates/005_company_resources.sql in the Supabase SQL Editor.'
+          ? 'The database is missing the Company Resources update. Run supabase/updates/006_company_resources.sql in the Supabase SQL Editor.'
           : 'Check your connection and try again.'}
         actionTitle={refreshing ? 'Trying…' : 'Try Again'}
         onAction={retry}

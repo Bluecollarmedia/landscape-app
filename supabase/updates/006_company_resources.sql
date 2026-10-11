@@ -1,5 +1,5 @@
 -- ============================================================================
--- Update 5 — run once in Supabase → SQL Editor (safe to run again).
+-- Update 6 — run once in Supabase → SQL Editor (safe to run again).
 --  • Company Resources: gate codes, truck/trailer lock codes, equipment
 --    instructions, company info and company cards (label + last 4 only).
 --  • Each resource is private until the owner grants individual workers access.

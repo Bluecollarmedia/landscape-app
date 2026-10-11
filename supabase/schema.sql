@@ -42,6 +42,13 @@ create table public.companies (
   city text,
   state text,
   zip text,
+  -- Yard: where crews start and end the day (not the office, not a jobsite).
+  yard_address text,
+  yard_city text,
+  yard_state text,
+  yard_zip text,
+  yard_latitude double precision,
+  yard_longitude double precision,
   cover_photo_url text,
   setup_state jsonb not null default '{}'::jsonb,
   setup_completed_at timestamptz,

@@ -17,6 +17,8 @@ export const EVENT_LABELS: Record<NotificationEventType, { label: string; icon: 
   schedule_conflict: { label: 'Schedule Conflict', icon: 'alert-triangle', description: 'When a scheduling conflict is detected' },
   quote_approved: { label: 'Quote Approved', icon: 'check-circle', description: 'When a customer approves a quote or change order' },
   quote_declined: { label: 'Quote Declined', icon: 'x-circle', description: 'When a customer declines a quote or change order' },
+  quote_sent: { label: 'Quote Ready', icon: 'file-text', description: 'Tells the customer a quote or change order is ready to review' },
+  invoice_issued: { label: 'Invoice', icon: 'dollar-sign', description: 'Tells the customer an invoice was issued' },
 };
 
 export const ALL_EVENTS: NotificationEventType[] = [

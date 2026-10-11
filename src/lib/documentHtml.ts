@@ -26,6 +26,10 @@ export interface DocumentHtmlOptions {
   /** For invoices: numbers of the quote / change orders it bills. */
   sourceNumbers?: string[];
   events?: FinancialEvent[];
+  /** Approval link printed on a sent quote / change order. */
+  approvalUrl?: string;
+  /** Hide the "how to approve" note (e.g. on the approval page itself). */
+  hideApprovalHint?: boolean;
 }
 
 const INK = '#1F2A24';
@@ -114,12 +118,15 @@ function approvalBlock(doc: FinancialDoc, s: DocumentSnapshot, opts: DocumentHtm
     return e?.actor ? `${e.actor.firstName} ${e.actor.lastName}`.trim() : undefined;
   };
   if (doc.status === 'approved' && doc.approvedAt) {
-    const by = who(doc.approvedBy);
+    const by = doc.approvedName || who(doc.approvedBy);
     return `<div class="block approval"><div class="label">Approval</div><div class="prose">Approved${by ? ` by ${escapeHtml(by)}` : ''} on ${escapeHtml(formatDocDateTime(doc.approvedAt))}.</div></div>`;
   }
-  if (doc.status === 'sent') {
+  if (doc.status === 'sent' && !opts.hideApprovalHint) {
     const contact = s.company.phone ? ` or call us at ${escapeHtml(s.company.phone)}` : '';
-    return `<div class="block approval"><div class="label">Approval</div><div class="prose">To approve, open this ${doc.kind === 'quote' ? 'quote' : 'change order'} in the Brighton app${contact}.</div></div>`;
+    const where = opts.approvalUrl
+      ? `visit <a href="${escapeHtml(opts.approvalUrl)}">${escapeHtml(opts.approvalUrl.replace(/^https?:\/\//, ''))}</a>`
+      : `open this ${doc.kind === 'quote' ? 'quote' : 'change order'} in the Brighton app`;
+    return `<div class="block approval"><div class="label">Approval</div><div class="prose">To approve, ${where}${contact}.</div></div>`;
   }
   return '';
 }
@@ -230,6 +237,7 @@ export function renderDocumentHtml(doc: FinancialDoc, s: DocumentSnapshot, opts:
   .block { page-break-inside: avoid; break-inside: avoid; }
   .prose { white-space: pre-wrap; overflow-wrap: anywhere; color: ${INK}; font-size: 9pt; }
   .approval { padding: 10px 12px; background: ${WARM}; border-radius: 6px; }
+  .approval a { color: inherit; overflow-wrap: anywhere; }
   .thanks { margin-top: 18px; font-size: 9.5pt; color: ${ACCENT}; font-weight: 500; page-break-inside: avoid; }
   ${pdf ? '' : `.footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid ${RULE}; font-size: 8pt; color: ${FAINT}; }`}
   .void-mark { position: absolute; top: 34%; left: 0; right: 0; text-align: center; font-size: 96pt; font-weight: 800;

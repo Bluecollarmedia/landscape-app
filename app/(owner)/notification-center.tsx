@@ -29,6 +29,8 @@ const EVENT_ICONS: Record<NotificationEventType, { icon: string; color: string }
   announcement_posted: { icon: 'volume-2', color: brand.primary },
   quote_approved: { icon: 'check-circle', color: semantic.success },
   quote_declined: { icon: 'x-circle', color: semantic.error },
+  quote_sent: { icon: 'file-text', color: semantic.info },
+  invoice_issued: { icon: 'dollar-sign', color: semantic.info },
 };
 const FALLBACK_ICON = { icon: 'bell', color: brand.primary };
 

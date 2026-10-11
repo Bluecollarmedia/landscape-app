@@ -85,7 +85,10 @@ export type NotificationEventType =
   | 'schedule_conflict'
   | 'announcement_posted'
   | 'quote_approved'
-  | 'quote_declined';
+  | 'quote_declined'
+  // To the customer
+  | 'quote_sent'
+  | 'invoice_issued';
 
 export interface NotificationPreference {
   id: string;

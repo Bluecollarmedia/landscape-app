@@ -89,6 +89,10 @@ export interface Quote extends FinancialDocBase {
   sentAt?: string;
   approvedAt?: string;
   approvedBy?: string;
+  /** Name typed by the customer (approval link) or the customer's own name (app). */
+  approvedName?: string;
+  /** Private token for the approval link (…/approve/<token>). */
+  shareToken?: string;
   declinedAt?: string;
   declinedBy?: string;
   declineReason?: string;
@@ -103,6 +107,10 @@ export interface ChangeOrder extends FinancialDocBase {
   sentAt?: string;
   approvedAt?: string;
   approvedBy?: string;
+  /** Name typed by the customer (approval link) or the customer's own name (app). */
+  approvedName?: string;
+  /** Private token for the approval link (…/approve/<token>). */
+  shareToken?: string;
   declinedAt?: string;
   declinedBy?: string;
   declineReason?: string;
@@ -137,6 +145,8 @@ export interface FinancialEvent {
   eventType: FinancialEventType;
   actorId?: string;
   note?: string;
+  /** Approval-link answers: typed name, IP address, browser. */
+  metadata?: { via?: 'app' | 'link'; name?: string; ip?: string; user_agent?: string };
   createdAt: string;
   actor?: PersonSummary;
 }

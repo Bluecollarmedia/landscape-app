@@ -12,8 +12,11 @@
  */
 
 import { db, insertRow, updateRow, deleteRow, findRow, rpc, refresh, isDemo } from './store';
+import { notifyPeople } from './actions';
+import { supabase } from '@/lib/supabase';
+import { config } from '@/lib/config';
 import { uuid, todayKey, localDateKey } from '@/lib/ids';
-import { calcTotals, lineAmount, sumMoney } from '@/lib/money';
+import { calcTotals, lineAmount, sumMoney, formatMoney } from '@/lib/money';
 import type {
   FinancialDocType, FinancialDoc, FinancialEventType, LineItem, DocumentSnapshot,
   Quote, ChangeOrder, Invoice, ProjectFinancialSummary, FinancialStatus,
@@ -321,7 +324,7 @@ export function duplicateAsDraft(kind: FinancialDocType, id: string): FinancialD
     customer: _cust, projectName: _pn, companyId: _co, ...rest
   } = src as FinancialDoc & Record<string, unknown>;
   const clean: Record<string, unknown> = { ...rest };
-  for (const k of ['sentAt', 'approvedAt', 'approvedBy', 'declinedAt', 'declinedBy', 'declineReason', 'issuedAt', 'voidedAt', 'voidReason']) {
+  for (const k of ['sentAt', 'approvedAt', 'approvedBy', 'approvedName', 'shareToken', 'declinedAt', 'declinedBy', 'declineReason', 'issuedAt', 'voidedAt', 'voidReason']) {
     delete clean[k];
   }
   const today = todayKey();
@@ -391,6 +394,7 @@ export function markSent(kind: 'quote' | 'change_order', id: string) {
     snapshot: currentSnapshot(row.projectId, row.customerId),
   });
   logEvent(kind, row, 'sent');
+  notifyCustomer(kind, row, `${DOC_LABEL[kind]} ${row.number} is ready for review`, `${formatMoney(row.total)} · Tap to review and approve`);
 }
 
 /** Invoice: draft → issued. Freezes the customer & company details. */
@@ -402,6 +406,14 @@ export function issueInvoice(id: string) {
     snapshot: currentSnapshot(row.projectId, row.customerId),
   });
   logEvent('invoice', row, 'issued');
+  notifyCustomer('invoice', row, `Invoice ${row.number}`, `${formatMoney(row.total)} · Tap to view`);
+}
+
+/** Tells the project's customer (in their app and by push) that a document
+ * is waiting for them. Customers without an app account simply don't get it. */
+function notifyCustomer(kind: FinancialDocType, row: Record<string, any>, title: string, body: string) {
+  if (!row.customerId) return;
+  notifyPeople([row.customerId], kind === 'invoice' ? 'invoice_issued' : 'quote_sent', title, body, { type: kind, id: row.id });
 }
 
 export function voidInvoice(id: string, reason?: string) {
@@ -445,7 +457,7 @@ export async function respondAsCustomer(kind: 'quote' | 'change_order', id: stri
     if (approve && kind === 'quote' && row.validUntil && row.validUntil < todayKey()) return { error: RESPONSE_ERRORS.expired };
     const now = new Date().toISOString();
     updateRow(TABLE_OF[kind], id, approve
-      ? { status: 'approved', approvedAt: now, approvedBy: db.personId }
+      ? { status: 'approved', approvedAt: now, approvedBy: db.personId, approvedName: personName(db.personId) }
       : { status: 'declined', declinedAt: now, declinedBy: db.personId, declineReason: note?.trim() || undefined });
     logEvent(kind, row, approve ? 'approved' : 'declined', note?.trim() || undefined);
     return {};
@@ -462,6 +474,37 @@ export async function respondAsCustomer(kind: 'quote' | 'change_order', id: stri
   return {};
 }
 
+function personName(id?: string): string | undefined {
+  const p = id ? db.people[id] : undefined;
+  return p ? `${p.firstName} ${p.lastName}`.trim() || undefined : undefined;
+}
+
+// ── Approval links ──────────────────────────────────────────────────────────
+
+/** Whether approval links can be sent (the web app's address is set). */
+export const approvalLinksEnabled = !!config.webUrl;
+
+/** The private link a customer opens to view and approve a sent quote or
+ * change order in any browser, without the app. */
+export async function approvalLink(doc: FinancialDoc): Promise<string | null> {
+  if (!config.webUrl || doc.kind === 'invoice' || doc.status === 'draft') return null;
+  let token = doc.shareToken;
+  if (!token && !isDemo()) {
+    // Made by the database; fetch it if this copy predates the column.
+    const { data } = await supabase.from(TABLE_OF[doc.kind]).select('share_token').eq('id', doc.id).maybeSingle();
+    token = (data as { share_token?: string } | null)?.share_token ?? undefined;
+  }
+  return token ? `${config.webUrl}/approve/${token}` : null;
+}
+
+/** Text for the message the owner sends with the link. */
+export function approvalMessage(doc: FinancialDoc, link: string): string {
+  const first = doc.customer?.firstName?.trim();
+  const company = db.company?.name ?? 'Brighton Lawn + Landscape';
+  const what = `${DOC_LABEL[doc.kind].toLowerCase()} ${doc.number}`;
+  return `${first ? `Hi ${first}, here` : 'Here'}'s your ${what} from ${company} (${formatMoney(doc.total)}). You can review and approve it here: ${link}`;
+}
+
 /** Extra details the document template prints: the quote a change order
  * amends, what an invoice bills, and who approved. */
 export function templateOptionsFor(doc: FinancialDoc) {
@@ -473,7 +516,9 @@ export function templateOptionsFor(doc: FinancialDoc) {
         ...db.changeOrders.filter((c) => doc.changeOrderIds.includes(c.id)).map((c) => c.number),
       ]
     : undefined;
-  return { linkedQuoteNumber, sourceNumbers, events: eventsFor(doc.id) };
+  const approvalUrl = config.webUrl && doc.kind !== 'invoice' && doc.shareToken
+    ? `${config.webUrl}/approve/${doc.shareToken}` : undefined;
+  return { linkedQuoteNumber, sourceNumbers, events: eventsFor(doc.id), approvalUrl };
 }
 
 /** Line items used before (most recent first, one per description) — offered

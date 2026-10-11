@@ -56,6 +56,12 @@
         {
           "locationWhenInUsePermission": "Brighton Lawn uses your location to check you in when you arrive at a job site."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7CB342"
+        }
       ]
     ],
     "experiments": {

@@ -9,7 +9,8 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Share } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -24,6 +25,7 @@ import { formatMoney } from '@/lib/money';
 import {
   DOC_LABEL, STATUS_LABEL, STATUS_TONE, displayStatus, snapshotFor, templateOptionsFor,
   getDoc, markSent, issueInvoice, recordResponse, markExpired, voidInvoice, deleteDraft, duplicateAsDraft, readinessProblems,
+  approvalLinksEnabled, approvalLink, approvalMessage,
 } from '@/data/financials';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -46,7 +48,7 @@ export default function DocumentScreen() {
   const insets = useSafeAreaInsets();
   const { doc, events, project, ready } = useFinancialDoc(kind, id);
   const { share, busy } = usePdfShare();
-  const [menu, setMenu] = useState<'more' | 'respond' | 'history' | null>(null);
+  const [menu, setMenu] = useState<'more' | 'respond' | 'history' | 'send' | null>(null);
 
   const html = useMemo(
     () => (doc ? renderDocumentHtml(doc, snapshotFor(doc), { mode: 'preview', ...templateOptionsFor(doc) }) : ''),
@@ -82,12 +84,35 @@ export default function DocumentScreen() {
     return true;
   };
 
+  // Quotes and change orders can go out as a link the customer approves in
+  // their browser; invoices (and every document, as a fallback) as a PDF.
+  const linkable = approvalLinksEnabled && doc.kind !== 'invoice';
+
+  const withLink = async (use: (link: string) => void) => {
+    const fresh = getDoc(doc.kind, doc.id) ?? doc;
+    const link = await approvalLink(fresh);
+    if (!link) {
+      showMessage('Link not ready', 'Try again in a moment, or share the PDF instead.');
+      return;
+    }
+    use(link);
+  };
+  const sendLink = () => withLink((link) => {
+    Share.share({ message: approvalMessage(getDoc(doc.kind, doc.id) ?? doc, link) }).catch(() => {});
+  });
+  const copyLink = () => withLink(async (link) => {
+    await Clipboard.setStringAsync(link);
+    showMessage('Link copied', 'Paste it into a text or email to the customer.');
+  });
+
   const send = (thenShare: boolean) => {
     if (!checkReady()) return;
     const doIt = () => {
       if (doc.kind === 'invoice') issueInvoice(doc.id);
       else markSent(doc.kind, doc.id);
-      if (thenShare) {
+      if (thenShare && linkable) {
+        setMenu('send');
+      } else if (thenShare) {
         // Share the locked version (status + frozen customer details).
         setTimeout(() => {
           const fresh = getDoc(doc.kind, doc.id);
@@ -118,7 +143,17 @@ export default function DocumentScreen() {
     if (copy) router.replace({ pathname: '/(owner)/document-edit', params: { kind: copy.kind, id: copy.id } } as any);
   };
 
+  const canSendLink = linkable && doc.status === 'sent' && status !== 'expired';
+  const shareOrSend = () => (canSendLink ? setMenu('send') : shareTapped());
+
+  const sendActions: SheetAction[] = [
+    { key: 'link', label: 'Text or Email Approval Link', icon: 'send', onPress: sendLink },
+    { key: 'copy', label: 'Copy Approval Link', icon: 'link', onPress: copyLink },
+    { key: 'pdf', label: 'Share PDF', icon: 'share-2', onPress: shareTapped },
+  ];
+
   const moreActions: SheetAction[] = [
+    ...(canSendLink ? [{ key: 'link', label: 'Send Approval Link', icon: 'send' as const, onPress: () => setMenu('send') }] : []),
     { key: 'pdf', label: isDraft ? 'Share Draft PDF' : 'Share PDF', icon: 'share-2', onPress: shareTapped },
     ...(doc.kind === 'quote' && doc.status === 'approved'
       ? [
@@ -152,7 +187,7 @@ export default function DocumentScreen() {
   } else if ((doc.kind === 'quote' || doc.kind === 'change_order') && doc.status === 'sent' && status !== 'expired') {
     primary = (
       <>
-        <Button title="Share" variant="secondary" icon="share-2" onPress={shareTapped} loading={busy} style={styles.flex} />
+        <Button title={canSendLink ? 'Send' : 'Share'} variant="secondary" icon={canSendLink ? 'send' : 'share-2'} onPress={shareOrSend} loading={busy} style={styles.flex} />
         <Button title="Record Answer" icon="check-circle" onPress={() => setMenu('respond')} style={styles.flex2} />
       </>
     );
@@ -218,12 +253,20 @@ export default function DocumentScreen() {
       <ActionSheet
         visible={menu === 'respond'}
         title="Record the customer's answer"
-        message="Use this when the customer answers by phone, email or in person. Customers can also approve in their Brighton app."
+        message={`Use this when the customer answers by phone, email or in person. Customers can also approve in their Brighton app${approvalLinksEnabled ? ' or with the approval link' : ''}.`}
         onClose={() => setMenu(null)}
         actions={doc.kind === 'invoice' ? [] : [
           { key: 'yes', label: 'Customer Approved', icon: 'check-circle', onPress: () => confirmAction(`Record ${doc.number} as approved?`, `${formatMoney(doc.total)} will count toward the project's approved amount.`, 'Approved', () => recordResponse(doc.kind as 'quote' | 'change_order', doc.id, true)) },
           { key: 'no', label: 'Customer Declined', icon: 'x-circle', destructive: true, onPress: () => confirmAction(`Record ${doc.number} as declined?`, 'It stays on record as declined.', 'Declined', () => recordResponse(doc.kind as 'quote' | 'change_order', doc.id, false), true) },
         ]}
+      />
+
+      <ActionSheet
+        visible={menu === 'send'}
+        title={`Send ${label.toLowerCase()} ${doc.number}`}
+        message="The link opens the document in any browser. The customer types their name to approve, and you're notified right away."
+        actions={sendActions}
+        onClose={() => setMenu(null)}
       />
 
       <ActionSheet visible={menu === 'history'} title="History" actions={[]} onClose={() => setMenu(null)}>
@@ -234,7 +277,7 @@ export default function DocumentScreen() {
               <View style={[styles.dot, { backgroundColor: e.eventType === 'declined' || e.eventType === 'voided' ? colors.error : colors.primary }]} />
               <View style={{ flex: 1 }}>
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>
-                  {EVENT_LABEL[e.eventType]}{e.actor ? ` by ${e.actor.firstName} ${e.actor.lastName}`.trimEnd() : ''}
+                  {EVENT_LABEL[e.eventType]}{e.actor ? ` by ${e.actor.firstName} ${e.actor.lastName}`.trimEnd() : e.metadata?.name ? ` by ${e.metadata.name}` : ''}{e.metadata?.via === 'link' ? ' (approval link)' : ''}
                 </Text>
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{formatDocDateTime(e.createdAt)}</Text>
                 {!!e.note && <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{e.note}</Text>}

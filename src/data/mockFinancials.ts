@@ -37,7 +37,7 @@ export function buildMockFinancials(projects: Project[]) {
     li('q1-4', 'Landscape fabric', 5000, 'sq ft', 0.75),
   ];
   quotes.push({
-    id: 'quote1', ...company, projectId: p1.id, customerId: p1.customerId, number: 'Q-1001', title: p1.name,
+    id: 'quote1', shareToken: 'demoquote1'.padEnd(64, '0'), ...company, projectId: p1.id, customerId: p1.customerId, number: 'Q-1001', title: p1.name,
     status: 'approved', lineItems: q1Items, taxRate: TAX, ...calcTotals(q1Items, TAX),
     notes: 'All work will be completed to industry standards.', exclusions: EXCLUSIONS, terms: TERMS,
     issueDate: '2026-07-08', validUntil: '2026-08-07',
@@ -50,7 +50,7 @@ export function buildMockFinancials(projects: Project[]) {
 
   const co1Items = [li('co1-1', 'Additional planting bed', 8, 'plant', 125), li('co1-2', 'Mulch (premium hardwood)', 4, 'yd', 65)];
   changeOrders.push({
-    id: 'co1', ...company, projectId: p1.id, quoteId: 'quote1', customerId: p1.customerId, number: 'CO-1001',
+    id: 'co1', shareToken: 'democo1'.padEnd(64, '0'), ...company, projectId: p1.id, quoteId: 'quote1', customerId: p1.customerId, number: 'CO-1001',
     description: 'Additional planting bed and extended mulch area around the back patio.',
     status: 'approved', lineItems: co1Items, taxRate: TAX, ...calcTotals(co1Items, TAX), terms: TERMS,
     issueDate: '2026-08-05', sentAt: '2026-08-05T14:12:00Z', approvedAt: '2026-08-05T18:45:00Z', approvedBy: p1.customerId,
@@ -62,7 +62,7 @@ export function buildMockFinancials(projects: Project[]) {
 
   const co2Items = [li('co2-1', 'French drain along north fence', 60, 'ln ft', 28, 'Perforated pipe in washed stone, wrapped in fabric, daylighted to the swale.')];
   changeOrders.push({
-    id: 'co2', ...company, projectId: p1.id, quoteId: 'quote1', customerId: p1.customerId, number: 'CO-1002',
+    id: 'co2', shareToken: 'democo2'.padEnd(64, '0'), ...company, projectId: p1.id, quoteId: 'quote1', customerId: p1.customerId, number: 'CO-1002',
     description: 'Drainage correction for standing water along the north fence line.',
     status: 'sent', lineItems: co2Items, taxRate: TAX, ...calcTotals(co2Items, TAX), terms: TERMS,
     issueDate: '2026-09-02', sentAt: '2026-09-02T16:00:00Z',
@@ -92,7 +92,7 @@ export function buildMockFinancials(projects: Project[]) {
       li('q2-3', 'Low-voltage lighting', 8, 'fixture', 185),
     ];
     quotes.push({
-      id: 'quote2', ...company, projectId: p2.id, customerId: p2.customerId, number: 'Q-1002', title: p2.name,
+      id: 'quote2', shareToken: 'demoquote2'.padEnd(64, '0'), ...company, projectId: p2.id, customerId: p2.customerId, number: 'Q-1002', title: p2.name,
       status: 'sent', lineItems: q2Items, taxRate: TAX, ...calcTotals(q2Items, TAX), exclusions: EXCLUSIONS, terms: TERMS,
       issueDate: '2026-09-28', validUntil: '2026-11-15', sentAt: '2026-09-28T17:00:00Z',
       createdBy: 'owner1', createdAt: '2026-09-28T16:00:00Z', updatedAt: '2026-09-28T17:00:00Z',
@@ -104,7 +104,7 @@ export function buildMockFinancials(projects: Project[]) {
   if (p3) {
     const q3Items = [li('q3-1', 'Fall cleanup', 1, 'visit', 450), li('q3-2', 'Aeration and overseeding', 8000, 'sq ft', 0.12)];
     quotes.push({
-      id: 'quote3', ...company, projectId: p3.id, customerId: p3.customerId, number: 'Q-1003', title: p3.name,
+      id: 'quote3', shareToken: 'demoquote3'.padEnd(64, '0'), ...company, projectId: p3.id, customerId: p3.customerId, number: 'Q-1003', title: p3.name,
       status: 'draft', lineItems: q3Items, taxRate: TAX, ...calcTotals(q3Items, TAX), terms: TERMS,
       issueDate: '2026-10-08', validUntil: '2026-11-07',
       createdBy: 'owner1', createdAt: '2026-10-08T12:00:00Z', updatedAt: '2026-10-08T12:00:00Z',

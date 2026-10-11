@@ -18,6 +18,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { startSession, endSession, startDemoSession, updateRow } from '@/data/store';
+import { unregisterForPush } from '@/lib/push';
 import type { AuthState, UserProfile, UserRole } from '@/types';
 import type { OnboardingStep } from '@/types/onboarding';
 
@@ -409,6 +410,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured) {
+      await unregisterForPush();
       await supabase.auth.signOut();
     }
     if (loadedFor.current) endSession();

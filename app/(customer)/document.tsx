@@ -34,7 +34,7 @@ export default function CustomerDocumentScreen() {
   const [responding, setResponding] = useState<'approve' | 'decline' | null>(null);
 
   const html = useMemo(
-    () => (doc ? renderDocumentHtml(doc, snapshotFor(doc), { mode: 'preview', ...templateOptionsFor(doc) }) : ''),
+    () => (doc ? renderDocumentHtml(doc, snapshotFor(doc), { mode: 'preview', ...templateOptionsFor(doc), hideApprovalHint: true }) : ''),
     [doc, events],
   );
 

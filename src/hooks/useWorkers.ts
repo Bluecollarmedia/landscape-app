@@ -2,6 +2,7 @@ import { useMemo, useCallback } from 'react';
 import type { CompanyMember, PersonSummary } from '@/types/company';
 import type { Assignment } from '@/types/schedule';
 import { db, useDb, updateRow, refresh } from '@/data/store';
+import { dropLocalResourceAccess } from '@/hooks/useResources';
 import { todayKey } from '@/lib/ids';
 
 export type WorkerTodayStatus = 'confirmed' | 'scheduled' | 'not_scheduled' | 'inactive';
@@ -109,6 +110,9 @@ export function useWorkers(options: UseWorkersOptions = {}) {
       Object.assign(changes, { deactivatedAt: new Date().toISOString(), deactivatedBy: db.personId || undefined });
     }
     updateRow('company_members', m.id, changes);
+    // The database revokes their resource access on deactivation; mirror it
+    // locally right away (and in demo mode, where there's no database).
+    if (changes.status && changes.status !== 'active') dropLocalResourceAccess(personId);
   }, []);
 
   const getWorker = useCallback(

@@ -11,6 +11,7 @@ import { useWorkerContext } from '@/providers/WorkerProvider';
 import { useAnnouncements } from '@/hooks/useAnnouncements';
 import { useCompanyYard } from '@/hooks/useCompanyYard';
 import { formatAddress } from '@/lib/address';
+import { useResources } from '@/hooks/useResources';
 import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -71,6 +72,7 @@ export default function WorkerTodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
+  const { resources } = useResources();
   const {
     todayAssignments, currentJob, jobState, checkIns, checkOuts, moveToNextJob,
     scheduleConfirmed, confirmSchedule, checkIn, checkOut, locateForCheckIn, locateForCheckOut, openMapsNavigation,
@@ -356,7 +358,13 @@ export default function WorkerTodayScreen() {
           )}
 
           {!showWorking && primaryAssignment?.truck && (
-            <Pressable style={[styles.truckPill, { backgroundColor: colors.primarySurface, bottom: -PILL_OVERHANG }, shadow.md]}>
+            <Pressable
+              style={[styles.truckPill, { backgroundColor: colors.primarySurface, bottom: -PILL_OVERHANG }, shadow.md]}
+              // Opens this truck's codes when the owner has shared any with this worker.
+              onPress={resources.some((r) => r.truckId === primaryAssignment.truck!.id)
+                ? () => router.push(`/(worker)/my-resources?truckId=${primaryAssignment.truck!.id}` as any)
+                : undefined}
+            >
               <Feather name="truck" size={18} color={colors.primaryDark} />
               <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
                 {primaryAssignment.truck.name}

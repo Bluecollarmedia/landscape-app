@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useSchedule } from '@/hooks/useSchedule';
+import { useResources } from '@/hooks/useResources';
 import { StatusBadge, Avatar, EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -51,6 +52,7 @@ export default function WorkerDetailScreen() {
   const insets = useSafeAreaInsets();
   const { getWorker, updateWorker } = useWorkers({ includeInactive: true });
   const schedule = useSchedule();
+  const { resourcesFor } = useResources();
 
   const worker = getWorker(id);
 
@@ -250,6 +252,29 @@ export default function WorkerDetailScreen() {
             )}
           </View>
 
+          {isActive && (
+            <Pressable
+              style={({ pressed }) => [styles.sectionCard, styles.resourceRow, { backgroundColor: colors.surface }, shadow.sm, pressed && { opacity: 0.92 }]}
+              onPress={() => router.push(`/(owner)/worker-access?personId=${p.id}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Manage resource access"
+            >
+              <View style={[styles.resourceIcon, { backgroundColor: colors.primarySurface }]}>
+                <Icon name="key" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Manage Resource Access</Text>
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                  {(() => {
+                    const n = resourcesFor(p.id).length;
+                    return n === 0 ? 'No company resources yet' : `Can open ${n} resource${n === 1 ? '' : 's'}`;
+                  })()}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+            </Pressable>
+          )}
+
           {isActive ? (
             <Pressable onPress={handleDeactivate} style={[styles.deactivateRow, { backgroundColor: semantic.errorLight }]}>
               <Icon name="user-x" size={16} color={semantic.error} />
@@ -339,6 +364,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     marginTop: spacing.xs,
   },
+  resourceRow: { flexDirection: 'row', alignItems: 'center' },
+  resourceIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   deactivateRow: {
     flexDirection: 'row',
     alignItems: 'center',

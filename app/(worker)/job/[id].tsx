@@ -8,6 +8,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useWorkerContext } from '@/providers/WorkerProvider';
+import { useResources } from '@/hooks/useResources';
 import { StatusBadge } from '@/components/ui';
 import { PhotoViewer } from '@/components/worker/PhotoViewer';
 import { typeScale } from '@/theme/typography';
@@ -57,6 +58,7 @@ export default function JobDetailScreen() {
   } = useWorkerContext();
   const [viewer, setViewer] = useState<ProjectPhoto[] | null>(null);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const { resources } = useResources();
 
   const assignment = [...todayAssignments, ...upcomingAssignments, ...completedAssignments]
     .find(a => a.id === id);
@@ -154,9 +156,22 @@ export default function JobDetailScreen() {
             {assignment.truck && (
               <View style={styles.metaRow}>
                 <Feather name="truck" size={14} color={colors.textTertiary} />
-                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
+                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm, flex: 1 }]}>
                   {assignment.truck.name}
                 </Text>
+                {/* Only shows when the owner gave this worker codes for this truck. */}
+                {resources.some((r) => r.truckId === assignment.truck!.id) && (
+                  <Pressable
+                    onPress={() => router.push(`/(worker)/my-resources?truckId=${assignment.truck!.id}` as any)}
+                    style={[styles.truckCodes, { backgroundColor: colors.primarySurface }]}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Truck codes"
+                  >
+                    <Feather name="key" size={12} color={colors.primaryDark} />
+                    <Text style={[typeScale.labelSmall, { color: colors.primaryDark, marginLeft: 4 }]}>Codes</Text>
+                  </Pressable>
+                )}
               </View>
             )}
           </View>
@@ -323,6 +338,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing.lg },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  truckCodes: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.full },
   navDot: {
     width: 28,
     height: 28,

@@ -266,6 +266,10 @@ create table public.assignments (
 );
 create index idx_assignments_company_date on public.assignments(company_id, scheduled_date);
 create index idx_assignments_person_date on public.assignments(person_id, scheduled_date);
+-- A worker can only be on the same job once per day (cancelled/moved don't count).
+create unique index uq_assignments_worker_job_day
+  on public.assignments (person_id, project_id, scheduled_date)
+  where status not in ('cancelled', 'reassigned');
 
 create table public.schedule_changes (
   id uuid primary key default gen_random_uuid(),

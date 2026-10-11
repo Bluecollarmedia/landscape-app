@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert, Switch, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert, Switch } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -21,6 +21,7 @@ import { useTeamCode, useJoinRequests } from '@/hooks/useOnboarding';
 import { inviteMessage, textInvite, copyText } from '@/lib/invite';
 import { EVENT_LABELS, ALL_EVENTS } from '@/lib/notificationEvents';
 import { getCompanyImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 import type { SetupStepKey } from '@/types/company';
 
 /** Recommended first-time setup for the owner. Opens automatically until it's been walked through once. */
@@ -402,7 +403,7 @@ function CompanyStep({ onSaved }: { onSaved: () => void }) {
     <>
       <Card title="Dashboard photo" style={styles.section}>
         <Pressable onPress={pickPhoto} style={styles.photoBox}>
-          <Image source={{ uri: preview }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <BrandCover uri={preview} style={StyleSheet.absoluteFill} />
           <View style={styles.photoBadge}>
             <Icon name="camera" size={14} color="#FFFFFF" />
             <Text style={[typeScale.labelSmall, { color: '#FFFFFF', marginLeft: 6 }]}>

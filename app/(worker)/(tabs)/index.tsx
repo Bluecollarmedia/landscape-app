@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal, Alert, Linking, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Modal, Alert, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -20,6 +20,7 @@ import type { ProjectTask } from '@/types/project';
 import type { Announcement } from '@/types/announcement';
 import type { WeatherActionType } from '@/types/operations';
 import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 
@@ -295,7 +296,7 @@ export default function WorkerTodayScreen() {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         <View style={[styles.hero, { height: showWorking ? HERO_HEIGHT_COMPACT : HERO_HEIGHT }]}>
-          <Image source={{ uri: primaryAssignment ? getProjectImageUriById(primaryAssignment.projectId, 1200) : getCompanyImageUri() }} style={styles.heroImage} resizeMode="cover" />
+          <BrandCover uri={primaryAssignment ? getProjectImageUriById(primaryAssignment.projectId) : getCompanyImageUri()} style={styles.heroImage} />
           <LinearGradient
             colors={['transparent', 'transparent', colors.groupedBackground]}
             locations={[0, 0.78, 1]}

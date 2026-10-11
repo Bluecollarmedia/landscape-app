@@ -225,7 +225,7 @@ export default function NewProjectScreen() {
             <Pressable onPress={handlePickPhoto} accessibilityRole="button" accessibilityLabel="Choose project photo">
               {photoUri || existing?.coverPhotoUrl ? (
                 <Image
-                  source={{ uri: photoUri ?? (existing ? getProjectImageUri(existing, 900) : undefined) }}
+                  source={{ uri: photoUri ?? (existing ? getProjectImageUri(existing) : undefined) }}
                   style={styles.photoPreview}
                   resizeMode="cover"
                 />

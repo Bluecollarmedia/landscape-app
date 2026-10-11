@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -13,6 +13,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import type { Assignment } from '@/types/schedule';
 import { localDateKey } from '@/lib/ids';
 import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 
 function formatTime(time?: string) {
   if (!time) return '';
@@ -55,7 +56,7 @@ function JobCard({ assignment, onPress }: { assignment: Assignment; onPress: () 
   const { colors } = useTheme();
   return (
     <Pressable style={[styles.jobCard, { backgroundColor: colors.surface }, shadow.sm]} onPress={onPress}>
-      <Image source={{ uri: getProjectImageUriById(assignment.projectId, 300) }} style={styles.thumb} resizeMode="cover" />
+      <BrandCover uri={getProjectImageUriById(assignment.projectId)} style={styles.thumb} variant="tile" />
       <View style={styles.jobInfo}>
         <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]} numberOfLines={1}>
           {assignment.project?.name ?? 'Unknown Project'}
@@ -102,11 +103,7 @@ export default function WorkerJobsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={styles.hero}>
-        <Image
-          source={{ uri: getCompanyImageUri() }}
-          style={[styles.heroImage, { opacity: 0.16 }]}
-          resizeMode="cover"
-        />
+        <BrandCover uri={getCompanyImageUri()} style={[styles.heroImage, { opacity: 0.16 }]} />
         <View style={[styles.headerContent, { paddingTop: insets.top + spacing.md }]}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>My Jobs</Text>
           <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>

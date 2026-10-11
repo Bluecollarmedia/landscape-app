@@ -85,6 +85,12 @@ const TABLES = {
   company_invitations: { scope: 'company', cols: ['id', 'companyId', 'email', 'name', 'phone', 'type', 'status', 'projectId', 'invitedBy', 'token', 'expiresAt', 'acceptedAt', 'acceptedBy', 'createdAt'] },
   join_requests: { scope: 'company', cols: ['id', 'companyId', 'personId', 'joinMethod', 'invitationId', 'status', 'requestedRole', 'assignedRole', 'reviewedBy', 'reviewedAt', 'declineReason', 'createdAt', 'updatedAt'] },
   membership_audit_log: { scope: 'company', cols: ['id', 'companyId', 'eventType', 'actorId', 'targetId', 'metadata', 'createdAt'] },
+  // Company Resources. hasSecret/createdBy/updatedBy are set by the database
+  // only, so they aren't listed as writable columns. Codes never come through
+  // here — see reveal_resource_secret() in supabase/updates/005.
+  company_resources: { scope: 'company', cols: ['id', 'companyId', 'category', 'name', 'description', 'truckId', 'itemName', 'cardLastFour', 'cardHolderId', 'createdAt', 'updatedAt'] },
+  resource_access: { scope: 'company', cols: ['id', 'companyId', 'resourceId', 'personId', 'createdAt'] },
+  resource_audit_log: { scope: 'company', cols: ['id', 'companyId', 'resourceId', 'resourceName', 'actorId', 'eventType', 'targetPersonId', 'metadata', 'createdAt'] },
 } satisfies Record<string, TableDef>;
 
 export type TableName = keyof typeof TABLES;
@@ -488,6 +494,13 @@ function reportError(action: string, error: { message?: string } | null | undefi
 
 // ── Loading ─────────────────────────────────────────────────────────────────
 
+const loadErrors: Partial<Record<TableName, string>> = {};
+
+/** The last load error for a table, if its most recent fetch failed. */
+export function loadErrorOf(table: TableName): string | undefined {
+  return loadErrors[table];
+}
+
 async function fetchTable(table: TableName): Promise<Row[] | null> {
   if (!session) return [];
   const def = TABLES[table] as TableDef;
@@ -498,8 +511,10 @@ async function fetchTable(table: TableName): Promise<Row[] | null> {
   const { data, error } = await q.limit(5000);
   if (error) {
     console.warn(`[store] load ${table} failed:`, error.message);
+    loadErrors[table] = error.message;
     return null;
   }
+  delete loadErrors[table];
   return (data ?? []).map(fromDb);
 }
 
@@ -543,6 +558,9 @@ function applyRealtime(table: TableName, payload: { eventType: string; new: Row;
     else raw[table] = [...raw[table], row];
   }
   emitChange();
+  // A worker who was just granted a resource gets the access row live, but
+  // the resource row itself didn't change, so fetch the ones now visible.
+  if (table === 'resource_access') reloadTable('company_resources');
 }
 
 function startRealtime() {
@@ -657,6 +675,9 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.company_invitations = [...onb.mockInvitations];
     raw.join_requests = onb.mockJoinRequests.map(({ person, ...r }) => r);
     raw.membership_audit_log = [...onb.mockAuditEvents];
+    raw.company_resources = mock.mockResources.map((r) => ({ ...r }));
+    raw.resource_access = mock.mockResourceAccess.map((a) => ({ ...a }));
+    raw.resource_audit_log = [];
     for (const r of onb.mockJoinRequests) {
       if (r.person && !raw.people.some((p) => p.id === r.person!.id)) {
         raw.people.push({ ...r.person, avatarUrl: r.person.profilePhotoUrl });

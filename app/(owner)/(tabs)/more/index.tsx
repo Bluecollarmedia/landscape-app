@@ -83,6 +83,13 @@ export default function MoreScreen() {
             colors={colors}
           />
           <MenuItem
+            icon="key"
+            label="Company Resources"
+            subtitle="Codes and info, and who can see them"
+            onPress={() => router.push('/(owner)/resources' as any)}
+            colors={colors}
+          />
+          <MenuItem
             icon="volume-2"
             label="Announcements"
             subtitle="Company-wide messages"

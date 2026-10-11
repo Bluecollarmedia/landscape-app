@@ -60,7 +60,16 @@ Why: those 5 screens are opened from multiple tabs (e.g. Dashboard's quick actio
 
 Rule of thumb: if you add a new screen that's reachable from more than one tab and is a "do a thing, then return" flow (not an intentional "go look at this record" navigation like viewing a project), put it here as a sibling modal route, not inside a tab's folder. Detail-view navigation (View Project, View Worker, View Customer) is intentionally left as normal cross-tab pushes — that's expected to switch tabs.
 
+Quotes & invoices follow the same rule: `document` (view a quote / change order / invoice, a normal card push), `document-new` and `document-edit` (modals) are siblings of `(tabs)`, opened from Owner → More → Quotes & Invoices, a project's More → Financials, or a notification. The customer side has its own `(customer)/document`.
+
 `ScheduleProvider` wraps the whole `Stack` in `(owner)/_layout.tsx` (not inside `(tabs)/_layout.tsx`) so the tabs and the modal screens share the same schedule state.
+
+## Quotes, Change Orders & Invoices
+- Tables: `quotes`, `change_orders`, `invoices`, `financial_events` (`supabase/updates/008_quotes_invoices.sql`). Line items live in each document's `line_items` JSON, so a document always re-prints as saved.
+- Once a document leaves Draft the database locks its contents (trigger `lock_financial_document`); statuses only move forward. Change a sent document by duplicating it as a new draft (`duplicateAsDraft`).
+- Customers see only sent/issued documents of their own project and answer through the `respond_to_financial_document` RPC. Workers can't see financials.
+- Logic: `src/data/financials.ts`. Money math in cents: `src/lib/money.ts`.
+- PDFs: one HTML template (`src/lib/documentHtml.ts`) drives both the in-app preview (react-native-webview) and the PDF (expo-print → pdf-lib stamps footer/page numbers → expo-sharing). The real logo is embedded from `src/lib/brandLogo.ts` (generated from `assets/images/logo-full.png`).
 
 ## Worker & Customer Navigation
 `app/(worker)/_layout.tsx` and `app/(customer)/_layout.tsx` are also a `Stack` over a `(tabs)` group. Detail screens (worker `task/[id]`, `job/[id]`, `day/[date]`, `edit-profile`, `notifications`; customer `project`) sit beside `(tabs)` in the Stack. Don't move them back into the tab navigator with `href: null`/`hidden`: native tabs can't navigate to routes that aren't tab triggers, so those taps silently do nothing on iOS (works on web, which uses JS tabs).

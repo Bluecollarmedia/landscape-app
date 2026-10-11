@@ -114,6 +114,20 @@ export default function ScheduleCreateScreen() {
     );
   }, [truckId, workerIds, date, isFullDay, startTime, endTime, schedule]);
 
+  // A worker can only be on a given job once per day. Returns their existing
+  // assignment on that job and date, if any.
+  function existingOnJob(personId: string, pid: string, d: string, excludeId?: string) {
+    if (!pid) return undefined;
+    return schedule.getByWorker(personId, d).find(a => a.projectId === pid && a.id !== excludeId);
+  }
+
+  function showAlreadyScheduled(names: string[], d: string) {
+    const who = names.length === 1 ? `${names[0]} is` : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} are`;
+    const msg = `${who} already scheduled at ${selectedProject?.name ?? 'this project'} on ${formatDateFull(d)}. Edit the existing assignment instead.`;
+    if (Platform.OS === 'web') alert(msg);
+    else Alert.alert('Already Scheduled', msg);
+  }
+
   function toggleWorker(personId: string) {
     setWorkerIds(prev => prev.includes(personId) ? prev.filter(id => id !== personId) : [...prev, personId]);
   }
@@ -126,6 +140,11 @@ export default function ScheduleCreateScreen() {
         else Alert.alert('Required', msg);
         return;
       }
+      const original = schedule.assignments.find(a => a.id === params.moveFrom);
+      if (original && existingOnJob(original.personId, projectId, original.scheduledDate, original.id)) {
+        showAlreadyScheduled([original.person?.firstName ?? 'This worker'], original.scheduledDate);
+        return;
+      }
       schedule.moveWorker(params.moveFrom!, projectId, notes || undefined);
       router.back();
       return;
@@ -135,6 +154,12 @@ export default function ScheduleCreateScreen() {
       const msg = 'Please select a project and at least one worker.';
       if (Platform.OS === 'web') alert(msg);
       else Alert.alert('Required', msg);
+      return;
+    }
+
+    const alreadyOnJob = selectedWorkers.filter(w => existingOnJob(w.personId, projectId, date));
+    if (alreadyOnJob.length > 0) {
+      showAlreadyScheduled(alreadyOnJob.map(w => w.person!.firstName), date);
       return;
     }
 
@@ -316,6 +341,14 @@ export default function ScheduleCreateScreen() {
               ))}
             </View>
           )}
+          {!isMove && selectedWorkers.some(w => existingOnJob(w.personId, projectId, date)) && (
+            <View style={[styles.conflictBox, { backgroundColor: semantic.warningLight, borderColor: semantic.warning }]}>
+              <Icon name="alert-triangle" size={14} color={semantic.warning} />
+              <Text style={[typeScale.caption, { color: colors.textPrimary, flex: 1 }]}>
+                {selectedWorkers.filter(w => existingOnJob(w.personId, projectId, date)).map(w => w.person!.firstName).join(', ')} already scheduled at {selectedProject?.name} on this day.
+              </Text>
+            </View>
+          )}
           {!isMove && (
             <Pressable style={[styles.addWorkersPill, { backgroundColor: colors.backgroundTertiary }]} onPress={() => setShowWorkerSheet(true)}>
               <Icon name="plus" size={14} color={colors.textPrimary} />
@@ -490,22 +523,31 @@ export default function ScheduleCreateScreen() {
             isFullDay,
           }).filter(c => c.type === 'time_overlap');
           const conflict = conflicts[0];
-          const showAsUnavailable = !!conflict && !selected;
+          const onJob = existingOnJob(w.personId, projectId, date);
+          const showAsUnavailable = !!conflict && !selected && !onJob;
 
           return (
             <Pressable
               key={w.personId}
-              style={[styles.workerPickerRow, showAsUnavailable && { opacity: 0.55 }]}
+              style={[styles.workerPickerRow, (showAsUnavailable || (onJob && !selected)) && { opacity: 0.55 }]}
               onPress={() => toggleWorker(w.personId)}
+              disabled={!!onJob && !selected}
               accessibilityRole="button"
-              accessibilityLabel={`${p.firstName} ${p.lastName}${conflict ? ', unavailable' : ''}`}
+              accessibilityLabel={`${p.firstName} ${p.lastName}${onJob ? ', already on this job' : conflict ? ', unavailable' : ''}`}
             >
               <Avatar firstName={p.firstName} lastName={p.lastName} size={36} uri={p.avatarUrl} />
               <View style={{ flex: 1 }}>
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
                   {p.firstName} {p.lastName}
                 </Text>
-                {conflict && (
+                {onJob ? (
+                  <>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
+                      Scheduled {formatAssignmentTime(onJob)} · {onJob.project?.name}
+                    </Text>
+                    <Text style={[typeScale.caption, { color: semantic.warning, fontWeight: '700' }]}>Already on this job</Text>
+                  </>
+                ) : conflict && (
                   <>
                     <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
                       Scheduled {formatAssignmentTime(conflict.assignment)} · {conflict.assignment.project?.name}

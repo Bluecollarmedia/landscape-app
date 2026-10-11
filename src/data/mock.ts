@@ -114,6 +114,10 @@ export const mockCompany: Company = {
   city: 'Cleveland',
   state: 'OH',
   zip: '44144',
+  yardAddress: '4521 Ridge Rd',
+  yardCity: 'Cleveland',
+  yardState: 'OH',
+  yardZip: '44144',
   createdAt: '2024-01-15T10:00:00Z',
   updatedAt: '2026-09-01T08:00:00Z',
 };

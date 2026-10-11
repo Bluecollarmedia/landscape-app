@@ -9,6 +9,8 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useWorkerContext } from '@/providers/WorkerProvider';
 import { useAnnouncements } from '@/hooks/useAnnouncements';
+import { useCompanyYard } from '@/hooks/useCompanyYard';
+import { formatAddress } from '@/lib/address';
 import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -84,6 +86,9 @@ export default function WorkerTodayScreen() {
   const showWorking = isCheckedIn && !!primaryAssignment;
   const showConfirmed = scheduleConfirmed && !!primaryAssignment && !isCheckedIn;
   const showCheckedOut = jobState === 'completed' && !!primaryAssignment;
+
+  // The company yard: its own destination, never the jobsite.
+  const { yard, label: yardName } = useCompanyYard();
 
   const { getUnreadForWorker, markAnnouncementRead } = useAnnouncements();
   const unreadAnnouncement: Announcement | null = user ? getUnreadForWorker(user.id) : null;
@@ -204,6 +209,12 @@ export default function WorkerTodayScreen() {
     );
   }
 
+  function handleYardPress() {
+    if (!yard) return;
+    haptics.select();
+    openMapsNavigation(yard);
+  }
+
   function handleOpenAnnouncement() {
     haptics.select();
     setOpenAnnouncement(true);
@@ -317,6 +328,27 @@ export default function WorkerTodayScreen() {
               <Text style={[typeScale.displayLarge, styles.heroTextShadow, { color: '#FFFFFF', marginTop: 2 }]}>
                 {greeting},{'\n'}{user?.firstName ?? 'there'}
               </Text>
+              {yard && (
+                <Pressable
+                  onPress={handleYardPress}
+                  hitSlop={{ top: 8, bottom: 8 }}
+                  style={({ pressed }) => [styles.yardRow, pressed && { opacity: 0.7 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${yardName}, ${formatAddress(yard)}`}
+                  accessibilityHint="Opens directions to the yard"
+                >
+                  <View style={[styles.yardPin, { backgroundColor: colors.primary }]}>
+                    <Feather name="map-pin" size={11} color="#FFFFFF" />
+                  </View>
+                  <Text
+                    style={[typeScale.labelLarge, styles.heroTextShadow, styles.yardText]}
+                    numberOfLines={1}
+                  >
+                    {yardName} · {yard.address}
+                  </Text>
+                  <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.85)" />
+                </Pressable>
+              )}
               <Text style={[typeScale.bodyLarge, styles.heroTextShadow, { color: '#FFFFFF', marginTop: spacing.xs }]}>
                 {tagline}
               </Text>
@@ -742,6 +774,9 @@ const styles = StyleSheet.create({
   heroImage: { width: '100%', height: '100%' },
   avatarWrap: { position: 'absolute', right: spacing.lg },
   heroText: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 100 },
+  yardRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', maxWidth: '100%', marginTop: spacing.sm, minHeight: 28 },
+  yardPin: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
+  yardText: { color: '#FFFFFF', flexShrink: 1, marginRight: spacing.xs },
   heroTextShadow: {
     textShadowColor: 'rgba(0, 0, 0, 0.35)',
     textShadowOffset: { width: 0, height: 1 },

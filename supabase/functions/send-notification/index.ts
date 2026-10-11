@@ -13,6 +13,9 @@
  * and the endpoint can't be used to send anything else.
  *
  * Deploy:  supabase functions deploy send-notification --no-verify-jwt
+ *          (or Supabase dashboard → Edge Functions → Deploy a new function →
+ *          Via Editor, name it send-notification, paste this file, and turn
+ *          off "Enforce JWT verification" in its settings)
  * Secrets (supabase secrets set …):
  *   RESEND_API_KEY      — from resend.com; without it no email is sent
  *   NOTIFY_EMAIL_FROM   — e.g. "Brighton Lawn + Landscape <quotes@brightonlawn.com>"
@@ -20,7 +23,12 @@
  *   APP_WEB_URL         — where the web app is hosted, e.g. https://app.brightonlawn.com
  */
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
-import { getServiceClient } from '../_shared/auth.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0';
+
+// Self-contained (no ../_shared import) so it can also be pasted into the
+// Supabase dashboard's function editor.
+const getServiceClient = () =>
+  createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const EMAIL_EVENTS = new Set(['quote_approved', 'quote_declined']);

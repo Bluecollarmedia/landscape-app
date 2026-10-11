@@ -24,6 +24,9 @@ export default function OwnerLayout() {
         <Stack.Screen name="resource-edit" options={{ presentation: 'modal' }} />
         <Stack.Screen name="resource-access" options={{ presentation: 'modal' }} />
         <Stack.Screen name="worker-access" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="document" />
+        <Stack.Screen name="document-new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="document-edit" options={{ presentation: 'modal', gestureEnabled: false }} />
         <Stack.Screen name="setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
       </Stack>
     </ScheduleProvider>

@@ -34,6 +34,7 @@ import type {
   WorkSession, WorkerHourlyRate, OvertimeRule, CompanyOperationsSettings,
   NotificationPreference, AppNotification, WorkerReminder,
 } from '@/types/operations';
+import type { Quote, ChangeOrder, Invoice, FinancialEvent, LineItem } from '@/types/financial';
 import type {
   TeamCode, CompanyJoinSettings, CompanyInvitation, JoinRequest, MembershipAuditEvent,
   CompanyMembership,
@@ -91,6 +92,10 @@ const TABLES = {
   company_resources: { scope: 'company', cols: ['id', 'companyId', 'category', 'name', 'description', 'truckId', 'itemName', 'cardLastFour', 'cardHolderId', 'createdAt', 'updatedAt'] },
   resource_access: { scope: 'company', cols: ['id', 'companyId', 'resourceId', 'personId', 'createdAt'] },
   resource_audit_log: { scope: 'company', cols: ['id', 'companyId', 'resourceId', 'resourceName', 'actorId', 'eventType', 'targetPersonId', 'metadata', 'createdAt'] },
+  quotes: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'customerId', 'number', 'title', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'exclusions', 'terms', 'issueDate', 'validUntil', 'snapshot', 'sentAt', 'approvedAt', 'approvedBy', 'approvedName', 'shareToken', 'declinedAt', 'declinedBy', 'declineReason', 'createdBy', 'createdAt', 'updatedAt'] },
+  change_orders: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'customerId', 'number', 'title', 'description', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'terms', 'issueDate', 'snapshot', 'sentAt', 'approvedAt', 'approvedBy', 'approvedName', 'shareToken', 'declinedAt', 'declinedBy', 'declineReason', 'createdBy', 'createdAt', 'updatedAt'] },
+  invoices: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'changeOrderIds', 'customerId', 'number', 'title', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'paymentInstructions', 'invoiceDate', 'dueDate', 'snapshot', 'issuedAt', 'voidedAt', 'voidReason', 'createdBy', 'createdAt', 'updatedAt'] },
+  financial_events: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'documentType', 'documentId', 'eventType', 'actorId', 'note', 'metadata', 'createdAt'] },
 } satisfies Record<string, TableDef>;
 
 export type TableName = keyof typeof TABLES;
@@ -193,6 +198,12 @@ export interface Db {
   invitations: CompanyInvitation[];
   joinRequests: JoinRequest[];
   auditEvents: MembershipAuditEvent[];
+  /** Newest first. Customers only receive sent/issued ones (database rules). */
+  quotes: Quote[];
+  changeOrders: ChangeOrder[];
+  invoices: Invoice[];
+  /** Oldest first. */
+  financialEvents: FinancialEvent[];
 }
 
 const DEFAULT_OVERTIME: OvertimeRule = {
@@ -246,6 +257,10 @@ export const db: Db = {
   invitations: [],
   joinRequests: [],
   auditEvents: [],
+  quotes: [],
+  changeOrders: [],
+  invoices: [],
+  financialEvents: [],
 };
 
 function groupBy<T extends Row>(rows: T[], key: string): Record<string, T[]> {
@@ -440,6 +455,35 @@ function derive() {
       return { ...r, person: p ? { ...p, profilePhotoUrl: p.avatarUrl } : undefined } as JoinRequest;
     });
   db.auditEvents = raw.membership_audit_log.slice().sort((a, b) => byCreated(b, a)) as MembershipAuditEvent[];
+
+  // Quotes, change orders, invoices. Postgres numerics can arrive as strings.
+  const projectNames: Record<string, string> = {};
+  for (const p of raw.projects) projectNames[p.id] = p.name;
+  const money = (d: Row): Row => ({
+    ...d,
+    lineItems: (Array.isArray(d.lineItems) ? d.lineItems : []).map((li: Row): LineItem => ({
+      ...(li as LineItem),
+      quantity: Number(li.quantity) || 0,
+      unitPrice: Number(li.unitPrice) || 0,
+      amount: Number(li.amount) || 0,
+    })),
+    taxRate: Number(d.taxRate ?? 0),
+    subtotal: Number(d.subtotal ?? 0),
+    taxAmount: Number(d.taxAmount ?? 0),
+    total: Number(d.total ?? 0),
+    customer: person(d.customerId),
+    projectName: projectNames[d.projectId],
+  });
+  db.quotes = raw.quotes.slice().sort((a, b) => byCreated(b, a)).map(money) as Quote[];
+  db.changeOrders = raw.change_orders.slice().sort((a, b) => byCreated(b, a)).map(money) as ChangeOrder[];
+  db.invoices = raw.invoices
+    .slice()
+    .sort((a, b) => byCreated(b, a))
+    .map((i) => ({ ...money(i), changeOrderIds: Array.isArray(i.changeOrderIds) ? i.changeOrderIds : [] })) as Invoice[];
+  db.financialEvents = raw.financial_events
+    .slice()
+    .sort(byCreated)
+    .map((e) => ({ ...e, actor: person(e.actorId) })) as FinancialEvent[];
 }
 
 // ── Subscription ────────────────────────────────────────────────────────────
@@ -678,6 +722,11 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.company_resources = mock.mockResources.map((r) => ({ ...r }));
     raw.resource_access = mock.mockResourceAccess.map((a) => ({ ...a }));
     raw.resource_audit_log = [];
+    const fin = (require('./mockFinancials') as typeof import('./mockFinancials')).buildMockFinancials(mock.mockProjects);
+    raw.quotes = fin.quotes;
+    raw.change_orders = fin.changeOrders;
+    raw.invoices = fin.invoices;
+    raw.financial_events = fin.events;
     for (const r of onb.mockJoinRequests) {
       if (r.person && !raw.people.some((p) => p.id === r.person!.id)) {
         raw.people.push({ ...r.person, avatarUrl: r.person.profilePhotoUrl });

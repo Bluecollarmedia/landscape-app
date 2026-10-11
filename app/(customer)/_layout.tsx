@@ -10,6 +10,7 @@ export default function CustomerLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="project" />
+      <Stack.Screen name="document" />
     </Stack>
   );
 }

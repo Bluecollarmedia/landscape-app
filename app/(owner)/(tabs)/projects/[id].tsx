@@ -29,6 +29,7 @@ import { semantic } from '@/theme/colors';
 import type { ProjectStatus, TaskStatus, HistoryEventType, ProjectPhoto, ProjectTask, PhotoType } from '@/types/project';
 import type { Assignment } from '@/types/schedule';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { ProjectFinancials } from '@/components/financials/ProjectFinancials';
 
 const today = todayKey();
 
@@ -74,6 +75,11 @@ const SECTIONS = [
 
 const MORE_ITEMS = [
   {
+    key: 'financials', label: 'Financials', icon: 'file-text' as const,
+    description: 'Quotes, change orders and invoices for this project',
+    iconBg: '#E3F1E4', iconColor: '#2E7D32',
+  },
+  {
     key: 'people', label: 'People', icon: 'users' as const,
     description: 'View and manage the customer and project team members',
     iconBg: '#DCE9FB', iconColor: '#2E6BD6',
@@ -89,6 +95,8 @@ const MORE_ITEMS = [
     iconBg: '#E9E9EC', iconColor: '#5B5B63',
   },
 ];
+
+type MoreSubSection = 'financials' | 'people' | 'activity' | 'settings';
 
 const PHOTO_TYPE_LABEL: Record<string, string> = {
   before: 'Before', after: 'After', progress: 'Progress', issue: 'Issue', general: 'General',
@@ -170,7 +178,8 @@ export default function ProjectDetailScreen() {
   // Customer tab rather than as their own top-level section.
   const initialSection = SECTIONS.some(s => s.key === section)
     ? section!
-    : (section === 'requests' || section === 'updates' || section === 'messages') ? 'customer' : 'overview';
+    : (section === 'requests' || section === 'updates' || section === 'messages') ? 'customer'
+    : section === 'financials' ? 'more' : 'overview';
 
   const [activeSection, setActiveSection] = useState(initialSection);
   const [customerSubTab, setCustomerSubTab] = useState<'updates' | 'requests' | 'messages'>(
@@ -179,7 +188,7 @@ export default function ProjectDetailScreen() {
   const [customerDrilldown, setCustomerDrilldown] = useState(section === 'requests' || section === 'updates' || section === 'messages');
   const [showManageAccess, setShowManageAccess] = useState(false);
   const [showCustomerPreview, setShowCustomerPreview] = useState(false);
-  const [moreSubSection, setMoreSubSection] = useState<'people' | 'activity' | 'settings' | null>(null);
+  const [moreSubSection, setMoreSubSection] = useState<MoreSubSection | null>(section === 'financials' ? 'financials' : null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, editRequestResponse, reopenRequest, deleteRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
@@ -1060,7 +1069,7 @@ export default function ProjectDetailScreen() {
             <Pressable
               key={item.key}
               style={[styles.moreCardRow, { backgroundColor: colors.surface }, shadow.sm]}
-              onPress={() => setMoreSubSection(item.key as 'people' | 'activity' | 'settings')}
+              onPress={() => setMoreSubSection(item.key as MoreSubSection)}
             >
               <View style={[styles.moreCardIcon, { backgroundColor: item.iconBg }]}>
                 <Icon name={item.icon} size={18} color={item.iconColor} />
@@ -1082,6 +1091,7 @@ export default function ProjectDetailScreen() {
 
     return (
       <View>
+        {moreSubSection === 'financials' && <ProjectFinancials projectId={p.id} />}
         {moreSubSection === 'people' && renderPeople()}
         {moreSubSection === 'activity' && renderActivity()}
         {moreSubSection === 'settings' && renderSettings()}
@@ -2302,7 +2312,7 @@ export default function ProjectDetailScreen() {
               <Pressable
                 key={item.key}
                 style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
-                onPress={() => { setActiveSection('more'); setMoreSubSection(item.key as 'people' | 'activity' | 'settings'); setShowMoreMenu(false); }}
+                onPress={() => { setActiveSection('more'); setMoreSubSection(item.key as MoreSubSection); setShowMoreMenu(false); }}
               >
                 <Icon name={item.icon} size={18} color={colors.textSecondary} />
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>

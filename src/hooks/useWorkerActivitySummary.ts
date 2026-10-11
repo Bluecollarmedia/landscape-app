@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useWorkerContext } from '@/providers/WorkerProvider';
-import { mockProjectPhotos } from '@/data/mock';
+import { db } from '@/data/store';
 import type { Assignment } from '@/types/schedule';
 import type { WorkerActivity, WorkerActivityType, CheckIn, CheckOut } from '@/types/worker';
 import type { ProjectPhoto } from '@/types/project';
@@ -50,19 +50,49 @@ function localDateKey(iso: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Sunday-start week containing (today - offset*7 days).
-function getWeekRange(weekOffset: number): { start: Date; end: Date; label: string } {
+export type ActivityPeriod = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'all_time';
+
+export const ACTIVITY_PERIODS: { key: ActivityPeriod; label: string }[] = [
+  { key: 'this_week', label: 'This Week' },
+  { key: 'last_week', label: 'Last Week' },
+  { key: 'this_month', label: 'This Month' },
+  { key: 'last_month', label: 'Last Month' },
+  { key: 'this_year', label: 'This Year' },
+  { key: 'all_time', label: 'All Time' },
+];
+
+/** Start/end of a period. Weeks start on Sunday. */
+function getPeriodRange(period: ActivityPeriod): { start: Date; end: Date; label: string } {
   const now = new Date();
+  const label = ACTIVITY_PERIODS.find(p => p.key === period)!.label;
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - start.getDay() - weekOffset * 7);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
+  let end = new Date(now);
   end.setHours(23, 59, 59, 999);
 
-  const label = weekOffset === 0 ? 'This Week' : weekOffset === 1 ? 'Last Week'
-    : `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-
+  switch (period) {
+    case 'this_week':
+    case 'last_week':
+      start.setDate(start.getDate() - start.getDay() - (period === 'last_week' ? 7 : 0));
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      break;
+    case 'this_month':
+      start.setDate(1);
+      break;
+    case 'last_month':
+      start.setDate(1);
+      start.setMonth(start.getMonth() - 1);
+      end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
+      break;
+    case 'this_year':
+      start.setMonth(0, 1);
+      break;
+    case 'all_time':
+      start.setTime(0);
+      break;
+  }
   return { start, end, label };
 }
 
@@ -85,8 +115,9 @@ function buildSession(
   return {
     assignmentId: checkIn.assignmentId,
     projectId: checkIn.projectId,
-    projectName: assignment?.project?.name ?? 'Unknown Project',
-    address: assignment?.project?.address,
+    // A job still in progress isn't in completedAssignments yet, so fall back to the project itself.
+    projectName: (assignment?.project ?? db.projects.find(p => p.id === checkIn.projectId))?.name ?? 'Unknown Project',
+    address: (assignment?.project ?? db.projects.find(p => p.id === checkIn.projectId))?.address,
     checkInAt: checkIn.timestamp,
     checkOutAt: checkOut?.timestamp,
     workedMs,
@@ -115,7 +146,7 @@ function groupSessionsByDay(sessions: WorkSession[]): DayGroup[] {
         jobs: daySessions.length,
         tasksCompleted: daySessions.reduce((sum, s) => sum + s.tasksCompleted, 0),
         photosUploaded: daySessions.reduce((sum, s) => sum + s.photosUploaded, 0),
-        thumbnailUri: (mockProjectPhotos[daySessions[0].projectId] ?? [])[0]?.fileUrl,
+        thumbnailUri: (db.photos[daySessions[0].projectId] ?? [])[0]?.fileUrl,
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -128,15 +159,17 @@ function groupSessionsByDay(sessions: WorkSession[]): DayGroup[] {
  * metadata to avoid relying on timestamp equality. */
 export function findPhotoForActivity(activity: WorkerActivity, workerId?: string): ProjectPhoto | undefined {
   if (activity.activityType !== 'photo_taken' || !activity.projectId) return undefined;
-  const photos = mockProjectPhotos[activity.projectId] ?? [];
+  const photos = db.photos[activity.projectId] ?? [];
+  const photoId = (activity.metadata as { photoId?: string } | undefined)?.photoId;
+  if (photoId) return photos.find(p => p.id === photoId);
   return photos.find(p => p.uploadedBy === workerId && p.takenAt === activity.timestamp);
 }
 
-export function useWorkerActivitySummary(weekOffset: number): WeekSummary {
+export function useWorkerActivitySummary(period: ActivityPeriod): WeekSummary {
   const { completedAssignments, checkIns, checkOuts, activities } = useWorkerContext();
 
   return useMemo(() => {
-    const { start, end, label } = getWeekRange(weekOffset);
+    const { start, end, label } = getPeriodRange(period);
 
     const sessions = checkIns
       .filter(c => {
@@ -155,11 +188,11 @@ export function useWorkerActivitySummary(weekOffset: number): WeekSummary {
       photosUploaded: days.reduce((sum, d) => sum + d.photosUploaded, 0),
       days,
     };
-  }, [weekOffset, completedAssignments, checkIns, checkOuts, activities]);
+  }, [period, completedAssignments, checkIns, checkOuts, activities]);
 }
 
 /** Resolves a single day's work sessions directly by date key, independent of
- * which week (This Week / Last Week) it happened to be viewed from. */
+ * which period it happened to be viewed from. */
 export function useWorkerDayDetail(dateKey: string): DayGroup | undefined {
   const { completedAssignments, checkIns, checkOuts, activities } = useWorkerContext();
 

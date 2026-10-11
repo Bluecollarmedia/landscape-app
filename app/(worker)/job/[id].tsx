@@ -12,13 +12,13 @@ import { StatusBadge } from '@/components/ui';
 import { PhotoViewer } from '@/components/worker/PhotoViewer';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
-import { mockProjectPhotos } from '@/data/mock';
+import { db } from '@/data/store';
+import { todayKey, localDateKey } from '@/lib/ids';
 import type { ProjectPhoto } from '@/types/project';
+import { getProjectImageUriById } from '@/lib/projectImages';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
-const HERO_IMAGE_URI =
-  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200&q=80';
 const HERO_HEIGHT = 220;
 
 function formatTime(time?: string) {
@@ -39,7 +39,7 @@ function formatDateLabel(dateStr: string): string {
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const iso = (x: Date) => x.toISOString().split('T')[0];
+  const iso = (x: Date) => localDateKey(x);
   if (dateStr === iso(today)) return 'Today';
   if (dateStr === iso(tomorrow)) return 'Tomorrow';
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -72,12 +72,12 @@ export default function JobDetailScreen() {
     );
   }
 
-  const isPast = assignment.status === 'completed' || assignment.scheduledDate < new Date().toISOString().split('T')[0];
+  const isPast = assignment.status === 'completed' || assignment.scheduledDate < todayKey();
 
   // Only this worker's own photos, scoped to this exact task — never another
   // worker's upload, another task, or another project's photo library.
   function getTaskPhotos(taskId: string): ProjectPhoto[] {
-    const projectPhotos = mockProjectPhotos[assignment!.projectId] ?? [];
+    const projectPhotos = db.photos[assignment!.projectId] ?? [];
     return projectPhotos.filter(p => p.taskId === taskId && p.uploadedBy === user?.id);
   }
 
@@ -90,14 +90,14 @@ export default function JobDetailScreen() {
   const tasks = projectTasks(assignment.projectId);
 
   function handleOpenMaps() {
-    if (assignment!.project?.address) openMapsNavigation(assignment!.project.address);
+    if (assignment!.project?.address) openMapsNavigation(assignment!.project);
   }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
         <View style={styles.hero}>
-          <Image source={{ uri: HERO_IMAGE_URI }} style={styles.heroImage} resizeMode="cover" />
+          <Image source={{ uri: getProjectImageUriById(assignment.projectId, 1200) }} style={styles.heroImage} resizeMode="cover" />
           <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.sm }]}>
             <Pressable onPress={() => router.back()} hitSlop={12}>
               {HAS_LIQUID_GLASS ? (

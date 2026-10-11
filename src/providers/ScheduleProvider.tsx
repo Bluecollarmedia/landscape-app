@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import type { Assignment, ScheduleChange, ScheduleChangeType, ScheduleConflict, TravelWarning } from '@/types/schedule';
-import { mockAssignments, mockScheduleChanges, mockPeople, mockProjects, mockTrucks } from '@/data/mock';
+import { db, useDb, insertRow, updateRow } from '@/data/store';
+import { todayKey, localDateKey, uuid } from '@/lib/ids';
 
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number);
@@ -15,8 +16,6 @@ function timesOverlap(s1?: string, e1?: string, s2?: string, e2?: string): boole
 function isActive(a: Assignment): boolean {
   return a.status !== 'cancelled' && a.status !== 'reassigned';
 }
-
-const today = new Date().toISOString().split('T')[0];
 
 export interface ScheduleContextValue {
   assignments: Assignment[];
@@ -48,8 +47,9 @@ export interface ScheduleContextValue {
 const ScheduleContext = createContext<ScheduleContextValue | null>(null);
 
 export function ScheduleProvider({ children }: { children: React.ReactNode }) {
-  const [assignments, setAssignments] = useState<Assignment[]>(mockAssignments);
-  const [changes, setChanges] = useState<ScheduleChange[]>(mockScheduleChanges);
+  const v = useDb();
+  const assignments = useMemo(() => db.assignments, [v]);
+  const changes = useMemo(() => db.scheduleChanges, [v]);
 
   const getByDate = useCallback((date: string) => {
     return assignments.filter(a => a.scheduledDate === date && isActive(a));
@@ -157,14 +157,8 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     return warnings;
   }, [assignments]);
 
-  const addChange = useCallback((change: Omit<ScheduleChange, 'id' | 'createdAt'>) => {
-    const full: ScheduleChange = {
-      ...change,
-      id: `sc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      createdAt: new Date().toISOString(),
-    };
-    setChanges(prev => [full, ...prev]);
-    return full;
+  const addChange = useCallback((change: Omit<ScheduleChange, 'id' | 'createdAt' | 'companyId' | 'changedBy'>) => {
+    return insertRow('schedule_changes', { ...change, changedBy: db.personId }) as unknown as ScheduleChange;
   }, []);
 
   const createAssignment = useCallback((params: {
@@ -172,17 +166,17 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     startTime?: string; endTime?: string; isFullDay: boolean;
     truckId?: string; notes?: string;
   }): Assignment => {
-    const person = mockPeople[params.personId];
-    const project = mockProjects.find(pr => pr.id === params.projectId);
-    const truck = params.truckId ? mockTrucks.find(t => t.id === params.truckId) : undefined;
+    const person = db.people[params.personId];
+    const project = db.projects.find(pr => pr.id === params.projectId);
+    const truck = params.truckId ? db.trucks.find(t => t.id === params.truckId) : undefined;
 
     const dayCount = assignments.filter(a =>
       a.personId === params.personId && a.scheduledDate === params.scheduledDate && isActive(a)
     ).length;
 
     const newAssignment: Assignment = {
-      id: `a_${Date.now()}`,
-      companyId: 'company1',
+      id: uuid(),
+      companyId: db.companyId,
       projectId: params.projectId,
       personId: params.personId,
       scheduledDate: params.scheduledDate,
@@ -191,7 +185,8 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
       isFullDay: params.isFullDay,
       sortOrder: dayCount + 1,
       status: 'scheduled',
-      confirmationState: 'not_sent',
+      // Shows on the worker's Today screen for them to confirm.
+      confirmationState: 'awaiting',
       truckId: params.truckId,
       notes: params.notes,
       createdAt: new Date().toISOString(),
@@ -201,16 +196,14 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
       truck: truck ? { id: truck.id, name: truck.name } : undefined,
     };
 
-    setAssignments(prev => [...prev, newAssignment]);
+    const { person: _p, project: _pr, truck: _t, ...row } = newAssignment;
+    insertRow('assignments', row);
 
     const timeStr = params.isFullDay ? 'Full Day' : `${params.startTime}–${params.endTime}`;
     addChange({
       assignmentId: newAssignment.id,
-      companyId: 'company1',
-      changedBy: 'owner1',
       changeType: 'created',
       newValue: JSON.stringify({ project: project?.name, time: timeStr, worker: person ? `${person.firstName} ${person.lastName}` : '' }),
-      changer: mockPeople.owner1,
     });
 
     return newAssignment;
@@ -220,29 +213,21 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     const original = assignments.find(a => a.id === assignmentId);
     if (!original) return;
 
-    setAssignments(prev => prev.map(a => {
-      if (a.id !== assignmentId) return a;
-      return {
-        ...a,
-        status: 'cancelled' as const,
-        cancelledAt: new Date().toISOString(),
-        cancelledBy: 'owner1',
-        cancellationReason: reason,
-        updatedAt: new Date().toISOString(),
-      };
-    }));
+    updateRow('assignments', assignmentId, {
+      status: 'cancelled',
+      cancelledAt: new Date().toISOString(),
+      cancelledBy: db.personId || undefined,
+      cancellationReason: reason,
+    });
 
     addChange({
       assignmentId,
-      companyId: 'company1',
-      changedBy: 'owner1',
       changeType: 'cancelled',
       previousValue: JSON.stringify({
         project: original.project?.name,
         time: original.isFullDay ? 'Full Day' : `${original.startTime}–${original.endTime}`,
       }),
       notes: reason,
-      changer: mockPeople.owner1,
     });
   }, [assignments, addChange]);
 
@@ -250,9 +235,9 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     const original = assignments.find(a => a.id === assignmentId);
     if (!original) return undefined;
 
-    const project = mockProjects.find(pr => pr.id === newProjectId);
+    const project = db.projects.find(pr => pr.id === newProjectId);
     const now = new Date().toISOString();
-    const newId = `a_${Date.now()}`;
+    const newId = uuid();
 
     const newAssignment: Assignment = {
       ...original,
@@ -267,33 +252,24 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
       updatedAt: now,
     };
 
-    setAssignments(prev => [
-      ...prev.map(a => {
-        if (a.id !== assignmentId) return a;
-        return { ...a, status: 'reassigned' as const, reassignedTo: newId, updatedAt: now };
-      }),
-      newAssignment,
-    ]);
+    // Insert the new one first so the old one's reassigned_to can point at it.
+    const { person: _p, project: _pr, truck: _t, ...row } = newAssignment;
+    insertRow('assignments', { ...row, reassignedTo: undefined, cancelledAt: undefined, cancelledBy: undefined, cancellationReason: undefined });
+    updateRow('assignments', assignmentId, { status: 'reassigned', reassignedTo: newId });
 
     addChange({
       assignmentId,
-      companyId: 'company1',
-      changedBy: 'owner1',
       changeType: 'reassigned',
       previousValue: JSON.stringify({ project: original.project?.name }),
       newValue: JSON.stringify({ project: project?.name }),
       notes: notes || `Moved to ${project?.name}`,
-      changer: mockPeople.owner1,
     });
 
     addChange({
       assignmentId: newId,
-      companyId: 'company1',
-      changedBy: 'owner1',
       changeType: 'emergency_override',
       newValue: JSON.stringify({ project: project?.name, movedFrom: original.project?.name }),
       notes,
-      changer: mockPeople.owner1,
     });
 
     return newAssignment;
@@ -305,17 +281,10 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
 
     const wasConfirmed = original.confirmationState === 'confirmed';
 
-    setAssignments(prev => prev.map(a => {
-      if (a.id !== assignmentId) return a;
-      const truck = updates.truckId ? mockTrucks.find(t => t.id === updates.truckId) : (updates.truckId === undefined ? a.truck : undefined);
-      return {
-        ...a,
-        ...updates,
-        truck: truck ? { id: truck.id, name: truck.name } : undefined,
-        confirmationState: wasConfirmed ? 'updated_since' as const : a.confirmationState,
-        updatedAt: new Date().toISOString(),
-      };
-    }));
+    updateRow('assignments', assignmentId, {
+      ...updates,
+      ...(wasConfirmed ? { confirmationState: 'updated_since' } : {}),
+    });
 
     let changeType: ScheduleChangeType = 'time_changed';
     if (updates.truckId !== undefined) changeType = 'truck_changed';
@@ -323,8 +292,6 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
 
     addChange({
       assignmentId,
-      companyId: 'company1',
-      changedBy: 'owner1',
       changeType,
       previousValue: JSON.stringify({
         startTime: original.startTime, endTime: original.endTime,
@@ -334,10 +301,9 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
         startTime: updates.startTime ?? original.startTime,
         endTime: updates.endTime ?? original.endTime,
         isFullDay: updates.isFullDay ?? original.isFullDay,
-        truck: updates.truckId ? mockTrucks.find(t => t.id === updates.truckId)?.name : original.truck?.name,
+        truck: updates.truckId ? db.trucks.find(t => t.id === updates.truckId)?.name : original.truck?.name,
       }),
       notes: changeNotes,
-      changer: mockPeople.owner1,
     });
   }, [assignments, addChange]);
 
@@ -358,7 +324,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     for (let i = 0; i < 7; i++) {
       const d = new Date(start);
       d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = localDateKey(d);
       const dayAssignments = assignments.filter(a => a.scheduledDate === dateStr && isActive(a));
       const workers = new Set(dayAssignments.map(a => a.personId));
       const projects = new Set(dayAssignments.map(a => a.projectId));
@@ -374,7 +340,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     return days;
   }, [assignments]);
 
-  const todayAssignments = useMemo(() => getByDate(today), [getByDate]);
+  const todayAssignments = useMemo(() => getByDate(todayKey()), [getByDate]);
 
   const stats = useMemo(() => {
     const active = todayAssignments;

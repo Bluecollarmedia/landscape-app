@@ -8,13 +8,13 @@
 import React from 'react';
 import {
   View,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useTheme } from '@/providers/ThemeProvider';
 import { spacing, sizing } from '@/theme/spacing';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -71,18 +71,20 @@ export function ScreenContainer({
   const content = <View style={innerStyle}>{children}</View>;
 
   const scrollContent = scrollable ? (
-    <ScrollView
+    // Scrolls the focused field above the keyboard.
+    <KeyboardAwareScrollView
+      bottomOffset={KEYBOARD_GAP}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       {content}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   ) : (
     content
   );
 
-  const wrapped = keyboardAvoiding ? (
+  const wrapped = keyboardAvoiding && !scrollable ? (
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -95,6 +97,9 @@ export function ScreenContainer({
 
   return <View style={[outerStyle, style]}>{wrapped}</View>;
 }
+
+/** Space kept between the focused field and the top of the keyboard. */
+export const KEYBOARD_GAP = 24;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

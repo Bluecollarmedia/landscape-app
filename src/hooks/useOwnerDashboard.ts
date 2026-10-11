@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import type { Feather } from '@expo/vector-icons';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useAttendance } from '@/hooks/useOperations';
-import { mockProjects, mockTrucks, mockRequests } from '@/data/mock';
+import { db, useDb } from '@/data/store';
+import { todayKey } from '@/lib/ids';
 import type { Project } from '@/types/project';
 import type { Assignment } from '@/types/schedule';
 import type { PersonSummary } from '@/types/company';
@@ -38,8 +39,6 @@ export interface ProjectHomeSummary extends Project {
 
 type AttendanceDetail = WorkerAttendance['assignments'][number] & { worker?: PersonSummary };
 
-const today = new Date().toISOString().split('T')[0];
-
 function formatTime(time?: string): string | undefined {
   if (!time) return undefined;
   const [h, m] = time.split(':').map(Number);
@@ -49,17 +48,14 @@ function formatTime(time?: string): string | undefined {
 }
 
 /**
- * Assignment times ('07:00') are naive company-local wall-clock strings, and
- * mock check-in timestamps are stamped with the same naive hour/minute under
- * a 'Z' suffix (see mockOperations.ts) rather than a real UTC instant. We
- * read the UTC components back out directly instead of letting the device's
- * local timezone reinterpret them, or "Since 7:03 AM" would render as a
- * shifted time on any machine not set to UTC.
+ * Check-in timestamps are real instants (UTC); show them in the device's
+ * local time. (Sample data in demo mode stamps naive local times with a 'Z'
+ * suffix, so it reads those back as-is.)
  */
 function formatClockIso(iso: string): string {
   const d = new Date(iso);
-  const hh = String(d.getUTCHours()).padStart(2, '0');
-  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  const hh = String(db.demo ? d.getUTCHours() : d.getHours()).padStart(2, '0');
+  const mm = String(db.demo ? d.getUTCMinutes() : d.getMinutes()).padStart(2, '0');
   return formatTime(`${hh}:${mm}`)!;
 }
 
@@ -94,8 +90,10 @@ export function useOwnerDashboard() {
   const { getByDate } = useSchedule();
   const { getAttendanceForDate, settings } = useAttendance();
 
-  const todayAssignments = useMemo(() => getByDate(today), [getByDate]);
-  const attendance = useMemo(() => getAttendanceForDate(today), [getAttendanceForDate]);
+  const v = useDb();
+  const today = todayKey();
+  const todayAssignments = useMemo(() => getByDate(today), [getByDate, today]);
+  const attendance = useMemo(() => getAttendanceForDate(today), [getAttendanceForDate, today]);
 
   const attendanceByAssignment = useMemo(() => {
     const map = new Map<string, AttendanceDetail>();
@@ -199,7 +197,7 @@ export function useOwnerDashboard() {
 
     for (const a of todayAssignments) {
       if (!a.truckId) continue;
-      const truck = mockTrucks.find(t => t.id === a.truckId);
+      const truck = db.trucks.find(t => t.id === a.truckId);
       if (truck && (truck.status === 'maintenance' || truck.status === 'out_of_service')) {
         items.push({
           id: `truck_${a.id}`,
@@ -213,9 +211,9 @@ export function useOwnerDashboard() {
       }
     }
 
-    const pendingRequests = Object.values(mockRequests).flat().filter(r => r.status === 'pending');
+    const pendingRequests = Object.values(db.requests).flat().filter(r => r.status === 'pending');
     for (const req of pendingRequests) {
-      const project = mockProjects.find(p => p.id === req.projectId);
+      const project = db.projects.find(p => p.id === req.projectId);
       items.push({
         id: `request_${req.id}`,
         title: `${req.requester ? `${req.requester.firstName} ${req.requester.lastName}` : 'A customer'} sent a request`,
@@ -228,7 +226,7 @@ export function useOwnerDashboard() {
     }
 
     return items.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
-  }, [todayAssignments, attendanceByAssignment, settings]);
+  }, [todayAssignments, attendanceByAssignment, settings, v]);
 
   // ── Crew Today: one live status row per worker ──────────────────
   const crewToday = useMemo<CrewMember[]>(() => {
@@ -287,7 +285,7 @@ export function useOwnerDashboard() {
 
   // ── Active Projects: today's activity surfaced first ─────────────
   const activeProjects = useMemo<ProjectHomeSummary[]>(() => {
-    const active = mockProjects.filter(p => p.status === 'active');
+    const active = db.projects.filter(p => p.status === 'active');
     const withMeta = active.map(p => {
       const todaysForProject = todayAssignments.filter(a => a.projectId === p.id);
       const anyOnSite = todaysForProject.some(a => onSiteWorkerIds.has(a.personId));
@@ -307,7 +305,7 @@ export function useOwnerDashboard() {
     });
 
     return withMeta.map(({ project, todayStatusLabel }) => ({ ...project, todayStatusLabel }));
-  }, [todayAssignments, onSiteWorkerIds]);
+  }, [todayAssignments, onSiteWorkerIds, v]);
 
   return {
     todayStats: {

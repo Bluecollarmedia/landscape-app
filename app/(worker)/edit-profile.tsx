@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, TextInput, Modal, Alert, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import { Avatar } from '@/components/ui';
+import { Avatar, Button, Input } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 export default function EditProfileScreen() {
   const { colors } = useTheme();
@@ -22,16 +25,29 @@ export default function EditProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl);
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [triedSave, setTriedSave] = useState(false);
 
   const hasChanges = firstName !== user?.firstName || lastName !== user?.lastName || phone !== (user?.phone ?? '') || avatarUrl !== user?.avatarUrl;
 
+  // Everything on this page is required.
+  const errors = {
+    photo: avatarUrl ? '' : 'Add a profile photo',
+    firstName: firstName.trim() ? '' : 'Enter your first name',
+    lastName: lastName.trim() ? '' : 'Enter your last name',
+    phone: phone.replace(/\D/g, '').length >= 10 ? '' : 'Enter a 10-digit phone number',
+  };
+  const isValid = !Object.values(errors).some(Boolean);
+  const show = (key: keyof typeof errors) => (triedSave ? errors[key] || undefined : undefined);
+
   function handleSave() {
     if (!user) return;
+    setTriedSave(true);
+    if (!isValid) return;
     updateProfile({
       ...user,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      phone: phone.trim() || undefined,
+      phone: phone.trim(),
       avatarUrl,
       updatedAt: new Date().toISOString(),
     });
@@ -90,7 +106,7 @@ export default function EditProfileScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      <View style={styles.content}>
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.photoSection}>
           <Pressable style={styles.avatarWrap} onPress={() => setPhotoSheetOpen(true)}>
             <Avatar firstName={firstName} lastName={lastName} size={96} uri={avatarUrl} />
@@ -100,61 +116,69 @@ export default function EditProfileScreen() {
           </Pressable>
           <Pressable onPress={() => setPhotoSheetOpen(true)}>
             <Text style={[typeScale.bodyMedium, { color: colors.primary, fontWeight: '600', marginTop: spacing.sm }]}>
-              Change Photo
+              {avatarUrl ? 'Change Photo' : 'Add Photo'}
             </Text>
           </Pressable>
+          {show('photo') ? (
+            <Text style={[typeScale.caption, { color: colors.error, marginTop: spacing.xs }]}>{show('photo')}</Text>
+          ) : null}
         </View>
 
-        <View style={[styles.fieldGroup, { backgroundColor: colors.surface }, shadow.sm]}>
-          <View style={styles.field}>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Full Name</Text>
-            <View style={styles.nameRow}>
-              <TextInput
-                style={[typeScale.bodyLarge, styles.input, { color: colors.textPrimary, flex: 1 }]}
-                value={firstName}
-                onChangeText={setFirstName}
-                placeholder="First name"
-                placeholderTextColor={colors.textTertiary}
-              />
-              <TextInput
-                style={[typeScale.bodyLarge, styles.input, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm }]}
-                value={lastName}
-                onChangeText={setLastName}
-                placeholder="Last name"
-                placeholderTextColor={colors.textTertiary}
-              />
-            </View>
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
-          <View style={styles.field}>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Phone Number</Text>
-            <TextInput
-              style={[typeScale.bodyLarge, styles.input, { color: colors.textPrimary }]}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="Add phone number"
-              placeholderTextColor={colors.textTertiary}
-              keyboardType="phone-pad"
+        <View style={styles.fields}>
+          <View style={styles.nameRow}>
+            <Input
+              label="First Name *"
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="First name"
+              textContentType="givenName"
+              autoComplete="given-name"
+              error={show('firstName')}
+              containerStyle={{ flex: 1, width: undefined }}
+            />
+            <Input
+              label="Last Name *"
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder="Last name"
+              textContentType="familyName"
+              autoComplete="family-name"
+              error={show('lastName')}
+              containerStyle={{ flex: 1, width: undefined }}
             />
           </View>
-          <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
-          <View style={styles.field}>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Email</Text>
-            <Text style={[typeScale.bodyLarge, styles.input, { color: colors.textTertiary }]}>{user?.email}</Text>
-          </View>
+          <Input
+            label="Phone Number *"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="(555) 555-0100"
+            keyboardType="phone-pad"
+            textContentType="telephoneNumber"
+            autoComplete="tel"
+            icon="phone"
+            error={show('phone')}
+          />
+          <Input
+            label="Email"
+            value={user?.email ?? ''}
+            editable={false}
+            icon="mail"
+            hint="Your email is your login and can't be changed here."
+          />
         </View>
 
-        <Pressable
-          style={[styles.saveButton, { backgroundColor: hasChanges ? colors.primary : colors.borderLight }]}
+        <Button
+          title="Save Changes"
           onPress={handleSave}
           disabled={!hasChanges}
-        >
-          <Text style={[typeScale.labelLarge, { color: hasChanges ? '#FFFFFF' : colors.textTertiary }]}>Save Changes</Text>
-        </Pressable>
-      </View>
+          fullWidth
+          size="lg"
+          style={{ marginTop: spacing.xl }}
+        />
+      </KeyboardAwareScrollView>
 
       {/* Change Profile Photo sheet */}
-      <Modal visible={photoSheetOpen} transparent animationType="slide" onRequestClose={() => setPhotoSheetOpen(false)}>
+      <BottomSheetModal visible={photoSheetOpen} onRequestClose={() => setPhotoSheetOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setPhotoSheetOpen(false)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -187,7 +211,7 @@ export default function EditProfileScreen() {
             </Pressable>
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Permission error */}
       <Modal visible={!!permissionError} transparent animationType="fade" onRequestClose={() => setPermissionError(null)}>
@@ -220,7 +244,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   backRow: { flexDirection: 'row', alignItems: 'center', width: 90 },
-  content: { flex: 1, paddingHorizontal: spacing.lg },
+  content: { flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing['3xl'] },
   photoSection: { alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.xl },
   avatarWrap: { position: 'relative' },
   cameraBadgeLarge: {
@@ -234,18 +258,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fieldGroup: { borderRadius: radius.lg, paddingHorizontal: spacing.lg },
-  field: { paddingVertical: spacing.md },
-  nameRow: { flexDirection: 'row', marginTop: 2 },
-  input: { paddingVertical: 4, marginTop: 2 },
+  fields: { gap: spacing.md },
+  nameRow: { flexDirection: 'row', gap: spacing.sm },
   divider: { height: StyleSheet.hairlineWidth },
-  saveButton: {
-    height: 52,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xl,
-  },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.lg },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: spacing.md },

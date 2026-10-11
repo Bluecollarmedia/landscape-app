@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal, Alert, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -12,21 +12,20 @@ import { useAnnouncements } from '@/hooks/useAnnouncements';
 import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
+import { JobMap } from '@/components/maps/JobMap';
 import { semantic } from '@/theme/colors';
 import { haptics } from '@/lib/haptics';
 import type { Assignment } from '@/types/schedule';
 import type { ProjectTask } from '@/types/project';
 import type { Announcement } from '@/types/announcement';
 import type { WeatherActionType } from '@/types/operations';
+import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
-// Temporary placeholder — swap for the project's real photo once available.
-const HERO_IMAGE_URI =
-  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200&q=80';
 
 const HERO_HEIGHT = 400;
 const HERO_HEIGHT_COMPACT = 190;
 const PILL_OVERHANG = 26;
-const MAP_TINT = '#E4EAF0';
 
 function formatElapsed(startIso: string, now: Date): string {
   const mins = Math.max(0, Math.round((now.getTime() - new Date(startIso).getTime()) / 60000));
@@ -72,11 +71,15 @@ export default function WorkerTodayScreen() {
   const tabBarClearance = useTabBarClearance();
   const {
     todayAssignments, currentJob, jobState, checkIns, checkOuts, moveToNextJob,
-    scheduleConfirmed, confirmSchedule, checkIn, checkOut, openMapsNavigation,
+    scheduleConfirmed, confirmSchedule, checkIn, checkOut, locateForCheckIn, locateForCheckOut, openMapsNavigation,
     projectTasks, projectSettings, taskPhotoCaptured,
   } = useWorkerContext();
 
-  const primaryAssignment = currentJob ?? todayAssignments[0];
+  // The job on screen: the one in progress, else the next unfinished one, else the last one
+  // (so a worker who checked out by mistake can check back in).
+  const primaryAssignment = currentJob
+    ?? todayAssignments.find(a => a.status !== 'completed')
+    ?? todayAssignments[todayAssignments.length - 1];
   const isCheckedIn = jobState === 'checked_in' || jobState === 'working';
   const showWorking = isCheckedIn && !!primaryAssignment;
   const showConfirmed = scheduleConfirmed && !!primaryAssignment && !isCheckedIn;
@@ -118,15 +121,27 @@ export default function WorkerTodayScreen() {
     confirmSchedule();
   }
 
-  function handleCheckIn() {
+  const [locating, setLocating] = useState(false);
+
+  async function handleCheckIn() {
+    if (locating) return;
+    haptics.select();
+    setLocating(true);
+    const result = await locateForCheckIn(primaryAssignment?.id);
+    setLocating(false);
+    if (!result.ok) {
+      haptics.warning();
+      if (Platform.OS === 'web') {
+        alert(`${result.title}\n\n${result.message}`);
+      } else {
+        Alert.alert(result.title, result.message, result.openSettings
+          ? [{ text: 'Cancel', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }]
+          : [{ text: 'OK' }]);
+      }
+      return;
+    }
     haptics.success();
-    const mockGps = {
-      latitude: 41.4756 + (Math.random() - 0.5) * 0.001,
-      longitude: -81.5558 + (Math.random() - 0.5) * 0.001,
-      accuracy: 8 + Math.random() * 20,
-      distanceFromSite: Math.floor(Math.random() * 100),
-    };
-    checkIn(mockGps);
+    checkIn(result.gps, primaryAssignment?.id);
   }
 
   function handleCheckOutPress() {
@@ -134,16 +149,11 @@ export default function WorkerTodayScreen() {
     setShowCheckoutConfirm(true);
   }
 
-  function confirmCheckOut() {
+  async function confirmCheckOut() {
     setShowCheckoutConfirm(false);
     haptics.success();
-    const mockGps = {
-      latitude: 41.4756 + (Math.random() - 0.5) * 0.001,
-      longitude: -81.5558 + (Math.random() - 0.5) * 0.001,
-      accuracy: 8 + Math.random() * 20,
-      distanceFromSite: Math.floor(Math.random() * 100),
-    };
-    checkOut(mockGps);
+    // Location is recorded for the owner's records; it never blocks checking out.
+    checkOut(await locateForCheckOut());
   }
 
   function handleBackToToday() {
@@ -274,6 +284,9 @@ export default function WorkerTodayScreen() {
             </Text>
           </LinearGradient>
         </Pressable>
+        <Pressable onPress={handleCheckIn} hitSlop={8} style={{ marginTop: spacing.lg }} accessibilityRole="button">
+          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{locating ? 'Finding your location…' : 'Left by mistake? Check back in'}</Text>
+        </Pressable>
       </View>
     );
   }
@@ -282,7 +295,7 @@ export default function WorkerTodayScreen() {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         <View style={[styles.hero, { height: showWorking ? HERO_HEIGHT_COMPACT : HERO_HEIGHT }]}>
-          <Image source={{ uri: HERO_IMAGE_URI }} style={styles.heroImage} resizeMode="cover" />
+          <Image source={{ uri: primaryAssignment ? getProjectImageUriById(primaryAssignment.projectId, 1200) : getCompanyImageUri() }} style={styles.heroImage} resizeMode="cover" />
           <LinearGradient
             colors={['transparent', 'transparent', colors.groupedBackground]}
             locations={[0, 0.78, 1]}
@@ -395,14 +408,12 @@ export default function WorkerTodayScreen() {
 
                 {primaryAssignment.project?.address && (
                   <>
-                    <View style={[styles.mapArea, { backgroundColor: MAP_TINT }]}>
-                      <View style={[styles.mapPinDot, { backgroundColor: colors.surface }, shadow.sm]}>
-                        <Feather name="map-pin" size={20} color={colors.primary} />
-                      </View>
-                    </View>
+                    <Pressable onPress={() => openMapsNavigation(primaryAssignment.project!)} accessibilityLabel="Open in Maps">
+                      <JobMap place={primaryAssignment.project} />
+                    </Pressable>
                     <Pressable
                       style={styles.openMapsRow}
-                      onPress={() => openMapsNavigation(primaryAssignment.project!.address!)}
+                      onPress={() => openMapsNavigation(primaryAssignment.project!)}
                     >
                       <Feather name="navigation" size={15} color={colors.primary} />
                       <Text style={[typeScale.bodyMedium, { color: colors.primary, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
@@ -442,7 +453,7 @@ export default function WorkerTodayScreen() {
                     </Text>
                   </View>
                   <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]}>
-                    Check in to start this job
+                    {locating ? 'Finding your location…' : 'Check in to start this job'}
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -501,7 +512,7 @@ export default function WorkerTodayScreen() {
                 {primaryAssignment.project?.address && (
                   <Pressable
                     style={[styles.actionPill, { backgroundColor: colors.primarySurface }]}
-                    onPress={() => openMapsNavigation(primaryAssignment.project!.address!)}
+                    onPress={() => openMapsNavigation(primaryAssignment.project!)}
                   >
                     <Feather name="navigation" size={16} color={colors.primaryDark} />
                     <Text style={[typeScale.bodyMedium, { color: colors.primaryDark, marginLeft: spacing.xs, fontWeight: '600' }]}>
@@ -633,12 +644,7 @@ export default function WorkerTodayScreen() {
         </Pressable>
       </Modal>
 
-      <Modal
-        visible={openAnnouncement}
-        transparent
-        animationType="slide"
-        onRequestClose={handleCloseAnnouncement}
-      >
+      <BottomSheetModal visible={openAnnouncement} onRequestClose={handleCloseAnnouncement}>
         <Pressable style={styles.sheetBackdrop} onPress={handleCloseAnnouncement}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -675,7 +681,7 @@ export default function WorkerTodayScreen() {
             })()}
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 }
@@ -771,18 +777,6 @@ const styles = StyleSheet.create({
   },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   mapCard: { padding: 0, overflow: 'hidden' },
-  mapArea: {
-    height: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapPinDot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   openMapsRow: {
     flexDirection: 'row',
     alignItems: 'center',

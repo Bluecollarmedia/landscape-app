@@ -1,13 +1,14 @@
 /**
  * Sign Up Screen — Brighton Lawn + Landscape
  *
- * New account creation. For this phase, it creates owner accounts.
- * Worker and customer accounts will be created through invitations
- * from the owner in a later phase.
+ * Plain account creation (no company yet). Used by people the owner invited
+ * by email: signing up with the invited email adds them to the company
+ * automatically. Anyone else lands on "Finish setting up" afterwards.
  */
 
 import React, { useState, useRef } from 'react';
-import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions, Platform, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -23,6 +24,7 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
 
 export default function SignUpScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { signUp } = useAuth();
   const router = useRouter();
 
@@ -51,7 +53,13 @@ export default function SignUpScreen() {
     setLoading(true);
 
     try {
-      await signUp(email.trim(), password, 'owner', firstName.trim(), lastName.trim());
+      const result = await signUp(email.trim(), password, { firstName: firstName.trim(), lastName: lastName.trim() });
+      if (result.needsEmailConfirmation) {
+        const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in.`;
+        if (Platform.OS === 'web') alert(msg);
+        else Alert.alert('Check your email', msg);
+        router.replace('/(auth)/login');
+      }
     } catch (err: any) {
       setError(err?.message ?? 'Something went wrong. Please try again.');
     } finally {
@@ -64,7 +72,7 @@ export default function SignUpScreen() {
       scrollable
       padded
       keyboardAvoiding
-      contentStyle={styles.content}
+      contentStyle={{ ...styles.content, paddingTop: insets.top + spacing.lg }}
     >
       {/* Logo */}
       <View style={styles.logoSection}>
@@ -81,7 +89,7 @@ export default function SignUpScreen() {
           Create your account
         </Text>
         <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-          Get started managing your business
+          Invited by your company? Use the email they invited.
         </Text>
       </View>
 
@@ -140,6 +148,10 @@ export default function SignUpScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          textContentType="newPassword"
+          autoComplete="new-password"
+          autoCapitalize="none"
+          autoCorrect={false}
           returnKeyType="done"
           onSubmitEditing={handleSignUp}
           icon="lock"
@@ -197,7 +209,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
   },
   footer: {
     alignItems: 'center',

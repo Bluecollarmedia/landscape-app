@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useAuth } from '@/providers/AuthProvider';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useWorkerContext } from '@/providers/WorkerProvider';
@@ -13,6 +14,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { ScreenContainer } from '@/components/layout';
 import type { NavAppPreference } from '@/types/worker';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const NAV_OPTIONS: { value: NavAppPreference; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { value: 'google_maps', label: 'Google Maps', icon: 'map' },
@@ -71,8 +73,7 @@ export default function WorkerSettingsScreen() {
       <ListSection title="Preferences">
         <ListRow
           icon="navigation"
-          title="Navigation App"
-          subtitle="Choose which maps app opens for directions"
+          title="Maps App"
           value={currentNavLabel}
           showChevron
           onPress={() => setNavSheetOpen(true)}
@@ -115,15 +116,16 @@ export default function WorkerSettingsScreen() {
 
       <ListSection>
         <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={() => setSignOutConfirmOpen(true)} />
+        <DeleteAccountRow />
       </ListSection>
 
       {/* Navigation App selection sheet */}
-      <Modal visible={navSheetOpen} transparent animationType="slide" onRequestClose={() => setNavSheetOpen(false)}>
+      <BottomSheetModal visible={navSheetOpen} onRequestClose={() => setNavSheetOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setNavSheetOpen(false)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.md }]}>
-              Navigation App
+              Maps App
             </Text>
             {NAV_OPTIONS.map(opt => (
               <Pressable
@@ -140,7 +142,7 @@ export default function WorkerSettingsScreen() {
             ))}
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Sign out confirmation */}
       <Modal visible={signOutConfirmOpen} transparent animationType="fade" onRequestClose={() => setSignOutConfirmOpen(false)}>
@@ -182,7 +184,7 @@ export default function WorkerSettingsScreen() {
 
 const styles = StyleSheet.create({
   profileCard: {
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.lg,
   },

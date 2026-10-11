@@ -11,9 +11,11 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { SplashScreen } from '@/components/branding/SplashScreen';
+import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
 
 ExpoSplashScreen.preventAutoHideAsync();
 
@@ -44,8 +46,13 @@ function RootNavigator() {
     }
 
     if (appState === 'onboarding') {
-      if (!inOnboardingGroup) {
-        router.replace('/(onboarding)/join-team');
+      // Signed in but not part of a company yet. The setup hub links to the
+      // create-company / join-team / project-code screens, which also work
+      // for an already-signed-in user, so those are allowed here too.
+      const setupScreens = ['create-company', 'join-team', 'customer-access'];
+      const onSetupScreen = inAuthGroup && setupScreens.includes((segments as string[])[1] ?? '');
+      if (!inOnboardingGroup && !onSetupScreen) {
+        router.replace('/(onboarding)/setup');
       }
       return;
     }
@@ -90,18 +97,25 @@ function RootNavigator() {
     return <SplashScreen onFinish={handleSplashFinish} />;
   }
 
-  return <Slot />;
+  return (
+    <>
+      <Slot />
+      <SignInWelcome />
+    </>
+  );
 }
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
+        <KeyboardProvider>
         <ThemeProvider>
           <AuthProvider>
             <RootNavigator />
           </AuthProvider>
         </ThemeProvider>
+        </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

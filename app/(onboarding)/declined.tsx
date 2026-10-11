@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -46,6 +47,7 @@ export default function DeclinedScreen() {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
         <Button title="Sign Out" onPress={signOut} variant="ghost" icon="log-out" fullWidth />
+        <DeleteAccountRow />
       </View>
     </View>
   );

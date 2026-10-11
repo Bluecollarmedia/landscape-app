@@ -11,20 +11,8 @@ import { EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import type { Assignment } from '@/types/schedule';
-
-// Temporary placeholders — swap for real per-project photos once available.
-const THUMBNAIL_URIS = [
-  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=300&q=70',
-  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=300&q=70',
-  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=300&q=70',
-];
-
-function getProjectThumbnail(projectId?: string): string {
-  if (!projectId) return THUMBNAIL_URIS[0];
-  let hash = 0;
-  for (let i = 0; i < projectId.length; i++) hash = (hash + projectId.charCodeAt(i)) % THUMBNAIL_URIS.length;
-  return THUMBNAIL_URIS[hash];
-}
+import { localDateKey } from '@/lib/ids';
+import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages';
 
 function formatTime(time?: string) {
   if (!time) return '';
@@ -43,7 +31,7 @@ function formatDateHeading(dateStr: string): string {
   const y = new Date(today);
   y.setDate(y.getDate() - 1);
 
-  const iso = (x: Date) => x.toISOString().split('T')[0];
+  const iso = (x: Date) => localDateKey(x);
   if (dateStr === iso(today)) return 'Today';
   if (dateStr === iso(tomorrow)) return 'Tomorrow';
   if (dateStr === iso(y)) return 'Yesterday';
@@ -67,7 +55,7 @@ function JobCard({ assignment, onPress }: { assignment: Assignment; onPress: () 
   const { colors } = useTheme();
   return (
     <Pressable style={[styles.jobCard, { backgroundColor: colors.surface }, shadow.sm]} onPress={onPress}>
-      <Image source={{ uri: getProjectThumbnail(assignment.projectId) }} style={styles.thumb} resizeMode="cover" />
+      <Image source={{ uri: getProjectImageUriById(assignment.projectId, 300) }} style={styles.thumb} resizeMode="cover" />
       <View style={styles.jobInfo}>
         <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]} numberOfLines={1}>
           {assignment.project?.name ?? 'Unknown Project'}
@@ -115,7 +103,7 @@ export default function WorkerJobsScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={styles.hero}>
         <Image
-          source={{ uri: THUMBNAIL_URIS[0] }}
+          source={{ uri: getCompanyImageUri() }}
           style={[styles.heroImage, { opacity: 0.16 }]}
           resizeMode="cover"
         />

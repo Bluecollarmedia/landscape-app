@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useAuth } from '@/providers/AuthProvider';
 import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -41,13 +42,14 @@ function MenuItem({ icon, label, subtitle, onPress, colors }: MenuItemProps) {
 
 export default function MoreScreen() {
   const { colors } = useTheme();
+  const tabBarClearance = useTabBarClearance();
   const { user, signOut } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance + spacing.lg }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>More</Text>
         </View>
@@ -231,7 +233,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     ...shadow.sm,
   },
 });

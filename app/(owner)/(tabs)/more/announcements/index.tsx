@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import type { Announcement } from '@/types/announcement';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 export default function AnnouncementsScreen() {
   const { colors } = useTheme();
@@ -119,7 +120,7 @@ export default function AnnouncementsScreen() {
       </ScrollView>
 
       {/* Expanded previous announcement */}
-      <Modal visible={!!expandedAnnouncement} transparent animationType="slide" onRequestClose={() => setExpandedAnnouncement(null)}>
+      <BottomSheetModal visible={!!expandedAnnouncement} onRequestClose={() => setExpandedAnnouncement(null)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setExpandedAnnouncement(null)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -149,7 +150,7 @@ export default function AnnouncementsScreen() {
             )}
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 }

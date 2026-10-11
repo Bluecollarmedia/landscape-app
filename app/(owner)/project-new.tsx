@@ -1,35 +1,163 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Platform, Image } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Button, Input, Card } from '@/components/ui';
+import { useCustomers } from '@/hooks/useCustomers';
+import { generateProjectCode } from '@/hooks/useCustomerAccess';
+import { useProject } from '@/hooks/useProject';
+import { insertRow } from '@/data/store';
+import { AddressFields, missingAddressPart, type AddressCheck } from '@/components/ui/AddressFields';
+import { verifyAddress, DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
+import { logProjectHistory, attachImage } from '@/data/actions';
+import { getProjectImageUri } from '@/lib/projectImages';
 import { typeScale } from '@/theme/typography';
-import { spacing } from '@/theme/spacing';
+import { spacing, radius } from '@/theme/spacing';
+import type { ProjectStatus } from '@/types/project';
 
+const STATUS_OPTIONS: { key: ProjectStatus; label: string }[] = [
+  { key: 'active', label: 'Active' },
+  { key: 'on_hold', label: 'On Hold' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'archived', label: 'Archived' },
+];
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function showAlert(title: string, msg: string) {
+  if (Platform.OS === 'web') alert(msg);
+  else Alert.alert(title, msg);
+}
+
+/** New Project, or Edit Project when opened with `?editId=<projectId>`. */
 export default function NewProjectScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const { project: existing, updateProject } = useProject(editId ?? '');
+  const isEdit = !!editId && !!existing;
+  const { allCustomers } = useCustomers();
 
-  const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [zip, setZip] = useState('');
-  const [notes, setNotes] = useState('');
+  const [name, setName] = useState(existing?.name ?? '');
+  const [address, setAddress] = useState(existing?.address ?? '');
+  const [city, setCity] = useState(existing?.city ?? '');
+  const [state, setState] = useState(existing?.state ?? '');
+  const [zip, setZip] = useState(existing?.zip ?? '');
+  const [addressCheck, setAddressCheck] = useState<AddressCheck>(
+    existing?.latitude != null && existing?.longitude != null ? { latitude: existing.latitude, longitude: existing.longitude } : {},
+  );
+  const [checking, setChecking] = useState(false);
+  const [notes, setNotes] = useState(existing?.notes ?? '');
+  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId);
+  const [startDate, setStartDate] = useState(existing?.startDate ?? '');
+  const [endDate, setEndDate] = useState(existing?.estimatedEndDate ?? '');
+  const [status, setStatus] = useState<ProjectStatus>(existing?.status ?? 'active');
+  const [progress, setProgress] = useState(existing?.progress ?? 0);
+  const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
 
-  function handleCreate() {
-    if (!name.trim()) {
-      if (Platform.OS === 'web') {
-        alert('Please enter a project name.');
-      } else {
-        Alert.alert('Required', 'Please enter a project name.');
-      }
+  async function handlePickPhoto() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showAlert('Permission Needed', 'Photo library access is needed to choose a project photo.');
       return;
     }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+    if (!result.canceled && result.assets?.[0]) setPhotoUri(result.assets[0].uri);
+  }
+
+  const customers = useMemo(
+    () => allCustomers.slice().sort((a, b) => `${a.person.firstName} ${a.person.lastName}`.localeCompare(`${b.person.firstName} ${b.person.lastName}`)),
+    [allCustomers],
+  );
+
+  async function handleSave() {
+    if (!name.trim()) {
+      showAlert('Required', 'Please enter a project name.');
+      return;
+    }
+    const missingAddress = missingAddressPart({ address, city, state, zip });
+    if (missingAddress) {
+      showAlert('Address needed', missingAddress);
+      return;
+    }
+    for (const [label, value] of [['Start date', startDate], ['Estimated end date', endDate]] as const) {
+      if (value.trim() && !DATE_RE.test(value.trim())) {
+        showAlert('Check the date', `${label} should look like 2026-05-01 (year-month-day).`);
+        return;
+      }
+    }
+
+    // Look the address up on the map so Open Maps goes to the exact spot.
+    if (Platform.OS !== 'web' && addressCheck.latitude == null && !addressCheck.overridden) {
+      setChecking(true);
+      const r = await verifyAddress({ address, city, state, zip });
+      setChecking(false);
+      if (r.status === 'found') {
+        const found = { latitude: r.latitude, longitude: r.longitude };
+        setAddressCheck(found);
+        save(found);
+        return;
+      }
+      if (r.status === 'not_found') {
+        Alert.alert(
+          'Address not found on the map',
+          'Double-check the address. If it\u2019s right (a new build, for example), you can save it as typed.',
+          [
+            { text: 'Fix Address', style: 'cancel' },
+            { text: 'Save As Typed', onPress: () => { setAddressCheck({ overridden: true }); save({ overridden: true }); } },
+          ],
+        );
+        return;
+      }
+    }
+    save(addressCheck);
+  }
+
+  function save(check: AddressCheck) {
+    const fields = {
+      name: name.trim(),
+      address: address.trim() || undefined,
+      city: city.trim() || undefined,
+      state: state.trim().toUpperCase() || undefined,
+      zip: zip.trim() || undefined,
+      notes: notes.trim() || undefined,
+      customerId,
+      startDate: startDate.trim() || undefined,
+      estimatedEndDate: endDate.trim() || undefined,
+      latitude: check.latitude,
+      longitude: check.longitude,
+    };
+
+    if (isEdit) {
+      updateProject({ ...fields, status, progress });
+      if (photoUri) attachImage('projects', existing!.id, 'coverPhotoUrl', photoUri, `projects/${existing!.id}`);
+      router.back();
+      return;
+    }
+
+    const project = insertRow('projects', {
+      ...fields,
+      status: 'active',
+      progress: 0,
+      customerProjectCode: generateProjectCode(),
+    });
+    insertRow('project_settings', {
+      projectId: project.id,
+      customerInteractionEnabled: true,
+      completionPhotoRequired: false,
+      checkinRadiusMeters: DEFAULT_CHECKIN_RADIUS_M,
+      customerCanRequest: true,
+      customerCanViewPhotos: true,
+      customerCanComment: true,
+    });
+    logProjectHistory(project.id, 'project_created', `Project created: ${fields.name}`);
+    if (photoUri) attachImage('projects', project.id, 'coverPhotoUrl', photoUri, `projects/${project.id}`);
     router.back();
   }
 
@@ -37,21 +165,84 @@ export default function NewProjectScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerTop}>
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.backButton}
-            accessibilityLabel="Cancel"
-          >
+          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityLabel="Cancel">
             <Icon name="x" size={24} color={colors.textPrimary} />
           </Pressable>
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>
-            New Project
+            {isEdit ? 'Edit Project' : 'New Project'}
           </Text>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.form}>
+          {isEdit && (
+            <Card title="Status & Progress" style={{ marginBottom: spacing.lg }}>
+              <View style={styles.chipRow}>
+                {STATUS_OPTIONS.map((opt) => {
+                  const active = status === opt.key;
+                  return (
+                    <Pressable
+                      key={opt.key}
+                      onPress={() => setStatus(opt.key)}
+                      style={[styles.chip, { backgroundColor: active ? colors.primary : colors.backgroundTertiary }]}
+                    >
+                      <Text style={[typeScale.labelSmall, { color: active ? '#FFFFFF' : colors.textSecondary, fontWeight: '600' }]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.lg }]}>Progress</Text>
+              <View style={styles.progressRow}>
+                <Pressable
+                  onPress={() => setProgress((v) => Math.max(0, v - 5))}
+                  style={[styles.stepButton, { borderColor: colors.border }]}
+                  accessibilityLabel="Decrease progress"
+                >
+                  <Icon name="minus" size={18} color={colors.textPrimary} />
+                </Pressable>
+                <Text style={[typeScale.displaySmall, { color: colors.primary, minWidth: 80, textAlign: 'center' }]}>
+                  {progress}%
+                </Text>
+                <Pressable
+                  onPress={() => setProgress((v) => Math.min(100, v + 5))}
+                  style={[styles.stepButton, { borderColor: colors.border }]}
+                  accessibilityLabel="Increase progress"
+                >
+                  <Icon name="plus" size={18} color={colors.textPrimary} />
+                </Pressable>
+              </View>
+              <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
+                The customer sees this on their project page.
+              </Text>
+            </Card>
+          )}
+
+          <Card title="Project Photo" style={{ marginBottom: spacing.lg }}>
+            <Pressable onPress={handlePickPhoto} accessibilityRole="button" accessibilityLabel="Choose project photo">
+              {photoUri || existing?.coverPhotoUrl ? (
+                <Image
+                  source={{ uri: photoUri ?? (existing ? getProjectImageUri(existing, 900) : undefined) }}
+                  style={styles.photoPreview}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.photoPreview, styles.photoEmpty, { borderColor: colors.border, backgroundColor: colors.backgroundTertiary }]}>
+                  <Icon name="camera" size={24} color={colors.textTertiary} />
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+                    Add a photo of the property (optional)
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+            {(photoUri || existing?.coverPhotoUrl) && (
+              <Button title="Choose a different photo" onPress={handlePickPhoto} variant="ghost" size="sm" />
+            )}
+          </Card>
+
           <Card title="Project Info">
             <Input
               label="Project Name"
@@ -61,41 +252,67 @@ export default function NewProjectScreen() {
               icon="folder"
               containerStyle={styles.fieldGap}
             />
-            <Input
-              label="Street Address"
-              placeholder="123 Main St"
-              value={address}
-              onChangeText={setAddress}
-              icon="map-pin"
-              containerStyle={styles.fieldGap}
+            <AddressFields
+              required
+              style={styles.fieldGap}
+              value={{ address, city, state, zip }}
+              onChange={(v) => { setAddress(v.address); setCity(v.city); setState(v.state); setZip(v.zip); }}
+              check={addressCheck}
+              onCheckChange={setAddressCheck}
             />
             <View style={styles.row}>
               <Input
-                label="City"
-                placeholder="Cleveland"
-                value={city}
-                onChangeText={setCity}
-                containerStyle={{ ...styles.fieldGap, flex: 2 }}
+                label="Start Date"
+                placeholder="2026-05-01"
+                value={startDate}
+                onChangeText={setStartDate}
+                containerStyle={{ ...styles.fieldGap, flex: 1 }}
+                maxLength={10}
+                autoCapitalize="none"
               />
               <Input
-                label="State"
-                placeholder="OH"
-                value={state}
-                onChangeText={setState}
+                label="Est. End Date"
+                placeholder="2026-06-15"
+                value={endDate}
+                onChangeText={setEndDate}
                 containerStyle={{ ...styles.fieldGap, flex: 1 }}
-                maxLength={2}
-                autoCapitalize="characters"
-              />
-              <Input
-                label="ZIP"
-                placeholder="44122"
-                value={zip}
-                onChangeText={setZip}
-                containerStyle={{ ...styles.fieldGap, flex: 1 }}
-                maxLength={5}
-                keyboardType="number-pad"
+                maxLength={10}
+                autoCapitalize="none"
               />
             </View>
+          </Card>
+
+          <Card title="Customer" style={{ marginTop: spacing.lg }}>
+            {customers.length === 0 ? (
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                No customers yet. Add one from the Customers tab, or share the project code later so the customer can join on their own.
+              </Text>
+            ) : (
+              <View style={styles.chipRow}>
+                <Pressable
+                  onPress={() => setCustomerId(undefined)}
+                  style={[styles.chip, { backgroundColor: !customerId ? colors.primary : colors.backgroundTertiary }]}
+                >
+                  <Text style={[typeScale.labelSmall, { color: !customerId ? '#FFFFFF' : colors.textSecondary, fontWeight: '600' }]}>
+                    None
+                  </Text>
+                </Pressable>
+                {customers.map((c) => {
+                  const active = customerId === c.person.id;
+                  return (
+                    <Pressable
+                      key={c.person.id}
+                      onPress={() => setCustomerId(c.person.id)}
+                      style={[styles.chip, { backgroundColor: active ? colors.primary : colors.backgroundTertiary }]}
+                    >
+                      <Text style={[typeScale.labelSmall, { color: active ? '#FFFFFF' : colors.textSecondary, fontWeight: '600' }]}>
+                        {`${c.person.firstName} ${c.person.lastName}`.trim() || c.person.email}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </Card>
 
           <Card title="Internal Notes" style={{ marginTop: spacing.lg }}>
@@ -111,56 +328,35 @@ export default function NewProjectScreen() {
 
           <View style={styles.actions}>
             <Button
-              title="Create Project"
-              onPress={handleCreate}
-              icon="plus"
+              title={isEdit ? 'Save Changes' : 'Create Project'}
+              onPress={handleSave}
+              loading={checking}
+              icon={isEdit ? 'check' : 'plus'}
               fullWidth
               size="lg"
             />
-            <Button
-              title="Cancel"
-              onPress={() => router.back()}
-              variant="ghost"
-              fullWidth
-            />
+            <Button title="Cancel" onPress={() => router.back()} variant="ghost" fullWidth />
           </View>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  backButton: {
-    padding: spacing.xs,
-  },
-  scrollContent: {
-    paddingBottom: spacing['5xl'],
-  },
-  form: {
-    padding: spacing.lg,
-  },
-  fieldGap: {
-    marginBottom: spacing.md,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  actions: {
-    marginTop: spacing['2xl'],
-    gap: spacing.sm,
-  },
+  screen: { flex: 1 },
+  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  headerTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  backButton: { padding: spacing.xs },
+  scrollContent: { paddingBottom: spacing['5xl'] },
+  form: { padding: spacing.lg },
+  fieldGap: { marginBottom: spacing.md },
+  row: { flexDirection: 'row', gap: spacing.md },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full },
+  progressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg, marginVertical: spacing.md },
+  stepButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  actions: { marginTop: spacing['2xl'], gap: spacing.sm },
+  photoPreview: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.md },
+  photoEmpty: { borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
 });

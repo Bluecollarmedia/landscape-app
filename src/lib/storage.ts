@@ -182,15 +182,48 @@ export async function getStorageInfo(): Promise<StorageInfo> {
     return mockStorageInfo();
   }
 
-  const response = await supabase.functions.invoke('storage-usage', {
-    method: 'GET',
+  // Adds up the files in this company's folders of the Supabase Storage
+  // "media" bucket (see src/lib/media.ts for the folder layout).
+  const { db } = require('@/data/store') as typeof import('@/data/store');
+  const bucket = supabase.storage.from('media');
+  const folders = [
+    ...db.projects.map((p) => `${db.companyId}/projects/${p.id}`),
+    `${db.companyId}/trucks`,
+    'avatars',
+  ];
+  let totalBytes = 0;
+  let photoCount = 0;
+  let avatarCount = 0;
+  const results = await Promise.all(folders.map((f) => bucket.list(f, { limit: 1000 })));
+  results.forEach(({ data }, i) => {
+    for (const obj of data ?? []) {
+      if (!obj.id) continue; // sub-folder
+      const size = Number((obj.metadata as { size?: number } | null)?.size ?? 0);
+      if (folders[i] === 'avatars') {
+        avatarCount++;
+      } else {
+        photoCount++;
+      }
+      totalBytes += size;
+    }
   });
-
-  if (response.error) {
-    throw new UploadError('Failed to load storage info.', 'server');
-  }
-
-  return response.data as StorageInfo;
+  const maxStorageBytes = 1024 * 1024 * 1024; // Supabase free plan: 1 GB
+  return {
+    usage: {
+      totalBytes,
+      fileCount: photoCount + avatarCount,
+      photoCount,
+      avatarCount,
+      documentCount: 0,
+      percentUsed: Math.round((totalBytes / maxStorageBytes) * 100),
+    },
+    settings: {
+      maxStorageBytes,
+      maxFileSizeBytes: 10_485_760,
+      rateLimitPerMinute: 10,
+      rateLimitPerHour: 100,
+    },
+  };
 }
 
 export async function updateStorageSettings(

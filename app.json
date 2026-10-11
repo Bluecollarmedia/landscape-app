@@ -50,7 +50,13 @@
           "imageWidth": 240
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Brighton Lawn uses your location to check you in when you arrive at a job site."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

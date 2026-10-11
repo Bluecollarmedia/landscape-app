@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Alert } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -13,6 +15,8 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { useTeamCode } from '@/hooks/useOnboarding';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { uploadImage } from '@/lib/media';
 
 type Step = 'code' | 'account' | 'profile';
 
@@ -20,8 +24,10 @@ export default function JoinTeamScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { setAppState } = useAuth();
+  const { setAppState, signUp, isAuthenticated, user, refreshContext } = useAuth();
   const { validateCode } = useTeamCode();
+  // Already signed in (came from "Finish setting up"): skip the account step.
+  const signedIn = isSupabaseConfigured && isAuthenticated && !!user;
 
   const [step, setStep] = useState<Step>('code');
 
@@ -34,16 +40,16 @@ export default function JoinTeamScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [firstName, setFirstName] = useState(user?.firstName ?? '');
+  const [lastName, setLastName] = useState(user?.lastName ?? '');
+  const [phone, setPhone] = useState(user?.phone ?? '');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  function handleValidateCode() {
-    const result = validateCode(teamCode.trim());
+  async function handleValidateCode() {
+    const result = await validateCode(teamCode.trim());
     if (result.valid) {
       setCodeValid(true);
       setCodeError('');
@@ -59,7 +65,7 @@ export default function JoinTeamScreen() {
       handleValidateCode();
       return;
     }
-    setStep('account');
+    setStep(signedIn ? 'profile' : 'account');
   }
 
   function handleAccountNext() {
@@ -117,31 +123,69 @@ export default function JoinTeamScreen() {
       setError('Please enter your phone number.');
       return;
     }
-    if (!photoUri) {
-      setError('A profile photo is required. Please add a clear photo of yourself.');
-      return;
-    }
     setError('');
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setAppState('pending_approval', {
-      onboardingStep: 'pending_approval',
-      pendingCompanyName: companyName,
-      pendingRequestId: 'jr-new',
-      pendingProfile: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        photoUri,
-      },
-    });
-    setLoading(false);
+
+    if (!isSupabaseConfigured) {
+      // Demo mode: no backend, just show the pending screen.
+      await new Promise((r) => setTimeout(r, 800));
+      setAppState('pending_approval', {
+        onboardingStep: 'pending_approval',
+        pendingCompanyName: companyName,
+        pendingRequestId: 'jr-new',
+      });
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const profile = { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() };
+      if (signedIn) {
+        const { data, error: rpcError } = await supabase.rpc('request_join', { p_code: teamCode.trim() });
+        if (rpcError) throw rpcError;
+        const result = data as { success: boolean; error?: string };
+        if (!result?.success) {
+          throw new Error(result?.error === 'already_member' ? "You're already on this team." : 'That team code no longer works. Ask your manager for a new one.');
+        }
+        await supabase.from('people').update({
+          first_name: profile.firstName, last_name: profile.lastName, phone: profile.phone,
+        }).eq('id', user!.id);
+      } else {
+        const result = await signUp(email.trim(), password, profile, { teamCode: teamCode.trim() });
+        if (result.needsEmailConfirmation) {
+          const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in. Your request to join ${companyName} has been sent.`;
+          if (Platform.OS === 'web') alert(msg);
+          else Alert.alert('Check your email', msg);
+          router.replace('/(auth)/login');
+          return;
+        }
+      }
+
+      // Profile photo is optional; upload it if one was picked.
+      if (photoUri) {
+        try {
+          const { data: ctx } = await supabase.rpc('get_my_context');
+          const personId = (ctx as { person?: { id: string } } | null)?.person?.id;
+          if (personId) {
+            const { url } = await uploadImage(photoUri, `avatars/${personId}`);
+            await supabase.from('people').update({ avatar_url: url }).eq('id', personId);
+          }
+        } catch (photoErr) {
+          console.warn('[join-team] profile photo upload failed', photoErr);
+        }
+      }
+
+      await refreshContext();
+    } catch (err: any) {
+      setError(err?.message ?? 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleBack() {
     if (step === 'account') setStep('code');
-    else if (step === 'profile') setStep('account');
+    else if (step === 'profile') setStep(signedIn ? 'code' : 'account');
     else router.back();
   }
 
@@ -168,7 +212,7 @@ export default function JoinTeamScreen() {
         Step {stepNumber} of 3 — {step === 'code' ? 'Team Code' : step === 'account' ? 'Create Account' : 'Complete Profile'}
       </Text>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {error ? (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
             <Icon name="alert-circle" size={16} color={semantic.error} />
@@ -226,8 +270,8 @@ export default function JoinTeamScreen() {
               Create your account or sign in if you already have one.
             </Text>
             <Input label="Email *" placeholder="you@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />
-            <Input label="Password *" placeholder="At least 6 characters" value={password} onChangeText={setPassword} secureTextEntry icon="lock" />
-            <Input label="Confirm Password *" placeholder="Re-enter password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry icon="lock" />
+            <Input label="Password *" placeholder="At least 6 characters" value={password} onChangeText={setPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
+            <Input label="Confirm Password *" placeholder="Re-enter password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
             <Button title="Next" onPress={handleAccountNext} fullWidth size="lg" icon="arrow-right" />
             <Pressable onPress={() => router.push('/(auth)/login')}>
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>
@@ -252,7 +296,7 @@ export default function JoinTeamScreen() {
 
             <View style={styles.photoSection}>
               <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginBottom: spacing.sm }]}>
-                Profile Photo *
+                Profile Photo (optional)
               </Text>
               <Pressable
                 style={[
@@ -307,7 +351,7 @@ export default function JoinTeamScreen() {
             <Button title="Submit Join Request" onPress={handleSubmitRequest} loading={loading} fullWidth size="lg" icon="send" />
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -340,7 +384,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     marginBottom: spacing.lg,
   },
   form: {
@@ -350,14 +394,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
     borderLeftWidth: 3,
   },
   companyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
   },
   row: {
     flexDirection: 'row',
@@ -400,7 +444,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
     borderLeftWidth: 3,
   },
 });

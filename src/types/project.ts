@@ -37,6 +37,8 @@ export interface Project {
   estimatedEndDate?: string;
   completedAt?: string;
   notes?: string;
+  /** Owner-uploaded cover photo (falls back to a stock photo). */
+  coverPhotoUrl?: string;
   createdAt: string;
   updatedAt: string;
   customer?: PersonSummary;
@@ -143,6 +145,17 @@ export interface ProjectRequest {
   createdAt: string;
   updatedAt: string;
   requester?: PersonSummary;
+}
+
+/** One message in the customer ↔ owner conversation on a project. */
+export interface ProjectMessage {
+  id: string;
+  companyId?: string;
+  projectId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  sender?: PersonSummary;
 }
 
 export type CustomerTimelineType =

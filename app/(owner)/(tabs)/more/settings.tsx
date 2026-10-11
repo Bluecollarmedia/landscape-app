@@ -5,18 +5,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useAuth } from '@/providers/AuthProvider';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import type { AppState } from '@/providers/AuthProvider';
 import { ListSection, ListRow } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
-import { mockCompany } from '@/data/mock';
+import { db, useDb } from '@/data/store';
 import type { UserRole } from '@/types';
 
 export default function SettingsScreen() {
   const { colors } = useTheme();
+  const tabBarClearance = useTabBarClearance();
   const { user, signOut, switchDevRole, switchDevState, appState } = useAuth();
+  useDb();
+  const company = db.company;
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -46,7 +51,7 @@ export default function SettingsScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>Settings</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance + spacing.lg }]} showsVerticalScrollIndicator={false}>
         <ListSection title="Your Account">
           <ListRow icon="user" title="Name" value={`${user?.firstName} ${user?.lastName}`} />
           <ListRow icon="mail" title="Email" value={user?.email ?? '—'} />
@@ -54,14 +59,32 @@ export default function SettingsScreen() {
         </ListSection>
 
         <ListSection title="Company">
-          <ListRow icon="briefcase" title="Name" value={mockCompany.name} />
-          <ListRow icon="phone" title="Phone" value={mockCompany.phone ?? '—'} />
-          <ListRow icon="mail" title="Email" value={mockCompany.email ?? '—'} />
+          <ListRow icon="briefcase" title="Name" value={company?.name ?? '—'} />
+          <ListRow icon="phone" title="Phone" value={company?.phone || '—'} />
+          <ListRow icon="mail" title="Email" value={company?.email || '—'} />
           <ListRow
             icon="map-pin"
             title="Address"
-            subtitle={`${mockCompany.address}, ${mockCompany.city}, ${mockCompany.state} ${mockCompany.zip}`}
+            subtitle={[company?.address, company?.city, [company?.state, company?.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'}
           />
+          {!db.demo && (
+            <>
+              <ListRow
+                icon="image"
+                iconColor={colors.primary}
+                title="Company Info & Dashboard Photo"
+                showChevron
+                onPress={() => router.push({ pathname: '/(owner)/setup', params: { step: 'company' } } as any)}
+              />
+              <ListRow
+                icon="check-square"
+                iconColor={colors.primary}
+                title="Recommended Setup"
+                showChevron
+                onPress={() => router.push('/(owner)/setup' as any)}
+              />
+            </>
+          )}
         </ListSection>
 
         <ListSection title="Team & Joining">
@@ -93,7 +116,7 @@ export default function SettingsScreen() {
 
         <ListSection title="App">
           <ListRow icon="info" title="Version" value="1.0.0" />
-          <ListRow icon="database" title="Backend" subtitle="Mock data (Supabase not configured)" />
+          <ListRow icon="database" title="Backend" subtitle={isSupabaseConfigured ? 'Supabase (live data)' : 'Mock data (Supabase not configured)'} />
         </ListSection>
 
         {!isSupabaseConfigured && (
@@ -116,6 +139,7 @@ export default function SettingsScreen() {
 
         <ListSection>
           <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={signOut} />
+          <DeleteAccountRow />
         </ListSection>
       </ScrollView>
     </View>

@@ -1,16 +1,12 @@
+import { openDirections, findCoords, distanceMeters, formatDistance, DEFAULT_CHECKIN_RADIUS_M, type Place } from '@/lib/maps';
+import { getCurrentGps } from '@/lib/location';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { useAuth } from './AuthProvider';
-import {
-  mockAssignments,
-  mockTasks,
-  mockSettings,
-  mockWorkerActivities,
-  mockCheckIns,
-  mockCheckOuts,
-  mockWorkerSettings,
-  mockProjects,
-} from '@/data/mock';
+import { db, useDb, insertRow, updateRow, upsertRow, findRow } from '@/data/store';
+import { addProjectPhoto, logProjectHistory, notifyStaff } from '@/data/actions';
+import { todayKey, localDateTime } from '@/lib/ids';
 import type { Assignment } from '@/types/schedule';
 import type { ProjectTask, ProjectSettings } from '@/types/project';
 import type {
@@ -23,6 +19,16 @@ import type {
   OfflineAction,
   OfflineSyncStatus,
 } from '@/types/worker';
+
+export type CheckInLocation =
+  | { ok: true; gps: GPSCoordinates | null }
+  | { ok: false; title: string; message: string; openSettings?: boolean };
+
+/** Demo mode has no real phone location; pretend the worker is on site. */
+const DEMO_GPS: GPSCoordinates = { latitude: 41.4756, longitude: -81.5558, accuracy: 10, distanceFromSite: 20 };
+
+/** GPS readings near trees and buildings drift; never count more than this much of the phone's error margin. */
+const MAX_ACCURACY_ALLOWANCE_M = 75;
 
 type JobState = 'not_started' | 'confirmed' | 'en_route' | 'checked_in' | 'working' | 'completed';
 
@@ -39,9 +45,13 @@ interface WorkerContextValue {
   confirmSchedule: () => void;
   acknowledgeChanges: () => void;
 
-  checkIn: (gps: GPSCoordinates) => void;
-  checkOut: (gps: GPSCoordinates) => void;
-  isWithinRadius: (gps: GPSCoordinates, projectId: string) => boolean;
+  /** Checks in to the given job (or the current/next one). Works again after checking out, to resume a job. */
+  checkIn: (gps: GPSCoordinates | null, assignmentId?: string) => void;
+  checkOut: (gps: GPSCoordinates | null) => void;
+  /** Reads the phone's location and checks it against the job site. Check-in is only allowed when ok. */
+  locateForCheckIn: (assignmentId?: string) => Promise<CheckInLocation>;
+  /** Reads the phone's location for check-out (never blocks). */
+  locateForCheckOut: () => Promise<GPSCoordinates | null>;
   checkIns: CheckIn[];
   checkOuts: CheckOut[];
 
@@ -61,7 +71,7 @@ interface WorkerContextValue {
   offlineQueue: OfflineAction[];
   isOnline: boolean;
 
-  openMapsNavigation: (address: string) => void;
+  openMapsNavigation: (place: Place) => void;
   moveToNextJob: () => void;
 }
 
@@ -75,38 +85,28 @@ export function useWorkerContext() {
 
 export function WorkerProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const workerId = user?.id ?? 'worker1';
+  const workerId = user?.id ?? '';
+  const v = useDb();
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayKey();
 
   const allAssignments = useMemo(() =>
-    mockAssignments.filter(a => a.personId === workerId && a.status !== 'cancelled'),
-    [workerId],
+    db.assignments.filter(a => a.personId === workerId && a.status !== 'cancelled' && a.status !== 'reassigned'),
+    [workerId, v],
   );
 
-  const [assignmentStatuses, setAssignmentStatuses] = useState<Record<string, Assignment['status']>>({});
-  const [scheduleConfirmed, setScheduleConfirmed] = useState(false);
-  const [changesAcknowledged, setChangesAcknowledged] = useState(false);
-  const [checkInList, setCheckInList] = useState<CheckIn[]>(
-    mockCheckIns.filter(c => c.personId === workerId),
-  );
-  const [checkOutList, setCheckOutList] = useState<CheckOut[]>(
-    mockCheckOuts.filter(c => c.personId === workerId),
-  );
-  const [taskStates, setTaskStates] = useState<Record<string, ProjectTask['status']>>({});
-  const [taskPhotos, setTaskPhotos] = useState<Record<string, boolean>>({});
+  const checkInList = useMemo(() => db.checkIns.filter(c => c.personId === workerId), [workerId, v]);
+  const checkOutList = useMemo(() => db.checkOuts.filter(c => c.personId === workerId), [workerId, v]);
+  const activityList = useMemo(() => db.workerActivities.filter(a => a.personId === workerId), [workerId, v]);
+  const workerSettings = useMemo(() => db.workerSettings, [v]);
+
+  const [localTaskPhotos, setLocalTaskPhotos] = useState<Record<string, boolean>>({});
   const [taskPhotoUris, setTaskPhotoUris] = useState<Record<string, string>>({});
-  const [activityList, setActivityList] = useState<WorkerActivity[]>(
-    mockWorkerActivities.filter(a => a.personId === workerId),
-  );
-  const [workerSettings, setWorkerSettings] = useState<WorkerSettings>(mockWorkerSettings);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [jobState, setJobState] = useState<JobState>('not_started');
   const [offlineQueue] = useState<OfflineAction[]>([]);
   const [isOnline] = useState(true);
 
-  const getAssignmentStatus = useCallback((a: Assignment) =>
-    assignmentStatuses[a.id] ?? a.status, [assignmentStatuses]);
+  const getAssignmentStatus = useCallback((a: Assignment) => a.status, []);
 
   const todayAssignments = useMemo(() =>
     allAssignments
@@ -121,31 +121,44 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
 
   const upcomingAssignments = useMemo(() =>
     allAssignments
-      .filter(a => a.scheduledDate > today)
-      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || a.sortOrder - b.sortOrder),
+      // Today's unfinished jobs count as upcoming too, so My Jobs never looks empty on the day of a job.
+      .filter(a => a.scheduledDate > today || (a.scheduledDate === today && a.status !== 'completed'))
+      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || (a.startTime ?? '').localeCompare(b.startTime ?? '') || a.sortOrder - b.sortOrder),
     [allAssignments, today],
   );
 
   const completedAssignments = useMemo(() =>
     allAssignments
-      .filter(a => a.scheduledDate < today || getAssignmentStatus(a) === 'completed')
+      .filter(a => a.scheduledDate < today || a.status === 'completed')
       .sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate)),
-    [allAssignments, today, getAssignmentStatus],
+    [allAssignments, today],
   );
 
   const currentJob = useMemo(() => {
     if (currentJobId) return todayAssignments.find(a => a.id === currentJobId) ?? null;
-    return todayAssignments.find(a => {
-      const s = getAssignmentStatus(a);
-      return s === 'checked_in' || s === 'working';
-    }) ?? null;
-  }, [todayAssignments, currentJobId, getAssignmentStatus]);
+    return todayAssignments.find(a => a.status === 'checked_in' || a.status === 'working') ?? null;
+  }, [todayAssignments, currentJobId]);
 
   const nextJob = useMemo(() => {
-    if (!currentJob) return todayAssignments[0] ?? null;
+    if (!currentJob) return todayAssignments.find(a => a.status !== 'completed') ?? null;
     const idx = todayAssignments.findIndex(a => a.id === currentJob.id);
-    return todayAssignments[idx + 1] ?? null;
+    return todayAssignments.slice(idx + 1).find(a => a.status !== 'completed') ?? null;
   }, [todayAssignments, currentJob]);
+
+  // Where the worker is with the current job, from the saved assignment status
+  // (so it survives closing the app).
+  const jobState = useMemo<JobState>(() => {
+    if (!currentJob) return 'not_started';
+    if (currentJob.status === 'checked_in') return 'checked_in';
+    if (currentJob.status === 'working') return 'working';
+    if (currentJob.status === 'completed') return 'completed';
+    return 'not_started';
+  }, [currentJob]);
+
+  const scheduleConfirmed = useMemo(() =>
+    todayAssignments.length > 0 && todayAssignments.every(a => a.confirmationState === 'confirmed'),
+    [todayAssignments],
+  );
 
   const hasScheduleChanges = useMemo(() =>
     todayAssignments.some(a =>
@@ -154,209 +167,226 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     [todayAssignments],
   );
 
-  const confirmSchedule = useCallback(() => {
-    setScheduleConfirmed(true);
-    const now = new Date().toISOString();
-    setActivityList(prev => [{
-      id: `wa-confirm-${Date.now()}`, personId: workerId, companyId: 'company1',
-      activityType: 'schedule_confirmed', description: 'Confirmed today\'s schedule',
-      timestamp: now,
-    }, ...prev]);
+  const logActivity = useCallback((activity: Omit<WorkerActivity, 'id' | 'companyId' | 'personId' | 'timestamp' | 'project'>) => {
+    insertRow('worker_activities', { ...activity, personId: workerId, timestamp: new Date().toISOString() });
   }, [workerId]);
+
+  const workerName = user ? `${user.firstName} ${user.lastName}`.trim() : 'A worker';
+
+  const confirmSchedule = useCallback(() => {
+    for (const a of todayAssignments) {
+      if (a.confirmationState !== 'confirmed') updateRow('assignments', a.id, { confirmationState: 'confirmed' });
+    }
+    logActivity({ activityType: 'schedule_confirmed', description: 'Confirmed today\'s schedule' });
+  }, [todayAssignments, logActivity]);
 
   const acknowledgeChanges = useCallback(() => {
-    setChangesAcknowledged(true);
-    const now = new Date().toISOString();
-    setActivityList(prev => [{
-      id: `wa-ack-${Date.now()}`, personId: workerId, companyId: 'company1',
-      activityType: 'schedule_acknowledged', description: 'Acknowledged schedule changes',
-      timestamp: now,
-    }, ...prev]);
-  }, [workerId]);
+    for (const a of todayAssignments) {
+      if (a.confirmationState === 'updated_since' || a.confirmationState === 'awaiting') {
+        updateRow('assignments', a.id, { confirmationState: 'confirmed' });
+      }
+    }
+    logActivity({ activityType: 'schedule_acknowledged', description: 'Acknowledged schedule changes' });
+  }, [todayAssignments, logActivity]);
 
-  const isWithinRadius = useCallback((gps: GPSCoordinates, projectId: string) => {
-    const settings = mockSettings[projectId];
-    if (!settings?.checkinRadiusMeters) return true;
-    const project = mockProjects.find(p => p.id === projectId);
-    if (!project?.latitude || !project?.longitude) return true;
-    const R = 6371000;
-    const dLat = (project.latitude - gps.latitude) * Math.PI / 180;
-    const dLon = (project.longitude - gps.longitude) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(gps.latitude * Math.PI / 180) *
-      Math.cos(project.latitude * Math.PI / 180) *
-      Math.sin(dLon / 2) ** 2;
-    const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return distance <= settings.checkinRadiusMeters;
-  }, []);
+  /** The job "I'm here" applies to: the given one, else the current/next unfinished one, else the last (to resume). */
+  const resolveCheckInJob = useCallback((assignmentId?: string) =>
+    (assignmentId && allAssignments.find(a => a.id === assignmentId))
+      || (currentJob && currentJob.status !== 'completed' ? currentJob : undefined)
+      || todayAssignments.find(a => a.status !== 'completed')
+      // Everything's checked out: let them check back in to the job they just left.
+      || currentJob
+      || todayAssignments[todayAssignments.length - 1],
+  [allAssignments, currentJob, todayAssignments]);
 
-  const checkIn = useCallback((gps: GPSCoordinates) => {
-    const job = currentJob ?? todayAssignments.find(a => getAssignmentStatus(a) !== 'completed');
-    if (!job) return;
+  const locateForCheckIn = useCallback(async (assignmentId?: string): Promise<CheckInLocation> => {
+    if (!isSupabaseConfigured) return { ok: true, gps: DEMO_GPS };
+    const job = resolveCheckInJob(assignmentId);
+    if (!job) return { ok: true, gps: null };
 
-    const now = new Date().toISOString();
-    const newCheckIn: CheckIn = {
-      id: `ci-${Date.now()}`,
-      assignmentId: job.id,
-      personId: workerId,
-      projectId: job.projectId,
-      companyId: 'company1',
-      timestamp: now,
-      gps,
-      withinRadius: isWithinRadius(gps, job.projectId),
-      createdAt: now,
+    const here = await getCurrentGps();
+    if (here.status === 'denied') {
+      return {
+        ok: false,
+        title: 'Turn on location',
+        message: 'Brighton Lawn needs your location to check you in at the job site. Turn it on in Settings, then try again.',
+        openSettings: true,
+      };
+    }
+    if (here.status === 'unavailable') {
+      return {
+        ok: false,
+        title: 'Can’t find your location',
+        message: 'Your phone couldn’t get a GPS fix. Step outside or wait a moment, then try again.',
+      };
+    }
+
+    const gps = here.gps;
+    const radius = db.settings[job.projectId]?.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M;
+    const site = job.project ? await findCoords(job.project) : null;
+    // If the job's address can't be found on the map there's nothing to compare against, so allow it.
+    if (!site) return { ok: true, gps };
+
+    const distance = Math.round(distanceMeters(gps, site));
+    const withDistance = { ...gps, distanceFromSite: distance };
+
+    const allowance = Math.min(gps.accuracy || 0, MAX_ACCURACY_ALLOWANCE_M);
+    if (distance - allowance <= radius) return { ok: true, gps: withDistance };
+
+    return {
+      ok: false,
+      title: 'You’re not at the job site yet',
+      message: `You’re about ${formatDistance(distance)} from ${job.project?.name ?? 'the job site'}. Check in once you get there.`,
     };
+  }, [resolveCheckInJob]);
 
-    setCheckInList(prev => [...prev, newCheckIn]);
-    setAssignmentStatuses(prev => ({ ...prev, [job.id]: 'checked_in' }));
+  const locateForCheckOut = useCallback(async (): Promise<GPSCoordinates | null> => {
+    if (!isSupabaseConfigured) return DEMO_GPS;
+    const here = await getCurrentGps();
+    if (here.status !== 'ok') return null;
+    const site = currentJob?.project ? await findCoords(currentJob.project) : null;
+    return site ? { ...here.gps, distanceFromSite: Math.round(distanceMeters(here.gps, site)) } : here.gps;
+  }, [currentJob]);
+
+  const checkIn = useCallback((gps: GPSCoordinates | null, assignmentId?: string) => {
+    const job = resolveCheckInJob(assignmentId);
+    if (!job) return;
+    const resuming = job.status === 'completed';
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    // locateForCheckIn already refused anyone outside the job's distance.
+    const withinRadius = true;
+    const projectName = job.project?.name ?? 'job site';
+
+    insertRow('check_ins', {
+      assignmentId: job.id, personId: workerId, projectId: job.projectId,
+      timestamp: nowIso, gps, withinRadius,
+    });
+    insertRow('work_sessions', {
+      personId: workerId, projectId: job.projectId, assignmentId: job.id,
+      checkInTime: nowIso, checkInGps: gps, status: 'active',
+    });
+    updateRow('assignments', job.id, { status: 'checked_in' });
     setCurrentJobId(job.id);
-    setJobState('checked_in');
+    logActivity({ assignmentId: job.id, projectId: job.projectId, activityType: 'checked_in', description: `${resuming ? 'Checked back in' : 'Checked in'} at ${projectName}` });
 
-    setActivityList(prev => [{
-      id: `wa-ci-${Date.now()}`, personId: workerId, companyId: 'company1',
-      assignmentId: job.id, projectId: job.projectId,
-      activityType: 'checked_in',
-      description: `Checked in at ${job.project?.name ?? 'job site'}`,
-      timestamp: now,
-      project: job.project ? { id: job.project.id, name: job.project.name } : undefined,
-    }, ...prev]);
-  }, [currentJob, todayAssignments, workerId, getAssignmentStatus, isWithinRadius]);
+    // Tell the owner.
+    const link = { type: 'assignment' as const, id: job.id };
+    const late = !job.isFullDay && job.startTime
+      ? now.getTime() > localDateTime(job.scheduledDate, job.startTime).getTime() + (db.operationsSettings.lateCheckinThresholdMinutes ?? 0) * 60000
+      : false;
+    if (resuming) {
+      notifyStaff('worker_checked_in', 'Worker checked back in', `${workerName} checked back in at ${projectName}.`, link, undefined, workerId);
+    } else if (late) {
+      notifyStaff('worker_checked_in_late', 'Late check-in', `${workerName} checked in late at ${projectName} (scheduled ${job.startTime}).`, link, undefined, workerId);
+    } else {
+      notifyStaff('worker_checked_in', 'Worker checked in', `${workerName} checked in at ${projectName}.`, link, undefined, workerId);
+    }
+  }, [resolveCheckInJob, workerId, logActivity, workerName]);
 
-  const checkOut = useCallback((gps: GPSCoordinates) => {
+  const checkOut = useCallback((gps: GPSCoordinates | null) => {
     const job = currentJob;
     if (!job) return;
 
-    const now = new Date().toISOString();
-    const newCheckOut: CheckOut = {
-      id: `co-${Date.now()}`,
-      assignmentId: job.id,
-      personId: workerId,
-      projectId: job.projectId,
-      companyId: 'company1',
-      timestamp: now,
-      gps,
-      createdAt: now,
-    };
-
-    setCheckOutList(prev => [...prev, newCheckOut]);
-    setAssignmentStatuses(prev => ({ ...prev, [job.id]: 'completed' }));
-    setJobState('completed');
-
-    setActivityList(prev => [{
-      id: `wa-co-${Date.now()}`, personId: workerId, companyId: 'company1',
-      assignmentId: job.id, projectId: job.projectId,
-      activityType: 'checked_out',
-      description: `Checked out from ${job.project?.name ?? 'job site'}`,
-      timestamp: now,
-      project: job.project ? { id: job.project.id, name: job.project.name } : undefined,
-    }, ...prev]);
-  }, [currentJob, workerId]);
+    const nowIso = new Date().toISOString();
+    const projectName = job.project?.name ?? 'job site';
+    insertRow('check_outs', {
+      assignmentId: job.id, personId: workerId, projectId: job.projectId,
+      timestamp: nowIso, gps,
+    });
+    const session = db.workSessions.find(s => s.assignmentId === job.id && s.personId === workerId && s.status === 'active');
+    if (session) {
+      const minutes = Math.max(0, Math.round((Date.now() - new Date(session.checkInTime).getTime()) / 60000));
+      updateRow('work_sessions', session.id, {
+        checkOutTime: nowIso, checkOutGps: gps, durationMinutes: minutes, status: 'completed',
+      });
+    }
+    updateRow('assignments', job.id, { status: 'completed' });
+    logActivity({ assignmentId: job.id, projectId: job.projectId, activityType: 'checked_out', description: `Checked out from ${projectName}` });
+    notifyStaff('worker_checked_out', 'Worker checked out', `${workerName} checked out from ${projectName}.`, { type: 'assignment', id: job.id }, undefined, workerId);
+  }, [currentJob, workerId, logActivity, workerName]);
 
   const moveToNextJob = useCallback(() => {
-    if (nextJob) {
-      setCurrentJobId(nextJob.id);
-      setJobState('not_started');
-    } else {
-      setCurrentJobId(null);
-      setJobState('not_started');
-    }
+    setCurrentJobId(nextJob ? nextJob.id : null);
   }, [nextJob]);
 
-  const projectTasksFn = useCallback((projectId: string): ProjectTask[] => {
-    const tasks = mockTasks[projectId] ?? [];
-    return tasks.map(t => ({
-      ...t,
-      status: taskStates[t.id] ?? t.status,
-    }));
-  }, [taskStates]);
+  const projectTasksFn = useCallback((projectId: string): ProjectTask[] =>
+    db.tasks[projectId] ?? [], [v]);
 
   const startTask = useCallback((taskId: string) => {
-    setTaskStates(prev => ({ ...prev, [taskId]: 'in_progress' }));
-    if (jobState === 'checked_in') setJobState('working');
-
-    const allTasks = Object.values(mockTasks).flat();
-    const task = allTasks.find(t => t.id === taskId);
-    const now = new Date().toISOString();
-
-    setActivityList(prev => [{
-      id: `wa-ts-${Date.now()}`, personId: workerId, companyId: 'company1',
+    const task = findRow('project_tasks', taskId);
+    updateRow('project_tasks', taskId, { status: 'in_progress' });
+    if (currentJob?.status === 'checked_in') updateRow('assignments', currentJob.id, { status: 'working' });
+    logActivity({
       assignmentId: currentJob?.id, projectId: task?.projectId,
-      activityType: 'task_started',
-      description: `Started: ${task?.title ?? 'task'}`,
-      timestamp: now,
-      project: currentJob?.project ? { id: currentJob.project.id, name: currentJob.project.name } : undefined,
-    }, ...prev]);
-  }, [workerId, currentJob, jobState]);
+      activityType: 'task_started', description: `Started: ${task?.title ?? 'task'}`,
+    });
+  }, [currentJob, logActivity]);
 
   const completeTask = useCallback((taskId: string) => {
-    setTaskStates(prev => ({ ...prev, [taskId]: 'completed' }));
-
-    const allTasks = Object.values(mockTasks).flat();
-    const task = allTasks.find(t => t.id === taskId);
-    const now = new Date().toISOString();
-
-    setActivityList(prev => [{
-      id: `wa-tc-${Date.now()}`, personId: workerId, companyId: 'company1',
+    const task = findRow('project_tasks', taskId);
+    updateRow('project_tasks', taskId, { status: 'completed', completedAt: new Date().toISOString() });
+    logActivity({
       assignmentId: currentJob?.id, projectId: task?.projectId,
-      activityType: 'task_completed',
-      description: `Completed: ${task?.title ?? 'task'}`,
-      timestamp: now,
-      project: currentJob?.project ? { id: currentJob.project.id, name: currentJob.project.name } : undefined,
-    }, ...prev]);
-  }, [workerId, currentJob]);
+      activityType: 'task_completed', description: `Completed: ${task?.title ?? 'task'}`,
+    });
+    if (task?.projectId) {
+      logProjectHistory(task.projectId, 'task_completed', `Task completed: ${task.title}`, { taskId });
+      const projectName = db.projects.find(p => p.id === task.projectId)?.name ?? 'a project';
+      notifyStaff('worker_completed_task', 'Task completed', `${workerName} completed "${task.title}" at ${projectName}.`, { type: 'project', id: task.projectId }, undefined, workerId);
+    }
+  }, [currentJob, logActivity, workerName]);
 
   const projectSettingsFn = useCallback((projectId: string) =>
-    mockSettings[projectId], []);
+    db.settings[projectId], [v]);
+
+  // A task counts as photographed once a photo is attached to it (from this
+  // device or saved earlier).
+  const taskPhotos = useMemo(() => {
+    const out: Record<string, boolean> = { ...localTaskPhotos };
+    for (const list of Object.values(db.photos)) {
+      for (const ph of list) if (ph.taskId) out[ph.taskId] = true;
+    }
+    return out;
+  }, [localTaskPhotos, v]);
 
   const captureTaskPhoto = useCallback((taskId: string, uri?: string) => {
-    setTaskPhotos(prev => ({ ...prev, [taskId]: true }));
+    setLocalTaskPhotos(prev => ({ ...prev, [taskId]: true }));
     if (uri) setTaskPhotoUris(prev => ({ ...prev, [taskId]: uri }));
-    const now = new Date().toISOString();
-    setActivityList(prev => [{
-      id: `wa-ph-${Date.now()}`, personId: workerId, companyId: 'company1',
-      assignmentId: currentJob?.id, projectId: currentJob?.projectId,
-      activityType: 'photo_taken',
-      description: 'Completion photo captured',
-      timestamp: now,
-      project: currentJob?.project ? { id: currentJob.project.id, name: currentJob.project.name } : undefined,
-    }, ...prev]);
-  }, [workerId, currentJob]);
+    const task = findRow('project_tasks', taskId);
+    const projectId = task?.projectId ?? currentJob?.projectId;
+    let photoId: string | undefined;
+    if (uri && projectId) {
+      photoId = addProjectPhoto({
+        projectId,
+        taskId,
+        assignmentId: currentJob?.id,
+        uploadedBy: workerId,
+        fileUrl: uri,
+        isCustomerVisible: false,
+        photoType: 'progress',
+        takenAt: new Date().toISOString(),
+      }).id;
+      notifyStaff('photo_waiting_review', 'New photo to review', `${workerName} added a photo for "${task?.title ?? 'a task'}".`, { type: 'project', id: projectId }, undefined, workerId);
+    }
+    logActivity({
+      assignmentId: currentJob?.id, projectId,
+      activityType: 'photo_taken', description: 'Completion photo captured',
+      metadata: photoId ? { photoId } : undefined,
+    });
+  }, [workerId, currentJob, logActivity, workerName]);
 
   const updateNavApp = useCallback((app: NavAppPreference) => {
-    setWorkerSettings(prev => ({ ...prev, navApp: app }));
-  }, []);
+    upsertRow('worker_settings', { personId: workerId, navApp: app, notificationsEnabled: db.workerSettings.notificationsEnabled });
+  }, [workerId]);
 
   const updateNotificationsEnabled = useCallback((enabled: boolean) => {
-    setWorkerSettings(prev => ({ ...prev, notificationsEnabled: enabled }));
-  }, []);
+    upsertRow('worker_settings', { personId: workerId, navApp: db.workerSettings.navApp, notificationsEnabled: enabled });
+  }, [workerId]);
 
-  const openMapsNavigation = useCallback((address: string) => {
-    const encoded = encodeURIComponent(address);
-    let url = '';
-    switch (workerSettings.navApp) {
-      case 'google_maps':
-        url = `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-        break;
-      case 'waze':
-        url = `https://waze.com/ul?q=${encoded}&navigate=yes`;
-        break;
-      case 'apple_maps':
-        url = `https://maps.apple.com/?daddr=${encoded}`;
-        break;
-      default:
-        url = Platform.OS === 'ios'
-          ? `https://maps.apple.com/?daddr=${encoded}`
-          : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-    }
-    if (Platform.OS === 'web') {
-      window.open(url, '_blank');
-      return;
-    }
-    // https links hand off to the installed app (Google Maps, Waze, Apple
-    // Maps) via universal links, or fall back to the browser if it's missing.
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Could not open maps', address);
-    });
+  const openMapsNavigation = useCallback((place: Place) => {
+    openDirections(place, workerSettings.navApp);
   }, [workerSettings.navApp]);
 
   const value = useMemo<WorkerContextValue>(() => ({
@@ -367,12 +397,13 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     nextJob,
     jobState,
     scheduleConfirmed,
-    hasScheduleChanges: hasScheduleChanges && !changesAcknowledged,
+    hasScheduleChanges,
     confirmSchedule,
     acknowledgeChanges,
     checkIn,
     checkOut,
-    isWithinRadius,
+    locateForCheckIn,
+    locateForCheckOut,
     checkIns: checkInList,
     checkOuts: checkOutList,
     projectTasks: projectTasksFn,
@@ -393,8 +424,8 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
   }), [
     todayAssignments, upcomingAssignments, completedAssignments,
     currentJob, nextJob, jobState, scheduleConfirmed, hasScheduleChanges,
-    changesAcknowledged, confirmSchedule, acknowledgeChanges,
-    checkIn, checkOut, isWithinRadius, checkInList, checkOutList,
+    confirmSchedule, acknowledgeChanges,
+    checkIn, checkOut, locateForCheckIn, locateForCheckOut, checkInList, checkOutList,
     projectTasksFn, startTask, completeTask, projectSettingsFn,
     taskPhotos, taskPhotoUris, captureTaskPhoto, activityList, workerSettings,
     updateNavApp, updateNotificationsEnabled, offlineQueue, isOnline, openMapsNavigation, moveToNextJob,

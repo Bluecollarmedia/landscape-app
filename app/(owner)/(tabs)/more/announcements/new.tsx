@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -58,7 +60,7 @@ export default function NewAnnouncementScreen() {
         <View style={{ width: 30 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }, shadow.sm]}>
           <View style={styles.field}>
             <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700', marginBottom: spacing.xs }]}>Title</Text>
@@ -179,7 +181,7 @@ export default function NewAnnouncementScreen() {
             <Text style={[typeScale.labelLarge, { color: colors.primary, fontWeight: '600' }]}>Cancel</Text>
           </Pressable>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -202,8 +204,8 @@ const styles = StyleSheet.create({
   },
   field: { marginBottom: spacing.lg },
   input: {
-    borderWidth: 1,
-    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typeScale.bodyLarge.fontSize,
@@ -235,7 +237,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
   },
@@ -258,7 +260,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     paddingVertical: spacing.md,
   },
   cancelLink: {

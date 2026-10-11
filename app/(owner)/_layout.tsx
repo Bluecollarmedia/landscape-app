@@ -18,6 +18,7 @@ export default function OwnerLayout() {
         <Stack.Screen name="schedule-create" options={{ presentation: 'modal' }} />
         <Stack.Screen name="search" options={{ presentation: 'modal' }} />
         <Stack.Screen name="notification-center" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
       </Stack>
     </ScheduleProvider>
   );

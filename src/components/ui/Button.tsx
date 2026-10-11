@@ -68,12 +68,14 @@ export function Button({
     const base: ViewStyle = {
       height: sizeConfig.height,
       paddingHorizontal: sizeConfig.px,
-      borderRadius: radius.sm,
+      borderRadius: radius.full,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing.sm,
       opacity: isDisabled ? 0.5 : 1,
+      // Slight press-down so taps feel physical.
+      transform: [{ scale: pressed && !isDisabled ? 0.97 : 1 }],
     };
 
     if (fullWidth) base.width = '100%';

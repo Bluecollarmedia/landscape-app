@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Alert, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -8,6 +10,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { SectionTabs, ProgressBar, Card, EmptyState, StatusBadge, Button, OptimizedImage } from '@/components/ui';
 import { useProject } from '@/hooks/useProject';
+import { db } from '@/data/store';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic, brand } from '@/theme/colors';
@@ -65,7 +68,7 @@ export default function CustomerProjectScreen() {
   const [reqDescription, setReqDescription] = useState('');
   const [reqCategory, setReqCategory] = useState<RequestCategory>('question');
 
-  const { project, photos, customerTimeline, updates, requests, settings, taskStats } = useProject(id);
+  const { project, photos, customerTimeline, updates, requests, submitRequest, settings, taskStats } = useProject(id);
 
   const sharedPhotos = useMemo(
     () => photos.filter(p => p.isCustomerVisible),
@@ -78,8 +81,8 @@ export default function CustomerProjectScreen() {
   );
 
   const customerRequests = useMemo(
-    () => requests.filter(r => r.requestedBy === 'customer1'),
-    [requests],
+    () => requests.filter(r => r.requestedBy === user?.id),
+    [requests, user?.id],
   );
 
   const isCompleted = project?.status === 'completed';
@@ -87,7 +90,11 @@ export default function CustomerProjectScreen() {
 
   function handleSubmitRequest() {
     if (!reqTitle.trim()) return;
-    Alert.alert('Request Submitted', `Your ${categoryOptions.find(c => c.key === reqCategory)?.label ?? reqCategory} has been sent to Brighton Lawn + Landscape. They'll review it shortly.`);
+    submitRequest({ title: reqTitle.trim(), description: reqDescription.trim() || undefined, category: reqCategory });
+    const companyName = db.company?.name ?? 'Brighton Lawn + Landscape';
+    const sentMsg = `Your ${categoryOptions.find(c => c.key === reqCategory)?.label ?? reqCategory} has been sent to ${companyName}. They'll review it shortly.`;
+    if (Platform.OS === 'web') alert(sentMsg);
+    else Alert.alert('Request Submitted', sentMsg);
     setReqTitle('');
     setReqDescription('');
     setReqCategory('question');
@@ -439,9 +446,9 @@ export default function CustomerProjectScreen() {
 
       <SectionTabs tabs={activeSections} activeTab={activeSection} onTabChange={setActiveSection} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {sectionRenderers[activeSection]?.()}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -541,7 +548,7 @@ const styles = StyleSheet.create({
   // Requests
   responseBox: {
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     marginTop: spacing.md,
   },
   categoryGrid: {
@@ -559,8 +566,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   formInput: {
-    borderWidth: 1,
-    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typeScale.bodySmall.fontSize,

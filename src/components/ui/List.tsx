@@ -98,10 +98,10 @@ export function ListRow({
         <View
           style={[
             styles.iconWrap,
-            { backgroundColor: iconColor ? `${iconColor}1A` : colors.backgroundTertiary },
+            { backgroundColor: iconColor ? `${iconColor}1A` : colors.primarySurface },
           ]}
         >
-          <Icon name={icon} size={16} color={iconColor ?? colors.textSecondary} />
+          <Icon name={icon} size={16} color={iconColor ?? colors.primary} />
         </View>
       )}
       <View style={{ flex: 1 }}>
@@ -109,7 +109,7 @@ export function ListRow({
           {title}
         </Text>
         {subtitle && (
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 1 }]} numberOfLines={2}>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 1 }]} numberOfLines={value ? 1 : 2}>
             {subtitle}
           </Text>
         )}
@@ -142,8 +142,9 @@ export function ListRow({
 
 const styles = StyleSheet.create({
   sectionWrap: { marginBottom: spacing.lg },
-  section: { borderRadius: radius.md, overflow: 'hidden' },
-  separator: { height: StyleSheet.hairlineWidth, marginLeft: spacing.md },
+  section: { borderRadius: radius.xl, overflow: 'hidden' },
+  // Inset past the icon circle, like iOS Settings.
+  separator: { height: StyleSheet.hairlineWidth, marginLeft: spacing.md + 32 + spacing.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -153,9 +154,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   iconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },

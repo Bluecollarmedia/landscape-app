@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -8,11 +10,13 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { Button, Input, Card } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
+import { useCustomers } from '@/hooks/useCustomers';
 
 export default function NewCustomerScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { addCustomer } = useCustomers();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -28,6 +32,13 @@ export default function NewCustomerScreen() {
       }
       return;
     }
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+      if (Platform.OS === 'web') alert('Please enter a valid email address.');
+      else Alert.alert('Check the email', 'Please enter a valid email address.');
+      return;
+    }
+    addCustomer({ firstName, lastName, email: trimmedEmail, phone });
     router.back();
   }
 
@@ -44,7 +55,7 @@ export default function NewCustomerScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.form}>
           <Card title="Customer Info">
             <View style={styles.row}>
@@ -69,6 +80,7 @@ export default function NewCustomerScreen() {
               value={email}
               onChangeText={setEmail}
               icon="mail"
+              hint="If they create an account with this email, they'll see the projects you assign to them."
               keyboardType="email-address"
               autoCapitalize="none"
               containerStyle={styles.fieldGap}
@@ -89,7 +101,7 @@ export default function NewCustomerScreen() {
             <Button title="Cancel" onPress={() => router.back()} variant="ghost" fullWidth />
           </View>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

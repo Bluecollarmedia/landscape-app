@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Platform, Alert } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -9,6 +11,7 @@ import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { usePayroll, type PayrollEstimate } from '@/hooks/useOperations';
+import { localDateKey } from '@/lib/ids';
 
 function formatHours(hours: number): string {
   const h = Math.floor(hours);
@@ -30,7 +33,7 @@ export default function PayrollScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { getPayrollEstimates, getRatesForWorker, overtimeRule } = usePayroll();
+  const { getPayrollEstimates, getRatesForWorker, overtimeRule, setHourlyRate } = usePayroll();
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [expandedWorker, setExpandedWorker] = useState<string | null>(null);
@@ -38,7 +41,7 @@ export default function PayrollScreen() {
   const referenceDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + weekOffset * 7);
-    return d.toISOString().split('T')[0];
+    return localDateKey(d);
   }, [weekOffset]);
 
   const estimates = useMemo(
@@ -90,7 +93,7 @@ export default function PayrollScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryRow, { gap: spacing.md }]}>
           <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }, shadow.sm]}>
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>ESTIMATED TOTAL</Text>
@@ -127,6 +130,7 @@ export default function PayrollScreen() {
             key={est.personId}
             estimate={est}
             rateHistory={getRatesForWorker(est.personId)}
+            onSetRate={(rate) => setHourlyRate(est.personId, rate)}
             expanded={expandedWorker === est.personId}
             onToggle={() =>
               setExpandedWorker((prev) => (prev === est.personId ? null : est.personId))
@@ -134,7 +138,7 @@ export default function PayrollScreen() {
             colors={colors}
           />
         ))}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -142,16 +146,32 @@ export default function PayrollScreen() {
 function PayrollCard({
   estimate,
   rateHistory,
+  onSetRate,
   expanded,
   onToggle,
   colors,
 }: {
   estimate: PayrollEstimate;
   rateHistory: any[];
+  onSetRate: (rate: number) => void;
   expanded: boolean;
   onToggle: () => void;
   colors: any;
 }) {
+  const [rateDraft, setRateDraft] = useState('');
+
+  function handleSaveRate() {
+    const rate = Number(rateDraft.replace(/[^0-9.]/g, ''));
+    if (!rateDraft.trim() || !Number.isFinite(rate) || rate <= 0) {
+      const msg = 'Enter an hourly rate, like 22 or 22.50.';
+      if (Platform.OS === 'web') alert(msg);
+      else Alert.alert('Check the rate', msg);
+      return;
+    }
+    onSetRate(Math.round(rate * 100) / 100);
+    setRateDraft('');
+  }
+
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
       <Pressable style={styles.cardHeader} onPress={onToggle}>
@@ -232,6 +252,28 @@ function PayrollCard({
               <Text style={[typeScale.labelLarge, { color: colors.primary }]}>
                 {formatMoney(estimate.totalPay)}
               </Text>
+            </View>
+          </View>
+
+          <View style={[styles.rateHistory, { borderTopColor: colors.borderLight }]}>
+            <Text style={[typeScale.overline, { color: colors.textTertiary, marginBottom: spacing.sm }]}>
+              {rateHistory.length === 0 ? 'SET PAY RATE' : 'CHANGE PAY RATE (FROM TODAY)'}
+            </Text>
+            <View style={styles.rateInputRow}>
+              <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>$</Text>
+              <TextInput
+                value={rateDraft}
+                onChangeText={setRateDraft}
+                placeholder={estimate.regularRate ? estimate.regularRate.toFixed(2) : '0.00'}
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="decimal-pad"
+                style={[styles.rateInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                accessibilityLabel="Hourly rate"
+              />
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>/hr</Text>
+              <Pressable onPress={handleSaveRate} style={[styles.rateSave, { backgroundColor: colors.primary }]} accessibilityRole="button">
+                <Text style={[typeScale.labelSmall, { color: '#FFFFFF', fontWeight: '600' }]}>Save</Text>
+              </Pressable>
             </View>
           </View>
 
@@ -317,4 +359,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginVertical: spacing.sm },
   rateHistory: { borderTopWidth: 1, marginTop: spacing.md, paddingTop: spacing.md },
   rateRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs },
+  rateInputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rateInput: { flex: 1, borderWidth: 1.5, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 16 },
+  rateSave: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.full },
 });

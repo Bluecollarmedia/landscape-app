@@ -1,7 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useMemo, useCallback } from 'react';
 import type { Truck, TruckStatus } from '@/types/truck';
-import { mockTrucks } from '@/data/mock';
+import { db, useDb, insertRow, updateRow } from '@/data/store';
 
 interface UseTrucksOptions {
   statusFilter?: TruckStatus | 'all';
@@ -9,18 +8,8 @@ interface UseTrucksOptions {
 
 export function useTrucks(options: UseTrucksOptions = {}) {
   const { statusFilter = 'all' } = options;
-  const [trucks, setTrucks] = useState<Truck[]>(mockTrucks);
-
-  // Trucks list and Add Truck are separate route screens, each with their
-  // own useTrucks() instance — a screen that's already mounted doesn't see
-  // mockTrucks mutations from another screen until it re-syncs. Re-pull on
-  // every focus (e.g. navigating back from Add Truck) so new/updated trucks
-  // and counts actually show up without requiring a full remount.
-  useFocusEffect(
-    useCallback(() => {
-      setTrucks([...mockTrucks]);
-    }, []),
-  );
+  const v = useDb();
+  const trucks = useMemo(() => db.trucks, [v]);
 
   const filtered = useMemo(() => {
     if (statusFilter === 'all') return trucks;
@@ -36,26 +25,13 @@ export function useTrucks(options: UseTrucksOptions = {}) {
   }, [trucks]);
 
   const addTruck = useCallback((truck: Omit<Truck, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newTruck: Truck = {
-      ...truck,
-      id: `truck_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setTrucks((prev) => {
-      const next = [...prev, newTruck];
-      mockTrucks.splice(0, mockTrucks.length, ...next);
-      return next;
-    });
-    return newTruck;
+    const { assigneeName, ...values } = truck;
+    return insertRow('trucks', values) as unknown as Truck;
   }, []);
 
   const updateTruck = useCallback((id: string, updates: Partial<Truck>) => {
-    setTrucks((prev) => {
-      const next = prev.map((t) => (t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t));
-      mockTrucks.splice(0, mockTrucks.length, ...next);
-      return next;
-    });
+    const { assigneeName, ...changes } = updates;
+    updateRow('trucks', id, changes);
   }, []);
 
   return { trucks: filtered, allTrucks: trucks, counts, addTruck, updateTruck };

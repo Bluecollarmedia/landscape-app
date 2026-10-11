@@ -13,8 +13,10 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import type { Assignment } from '@/types/schedule';
 import { haptics } from '@/lib/haptics';
+import { todayKey, localDateKey } from '@/lib/ids';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
-const today = new Date().toISOString().split('T')[0];
+const today = todayKey();
 
 function formatDateTop(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -47,14 +49,14 @@ function formatTimeRange(a: Assignment): string {
 function offsetDateStr(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 function getWeekStart(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
   const day = d.getDay();
   d.setDate(d.getDate() - day);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 const confirmBadge = (state: string) => {
@@ -73,6 +75,7 @@ export default function ScheduleScreen() {
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
+  const [showIosPicker, setShowIosPicker] = useState(false);
 
   const schedule = useSchedule();
   const grouped = schedule.getGroupedByWorker(selectedDate);
@@ -118,7 +121,7 @@ export default function ScheduleScreen() {
   function handleDatePicked(event: DateTimePickerEvent, date?: Date) {
     if (Platform.OS === 'android') setShowAndroidPicker(false);
     if (event.type === 'dismissed' || !date) return;
-    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedDate(localDateKey(date));
   }
 
   function renderDayView() {
@@ -298,7 +301,7 @@ export default function ScheduleScreen() {
           </Pressable>
         ) : (
           <Pressable
-            onPress={() => { if (Platform.OS === 'android') setShowAndroidPicker(true); else if (Platform.OS === 'web') setSelectedDate(today); }}
+            onPress={() => { if (Platform.OS === 'android') setShowAndroidPicker(true); else if (Platform.OS === 'ios') setShowIosPicker(true); else setSelectedDate(today); }}
             style={styles.dateCenter}
             accessibilityRole="button"
             accessibilityLabel="Choose date"
@@ -310,19 +313,6 @@ export default function ScheduleScreen() {
               </Text>
             </View>
             <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{formatDateFull(selectedDate)}</Text>
-
-            {Platform.OS === 'ios' && (
-              // Invisible native compact picker layered over our styled label — tapping it
-              // opens Apple's own calendar popover; opacity must stay >0 or iOS drops hit testing.
-              <DateTimePicker
-                value={selectedDateObj}
-                mode="date"
-                display="compact"
-                onChange={handleDatePicked}
-                style={styles.iosDatePickerOverlay}
-                accessibilityLabel="Choose date"
-              />
-            )}
           </Pressable>
         )}
 
@@ -338,6 +328,27 @@ export default function ScheduleScreen() {
 
       {Platform.OS === 'android' && showAndroidPicker && (
         <DateTimePicker value={selectedDateObj} mode="date" display="default" onChange={handleDatePicked} />
+      )}
+      {Platform.OS === 'ios' && (
+        <BottomSheetModal visible={showIosPicker} onRequestClose={() => setShowIosPicker(false)}>
+          <Pressable style={styles.pickerOverlay} onPress={() => setShowIosPicker(false)}>
+            <Pressable style={[styles.pickerCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.pickerHeader}>
+                <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Go to Date</Text>
+                <Pressable onPress={() => setShowIosPicker(false)} hitSlop={12} accessibilityRole="button">
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Done</Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={selectedDateObj}
+                mode="date"
+                display="inline"
+                accentColor={colors.primary}
+                onChange={(e: DateTimePickerEvent, d?: Date) => { handleDatePicked(e, d); setShowIosPicker(false); }}
+              />
+            </Pressable>
+          </Pressable>
+        </BottomSheetModal>
       )}
 
       <View style={styles.segmentWrap}>
@@ -468,14 +479,14 @@ function AssignmentSheet({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <BottomSheetModal visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.sheetOverlay} onPress={onClose}>
         <Pressable style={[styles.sheetCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.sheetGrabber, { backgroundColor: colors.border }]} />
           {body}
         </Pressable>
       </Pressable>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
@@ -499,14 +510,9 @@ const styles = StyleSheet.create({
   },
   dateCenter: { alignItems: 'center' },
   dateCenterTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  iosDatePickerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: -40,
-    right: -40,
-    bottom: 0,
-    opacity: 0.02,
-  },
+  pickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  pickerCard: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   segmentWrap: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -536,7 +542,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   timeCol: { width: 64 },
   travelWarning: {

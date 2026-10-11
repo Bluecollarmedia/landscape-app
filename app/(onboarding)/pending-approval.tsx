@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -15,7 +16,24 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
 export default function PendingApprovalScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { signOut, pendingCompanyName, user } = useAuth();
+  const { signOut, pendingCompanyName, user, refreshContext } = useAuth();
+  const [checking, setChecking] = useState(false);
+
+  // Look for an approval every so often, so the app moves on by itself once
+  // the owner approves (no need to sign out and back in).
+  useEffect(() => {
+    const timer = setInterval(() => { refreshContext().catch(() => {}); }, 15000);
+    return () => clearInterval(timer);
+  }, [refreshContext]);
+
+  async function handleCheckAgain() {
+    setChecking(true);
+    try {
+      await refreshContext();
+    } finally {
+      setChecking(false);
+    }
+  }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -73,7 +91,9 @@ export default function PendingApprovalScreen() {
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <Button title="Check Again" onPress={handleCheckAgain} loading={checking} variant="secondary" icon="refresh-cw" fullWidth />
         <Button title="Sign Out" onPress={signOut} variant="ghost" icon="log-out" fullWidth />
+        <DeleteAccountRow />
       </View>
     </View>
   );
@@ -122,5 +142,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
   },
 });

@@ -54,7 +54,7 @@ export const Input = forwardRef<TextInput, InputProps>(
             styles.inputRow,
             {
               borderColor,
-              backgroundColor: colors.backgroundSecondary,
+              backgroundColor: focused ? colors.surface : colors.backgroundSecondary,
             },
           ]}
         >
@@ -129,8 +129,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: sizing.inputHeight,
-    borderWidth: 1,
-    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },

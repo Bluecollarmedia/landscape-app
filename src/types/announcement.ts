@@ -13,6 +13,8 @@ export interface Announcement {
   audience: AnnouncementAudience;
   priority: AnnouncementPriority;
   weatherAction?: WeatherActionType;
+  /** Who it was sent to (active workers at send time). Empty = everyone. */
+  recipientIds?: string[];
   expiresAt?: string;
   createdAt: string;
   updatedAt: string;

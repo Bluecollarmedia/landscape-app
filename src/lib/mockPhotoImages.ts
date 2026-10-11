@@ -25,6 +25,8 @@ function hashCode(value: string): number {
 }
 
 export function getMockPhotoImageUri(photo: ProjectPhoto, width = 600): string {
+  // Real photos (uploaded, or just picked on this device) show themselves.
+  if (photo.fileUrl && !photo.fileUrl.includes('placehold.co')) return photo.fileUrl;
   const id = MOCK_PHOTO_IDS[hashCode(photo.id) % MOCK_PHOTO_IDS.length];
   return `https://images.unsplash.com/${id}?w=${width}&q=80`;
 }

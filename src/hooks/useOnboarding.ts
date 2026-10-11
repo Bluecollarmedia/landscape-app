@@ -1,63 +1,67 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type {
   JoinRequest,
   CompanyInvitation,
   TeamCode,
   CompanyJoinSettings,
   CompanyMembership,
-  OnboardingState,
   JoinRequestPerson,
 } from '@/types/onboarding';
-import {
-  mockTeamCode,
-  mockDeactivatedCode,
-  mockJoinSettings,
-  mockJoinRequests,
-  mockInvitations,
-  mockMemberships,
-  mockAuditEvents,
-} from '@/data/mockOnboarding';
-import { mockMembers, mockPeople } from '@/data/mock';
+import { db, useDb, insertRow, updateRow, upsertRow, rpc, refresh, isDemo } from '@/data/store';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+
+function randomSuffix(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 4; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
+function codePrefix(): string {
+  const letters = (db.company?.name ?? 'TEAM').replace(/[^A-Za-z]/g, '').toUpperCase();
+  return (letters + 'TEAM').slice(0, 8);
+}
 
 // ── Team Code Hook ─────────────────────────────────────────────
 
 export function useTeamCode(companyId?: string) {
-  const [codes, setCodes] = useState<TeamCode[]>([mockTeamCode, mockDeactivatedCode]);
+  const v = useDb();
 
-  const activeCode = useMemo(
-    () => codes.find((c) => c.companyId === (companyId ?? 'company1') && c.isActive),
-    [codes, companyId],
+  const activeCode = useMemo<TeamCode | undefined>(
+    () => db.teamCodes.filter((c) => c.companyId === (companyId ?? db.companyId) && c.isActive).pop(),
+    [v, companyId],
   );
 
+  /** Checks a team code before joining. Works before sign-in. */
   const validateCode = useCallback(
-    (code: string): { valid: boolean; companyId?: string; companyName?: string } => {
-      const found = codes.find((c) => c.code.toUpperCase() === code.toUpperCase() && c.isActive);
-      if (found) {
-        return { valid: true, companyId: found.companyId, companyName: 'Brighton Lawn + Landscape' };
+    async (code: string): Promise<{ valid: boolean; companyId?: string; companyName?: string }> => {
+      if (!isSupabaseConfigured) {
+        const found = db.teamCodes.find((c) => c.code.toUpperCase() === code.toUpperCase() && c.isActive);
+        return found ? { valid: true, companyId: found.companyId, companyName: db.company?.name ?? 'Brighton Lawn + Landscape' } : { valid: false };
       }
-      return { valid: false };
+      const { data, error } = await supabase.rpc('lookup_team_code', { p_code: code });
+      if (error || !data) return { valid: false };
+      const r = data as { valid: boolean; company_id?: string; company_name?: string };
+      return { valid: !!r.valid, companyId: r.company_id, companyName: r.company_name };
     },
-    [codes],
+    [],
   );
 
   const regenerateCode = useCallback(() => {
-    const prefix = 'BRIGHTON';
-    const num = Math.floor(1000 + Math.random() * 9000);
-    const newCode = `${prefix}-${num}`;
-    setCodes((prev) =>
-      prev.map((c) =>
-        c.isActive ? { ...c, isActive: false, deactivatedAt: new Date().toISOString() } : c,
-      ).concat({
-        id: `tc-${Date.now()}`,
-        companyId: companyId ?? 'company1',
-        code: newCode,
-        isActive: true,
-        createdBy: 'owner1',
-        createdAt: new Date().toISOString(),
-      }),
-    );
+    const now = new Date().toISOString();
+    for (const c of db.teamCodes.filter((t) => t.isActive)) {
+      updateRow('team_codes', c.id, { isActive: false, deactivatedAt: now });
+    }
+    const newCode = `${codePrefix()}-${randomSuffix()}`;
+    const row = insertRow('team_codes', {
+      code: newCode,
+      isActive: true,
+      createdBy: db.personId,
+    });
+    upsertRow('company_join_settings', { ...db.joinSettings, companyId: db.companyId, currentTeamCodeId: row.id });
+    insertRow('membership_audit_log', { eventType: 'team_code_generated', actorId: db.personId });
     return newCode;
-  }, [companyId]);
+  }, []);
 
   return { activeCode, validateCode, regenerateCode };
 }
@@ -65,124 +69,74 @@ export function useTeamCode(companyId?: string) {
 // ── Join Requests Hook ─────────────────────────────────────────
 
 export function useJoinRequests(companyId?: string) {
-  const [requests, setRequests] = useState<JoinRequest[]>(mockJoinRequests);
+  const v = useDb();
+  const cid = companyId ?? db.companyId;
 
-  const pendingRequests = useMemo(
-    () => requests.filter((r) => r.companyId === (companyId ?? 'company1') && r.status === 'pending'),
-    [requests, companyId],
+  const pendingRequests = useMemo<JoinRequest[]>(
+    () => db.joinRequests.filter((r) => r.companyId === cid && r.status === 'pending'),
+    [v, cid],
   );
 
-  const allRequests = useMemo(
-    () => requests.filter((r) => r.companyId === (companyId ?? 'company1')),
-    [requests, companyId],
+  const allRequests = useMemo<JoinRequest[]>(
+    () => db.joinRequests.filter((r) => r.companyId === cid),
+    [v, cid],
   );
 
   const submitRequest = useCallback(
     (personData: JoinRequestPerson, joinMethod: 'team_code' | 'email_invitation', targetCompanyId?: string) => {
-      const cId = targetCompanyId ?? companyId ?? 'company1';
-      const existing = requests.find(
-        (r) => r.companyId === cId && r.personId === personData.id && r.status === 'pending',
-      );
+      const target = targetCompanyId ?? cid;
+      const existing = db.joinRequests.find((r) => r.companyId === target && r.personId === personData.id && r.status === 'pending');
       if (existing) return { success: false, reason: 'duplicate' as const };
-
-      const alreadyApproved = requests.find(
-        (r) => r.companyId === cId && r.personId === personData.id && r.status === 'approved',
-      );
-      if (alreadyApproved) return { success: false, reason: 'already_member' as const };
-
-      const newRequest: JoinRequest = {
-        id: `jr-${Date.now()}`,
-        companyId: cId,
+      const row = insertRow('join_requests', {
+        companyId: target,
         personId: personData.id,
         joinMethod,
         status: 'pending',
         requestedRole: 'worker',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        person: personData,
-      };
-      setRequests((prev) => [newRequest, ...prev]);
-      return { success: true, requestId: newRequest.id };
+      });
+      return { success: true, requestId: row.id as string };
     },
-    [requests, companyId],
+    [cid],
   );
 
+  /** Approves a request and makes the person an active member with this role. */
   const approveRequest = useCallback(
-    (requestId: string, assignedRole: 'worker' | 'customer' | 'admin') => {
-      let approvedPerson: JoinRequestPerson | undefined;
-      setRequests((prev) =>
-        prev.map((r) => {
-          if (r.id === requestId) {
-            approvedPerson = r.person;
-            return {
-              ...r,
-              status: 'approved' as const,
-              assignedRole,
-              reviewedBy: 'owner1',
-              reviewedAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-          }
-          return r;
-        }),
-      );
-
-      if (approvedPerson) {
-        const person = approvedPerson;
-        const personSummary: import('@/types/company').PersonSummary = {
-          id: person.id,
-          firstName: person.firstName,
-          lastName: person.lastName,
-          email: person.email,
-          phone: person.phone,
-          avatarUrl: person.profilePhotoUrl,
-        };
-        if (!mockPeople[person.id]) {
-          mockPeople[person.id] = personSummary;
-        }
-        const alreadyMember = mockMembers.some((m) => m.personId === person.id && m.status === 'active');
-        if (!alreadyMember) {
-          mockMembers.push({
-            id: `cm-${Date.now()}`,
-            companyId: companyId ?? 'company1',
-            personId: person.id,
-            role: assignedRole === 'admin' ? 'worker' : assignedRole,
-            status: 'active',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            person: personSummary,
-          });
-        }
+    async (requestId: string, assignedRole: 'worker' | 'customer' | 'admin') => {
+      const request = db.joinRequests.find((r) => r.id === requestId);
+      if (!request) return;
+      if (isDemo()) {
+        updateRow('join_requests', requestId, {
+          status: 'approved', assignedRole, reviewedBy: db.personId, reviewedAt: new Date().toISOString(),
+        });
+        const existing = db.members.find((m) => m.personId === request.personId);
+        if (existing) updateRow('company_members', existing.id, { role: assignedRole, status: 'active' });
+        else insertRow('company_members', { personId: request.personId, role: assignedRole, status: 'active', joinMethod: request.joinMethod, joinRequestId: requestId });
+        return;
       }
+      // Optimistic: hide it from the pending list right away.
+      updateRow('join_requests', requestId, { status: 'approved', assignedRole });
+      const { error } = await rpc('approve_join_request', { p_request_id: requestId, p_role: assignedRole });
+      if (error) console.warn('[join] approve failed', error.message);
+      await refresh('join_requests', 'company_members', 'people');
     },
-    [companyId],
+    [],
   );
 
-  const declineRequest = useCallback((requestId: string, reason?: string) => {
-    setRequests((prev) =>
-      prev.map((r) =>
-        r.id === requestId
-          ? {
-              ...r,
-              status: 'declined' as const,
-              declineReason: reason,
-              reviewedBy: 'owner1',
-              reviewedAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            }
-          : r,
-      ),
-    );
+  const declineRequest = useCallback(async (requestId: string, reason?: string) => {
+    if (isDemo()) {
+      updateRow('join_requests', requestId, {
+        status: 'declined', declineReason: reason, reviewedBy: db.personId, reviewedAt: new Date().toISOString(),
+      });
+      return;
+    }
+    updateRow('join_requests', requestId, { status: 'declined', declineReason: reason });
+    const { error } = await rpc('decline_join_request', { p_request_id: requestId, p_reason: reason ?? null });
+    if (error) console.warn('[join] decline failed', error.message);
+    await refresh('join_requests');
   }, []);
 
   const cancelRequest = useCallback((requestId: string) => {
-    setRequests((prev) =>
-      prev.map((r) =>
-        r.id === requestId
-          ? { ...r, status: 'cancelled' as const, updatedAt: new Date().toISOString() }
-          : r,
-      ),
-    );
+    updateRow('join_requests', requestId, { status: 'cancelled' });
   }, []);
 
   return { pendingRequests, allRequests, submitRequest, approveRequest, declineRequest, cancelRequest };
@@ -191,58 +145,55 @@ export function useJoinRequests(companyId?: string) {
 // ── Invitations Hook ───────────────────────────────────────────
 
 export function useInvitations(companyId?: string) {
-  const [invitations, setInvitations] = useState<CompanyInvitation[]>(mockInvitations);
+  const v = useDb();
+  const cid = companyId ?? db.companyId;
 
-  const pendingInvitations = useMemo(
-    () => invitations.filter((i) => i.companyId === (companyId ?? 'company1') && i.status === 'pending'),
-    [invitations, companyId],
+  const pendingInvitations = useMemo<CompanyInvitation[]>(
+    () => db.invitations.filter((i) => i.companyId === cid && i.status === 'pending'),
+    [v, cid],
   );
 
-  const allInvitations = useMemo(
-    () => invitations.filter((i) => i.companyId === (companyId ?? 'company1')),
-    [invitations, companyId],
+  const allInvitations = useMemo<CompanyInvitation[]>(
+    () => db.invitations.filter((i) => i.companyId === cid),
+    [v, cid],
   );
 
+  /** Records an invitation. Whoever creates an account with this email is
+   * added to the company automatically (no approval needed). No email is
+   * sent by the app — share the app with them yourself. */
   const createInvitation = useCallback(
     (data: { email: string; name?: string; phone?: string; type: 'worker' | 'customer'; projectId?: string }) => {
-      const existing = invitations.find(
+      const existing = db.invitations.find(
         (i) => i.email.toLowerCase() === data.email.toLowerCase() && i.status === 'pending',
       );
       if (existing) return { success: false, reason: 'already_invited' as const };
 
-      const token = `inv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const expiry = new Date();
-      expiry.setDate(expiry.getDate() + 7);
-
-      const inv: CompanyInvitation = {
-        id: `inv-${Date.now()}`,
-        companyId: companyId ?? 'company1',
-        email: data.email,
+      expiry.setDate(expiry.getDate() + 14);
+      const inv = insertRow('company_invitations', {
+        email: data.email.trim().toLowerCase(),
         name: data.name,
         phone: data.phone,
         type: data.type,
         status: 'pending',
         projectId: data.projectId,
-        invitedBy: 'owner1',
-        token,
+        invitedBy: db.personId,
+        token: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`,
         expiresAt: expiry.toISOString(),
-        createdAt: new Date().toISOString(),
-      };
-      setInvitations((prev) => [inv, ...prev]);
+      }) as unknown as CompanyInvitation;
+      insertRow('membership_audit_log', { eventType: 'invitation_created', actorId: db.personId, metadata: { email: data.email } });
       return { success: true, invitation: inv };
     },
-    [invitations, companyId],
+    [],
   );
 
   const revokeInvitation = useCallback((invitationId: string) => {
-    setInvitations((prev) =>
-      prev.map((i) => (i.id === invitationId ? { ...i, status: 'revoked' as const } : i)),
-    );
+    updateRow('company_invitations', invitationId, { status: 'revoked' });
   }, []);
 
   const validateInvitationToken = useCallback(
     (token: string) => {
-      const inv = invitations.find((i) => i.token === token);
+      const inv = db.invitations.find((i) => i.token === token);
       if (!inv) return { valid: false, reason: 'not_found' as const };
       if (inv.status === 'expired' || new Date(inv.expiresAt) < new Date())
         return { valid: false, reason: 'expired' as const };
@@ -250,7 +201,7 @@ export function useInvitations(companyId?: string) {
       if (inv.status === 'accepted') return { valid: false, reason: 'already_used' as const };
       return { valid: true, invitation: inv };
     },
-    [invitations],
+    [v],
   );
 
   return { pendingInvitations, allInvitations, createInvitation, revokeInvitation, validateInvitationToken };
@@ -259,11 +210,12 @@ export function useInvitations(companyId?: string) {
 // ── Join Settings Hook ─────────────────────────────────────────
 
 export function useJoinSettings(companyId?: string) {
-  const [settings, setSettings] = useState<CompanyJoinSettings>(mockJoinSettings);
+  const v = useDb();
+  const settings = useMemo<CompanyJoinSettings>(() => ({ ...db.joinSettings }), [v]);
 
   const updateSettings = useCallback((updates: Partial<CompanyJoinSettings>) => {
-    setSettings((prev) => ({ ...prev, ...updates }));
-  }, []);
+    upsertRow('company_join_settings', { ...db.joinSettings, ...updates, companyId: companyId ?? db.companyId });
+  }, [companyId]);
 
   return { settings, updateSettings };
 }
@@ -271,19 +223,22 @@ export function useJoinSettings(companyId?: string) {
 // ── Memberships Hook ───────────────────────────────────────────
 
 export function useMemberships(companyId?: string) {
-  const [memberships, setMemberships] = useState<CompanyMembership[]>(mockMemberships);
+  const v = useDb();
+  const cid = companyId ?? db.companyId;
 
-  const activeMemberships = useMemo(
-    () => memberships.filter((m) => m.companyId === (companyId ?? 'company1') && m.status === 'active'),
-    [memberships, companyId],
+  const activeMemberships = useMemo<CompanyMembership[]>(
+    () => db.memberships.filter((m) => m.companyId === cid && m.status === 'active'),
+    [v, cid],
   );
 
   const getMembershipForPerson = useCallback(
-    (personId: string) =>
-      memberships.find((m) => m.companyId === (companyId ?? 'company1') && m.personId === personId && m.status === 'active'),
-    [memberships, companyId],
+    (personId: string) => db.memberships.find((m) => m.companyId === cid && m.personId === personId && m.status === 'active'),
+    [v, cid],
   );
 
+  /** Membership is created by the database when a join request is approved
+   * (approve_join_request). This only fills the gap in demo mode or when a
+   * membership is genuinely missing. */
   const createMembership = useCallback(
     (data: {
       personId: string;
@@ -292,41 +247,33 @@ export function useMemberships(companyId?: string) {
       joinRequestId?: string;
       person?: JoinRequestPerson;
     }) => {
-      const m: CompanyMembership = {
-        id: `cm-${Date.now()}`,
-        companyId: companyId ?? 'company1',
+      const existing = db.members.find((m) => m.companyId === cid && m.personId === data.personId);
+      if (existing) {
+        return db.memberships.find((m) => m.id === existing.id)!;
+      }
+      const row = insertRow('company_members', {
         personId: data.personId,
         role: data.role,
         status: 'active',
         joinMethod: data.joinMethod,
         joinRequestId: data.joinRequestId,
-        approvedBy: 'owner1',
+        approvedBy: db.personId,
         approvedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        person: data.person,
-      };
-      setMemberships((prev) => [...prev, m]);
-      return m;
+      });
+      return { ...row, person: data.person } as unknown as CompanyMembership;
     },
-    [companyId],
+    [cid],
   );
 
   const deactivateMembership = useCallback((personId: string) => {
-    setMemberships((prev) =>
-      prev.map((m) =>
-        m.personId === personId && m.status === 'active'
-          ? {
-              ...m,
-              status: 'inactive' as const,
-              deactivatedAt: new Date().toISOString(),
-              deactivatedBy: 'owner1',
-              updatedAt: new Date().toISOString(),
-            }
-          : m,
-      ),
-    );
-  }, []);
+    const m = db.members.find((x) => x.companyId === cid && x.personId === personId && x.status === 'active');
+    if (!m) return;
+    updateRow('company_members', m.id, {
+      status: 'inactive',
+      deactivatedAt: new Date().toISOString(),
+      deactivatedBy: db.personId,
+    });
+  }, [cid]);
 
   return { activeMemberships, getMembershipForPerson, createMembership, deactivateMembership };
 }

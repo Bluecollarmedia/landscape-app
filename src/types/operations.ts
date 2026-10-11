@@ -80,6 +80,7 @@ export type NotificationEventType =
   | 'worker_completed_job'
   | 'photo_waiting_review'
   | 'customer_request_submitted'
+  | 'customer_message'
   | 'schedule_changed'
   | 'schedule_conflict'
   | 'announcement_posted';
@@ -104,7 +105,7 @@ export interface AppNotification {
   title: string;
   body: string;
   status: NotificationStatus;
-  linkedEntityType?: 'worker' | 'project' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement';
+  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement';
   linkedEntityId?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;

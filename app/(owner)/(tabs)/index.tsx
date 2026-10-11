@@ -9,11 +9,13 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useOwnerDashboard, type AttentionItem, type CrewMember, type ProjectHomeSummary } from '@/hooks/useOwnerDashboard';
-import { Avatar, OptimizedImage, ProgressBar } from '@/components/ui';
+import { Avatar, ProgressBar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { getProjectImageUri, getCompanyImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
+import { DASHBOARD_HERO_HEIGHT } from '@/components/media/HeaderPhotoField';
 import { useCompanySetup } from '@/hooks/useCompanySetup';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
@@ -161,10 +163,7 @@ export default function OwnerDashboard() {
         style={[styles.projectCard, { backgroundColor: colors.surface }, shadow.sm]}
         onPress={() => router.push(`/(owner)/projects/${project.id}` as any)}
       >
-        <OptimizedImage
-          source={getProjectImageUri(project, 600)}
-          style={styles.projectImage}
-        />
+        <BrandCover uri={getProjectImageUri(project)} style={styles.projectImage} variant="tile" />
         <View style={styles.projectInfo}>
           <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
             {project.name}
@@ -268,7 +267,7 @@ export default function OwnerDashboard() {
         <View style={styles.content}>
           {/* Today hero */}
           <View style={[styles.heroCard, shadow.md]}>
-            <OptimizedImage source={getCompanyImageUri()} style={StyleSheet.absoluteFill} />
+            <BrandCover uri={getCompanyImageUri()} style={StyleSheet.absoluteFill} />
             <LinearGradient
               colors={['rgba(10,20,15,0.25)', 'rgba(8,16,12,0.85)']}
               style={StyleSheet.absoluteFill}
@@ -493,7 +492,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg },
 
   heroCard: {
-    height: 280,
+    height: DASHBOARD_HERO_HEIGHT,
     borderRadius: radius.lg,
     overflow: 'hidden',
     marginBottom: spacing.xl,

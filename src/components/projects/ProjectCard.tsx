@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
-import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { radius, spacing, shadow } from '@/theme/spacing';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { getProjectImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 import type { Project, ProjectStatus } from '@/types/project';
 
 interface ProjectCardProps {
@@ -40,7 +40,7 @@ export function ProjectCard({ project, onPress }: ProjectCardProps) {
       accessibilityRole="button"
       accessibilityLabel={`${project.name}, ${config.label}, ${project.progress}% complete`}
     >
-      <OptimizedImage source={getProjectImageUri(project, 300)} style={styles.image} />
+      <BrandCover uri={getProjectImageUri(project)} style={styles.image} variant="tile" />
 
       <View style={styles.content}>
         <View style={styles.titleRow}>

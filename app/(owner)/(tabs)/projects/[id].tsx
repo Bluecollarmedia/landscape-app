@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Switch, Alert, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking } from 'react-native';
+import { Switch } from '@/components/ui/Switch';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -919,7 +920,6 @@ export default function ProjectDetailScreen() {
                   <Switch
                     value={settings.customerCanComment}
                     onValueChange={handleToggleComments}
-                    trackColor={{ true: colors.primary, false: colors.borderLight }}
                   />
                 </View>
 
@@ -935,7 +935,6 @@ export default function ProjectDetailScreen() {
                   <Switch
                     value={settings.customerCanRequest}
                     onValueChange={handleToggleRequests}
-                    trackColor={{ true: colors.primary, false: colors.borderLight }}
                   />
                 </View>
               </View>
@@ -2108,7 +2107,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerInteractionEnabled}
               onValueChange={(v) => updateSettings({ customerInteractionEnabled: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
           <Divider style={{ marginVertical: spacing.xs }} />
@@ -2121,7 +2119,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerCanRequest}
               onValueChange={(v) => updateSettings({ customerCanRequest: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
           <Divider style={{ marginVertical: spacing.xs }} />
@@ -2134,7 +2131,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerCanViewPhotos}
               onValueChange={(v) => updateSettings({ customerCanViewPhotos: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
         </View>
@@ -2160,7 +2156,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.completionPhotoRequired}
               onValueChange={(v) => updateSettings({ completionPhotoRequired: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
 

@@ -14,3 +14,4 @@ export { OptimizedImage } from './OptimizedImage';
 export { ListSection, ListRow } from './List';
 export { InlineNotice } from './InlineNotice';
 export { Icon } from './Icon';
+export { Switch } from './Switch';

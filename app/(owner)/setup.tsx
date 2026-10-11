@@ -1,10 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert, Switch } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Button, Input, Card } from '@/components/ui';
@@ -20,8 +19,8 @@ import { usePayroll, useNotifications } from '@/hooks/useOperations';
 import { useTeamCode, useJoinRequests } from '@/hooks/useOnboarding';
 import { inviteMessage, textInvite, copyText } from '@/lib/invite';
 import { EVENT_LABELS, ALL_EVENTS } from '@/lib/notificationEvents';
-import { getCompanyImageUri } from '@/lib/projectImages';
-import { BrandCover } from '@/components/branding/BrandCover';
+import { getCompanyImageUri, getWorkerHeaderImageUri } from '@/lib/projectImages';
+import { HeaderPhotoField } from '@/components/media/HeaderPhotoField';
 import type { SetupStepKey } from '@/types/company';
 
 /** Recommended first-time setup for the owner. Opens automatically until it's been walked through once. */
@@ -371,18 +370,14 @@ function CompanyStep({ onSaved }: { onSaved: () => void }) {
   const [city, setCity] = useState(c?.city ?? '');
   const [state, setState] = useState(c?.state ?? '');
   const [zip, setZip] = useState(c?.zip ?? '');
-  const [photoUri, setPhotoUri] = useState<string | undefined>();
-  const preview = useMemo(() => photoUri ?? getCompanyImageUri(), [photoUri, c?.coverPhotoUrl]);
+  const [dashboardPhoto, setDashboardPhoto] = useState<string | undefined>(getCompanyImageUri());
+  const [workerPhoto, setWorkerPhoto] = useState<string | undefined>(getWorkerHeaderImageUri());
 
-  async function pickPhoto() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      const msg = 'Photo library access is needed to choose a dashboard photo.';
-      if (Platform.OS === 'web') alert(msg); else Alert.alert('Permission Needed', msg);
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
-    if (!result.canceled && result.assets?.[0]) setPhotoUri(result.assets[0].uri);
+  /** Saves a header photo only when it changed: a new crop uploads, Remove clears it. */
+  function saveHeaderPhoto(field: 'coverPhotoUrl' | 'workerCoverPhotoUrl', value: string | undefined, folder: string) {
+    if (!c || value === (c[field] || undefined)) return;
+    if (value) attachImage('companies', c.id, field, value, folder);
+    else updateRow('companies', c.id, { [field]: undefined });
   }
 
   function handleSave() {
@@ -395,24 +390,23 @@ function CompanyStep({ onSaved }: { onSaved: () => void }) {
       state: state.trim() || undefined,
       zip: zip.trim() || undefined,
     });
-    if (photoUri) attachImage('companies', c.id, 'coverPhotoUrl', photoUri, 'company');
+    saveHeaderPhoto('coverPhotoUrl', dashboardPhoto, 'company');
+    saveHeaderPhoto('workerCoverPhotoUrl', workerPhoto, 'company');
     onSaved();
   }
 
   return (
     <>
       <Card title="Dashboard photo" style={styles.section}>
-        <Pressable onPress={pickPhoto} style={styles.photoBox}>
-          <BrandCover uri={preview} style={StyleSheet.absoluteFill} />
-          <View style={styles.photoBadge}>
-            <Icon name="camera" size={14} color="#FFFFFF" />
-            <Text style={[typeScale.labelSmall, { color: '#FFFFFF', marginLeft: 6 }]}>
-              {photoUri || c?.coverPhotoUrl ? 'Change photo' : 'Choose your own photo'}
-            </Text>
-          </View>
-        </Pressable>
-        <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-          Shown at the top of your dashboard and on the workers' home screen.
+        <HeaderPhotoField kind="dashboard" value={dashboardPhoto} onChange={setDashboardPhoto} />
+        <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
+          The Today card at the top of your dashboard.
+        </Text>
+      </Card>
+      <Card title="Workers' home photo" style={styles.section}>
+        <HeaderPhotoField kind="worker" value={workerPhoto} onChange={setWorkerPhoto} />
+        <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
+          The top of your workers' Today, Jobs and Activity screens. A job's own cover photo shows instead on days they're scheduled there.
         </Text>
       </Card>
       <Card title={c?.name ?? 'Company'} style={styles.section}>
@@ -466,23 +460,6 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radius.lg,
     marginBottom: spacing.md,
-  },
-  photoBox: {
-    height: 160,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    marginBottom: spacing.sm,
-    justifyContent: 'flex-end',
-    alignItems: 'flex-start',
-  },
-  photoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   footer: {
     paddingHorizontal: spacing.lg,

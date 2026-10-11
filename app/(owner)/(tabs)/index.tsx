@@ -15,6 +15,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { getProjectImageUri, getCompanyImageUri } from '@/lib/projectImages';
 import { BrandCover } from '@/components/branding/BrandCover';
+import { DASHBOARD_HERO_HEIGHT } from '@/components/media/HeaderPhotoField';
 import { useCompanySetup } from '@/hooks/useCompanySetup';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
@@ -491,7 +492,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg },
 
   heroCard: {
-    height: 280,
+    height: DASHBOARD_HERO_HEIGHT,
     borderRadius: radius.lg,
     overflow: 'hidden',
     marginBottom: spacing.xl,

@@ -12,7 +12,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import type { Assignment } from '@/types/schedule';
 import { localDateKey } from '@/lib/ids';
-import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages';
+import { getProjectImageUriById, getWorkerHeaderImageUri } from '@/lib/projectImages';
 import { BrandCover } from '@/components/branding/BrandCover';
 
 function formatTime(time?: string) {
@@ -103,7 +103,7 @@ export default function WorkerJobsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={styles.hero}>
-        <BrandCover uri={getCompanyImageUri()} style={[styles.heroImage, { opacity: 0.16 }]} />
+        <BrandCover uri={getWorkerHeaderImageUri()} style={[styles.heroImage, { opacity: 0.16 }]} />
         <View style={[styles.headerContent, { paddingTop: insets.top + spacing.md }]}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>My Jobs</Text>
           <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>

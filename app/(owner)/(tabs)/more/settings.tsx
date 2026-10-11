@@ -72,7 +72,7 @@ export default function SettingsScreen() {
               <ListRow
                 icon="image"
                 iconColor={colors.primary}
-                title="Company Info & Dashboard Photo"
+                title="Company Info & Header Photos"
                 showChevron
                 onPress={() => router.push({ pathname: '/(owner)/setup', params: { step: 'company' } } as any)}
               />

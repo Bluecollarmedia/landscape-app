@@ -19,3 +19,8 @@ export function getProjectImageUriById(projectId: string | undefined): string | 
 export function getCompanyImageUri(): string | undefined {
   return db.company?.coverPhotoUrl || undefined;
 }
+
+/** The workers' home header photo the owner picked, or undefined for the Brighton green backdrop. */
+export function getWorkerHeaderImageUri(): string | undefined {
+  return db.company?.workerCoverPhotoUrl || undefined;
+}

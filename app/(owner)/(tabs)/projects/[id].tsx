@@ -20,6 +20,7 @@ import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
 import { getProjectImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 import { getMockPhotoImageUri } from '@/lib/mockPhotoImages';
 import { haptics } from '@/lib/haptics';
 import { todayKey, localDateKey, isoToLocalDateKey } from '@/lib/ids';
@@ -286,7 +287,7 @@ export default function ProjectDetailScreen() {
     return (
       <View>
         <View style={styles.coverWrap}>
-          <OptimizedImage source={getProjectImageUri(p, 900)} style={styles.coverImage} />
+          <BrandCover uri={getProjectImageUri(p)} style={styles.coverImage} />
           <View style={[styles.coverStatusPill, { backgroundColor: 'rgba(20,20,20,0.55)' }]}>
             <View style={[styles.coverStatusDot, { backgroundColor: statusDotColors[p.status] }]} />
             <Text style={[typeScale.labelSmall, { color: '#FFFFFF' }]}>{config.label}</Text>
@@ -608,7 +609,7 @@ export default function ProjectDetailScreen() {
     return (
       <View style={styles.sectionContent}>
         <View style={[styles.moreSummaryCard, { backgroundColor: colors.surface }, shadow.sm]}>
-          <OptimizedImage source={getProjectImageUri(p, 200)} style={styles.moreSummaryImage} />
+          <BrandCover uri={getProjectImageUri(p)} style={styles.moreSummaryImage} variant="tile" />
           <View style={{ marginLeft: spacing.md, flex: 1 }}>
             <StatusBadge label={config.label} status={config.type} style={{ alignSelf: 'flex-start' }} />
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
@@ -1048,7 +1049,7 @@ export default function ProjectDetailScreen() {
       return (
         <View style={styles.sectionContent}>
           <View style={[styles.moreSummaryCard, { backgroundColor: colors.surface }, shadow.sm]}>
-            <OptimizedImage source={getProjectImageUri(p, 200)} style={styles.moreSummaryImage} />
+            <BrandCover uri={getProjectImageUri(p)} style={styles.moreSummaryImage} variant="tile" />
             <View style={{ marginLeft: spacing.md, flex: 1 }}>
               <StatusBadge label={config.label} status={config.type} style={{ alignSelf: 'flex-start' }} />
               <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
@@ -1866,7 +1867,7 @@ export default function ProjectDetailScreen() {
     return (
       <View style={styles.sectionContent}>
         <View style={[styles.moreSummaryCard, { backgroundColor: colors.surface }, shadow.sm]}>
-          <OptimizedImage source={getProjectImageUri(p, 200)} style={styles.moreSummaryImage} />
+          <BrandCover uri={getProjectImageUri(p)} style={styles.moreSummaryImage} variant="tile" />
           <View style={{ marginLeft: spacing.md, flex: 1 }}>
             <StatusBadge label={config.label} status={config.type} style={{ alignSelf: 'flex-start' }} />
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>

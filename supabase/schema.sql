@@ -50,6 +50,8 @@ create table public.companies (
   yard_latitude double precision,
   yard_longitude double precision,
   cover_photo_url text,
+  -- Header photo on the workers' home screens (cover_photo_url is the owner dashboard's).
+  worker_cover_photo_url text,
   setup_state jsonb not null default '{}'::jsonb,
   setup_completed_at timestamptz,
   created_at timestamptz not null default now(),

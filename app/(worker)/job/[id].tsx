@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -17,6 +17,7 @@ import { db } from '@/data/store';
 import { todayKey, localDateKey } from '@/lib/ids';
 import type { ProjectPhoto } from '@/types/project';
 import { getProjectImageUriById } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
@@ -99,7 +100,7 @@ export default function JobDetailScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
         <View style={styles.hero}>
-          <Image source={{ uri: getProjectImageUriById(assignment.projectId, 1200) }} style={styles.heroImage} resizeMode="cover" />
+          <BrandCover uri={getProjectImageUriById(assignment.projectId)} style={styles.heroImage} />
           <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.sm }]}>
             <Pressable onPress={() => router.back()} hitSlop={12}>
               {HAS_LIQUID_GLASS ? (

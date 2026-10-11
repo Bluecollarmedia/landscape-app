@@ -18,6 +18,8 @@ export interface Company {
   yardLongitude?: number;
   /** Owner's own photo for the dashboard header. */
   coverPhotoUrl?: string;
+  /** Owner's own photo for the top of the workers' home screens. */
+  workerCoverPhotoUrl?: string;
   /** First-time setup progress: which steps were finished or skipped. */
   setupState?: CompanySetupState;
   setupCompletedAt?: string;

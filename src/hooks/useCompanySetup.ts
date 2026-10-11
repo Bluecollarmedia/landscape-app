@@ -15,7 +15,7 @@ export const SETUP_STEPS: SetupStepInfo[] = [
   { key: 'workers', title: 'Invite your workers', subtitle: 'Text them the team code so they can join.', icon: 'users' },
   { key: 'payRates', title: 'Set pay rates', subtitle: 'Hourly rates power the payroll estimates.', icon: 'dollar-sign' },
   { key: 'notifications', title: 'Choose your alerts', subtitle: 'Pick what you want to be told about.', icon: 'bell' },
-  { key: 'company', title: 'Company info & photo', subtitle: 'Contact details and your dashboard photo.', icon: 'briefcase' },
+  { key: 'company', title: 'Company info & photos', subtitle: 'Contact details and your header photos.', icon: 'briefcase' },
 ];
 
 function activeWorkerIds(): string[] {
@@ -35,7 +35,7 @@ function autoDone(key: SetupStepKey): boolean {
     }
     case 'company': {
       const c = db.company;
-      return !!(c?.phone && c?.email && c?.address && c?.coverPhotoUrl);
+      return !!(c?.phone && c?.email && c?.address);
     }
     default:
       return false;

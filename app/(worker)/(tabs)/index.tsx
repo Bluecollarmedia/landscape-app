@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal, Alert, Linking, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Modal, Alert, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -22,11 +22,12 @@ import type { Assignment } from '@/types/schedule';
 import type { ProjectTask } from '@/types/project';
 import type { Announcement } from '@/types/announcement';
 import type { WeatherActionType } from '@/types/operations';
-import { getProjectImageUriById, getCompanyImageUri } from '@/lib/projectImages';
+import { getProjectImageUriById, getWorkerHeaderImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
+import { WORKER_HERO_HEIGHT as HERO_HEIGHT } from '@/components/media/HeaderPhotoField';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 
-const HERO_HEIGHT = 400;
 const HERO_HEIGHT_COMPACT = 190;
 const PILL_OVERHANG = 26;
 
@@ -308,7 +309,7 @@ export default function WorkerTodayScreen() {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         <View style={[styles.hero, { height: showWorking ? HERO_HEIGHT_COMPACT : HERO_HEIGHT }]}>
-          <Image source={{ uri: primaryAssignment ? getProjectImageUriById(primaryAssignment.projectId, 1200) : getCompanyImageUri() }} style={styles.heroImage} resizeMode="cover" />
+          <BrandCover uri={(primaryAssignment && getProjectImageUriById(primaryAssignment.projectId)) || getWorkerHeaderImageUri()} style={styles.heroImage} />
           <LinearGradient
             colors={['transparent', 'transparent', colors.groupedBackground]}
             locations={[0, 0.78, 1]}

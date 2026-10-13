@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Update 10 — run once in Supabase → SQL Editor (safe to run again).
 --  • Storage limit: the owner picks the company's storage limit under
---    More → Settings → Storage (1 GB, 100 GB, 1000 GB or Unlimited).
+--    More → Settings → Storage (1 GB, 100 GB, 1 TB, Unlimited or any custom number of GB).
 --    0 means no limit. Existing companies start at 1 GB, the Supabase
 --    Free plan's limit; anything bigger needs the Supabase Pro plan.
 --  • No new access rules: everyone in the company can already read the

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TextInput, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -26,6 +26,27 @@ export default function StorageScreen() {
   const insets = useSafeAreaInsets();
   const { info, loading, error, refresh } = useStorageInfo();
   const { limitGb, limitBytes, setLimitGb } = useStorageLimit();
+  const presetIndex = STORAGE_LIMIT_OPTIONS_GB.indexOf(limitGb as typeof STORAGE_LIMIT_OPTIONS_GB[number]);
+  const [customOpen, setCustomOpen] = useState(presetIndex === -1);
+  const [customText, setCustomText] = useState(presetIndex === -1 ? String(limitGb) : '');
+  const customIndex = STORAGE_LIMIT_OPTIONS_GB.length;
+  const selectedIndex = customOpen || presetIndex === -1 ? customIndex : presetIndex;
+  const customGb = Number(customText);
+  const customValid = /^\d+$/.test(customText.trim()) && customGb >= 1 && customGb <= 1_000_000;
+
+  // Keep the box in sync when the limit changes elsewhere (another device, Realtime).
+  useEffect(() => {
+    if (presetIndex === -1) {
+      setCustomOpen(true);
+      setCustomText(String(limitGb));
+    }
+  }, [limitGb, presetIndex]);
+
+  function saveCustom() {
+    if (!customValid) return;
+    haptics.success();
+    setLimitGb(customGb);
+  }
 
   if (loading && !info) {
     return (
@@ -41,7 +62,6 @@ export default function StorageScreen() {
 
   const unlimited = limitBytes === 0;
   const usagePercent = unlimited ? 0 : Math.round(((usage?.totalBytes ?? 0) / limitBytes) * 100);
-  const limitIndex = Math.max(0, STORAGE_LIMIT_OPTIONS_GB.indexOf(limitGb as typeof STORAGE_LIMIT_OPTIONS_GB[number]));
   const usageColor = usagePercent > 90
     ? semantic.error
     : usagePercent > 75
@@ -107,11 +127,18 @@ export default function StorageScreen() {
         {/* Storage Limit */}
         <Card title="Storage Limit" style={styles.card}>
           <SegmentedControl
-            values={STORAGE_LIMIT_OPTIONS_GB.map(storageLimitLabel)}
-            selectedIndex={limitIndex}
+            values={[...STORAGE_LIMIT_OPTIONS_GB.map(shortLimitLabel), 'Custom']}
+            selectedIndex={selectedIndex}
             onChange={(event) => {
               haptics.select();
-              setLimitGb(STORAGE_LIMIT_OPTIONS_GB[event.nativeEvent.selectedSegmentIndex]);
+              const i = event.nativeEvent.selectedSegmentIndex;
+              if (i === customIndex) {
+                setCustomOpen(true);
+                if (!customText && limitGb > 0) setCustomText(String(limitGb));
+                return;
+              }
+              setCustomOpen(false);
+              setLimitGb(STORAGE_LIMIT_OPTIONS_GB[i]);
             }}
             tintColor={colors.primary}
             appearance="light"
@@ -120,6 +147,37 @@ export default function StorageScreen() {
             activeFontStyle={{ color: '#FFFFFF', fontWeight: '600' }}
             style={styles.segment}
           />
+          {selectedIndex === customIndex && (
+            <View style={styles.customRow}>
+              <View style={[styles.customField, { backgroundColor: colors.groupedBackground }]}>
+                <TextInput
+                  value={customText}
+                  onChangeText={(t) => setCustomText(t.replace(/[^0-9]/g, ''))}
+                  onSubmitEditing={saveCustom}
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                  placeholder="e.g. 250"
+                  placeholderTextColor={colors.textTertiary}
+                  style={[typeScale.bodyLarge, styles.customInput, { color: colors.textPrimary }]}
+                  accessibilityLabel="Custom storage limit in GB"
+                />
+                <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>GB</Text>
+              </View>
+              <PressScale
+                onPress={customValid ? saveCustom : undefined}
+                disabled={!customValid}
+                style={[
+                  styles.customSave,
+                  { backgroundColor: customValid ? colors.primary : colors.backgroundTertiary },
+                ]}
+                accessibilityLabel="Save storage limit"
+              >
+                <Text style={[typeScale.labelLarge, { color: customValid ? '#FFFFFF' : colors.textTertiary }]}>
+                  {customValid && customGb === limitGb ? 'Saved' : 'Save'}
+                </Text>
+              </PressScale>
+            </View>
+          )}
           {(unlimited || limitGb > SUPABASE_FREE_PLAN_GB) ? (
             <View style={[styles.noteBox, { backgroundColor: semantic.infoLight }]}>
               <Icon name="info" size={14} color={semantic.info} />
@@ -211,6 +269,12 @@ export default function StorageScreen() {
   );
 }
 
+/** Short labels so five options fit across a phone screen. */
+function shortLimitLabel(limitGb: number): string {
+  if (limitGb === 0) return 'Unlimited';
+  return limitGb >= 1000 && limitGb % 1000 === 0 ? `${limitGb / 1000} TB` : `${limitGb} GB`;
+}
+
 function Header({ colors, insets, onBack }: { colors: any; insets: any; onBack: () => void }) {
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
@@ -286,6 +350,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segment: { height: 36 },
+  customRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  customField: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    height: 44,
+  },
+  customInput: { flex: 1, minWidth: 0, paddingVertical: 0 },
+  customSave: {
+    height: 44,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   noteBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',

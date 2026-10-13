@@ -39,6 +39,7 @@ export interface StorageUsage {
 }
 
 export interface StorageSettings {
+  /** 0 means no limit. */
   maxStorageBytes: number;
   maxFileSizeBytes: number;
   rateLimitPerMinute: number;
@@ -48,6 +49,25 @@ export interface StorageSettings {
 export interface StorageInfo {
   usage: StorageUsage;
   settings: StorageSettings;
+}
+
+/** Storage limits the owner can pick. 0 GB means no limit. */
+export const STORAGE_LIMIT_OPTIONS_GB = [1, 100, 1000, 0] as const;
+
+/** Used until the owner picks a limit: the Supabase Free plan's 1 GB. */
+export const DEFAULT_STORAGE_LIMIT_GB = 1;
+
+/** Limits above this need a paid Supabase plan. */
+export const SUPABASE_FREE_PLAN_GB = 1;
+
+const GB = 1024 * 1024 * 1024;
+
+export function storageLimitBytes(limitGb: number): number {
+  return limitGb * GB;
+}
+
+export function storageLimitLabel(limitGb: number): string {
+  return limitGb === 0 ? 'Unlimited' : `${limitGb.toLocaleString('en-US')} GB`;
 }
 
 export const ALLOWED_MIME_TYPES = new Set([
@@ -63,7 +83,7 @@ export const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(i > 1 ? 2 : 0)} ${units[i]}`;
 }

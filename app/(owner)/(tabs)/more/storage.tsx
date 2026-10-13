@@ -5,18 +5,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { Card, ProgressBar, LoadingSpinner } from '@/components/ui';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import { Card, LoadingSpinner } from '@/components/ui';
+import { PressScale, UsageBar } from '@/components/settings/SettingsList';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { useStorageInfo } from '@/hooks/useStorage';
-import { formatBytes } from '@/types/storage';
+import { useStorageInfo, useStorageLimit } from '@/hooks/useStorage';
+import { haptics } from '@/lib/haptics';
+import {
+  formatBytes,
+  storageLimitLabel,
+  STORAGE_LIMIT_OPTIONS_GB,
+  SUPABASE_FREE_PLAN_GB,
+} from '@/types/storage';
 
 export default function StorageScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { info, loading, error, refresh } = useStorageInfo();
+  const { limitGb, limitBytes, setLimitGb } = useStorageLimit();
 
   if (loading && !info) {
     return (
@@ -30,7 +39,9 @@ export default function StorageScreen() {
   const usage = info?.usage;
   const settings = info?.settings;
 
-  const usagePercent = usage?.percentUsed ?? 0;
+  const unlimited = limitBytes === 0;
+  const usagePercent = unlimited ? 0 : Math.round(((usage?.totalBytes ?? 0) / limitBytes) * 100);
+  const limitIndex = Math.max(0, STORAGE_LIMIT_OPTIONS_GB.indexOf(limitGb as typeof STORAGE_LIMIT_OPTIONS_GB[number]));
   const usageColor = usagePercent > 90
     ? semantic.error
     : usagePercent > 75
@@ -65,29 +76,62 @@ export default function StorageScreen() {
                 {formatBytes(usage?.totalBytes ?? 0)}
               </Text>
               <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                of {formatBytes(settings?.maxStorageBytes ?? 0)} used
+                {unlimited ? 'used · no limit set' : `of ${storageLimitLabel(limitGb)} used`}
               </Text>
             </View>
-            <View style={[styles.percentBadge, { backgroundColor: usageColor + '15' }]}>
-              <Text style={[typeScale.labelSmall, { color: usageColor, fontWeight: '700' }]}>
-                {usagePercent}%
-              </Text>
-            </View>
+            {!unlimited && (
+              <View style={[styles.percentBadge, { backgroundColor: usageColor + '15' }]}>
+                <Text style={[typeScale.labelSmall, { color: usageColor, fontWeight: '700' }]}>
+                  {usagePercent}%
+                </Text>
+              </View>
+            )}
           </View>
 
-          <ProgressBar
-            progress={usagePercent}
-            color={usageColor}
-            style={{ marginTop: spacing.md }}
-          />
+          {!unlimited && (
+            <View style={{ marginTop: spacing.md }}>
+              <UsageBar percent={usagePercent} color={usageColor} height={8} />
+            </View>
+          )}
 
           {usagePercent > 90 && (
             <View style={[styles.warningBanner, { backgroundColor: semantic.errorLight }]}>
               <Icon name="alert-triangle" size={14} color={semantic.error} />
               <Text style={[typeScale.caption, { color: semantic.error, flex: 1, marginLeft: spacing.xs }]}>
-                Storage is almost full. Delete unused files or increase your quota.
+                Storage is almost full. Delete unused files or pick a bigger limit below.
               </Text>
             </View>
+          )}
+        </Card>
+
+        {/* Storage Limit */}
+        <Card title="Storage Limit" style={styles.card}>
+          <SegmentedControl
+            values={STORAGE_LIMIT_OPTIONS_GB.map(storageLimitLabel)}
+            selectedIndex={limitIndex}
+            onChange={(event) => {
+              haptics.select();
+              setLimitGb(STORAGE_LIMIT_OPTIONS_GB[event.nativeEvent.selectedSegmentIndex]);
+            }}
+            tintColor={colors.primary}
+            appearance="light"
+            backgroundColor={colors.groupedBackground}
+            fontStyle={{ color: colors.textSecondary }}
+            activeFontStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+            style={styles.segment}
+          />
+          {(unlimited || limitGb > SUPABASE_FREE_PLAN_GB) ? (
+            <View style={[styles.noteBox, { backgroundColor: semantic.infoLight }]}>
+              <Icon name="info" size={14} color={semantic.info} />
+              <Text style={[typeScale.caption, { color: semantic.info, flex: 1, marginLeft: spacing.xs }]}>
+                Photos are saved in Supabase. Its Free plan holds 1 GB, so anything over that needs
+                the Supabase Pro plan ($25/month with 100 GB included, then about 2¢ per extra GB).
+              </Text>
+            </View>
+          ) : (
+            <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+              1 GB matches the Supabase Free plan your photos are saved on.
+            </Text>
           )}
         </Card>
 
@@ -122,12 +166,7 @@ export default function StorageScreen() {
         </Card>
 
         {/* Storage Limits */}
-        <Card title="Storage Limits" style={styles.card}>
-          <LimitRow
-            label="Storage Quota"
-            value={formatBytes(settings?.maxStorageBytes ?? 0)}
-            colors={colors}
-          />
+        <Card title="Upload Limits" style={styles.card}>
           <LimitRow
             label="Max File Size"
             value={formatBytes(settings?.maxFileSizeBytes ?? 0)}
@@ -175,9 +214,14 @@ export default function StorageScreen() {
 function Header({ colors, insets, onBack }: { colors: any; insets: any; onBack: () => void }) {
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-      <Pressable onPress={onBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
-        <Icon name="arrow-left" size={24} color={colors.textPrimary} />
-      </Pressable>
+      <PressScale
+        onPress={onBack}
+        pressedScale={0.9}
+        style={[styles.backButton, { backgroundColor: colors.surface }, shadow.sm]}
+        accessibilityLabel="Go back"
+      >
+        <Icon name="chevron-left" size={22} color={colors.textPrimary} />
+      </PressScale>
       <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>
         Storage
       </Text>
@@ -234,6 +278,21 @@ const styles = StyleSheet.create({
     paddingBottom: spacing['5xl'],
   },
   card: { marginBottom: spacing.lg },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segment: { height: 36 },
+  noteBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: spacing.sm,
+    borderRadius: radius.xs,
+    marginTop: spacing.md,
+  },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',

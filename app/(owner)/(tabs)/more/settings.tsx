@@ -1,21 +1,26 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
+import { Avatar } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
+import { SettingsGroup, SettingsRow, PressScale, UsageBar, tileColors } from '@/components/settings/SettingsList';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useAuth } from '@/providers/AuthProvider';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import type { AppState } from '@/providers/AuthProvider';
-import { ListSection, ListRow } from '@/components/ui';
+import { ListSection } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
-import { spacing } from '@/theme/spacing';
+import { spacing, radius, shadow } from '@/theme/spacing';
+import { brand } from '@/theme/colors';
 import { db, useDb } from '@/data/store';
 import { useCompanyYard } from '@/hooks/useCompanyYard';
+import { useStorageInfo, useStorageLimit } from '@/hooks/useStorage';
 import { formatAddress } from '@/lib/address';
+import { formatBytes, storageLimitLabel } from '@/types/storage';
 import type { UserRole } from '@/types';
 
 export default function SettingsScreen() {
@@ -25,8 +30,17 @@ export default function SettingsScreen() {
   useDb();
   const company = db.company;
   const { yard } = useCompanyYard();
+  const { info } = useStorageInfo();
+  const { limitGb, limitBytes } = useStorageLimit();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  const usedBytes = info?.usage.totalBytes ?? 0;
+  const usedPercent = limitBytes > 0 ? Math.round((usedBytes / limitBytes) * 100) : 0;
+  const usageColor = usedPercent > 90 ? tileColors.red : usedPercent > 75 ? tileColors.orange : colors.primary;
+  const companyAddress = [company?.address, company?.city, [company?.state, company?.zip].filter(Boolean).join(' ')]
+    .filter(Boolean)
+    .join(', ');
 
   const devStates: { label: string; state: AppState; role?: UserRole }[] = [
     { label: 'Owner', state: 'active', role: 'owner' },
@@ -48,108 +62,137 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go back">
-          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>Settings</Text>
+        <PressScale
+          onPress={() => router.back()}
+          pressedScale={0.9}
+          style={[styles.backButton, { backgroundColor: colors.surface }, shadow.sm]}
+          accessibilityLabel="Go back"
+        >
+          <Icon name="chevron-left" size={22} color={colors.textPrimary} />
+        </PressScale>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance + spacing.lg }]} showsVerticalScrollIndicator={false}>
-        <ListSection title="Your Account">
-          <ListRow icon="user" title="Name" value={`${user?.firstName} ${user?.lastName}`} />
-          <ListRow icon="mail" title="Email" value={user?.email ?? '—'} />
-          <ListRow icon="shield" title="Role" value="Owner" />
-        </ListSection>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance + spacing.lg }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[typeScale.displaySmall, styles.title, { color: colors.textPrimary }]}>Settings</Text>
 
-        <ListSection title="Company">
-          <ListRow icon="briefcase" title="Name" value={company?.name ?? '—'} />
-          <ListRow icon="phone" title="Phone" value={company?.phone || '—'} />
-          <ListRow icon="mail" title="Email" value={company?.email || '—'} />
-          <ListRow
-            icon="map-pin"
-            title="Address"
-            subtitle={[company?.address, company?.city, [company?.state, company?.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'}
-          />
-          <ListRow
+        <LinearGradient
+          colors={[brand.primary, brand.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, shadow.md]}
+        >
+          <View style={styles.heroAvatarRing}>
+            <Avatar firstName={user?.firstName ?? 'O'} lastName={user?.lastName ?? ''} size={60} uri={user?.avatarUrl} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[typeScale.headingLarge, { color: '#FFFFFF' }]} numberOfLines={1}>
+              {user?.firstName} {user?.lastName}
+            </Text>
+            <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>
+              {user?.email ?? '—'}
+            </Text>
+            <View style={styles.heroChips}>
+              <View style={styles.heroChip}>
+                <Icon name="shield" size={12} color="#FFFFFF" />
+                <Text style={[typeScale.labelSmall, { color: '#FFFFFF' }]}>Owner</Text>
+              </View>
+              {!!company?.name && (
+                <View style={[styles.heroChip, { flexShrink: 1 }]}>
+                  <Icon name="briefcase" size={12} color="#FFFFFF" />
+                  <Text style={[typeScale.labelSmall, { color: '#FFFFFF', flexShrink: 1 }]} numberOfLines={1}>
+                    {company.name}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </LinearGradient>
+
+        <SettingsGroup title="Company">
+          {!db.demo && (
+            <SettingsRow
+              icon="briefcase"
+              tint={tileColors.green}
+              title="Company Info & Header Photos"
+              subtitle={[company?.phone, company?.email].filter(Boolean).join(' · ') || 'Name, phone, email, photos'}
+              onPress={() => router.push({ pathname: '/(owner)/setup', params: { step: 'company' } } as any)}
+            />
+          )}
+          {db.demo && (
+            <SettingsRow icon="briefcase" tint={tileColors.green} title={company?.name ?? 'Company'} subtitle={companyAddress || undefined} />
+          )}
+          {!db.demo && !!companyAddress && (
+            <SettingsRow icon="map-pin" tint={tileColors.pink} title="Office Address" subtitle={companyAddress} />
+          )}
+          <SettingsRow
             icon="navigation"
-            iconColor={colors.primary}
+            tint={tileColors.blue}
             title="Yard Location"
             subtitle={yard ? formatAddress(yard) : 'Not set yet'}
-            showChevron
             onPress={() => router.push('/(owner)/more/yard-location' as any)}
           />
           {!db.demo && (
-            <>
-              <ListRow
-                icon="image"
-                iconColor={colors.primary}
-                title="Company Info & Header Photos"
-                showChevron
-                onPress={() => router.push({ pathname: '/(owner)/setup', params: { step: 'company' } } as any)}
-              />
-              <ListRow
-                icon="check-square"
-                iconColor={colors.primary}
-                title="Recommended Setup"
-                showChevron
-                onPress={() => router.push('/(owner)/setup' as any)}
-              />
-            </>
+            <SettingsRow
+              icon="check-square"
+              tint={tileColors.indigo}
+              title="Recommended Setup"
+              subtitle="Trucks, workers, pay rates and more"
+              onPress={() => router.push('/(owner)/setup' as any)}
+            />
           )}
-        </ListSection>
+        </SettingsGroup>
 
-        <ListSection title="Team & Joining">
-          <ListRow
-            icon="user-plus"
-            iconColor={colors.primary}
-            title="Join Settings"
-            showChevron
-            onPress={() => router.push('/(owner)/more/join-settings' as any)}
-          />
-          <ListRow
-            icon="inbox"
-            iconColor={colors.primary}
-            title="Pending Requests"
-            showChevron
-            onPress={() => router.push('/(owner)/more/pending-requests' as any)}
-          />
-        </ListSection>
-
-        <ListSection title="Storage & Security">
-          <ListRow
+        <SettingsGroup title="Storage">
+          <SettingsRow
             icon="hard-drive"
-            iconColor={colors.primary}
-            title="Storage Usage"
-            showChevron
+            tint={tileColors.teal}
+            title="Storage"
             onPress={() => router.push('/(owner)/more/storage' as any)}
-          />
-        </ListSection>
+          >
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 1, marginBottom: spacing.xs + 2 }]}>
+              {limitBytes > 0
+                ? `${formatBytes(usedBytes)} of ${storageLimitLabel(limitGb)} used`
+                : `${formatBytes(usedBytes)} used`}
+            </Text>
+            <UsageBar percent={limitBytes > 0 ? usedPercent : 0} color={usageColor} />
+          </SettingsRow>
+        </SettingsGroup>
 
-        <ListSection title="App">
-          <ListRow icon="info" title="Version" value="1.0.0" />
-          <ListRow icon="database" title="Backend" subtitle={isSupabaseConfigured ? 'Supabase (live data)' : 'Mock data (Supabase not configured)'} />
-        </ListSection>
+        <SettingsGroup title="App">
+          <SettingsRow icon="info" tint={tileColors.gray} title="Version" value="1.0.0" />
+          <SettingsRow
+            icon="database"
+            tint={tileColors.gray}
+            title="Backend"
+            subtitle={isSupabaseConfigured ? 'Supabase (live data)' : 'Mock data (Supabase not configured)'}
+          />
+        </SettingsGroup>
 
         {!isSupabaseConfigured && (
-          <ListSection title="Dev Tools" footer="Switch between roles and states for testing — hidden once the app is connected to a real backend">
+          <SettingsGroup title="Dev Tools" footer="Switch between roles and states for testing — hidden once the app is connected to a real backend">
             {devStates.map((item) => {
               const isActive =
                 (item.role && appState === 'active' && user?.role === item.role) ||
                 (!item.role && appState === item.state);
               return (
-                <ListRow
+                <SettingsRow
                   key={item.label}
                   title={item.label}
-                  selected={isActive}
+                  selected={!!isActive}
                   onPress={() => handleDevSwitch(item)}
                 />
               );
             })}
-          </ListSection>
+          </SettingsGroup>
         )}
 
+        <SettingsGroup>
+          <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
+        </SettingsGroup>
         <ListSection>
-          <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={signOut} />
           <DeleteAccountRow />
         </ListSection>
       </ScrollView>
@@ -163,9 +206,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  backButton: { padding: spacing.xs },
-  scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing['5xl'] },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: { marginBottom: spacing.lg, marginLeft: spacing.xs },
+  scrollContent: { paddingHorizontal: spacing.lg },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.xl + 4,
+    marginBottom: spacing.xl,
+  },
+  heroAvatarRing: {
+    padding: 3,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  heroChips: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
+  heroChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
 });

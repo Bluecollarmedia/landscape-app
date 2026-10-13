@@ -184,16 +184,9 @@ export default function MoreScreen() {
             ACCOUNT
           </Text>
           <MenuItem
-            icon="hard-drive"
-            label="Storage"
-            subtitle="Usage, quotas, and file management"
-            onPress={() => router.push('/(owner)/more/storage' as any)}
-            colors={colors}
-          />
-          <MenuItem
             icon="settings"
             label="Settings"
-            subtitle="Company and app settings"
+            subtitle="Company, storage and app settings"
             onPress={() => router.push('/(owner)/more/settings' as any)}
             colors={colors}
           />

@@ -12,6 +12,8 @@ import {
   UploadError,
 } from '@/lib/storage';
 import { logger } from '@/lib/logger';
+import { db, useDb, updateRow } from '@/data/store';
+import { DEFAULT_STORAGE_LIMIT_GB, storageLimitBytes } from '@/types/storage';
 import type {
   UploadPurpose,
   UploadProgress,
@@ -137,6 +139,24 @@ export function useStorageInfo() {
   }, [refresh]);
 
   return { info, loading, error, refresh, updateSettings };
+}
+
+// ── useStorageLimit — the company's storage limit the owner picked ──
+
+/**
+ * The storage limit saved on the company row (0 = Unlimited). Saving it
+ * updates every screen right away, so usage percentages follow the pick.
+ */
+export function useStorageLimit() {
+  useDb();
+  const limitGb = db.company?.storageLimitGb ?? DEFAULT_STORAGE_LIMIT_GB;
+
+  const setLimitGb = useCallback((next: number) => {
+    if (!db.company) return;
+    updateRow('companies', db.company.id, { storageLimitGb: next });
+  }, []);
+
+  return { limitGb, limitBytes: storageLimitBytes(limitGb), setLimitGb };
 }
 
 // ── usePhotoDelete — handles media deletion with confirmation ─────

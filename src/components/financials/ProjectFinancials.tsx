@@ -12,6 +12,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useFinancialDocs } from '@/hooks/useFinancials';
 import { DocumentRow } from './DocumentRow';
 import { FinancialSummaryCard } from './FinancialSummaryCard';
+import { ProspectBanner } from './ProspectBanner';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import type { FinancialDocType } from '@/types/financial';
@@ -39,6 +40,7 @@ export function ProjectFinancials({ projectId }: { projectId: string }) {
 
   return (
     <View style={styles.wrap}>
+      <ProspectBanner projectId={projectId} />
       <FinancialSummaryCard projectId={projectId} />
 
       <SegmentedControl

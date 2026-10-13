@@ -83,6 +83,13 @@ export default function MoreScreen() {
             colors={colors}
           />
           <MenuItem
+            icon="clipboard"
+            label="Materials"
+            subtitle="What to order or pick up for upcoming jobs"
+            onPress={() => router.push('/(owner)/more/materials' as any)}
+            colors={colors}
+          />
+          <MenuItem
             icon="truck"
             label="Trucks"
             subtitle="Vehicles and equipment"

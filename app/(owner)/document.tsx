@@ -25,7 +25,7 @@ import { formatMoney } from '@/lib/money';
 import {
   DOC_LABEL, STATUS_LABEL, STATUS_TONE, displayStatus, snapshotFor, templateOptionsFor,
   getDoc, markSent, issueInvoice, recordResponse, markExpired, voidInvoice, deleteDraft, duplicateAsDraft, readinessProblems,
-  approvalLinksEnabled, approvalLink, approvalMessage,
+  approvalLinksEnabled, approvalLink, approvalMessage, canStartProject, startProjectFromQuote,
 } from '@/data/financials';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -144,6 +144,14 @@ export default function DocumentScreen() {
   };
 
   const canSendLink = linkable && doc.status === 'sent' && status !== 'expired';
+  // An approved quote on a Prospect: make it the real project (same record).
+  const canStart = doc.kind === 'quote' && doc.status === 'approved' && canStartProject(doc.projectId);
+  const startProject = () => confirmAction(
+    'Start this project?',
+    `${project?.name ?? 'The project'} becomes an active project with ${doc.number} attached. No one is scheduled until you add them.`,
+    'Start Project',
+    () => { if (startProjectFromQuote(doc.projectId)) router.push(`/(owner)/projects/${doc.projectId}` as any); },
+  );
   const shareOrSend = () => (canSendLink ? setMenu('send') : shareTapped());
 
   const sendActions: SheetAction[] = [
@@ -155,6 +163,7 @@ export default function DocumentScreen() {
   const moreActions: SheetAction[] = [
     ...(canSendLink ? [{ key: 'link', label: 'Send Approval Link', icon: 'send' as const, onPress: () => setMenu('send') }] : []),
     { key: 'pdf', label: isDraft ? 'Share Draft PDF' : 'Share PDF', icon: 'share-2', onPress: shareTapped },
+    ...(canStart ? [{ key: 'start', label: 'Start Project', icon: 'play-circle' as const, onPress: startProject }] : []),
     ...(doc.kind === 'quote' && doc.status === 'approved'
       ? [
           { key: 'co', label: 'New Change Order', icon: 'layers' as const, onPress: () => router.push({ pathname: '/(owner)/document-new', params: { kind: 'change_order', projectId: doc.projectId, quoteId: doc.id } } as any) },
@@ -189,6 +198,13 @@ export default function DocumentScreen() {
       <>
         <Button title={canSendLink ? 'Send' : 'Share'} variant="secondary" icon={canSendLink ? 'send' : 'share-2'} onPress={shareOrSend} loading={busy} style={styles.flex} />
         <Button title="Record Answer" icon="check-circle" onPress={() => setMenu('respond')} style={styles.flex2} />
+      </>
+    );
+  } else if (canStart) {
+    primary = (
+      <>
+        <Button title="Share" variant="secondary" icon="share-2" onPress={shareTapped} loading={busy} style={styles.flex} />
+        <Button title="Start Project" icon="play-circle" onPress={startProject} style={styles.flex2} />
       </>
     );
   } else if (doc.kind === 'quote' && doc.status === 'approved') {

@@ -14,6 +14,7 @@ import { db, useDb } from '@/data/store';
 import type { ProjectStatus } from '@/types/project';
 
 const statusConfig: Record<ProjectStatus, { label: string; type: 'success' | 'warning' | 'info' | 'neutral' }> = {
+  prospect: { label: 'Quote', type: 'neutral' },
   active: { label: 'Active', type: 'success' },
   on_hold: { label: 'On Hold', type: 'warning' },
   completed: { label: 'Completed', type: 'info' },

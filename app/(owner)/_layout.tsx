@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { ScheduleProvider } from '@/providers/ScheduleProvider';
+import { useMaterialReminders } from '@/hooks/useMaterialReminders';
 
 /**
  * Stack that sits above the (tabs) navigator. Screens declared here with
@@ -9,6 +10,8 @@ import { ScheduleProvider } from '@/providers/ScheduleProvider';
  * dismissing one always returns to whatever tab/screen was underneath.
  */
 export default function OwnerLayout() {
+  // Materials prep reminders on this phone (see lib/materialReminders.ts).
+  useMaterialReminders(true);
   return (
     <ScheduleProvider>
       <Stack screenOptions={{ headerShown: false }}>

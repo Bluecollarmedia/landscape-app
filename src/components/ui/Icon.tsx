@@ -85,6 +85,7 @@ const FEATHER_TO_SF: Partial<Record<string, string>> = {
   'more-horizontal': 'ellipsis',
   'phone': 'phone',
   'play': 'play.fill',
+  'play-circle': 'play.circle',
   'plus': 'plus',
   'plus-circle': 'plus.circle',
   'plus-square': 'plus.square',

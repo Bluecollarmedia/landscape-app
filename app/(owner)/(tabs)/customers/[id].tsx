@@ -13,6 +13,7 @@ const projectStatusBadge = (status: string): { label: string; status: 'success' 
   if (status === 'active') return { label: 'Active', status: 'success' };
   if (status === 'completed') return { label: 'Completed', status: 'info' };
   if (status === 'on_hold') return { label: 'On Hold', status: 'warning' };
+  if (status === 'prospect') return { label: 'Prospect', status: 'neutral' };
   return { label: status.replace('_', ' '), status: 'neutral' };
 };
 

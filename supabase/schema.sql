@@ -1384,14 +1384,18 @@ $$;
 revoke execute on function public.delete_my_account() from public, anon;
 grant execute on function public.delete_my_account() to authenticated;
 
--- Repeating schedules (update 012): a worker on a job weekly, every 2 weeks or
--- monthly. Days are filled in as assignments by extend_schedule_series().
+-- Repeating schedules (update 012): a worker on a job weekly, every 2 weeks,
+-- monthly or custom. Days are filled in as assignments by extend_schedule_series().
 create table if not exists public.schedule_series (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
   project_id uuid not null references public.projects(id) on delete cascade,
   person_id uuid not null references public.people(id) on delete cascade,
-  frequency text not null check (frequency in ('weekly','biweekly','monthly')),
+  frequency text not null,
+  -- Custom repeats: days between visits (2–365).
+  interval_days integer,
+  -- How far ahead days are filled in.
+  horizon_days integer not null default 56,
   start_date date not null,
   end_date date,
   start_time text,           -- 'HH:MM' company-local wall clock
@@ -1405,6 +1409,20 @@ create table if not exists public.schedule_series (
   updated_at timestamptz not null default now(),
   check (end_date is null or end_date >= start_date)
 );
+-- Earlier copies of this file had no custom repeats or schedule-ahead.
+alter table public.schedule_series
+  add column if not exists interval_days integer,
+  add column if not exists horizon_days integer not null default 56;
+alter table public.schedule_series drop constraint if exists schedule_series_frequency_check;
+alter table public.schedule_series add constraint schedule_series_frequency_check
+  check (frequency in ('weekly','biweekly','monthly','custom'));
+alter table public.schedule_series drop constraint if exists schedule_series_interval_check;
+alter table public.schedule_series add constraint schedule_series_interval_check
+  check (frequency <> 'custom' or coalesce(interval_days between 2 and 365, false));
+alter table public.schedule_series drop constraint if exists schedule_series_horizon_check;
+alter table public.schedule_series add constraint schedule_series_horizon_check
+  check (horizon_days between 7 and 366);
+
 create index if not exists idx_schedule_series_company on public.schedule_series(company_id);
 
 drop trigger if exists schedule_series_updated_at on public.schedule_series;
@@ -1428,14 +1446,15 @@ create unique index if not exists uq_assignments_series_day
   on public.assignments (series_id, scheduled_date)
   where series_id is not null;
 
--- Fills in a repeat's days from p_today up to p_horizon_days ahead.
+-- Fills in a repeat's days from p_today up to its schedule-ahead window
+-- (p_horizon_days overrides it, for tests).
 -- p_series = null tops up every running repeat the caller can manage.
 -- p_today is the company's local date, passed by the app.
 -- Returns how many days were added.
 create or replace function public.extend_schedule_series(
   p_series uuid default null,
   p_today date default current_date,
-  p_horizon_days integer default 56
+  p_horizon_days integer default null
 )
 returns integer language plpgsql set search_path = public as $$
 declare
@@ -1460,13 +1479,14 @@ begin
         where m.company_id = ss.company_id and m.person_id = ss.person_id and m.status = 'active'
       )
   loop
-    last_day := least(coalesce(s.end_date, 'infinity'::date), p_today + p_horizon_days);
+    last_day := least(coalesce(s.end_date, 'infinity'::date), p_today + coalesce(p_horizon_days, s.horizon_days, 56));
     label := case when s.is_full_day then 'Full Day' else coalesce(s.start_time, '') || '–' || coalesce(s.end_time, '') end;
     n := 0;
     loop
       d := case s.frequency
         when 'weekly'   then s.start_date + 7 * n
         when 'biweekly' then s.start_date + 14 * n
+        when 'custom'   then s.start_date + s.interval_days * n
         else (s.start_date + make_interval(months => n))::date
       end;
       exit when d > last_day;

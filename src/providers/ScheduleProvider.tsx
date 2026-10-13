@@ -50,7 +50,7 @@ export interface ScheduleContextValue {
     personId: string; projectId: string; scheduledDate: string;
     startTime?: string; endTime?: string; isFullDay: boolean;
     truckId?: string; notes?: string;
-    frequency: RepeatFrequency; endDate?: string;
+    frequency: RepeatFrequency; intervalDays?: number; horizonDays?: number; endDate?: string;
   }) => ScheduleSeries;
   /** Stops a repeat after `afterDate`: later days that haven't started are cancelled. */
   endSeriesAfter: (seriesId: string, afterDate: string) => void;
@@ -333,7 +333,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
    * extend_schedule_series() does in the database. */
   const extendLocally = useCallback((s: ScheduleSeries, today: string) => {
     if (s.stoppedAt) return;
-    const to = addDaysKey(today, SERIES_HORIZON_DAYS);
+    const to = addDaysKey(today, s.horizonDays ?? SERIES_HORIZON_DAYS);
     for (const d of occurrenceDates(s, today, to)) {
       // Raw rows, so days added earlier in this loop count too.
       const taken = (rowsOf('assignments') as Assignment[]).some(a =>
@@ -361,7 +361,6 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await rpc<number>('extend_schedule_series', {
       p_series: only?.id ?? null,
       p_today: today,
-      p_horizon_days: SERIES_HORIZON_DAYS,
     });
     if (error) {
       console.warn('[schedule] filling in repeating schedules failed:', error.message);
@@ -384,12 +383,14 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     personId: string; projectId: string; scheduledDate: string;
     startTime?: string; endTime?: string; isFullDay: boolean;
     truckId?: string; notes?: string;
-    frequency: RepeatFrequency; endDate?: string;
+    frequency: RepeatFrequency; intervalDays?: number; horizonDays?: number; endDate?: string;
   }): ScheduleSeries => {
     const row = insertRow('schedule_series', {
       projectId: params.projectId,
       personId: params.personId,
       frequency: params.frequency,
+      intervalDays: params.frequency === 'custom' ? params.intervalDays : undefined,
+      horizonDays: params.horizonDays ?? SERIES_HORIZON_DAYS,
       startDate: params.scheduledDate,
       endDate: params.endDate,
       startTime: params.isFullDay ? undefined : params.startTime,

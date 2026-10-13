@@ -19,7 +19,9 @@ import { db, useDb } from '@/data/store';
 import { todayKey, localDateKey } from '@/lib/ids';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import type { RepeatFrequency } from '@/types/schedule';
-import { addMonthsKey, describeRepeat, occurrenceDates } from '@/lib/recurrence';
+import {
+  addMonthsKey, describeHorizon, describeRepeat, occurrenceDates, HORIZON_OPTIONS, SERIES_HORIZON_DAYS,
+} from '@/lib/recurrence';
 
 const today = todayKey();
 
@@ -38,7 +40,10 @@ const REPEAT_OPTIONS: { label: string; value: RepeatFrequency | 'none' }[] = [
   { label: 'Weekly', value: 'weekly' },
   { label: '2 Weeks', value: 'biweekly' },
   { label: 'Monthly', value: 'monthly' },
+  { label: 'Custom', value: 'custom' },
 ];
+
+const CUSTOM_LIMITS = { days: { min: 2, max: 365 }, weeks: { min: 1, max: 52 } };
 
 function formatTime(time?: string): string {
   if (!time) return '';
@@ -99,6 +104,9 @@ export default function ScheduleCreateScreen() {
   const [truckId, setTruckId] = useState('');
   const [notes, setNotes] = useState('');
   const [repeat, setRepeat] = useState<RepeatFrequency | 'none'>('none');
+  const [customCount, setCustomCount] = useState(10);
+  const [customUnit, setCustomUnit] = useState<'days' | 'weeks'>('days');
+  const [horizonDays, setHorizonDays] = useState(SERIES_HORIZON_DAYS);
   const [hasEndDate, setHasEndDate] = useState(false);
   const [endDate, setEndDate] = useState(() => addMonthsKey(params.date ?? today, 3));
 
@@ -114,11 +122,27 @@ export default function ScheduleCreateScreen() {
   const dateObj = useMemo(() => new Date(date + 'T12:00:00'), [date]);
   const endDateObj = useMemo(() => new Date(endDate + 'T12:00:00'), [endDate]);
   const isRepeating = !isMove && repeat !== 'none';
+  const intervalDays = customUnit === 'weeks' ? customCount * 7 : customCount;
+  const repeatRule = { frequency: repeat as RepeatFrequency, intervalDays: repeat === 'custom' ? intervalDays : undefined };
+
+  function stepCustom(delta: number) {
+    const { min, max } = CUSTOM_LIMITS[customUnit];
+    setCustomCount(n => Math.min(max, Math.max(min, n + delta)));
+  }
+
+  function setUnit(unit: 'days' | 'weeks') {
+    if (unit === customUnit) return;
+    // Keep roughly the same gap when switching units.
+    const next = unit === 'weeks' ? Math.max(1, Math.round(customCount / 7)) : Math.max(2, customCount * 7);
+    const { min, max } = CUSTOM_LIMITS[unit];
+    setCustomUnit(unit);
+    setCustomCount(Math.min(max, Math.max(min, next)));
+  }
   // The first few days the repeat lands on, for the preview.
   const upcomingDays = useMemo(() => {
     if (repeat === 'none') return [];
-    return occurrenceDates({ frequency: repeat, startDate: date, endDate: hasEndDate ? endDate : undefined }, date, '9999-12-31', 4);
-  }, [repeat, date, hasEndDate, endDate]);
+    return occurrenceDates({ ...repeatRule, startDate: date, endDate: hasEndDate ? endDate : undefined }, date, '9999-12-31', 4);
+  }, [repeat, intervalDays, date, hasEndDate, endDate]);
   const startTimeObj = useMemo(() => timeStrToDate(date, startTime), [date, startTime]);
   const endTimeObj = useMemo(() => timeStrToDate(date, endTime), [date, endTime]);
 
@@ -255,6 +279,8 @@ export default function ScheduleCreateScreen() {
           truckId: truckId || undefined,
           notes: notes || undefined,
           frequency: repeat as RepeatFrequency,
+          intervalDays: repeat === 'custom' ? intervalDays : undefined,
+          horizonDays,
           endDate: hasEndDate ? endDate : undefined,
         });
       }
@@ -432,8 +458,61 @@ export default function ScheduleCreateScreen() {
               {repeat !== 'none' && (
                 <>
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', marginTop: spacing.xs }]}>
-                    {describeRepeat(repeat, date)}
+                    {describeRepeat(repeatRule, date)}
                   </Text>
+
+                  {repeat === 'custom' && (
+                    <View style={styles.customRow}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Every</Text>
+                      <View style={[styles.stepper, { backgroundColor: colors.backgroundTertiary }]}>
+                        <Pressable
+                          onPress={() => stepCustom(-1)}
+                          style={({ pressed }) => [styles.stepperButton, pressed && { opacity: 0.5 }]}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Fewer ${customUnit}`}
+                        >
+                          <Icon name="minus" size={16} color={colors.textPrimary} />
+                        </Pressable>
+                        <Text style={[typeScale.headingSmall, styles.stepperValue, { color: colors.textPrimary }]}>{customCount}</Text>
+                        <Pressable
+                          onPress={() => stepCustom(1)}
+                          style={({ pressed }) => [styles.stepperButton, pressed && { opacity: 0.5 }]}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel={`More ${customUnit}`}
+                        >
+                          <Icon name="plus" size={16} color={colors.textPrimary} />
+                        </Pressable>
+                      </View>
+                      <SegmentedControl
+                        values={['Days', 'Weeks']}
+                        selectedIndex={customUnit === 'weeks' ? 1 : 0}
+                        onChange={(event) => setUnit(event.nativeEvent.selectedSegmentIndex === 1 ? 'weeks' : 'days')}
+                        tintColor={colors.primary}
+                        appearance="light"
+                        backgroundColor={colors.groupedBackground}
+                        fontStyle={{ color: colors.textSecondary }}
+                        activeFontStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+                        style={[styles.segmentControl, { flex: 1 }]}
+                      />
+                    </View>
+                  )}
+
+                  <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>Schedule ahead</Text>
+                  <SegmentedControl
+                    values={HORIZON_OPTIONS.map(o => o.label)}
+                    selectedIndex={Math.max(0, HORIZON_OPTIONS.findIndex(o => o.days === horizonDays))}
+                    onChange={(event) => setHorizonDays(HORIZON_OPTIONS[event.nativeEvent.selectedSegmentIndex].days)}
+                    tintColor={colors.primary}
+                    appearance="light"
+                    backgroundColor={colors.groupedBackground}
+                    fontStyle={{ color: colors.textSecondary }}
+                    activeFontStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+                    style={styles.segmentControl}
+                  />
+
+                  <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>Ends</Text>
 
                   <SegmentedControl
                     values={['No End Date', 'End Date']}
@@ -487,7 +566,7 @@ export default function ScheduleCreateScreen() {
                         {upcomingDays.map(formatDateShort).join(' · ')}{upcomingDays.length === 4 ? ' …' : ''}
                       </Text>
                       <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-                        Days are added 8 weeks ahead and keep filling in on their own. A day the worker is already on this job is skipped.
+                        Workers see their days {describeHorizon(horizonDays)} ahead, and more keep filling in on their own. A day the worker is already on this job is skipped.
                       </Text>
                     </View>
                   )}
@@ -890,6 +969,10 @@ const styles = StyleSheet.create({
   segmentControl: { height: 34 },
   timeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   timeField: { flex: 1, borderRadius: radius.lg, padding: spacing.md },
+  customRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  stepper: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.full, paddingHorizontal: spacing.xs, height: 34 },
+  stepperButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  stepperValue: { minWidth: 32, textAlign: 'center' },
   repeatPreview: { borderRadius: radius.lg, padding: spacing.md, gap: 4 },
 
   workerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

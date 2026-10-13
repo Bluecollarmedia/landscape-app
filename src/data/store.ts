@@ -73,7 +73,7 @@ const TABLES = {
   // Crews (supabase/updates/014). A worker is in at most one crew.
   crews: { scope: 'company', cols: ['id', 'companyId', 'name', 'color', 'createdAt', 'updatedAt'] },
   crew_members: { scope: 'company', cols: ['id', 'companyId', 'crewId', 'personId', 'createdAt'] },
-  schedule_series: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'frequency', 'startDate', 'endDate', 'startTime', 'endTime', 'isFullDay', 'truckId', 'notes', 'createdBy', 'stoppedAt', 'createdAt', 'updatedAt'] },
+  schedule_series: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'frequency', 'intervalDays', 'horizonDays', 'startDate', 'endDate', 'startTime', 'endTime', 'isFullDay', 'truckId', 'notes', 'createdBy', 'stoppedAt', 'createdAt', 'updatedAt'] },
   schedule_changes: { scope: 'company', cols: ['id', 'companyId', 'assignmentId', 'changedBy', 'changeType', 'previousValue', 'newValue', 'notes', 'createdAt'] },
   announcements: { scope: 'company', cols: ['id', 'companyId', 'createdBy', 'title', 'body', 'audience', 'priority', 'weatherAction', 'recipientIds', 'expiresAt', 'createdAt', 'updatedAt'] },
   announcement_reads: { scope: 'company', cols: ['id', 'companyId', 'announcementId', 'personId', 'readAt'] },

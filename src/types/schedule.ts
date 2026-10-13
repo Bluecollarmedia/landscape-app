@@ -45,7 +45,7 @@ export interface Assignment {
   truck?: { id: string; name: string };
 }
 
-export type RepeatFrequency = 'weekly' | 'biweekly' | 'monthly';
+export type RepeatFrequency = 'weekly' | 'biweekly' | 'monthly' | 'custom';
 
 /** A repeating schedule for one worker on one job (e.g. the maintenance crew
  * every 2 weeks). Its days are filled in as normal assignments a few weeks
@@ -56,6 +56,10 @@ export interface ScheduleSeries {
   projectId: string;
   personId: string;
   frequency: RepeatFrequency;
+  /** Custom repeats: days between visits. */
+  intervalDays?: number;
+  /** How many days ahead its days are filled in. */
+  horizonDays: number;
   /** First day; later days fall on the same weekday (or day of the month). */
   startDate: string;
   /** Last day it can land on. Open-ended when missing. */

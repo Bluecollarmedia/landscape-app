@@ -61,3 +61,14 @@ select 'worker sees series=' || count(*) from public.schedule_series;
 select 'worker extend added=' || public.extend_schedule_series(null,'2026-10-13',56);
 reset role;
 select 'stopped still=' || (stopped_at is not null) from public.schedule_series where id = :'S';
+
+\echo '--- 8. Custom every 10 days, scheduled 4 weeks ahead (its own window)'
+set role authenticated; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a',false);
+insert into public.schedule_series(id,company_id,project_id,person_id,frequency,interval_days,horizon_days,start_date,is_full_day)
+ values ('50000000-0000-0000-0000-000000000003',:'C',:'J',pg_temp.pid('tyler'),'custom',10,28,'2026-10-13',true);
+select 'custom added=' || public.extend_schedule_series('50000000-0000-0000-0000-000000000003','2026-10-13');
+select 'custom ' || scheduled_date from public.assignments where series_id = '50000000-0000-0000-0000-000000000003' order by 1;
+\echo 'custom without a day count (expect error):'
+insert into public.schedule_series(company_id,project_id,person_id,frequency,start_date)
+ values (:'C',:'J',pg_temp.pid('tyler'),'custom','2026-10-13');
+reset role;

@@ -5,8 +5,20 @@
  */
 import type { RepeatFrequency } from '@/types/schedule';
 
-/** How far ahead a repeat's days are filled in. Matches the database default. */
+/** How far ahead a repeat's days are filled in unless the owner picks
+ * otherwise. Matches the database default. */
 export const SERIES_HORIZON_DAYS = 56;
+
+/** Schedule-ahead choices on Schedule Work. */
+export const HORIZON_OPTIONS = [
+  { label: '2 Wks', days: 14 },
+  { label: '1 Mo', days: 28 },
+  { label: '2 Mo', days: 56 },
+  { label: '3 Mo', days: 91 },
+  { label: '6 Mo', days: 182 },
+];
+
+type RepeatRule = { frequency: RepeatFrequency; intervalDays?: number };
 
 function parseKey(key: string): Date {
   const [y, m, d] = key.split('-').map(Number);
@@ -34,16 +46,17 @@ export function addMonthsKey(key: string, months: number): string {
   return toKey(target);
 }
 
-function nthDate(frequency: RepeatFrequency, startDate: string, n: number): string {
-  if (frequency === 'weekly') return addDaysKey(startDate, 7 * n);
-  if (frequency === 'biweekly') return addDaysKey(startDate, 14 * n);
+function nthDate(rule: RepeatRule, startDate: string, n: number): string {
+  if (rule.frequency === 'weekly') return addDaysKey(startDate, 7 * n);
+  if (rule.frequency === 'biweekly') return addDaysKey(startDate, 14 * n);
+  if (rule.frequency === 'custom') return addDaysKey(startDate, Math.max(1, rule.intervalDays ?? 7) * n);
   return addMonthsKey(startDate, n);
 }
 
 /** Days the repeat lands on from `from` through `to` (inclusive), never past
  * its end date. At most `limit` days. */
 export function occurrenceDates(
-  s: { frequency: RepeatFrequency; startDate: string; endDate?: string },
+  s: RepeatRule & { startDate: string; endDate?: string },
   from: string,
   to: string,
   limit = 500,
@@ -51,7 +64,7 @@ export function occurrenceDates(
   const last = s.endDate && s.endDate < to ? s.endDate : to;
   const out: string[] = [];
   for (let n = 0; out.length < limit; n++) {
-    const d = nthDate(s.frequency, s.startDate, n);
+    const d = nthDate(s, s.startDate, n);
     if (d > last) break;
     if (d >= from) out.push(d);
   }
@@ -66,16 +79,39 @@ function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-/** "Every 2 weeks on Monday", "Every week on Friday", "Monthly on the 12th". */
-export function describeRepeat(frequency: RepeatFrequency, startDate: string): string {
+/** "Every 10 days", "Every 3 weeks", "Every week". */
+function everyDays(days: number): string {
+  if (days % 7 === 0) return days === 7 ? 'Every week' : `Every ${days / 7} weeks`;
+  return `Every ${days} days`;
+}
+
+/** "Every 2 weeks on Monday", "Every week on Friday", "Monthly on the 12th",
+ * "Every 10 days". */
+export function describeRepeat(rule: RepeatRule, startDate: string): string {
   const d = parseKey(startDate);
   const weekday = WEEKDAYS[d.getUTCDay()];
-  if (frequency === 'weekly') return `Every week on ${weekday}`;
-  if (frequency === 'biweekly') return `Every 2 weeks on ${weekday}`;
+  if (rule.frequency === 'weekly') return `Every week on ${weekday}`;
+  if (rule.frequency === 'biweekly') return `Every 2 weeks on ${weekday}`;
+  if (rule.frequency === 'custom') {
+    const days = rule.intervalDays ?? 7;
+    return days % 7 === 0 ? `${everyDays(days)} on ${weekday}` : everyDays(days);
+  }
   return `Monthly on the ${ordinal(d.getUTCDate())}`;
 }
 
-/** Short form for badges: "Weekly", "Every 2 weeks", "Monthly". */
-export function repeatShortLabel(frequency: RepeatFrequency): string {
-  return frequency === 'weekly' ? 'Weekly' : frequency === 'biweekly' ? 'Every 2 weeks' : 'Monthly';
+/** Short form for badges: "Weekly", "Every 2 weeks", "Monthly", "Every 10 days". */
+export function repeatShortLabel(rule: RepeatRule): string {
+  if (rule.frequency === 'custom') return everyDays(rule.intervalDays ?? 7);
+  return rule.frequency === 'weekly' ? 'Weekly' : rule.frequency === 'biweekly' ? 'Every 2 weeks' : 'Monthly';
+}
+
+/** "2 months", "6 weeks" — how far ahead a repeat is scheduled. */
+export function describeHorizon(days: number): string {
+  const opt = HORIZON_OPTIONS.find(o => o.days === days);
+  if (opt) {
+    const [n, unit] = opt.label.split(' ');
+    const word = unit === 'Wks' ? 'week' : 'month';
+    return `${n} ${word}${n === '1' ? '' : 's'}`;
+  }
+  return `${Math.round(days / 7)} weeks`;
 }

@@ -482,7 +482,7 @@ function AssignmentSheet({
           <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]}>
             {series.stoppedAt
               ? `Repeat ended${series.endDate ? ` after ${formatDateFull(series.endDate)}` : ''}`
-              : `Repeats ${repeatShortLabel(series.frequency).toLowerCase()}${series.endDate ? ` until ${formatDateFull(series.endDate)}` : ''}`}
+              : `Repeats ${repeatShortLabel(series).toLowerCase()}${series.endDate ? ` until ${formatDateFull(series.endDate)}` : ''}`}
           </Text>
         </View>
       )}

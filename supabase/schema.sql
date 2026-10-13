@@ -389,6 +389,15 @@ create table public.worker_hourly_rates (
   created_at timestamptz not null default now()
 );
 
+create table public.worker_pay_settings (
+  person_id uuid primary key references public.people(id) on delete cascade,
+  company_id uuid not null references public.companies(id) on delete cascade,
+  overtime_enabled boolean not null default true,
+  overtime_after_hours numeric(5,2) not null default 40 check (overtime_after_hours > 0),
+  overtime_multiplier numeric(4,2) not null default 1.5 check (overtime_multiplier >= 1),
+  updated_at timestamptz not null default now()
+);
+
 create table public.overtime_rules (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.companies(id) on delete cascade,
@@ -532,7 +541,7 @@ begin
     'companies','people','company_members','projects','project_tasks','project_settings',
     'project_updates','project_requests','trucks','assignments','announcements',
     'work_sessions','overtime_rules','company_operations_settings',
-    'notification_preferences','worker_settings','join_requests'
+    'notification_preferences','worker_settings','join_requests','worker_pay_settings'
   ] loop
     execute format('create trigger %I before update on public.%I for each row execute function public.set_updated_at()',
                    t || '_updated_at', t);
@@ -750,6 +759,9 @@ end $$;
 
 alter table public.worker_hourly_rates enable row level security;
 create policy hourly_rates_staff on public.worker_hourly_rates for all
+  using (public.is_staff(company_id)) with check (public.is_staff(company_id));
+alter table public.worker_pay_settings enable row level security;
+create policy worker_pay_settings_staff on public.worker_pay_settings for all
   using (public.is_staff(company_id)) with check (public.is_staff(company_id));
 
 do $$
@@ -1219,7 +1231,7 @@ alter publication supabase_realtime add table
   public.project_updates, public.project_requests, public.project_history, public.customer_timeline,
   public.trucks, public.assignments, public.schedule_changes, public.announcements,
   public.announcement_reads, public.check_ins, public.check_outs, public.worker_activities,
-  public.work_sessions, public.worker_hourly_rates, public.app_notifications,
+  public.work_sessions, public.worker_hourly_rates, public.worker_pay_settings, public.app_notifications,
   public.join_requests, public.company_invitations, public.team_codes, public.company_join_settings;
 
 -- ============================================================================

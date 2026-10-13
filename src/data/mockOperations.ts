@@ -1,6 +1,7 @@
 import type {
   WorkSession,
   WorkerHourlyRate,
+  WorkerPaySettings,
   OvertimeRule,
   NotificationPreference,
   AppNotification,
@@ -307,6 +308,14 @@ export const mockHourlyRates: WorkerHourlyRate[] = [
     setBy: 'owner1', createdAt: '2026-04-01T00:00:00Z',
     worker: mockPeople.worker4,
   },
+];
+
+// ── Per-worker overtime ───────────────────────────────────────
+// worker1/worker2 have no row, so they use the company rule.
+
+export const mockWorkerPaySettings: WorkerPaySettings[] = [
+  { personId: 'worker3', companyId: 'company1', overtimeEnabled: true, overtimeAfterHours: 45, overtimeMultiplier: 2 },
+  { personId: 'worker4', companyId: 'company1', overtimeEnabled: false, overtimeAfterHours: 40, overtimeMultiplier: 1.5 },
 ];
 
 // ── Overtime Rules ─────────────────────────────────────────────

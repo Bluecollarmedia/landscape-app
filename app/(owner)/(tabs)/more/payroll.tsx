@@ -8,9 +8,10 @@ import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Avatar } from '@/components/ui';
+import { Switch } from '@/components/ui/Switch';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
-import { usePayroll, type PayrollEstimate } from '@/hooks/useOperations';
+import { usePayroll, type PayrollEstimate, type OvertimeTerms } from '@/hooks/useOperations';
 import { localDateKey } from '@/lib/ids';
 
 function formatHours(hours: number): string {
@@ -24,6 +25,23 @@ function formatMoney(amount: number): string {
   return '$' + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
+function formatMultiplier(m: number): string {
+  return `${Number(m.toFixed(2))}x`;
+}
+
+function formatThreshold(hours: number): string {
+  return `${Number(hours.toFixed(2))}h`;
+}
+
+function overtimeSummary(ot: OvertimeTerms): string {
+  return ot.enabled ? `OT ${formatMultiplier(ot.multiplier)} after ${formatThreshold(ot.afterHours)}` : 'No OT';
+}
+
+function showAlert(title: string, msg: string) {
+  if (Platform.OS === 'web') alert(msg);
+  else Alert.alert(title, msg);
+}
+
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00Z');
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -33,7 +51,7 @@ export default function PayrollScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { getPayrollEstimates, getRatesForWorker, overtimeRule, setHourlyRate } = usePayroll();
+  const { getPayrollEstimates, getRatesForWorker, setHourlyRate, setWorkerOvertime } = usePayroll();
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [expandedWorker, setExpandedWorker] = useState<string | null>(null);
@@ -109,14 +127,12 @@ export default function PayrollScreen() {
           </View>
         </View>
 
-        {overtimeRule.isActive && (
-          <View style={[styles.otBanner, { backgroundColor: colors.infoLight }]}>
-            <Icon name="info" size={14} color={colors.info} />
-            <Text style={[typeScale.caption, { color: colors.info, flex: 1 }]}>
-              Overtime: {overtimeRule.overtimeMultiplier}x after {overtimeRule.weeklyThresholdHours ?? 40}h/week
-            </Text>
-          </View>
-        )}
+        <View style={[styles.otBanner, { backgroundColor: colors.infoLight }]}>
+          <Icon name="info" size={14} color={colors.info} />
+          <Text style={[typeScale.caption, { color: colors.info, flex: 1 }]}>
+            Each worker has their own rate and overtime. Tap a worker to change them.
+          </Text>
+        </View>
 
         <View style={[styles.disclaimer, { backgroundColor: colors.warningLight }]}>
           <Icon name="alert-triangle" size={14} color={colors.warning} />
@@ -131,6 +147,7 @@ export default function PayrollScreen() {
             estimate={est}
             rateHistory={getRatesForWorker(est.personId)}
             onSetRate={(rate) => setHourlyRate(est.personId, rate)}
+            onSetOvertime={(terms) => setWorkerOvertime(est.personId, terms)}
             expanded={expandedWorker === est.personId}
             onToggle={() =>
               setExpandedWorker((prev) => (prev === est.personId ? null : est.personId))
@@ -147,6 +164,7 @@ function PayrollCard({
   estimate,
   rateHistory,
   onSetRate,
+  onSetOvertime,
   expanded,
   onToggle,
   colors,
@@ -154,6 +172,7 @@ function PayrollCard({
   estimate: PayrollEstimate;
   rateHistory: any[];
   onSetRate: (rate: number) => void;
+  onSetOvertime: (terms: { enabled: boolean; afterHours: number; multiplier: number }) => void;
   expanded: boolean;
   onToggle: () => void;
   colors: any;
@@ -172,6 +191,35 @@ function PayrollCard({
     setRateDraft('');
   }
 
+  const ot = estimate.overtime;
+  const [afterDraft, setAfterDraft] = useState('');
+  const [multDraft, setMultDraft] = useState('');
+  const otDirty = afterDraft.trim() !== '' || multDraft.trim() !== '';
+
+  function handleToggleOvertime(enabled: boolean) {
+    onSetOvertime({ enabled, afterHours: ot.afterHours, multiplier: ot.multiplier });
+  }
+
+  function handleSaveOvertime() {
+    const afterHours = afterDraft.trim() ? Number(afterDraft.replace(/[^0-9.]/g, '')) : ot.afterHours;
+    const multiplier = multDraft.trim() ? Number(multDraft.replace(/[^0-9.]/g, '')) : ot.multiplier;
+    if (!Number.isFinite(afterHours) || afterHours <= 0 || afterHours > 168) {
+      showAlert('Check the hours', 'Enter the hours a week before overtime starts, like 40.');
+      return;
+    }
+    if (!Number.isFinite(multiplier) || multiplier < 1 || multiplier > 10) {
+      showAlert('Check the multiplier', 'Enter how much overtime pays, like 1.5 or 2.');
+      return;
+    }
+    onSetOvertime({
+      enabled: true,
+      afterHours: Math.round(afterHours * 100) / 100,
+      multiplier: Math.round(multiplier * 100) / 100,
+    });
+    setAfterDraft('');
+    setMultDraft('');
+  }
+
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
       <Pressable style={styles.cardHeader} onPress={onToggle}>
@@ -187,6 +235,9 @@ function PayrollCard({
           </Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
             {formatHours(estimate.regularHours + estimate.overtimeHours)} · ${estimate.regularRate}/hr
+          </Text>
+          <Text style={[typeScale.caption, { color: ot.enabled ? colors.textSecondary : colors.textTertiary }]}>
+            {overtimeSummary(ot)}
           </Text>
         </View>
         <Text style={[typeScale.headingLarge, { color: colors.primary }]}>
@@ -277,6 +328,63 @@ function PayrollCard({
             </View>
           </View>
 
+          <View style={[styles.rateHistory, { borderTopColor: colors.borderLight }]}>
+            <View style={styles.otToggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Gets overtime</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                  {ot.enabled ? `${formatMultiplier(ot.multiplier)} pay after ${formatThreshold(ot.afterHours)} a week` : 'Always paid the regular rate'}
+                  {!ot.isCustom && ' (company default)'}
+                </Text>
+              </View>
+              <Switch
+                value={ot.enabled}
+                onValueChange={handleToggleOvertime}
+                accessibilityLabel={`Overtime for ${estimate.worker.firstName}`}
+              />
+            </View>
+
+            {ot.enabled && (
+              <View style={styles.otFields}>
+                <View style={styles.otField}>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Starts after</Text>
+                  <View style={styles.rateInputRow}>
+                    <TextInput
+                      value={afterDraft}
+                      onChangeText={setAfterDraft}
+                      placeholder={String(ot.afterHours)}
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="decimal-pad"
+                      style={[styles.rateInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                      accessibilityLabel="Hours a week before overtime starts"
+                    />
+                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>hrs/wk</Text>
+                  </View>
+                </View>
+                <View style={styles.otField}>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Pays</Text>
+                  <View style={styles.rateInputRow}>
+                    <TextInput
+                      value={multDraft}
+                      onChangeText={setMultDraft}
+                      placeholder={String(ot.multiplier)}
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="decimal-pad"
+                      style={[styles.rateInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                      accessibilityLabel="Overtime multiplier"
+                    />
+                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>× rate</Text>
+                  </View>
+                </View>
+                {otDirty && (
+                  <Pressable onPress={handleSaveOvertime} style={[styles.rateSave, styles.otSave, { backgroundColor: colors.primary }]} accessibilityRole="button">
+                    <Text style={[typeScale.labelSmall, { color: '#FFFFFF', fontWeight: '600' }]}>Save overtime</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+          </View>
+
           {rateHistory.length > 1 && (
             <View style={[styles.rateHistory, { borderTopColor: colors.borderLight }]}>
               <Text style={[typeScale.overline, { color: colors.textTertiary, marginBottom: spacing.sm }]}>
@@ -360,6 +468,10 @@ const styles = StyleSheet.create({
   rateHistory: { borderTopWidth: 1, marginTop: spacing.md, paddingTop: spacing.md },
   rateRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs },
   rateInputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rateInput: { flex: 1, borderWidth: 1.5, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 16 },
+  rateInput: { flex: 1, minWidth: 0, borderWidth: 1.5, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 16 },
+  otToggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  otFields: { marginTop: spacing.md, gap: spacing.sm },
+  otField: { gap: spacing['2xs'] },
+  otSave: { alignSelf: 'flex-end', marginTop: spacing.xs },
   rateSave: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.full },
 });

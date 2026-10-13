@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTrucks } from '@/hooks/useTrucks';
-import { Card, StatusBadge, EmptyState, OptimizedImage } from '@/components/ui';
+import { Card, StatusBadge, EmptyState, OptimizedImage, GlassIconButton } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { TruckStatus } from '@/types/truck';
@@ -40,9 +40,7 @@ export default function TruckDetailScreen() {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
-            <Icon name="arrow-left" size={24} color={colors.textPrimary} />
-          </Pressable>
+          <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Go back" />
         </View>
         <View style={styles.center}>
           <EmptyState icon="alert-circle" title="Vehicle not found" description="This truck or trailer may have been removed." />
@@ -56,9 +54,7 @@ export default function TruckDetailScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
-          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
-        </Pressable>
+        <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Go back" />
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>{truck.name}</Text>
       </View>
 
@@ -109,7 +105,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     gap: spacing.md,
   },
-  backButton: { padding: spacing.xs },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing['5xl'] },
   photo: {

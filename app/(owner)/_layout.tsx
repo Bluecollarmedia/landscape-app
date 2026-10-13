@@ -18,6 +18,7 @@ export default function OwnerLayout() {
         <Stack.Screen name="schedule-create" options={{ presentation: 'modal' }} />
         <Stack.Screen name="search" options={{ presentation: 'modal' }} />
         <Stack.Screen name="notification-center" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
         {/* Company Resources: opened from More and from Workers, so it sits
             above the tabs (a normal push) and its forms are modals. */}
         <Stack.Screen name="resources" />

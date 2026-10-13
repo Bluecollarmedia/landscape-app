@@ -56,6 +56,13 @@ export default function SettingsScreen() {
 
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance + spacing.lg }]} showsVerticalScrollIndicator={false}>
         <ListSection title="Your Account">
+          <ListRow
+            icon="camera"
+            iconColor={colors.primary}
+            title="Edit Profile & Photo"
+            showChevron
+            onPress={() => router.push('/(owner)/edit-profile' as any)}
+          />
           <ListRow icon="user" title="Name" value={`${user?.firstName} ${user?.lastName}`} />
           <ListRow icon="mail" title="Email" value={user?.email ?? '—'} />
           <ListRow icon="shield" title="Role" value="Owner" />

@@ -54,13 +54,23 @@ export default function MoreScreen() {
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>More</Text>
         </View>
 
-        <View style={styles.profileCard}>
-          <Avatar
-            firstName={user?.firstName ?? 'O'}
-            lastName={user?.lastName ?? 'W'}
-            size={56}
-            uri={user?.avatarUrl}
-          />
+        <Pressable
+          style={styles.profileCard}
+          onPress={() => router.push('/(owner)/edit-profile' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Edit profile and photo"
+        >
+          <View>
+            <Avatar
+              firstName={user?.firstName ?? 'O'}
+              lastName={user?.lastName ?? 'W'}
+              size={56}
+              uri={user?.avatarUrl}
+            />
+            <View style={[styles.cameraBadge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+              <Feather name="camera" size={11} color="#FFFFFF" />
+            </View>
+          </View>
           <View style={styles.profileInfo}>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>
               {user?.firstName} {user?.lastName}
@@ -68,8 +78,12 @@ export default function MoreScreen() {
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
               {user?.email}
             </Text>
+            <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '600', marginTop: 2 }]}>
+              Edit Profile
+            </Text>
           </View>
-        </View>
+          <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+        </Pressable>
 
         <View style={styles.menuSection}>
           <Text style={[typeScale.overline, { color: colors.textTertiary, marginBottom: spacing.sm, paddingHorizontal: spacing.lg }]}>
@@ -223,6 +237,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   profileInfo: { flex: 1 },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   menuSection: { marginBottom: spacing.xl },
   menuItem: {
     flexDirection: 'row',

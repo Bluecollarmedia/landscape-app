@@ -1,5 +1,5 @@
 -- ============================================================================
--- Update 12 — run once in Supabase → SQL Editor (safe to run again).
+-- Update 13 — run once in Supabase → SQL Editor (safe to run again).
 --  • Custom overtime for each worker: on or off, how many hours a week before
 --    it starts, and the multiplier (e.g. 2x after 45h). Set on More → Payroll
 --    Estimate by opening a worker's card. Hourly rates stay where they were

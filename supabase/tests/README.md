@@ -25,3 +25,12 @@ on the last day of short months, and workers can't create or change repeats.
 psql -d t -f supabase/updates/012_recurring_schedules.sql
 psql -d t -f supabase/tests/012_recurring_schedules_test.sql
 ```
+
+`014_crews_test.sql` checks crews: names are unique per company, a worker is
+in at most one crew, deleting a crew frees its members, and workers can see
+but not change crews.
+
+```sh
+psql -d t -f supabase/updates/014_crews.sql
+psql -d t -f supabase/tests/014_crews_test.sql
+```

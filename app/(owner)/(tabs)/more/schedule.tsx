@@ -7,7 +7,8 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useSchedule } from '@/hooks/useSchedule';
-import { Card, StatusBadge, Avatar, Divider, EmptyState } from '@/components/ui';
+import { Card, StatusBadge, Avatar, Divider, EmptyState, CrewLabel } from '@/components/ui';
+import { useCrews } from '@/hooks/useCrews';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -79,6 +80,7 @@ export default function ScheduleScreen() {
   const [showIosPicker, setShowIosPicker] = useState(false);
 
   const schedule = useSchedule();
+  const { crewOf } = useCrews();
   const grouped = schedule.getGroupedByWorker(selectedDate);
   const allDayAssignments = schedule.getAllByDate(selectedDate);
   const cancelledCount = allDayAssignments.filter(a => a.status === 'cancelled' || a.status === 'reassigned').length;
@@ -165,6 +167,7 @@ export default function ScheduleScreen() {
           const group = grouped[workerId];
           const person = group.person!;
           const travelWarnings = schedule.detectTravelWarnings(workerId, selectedDate);
+          const crew = crewOf(workerId);
 
           return (
             <Card key={workerId} style={styles.workerCard} noPadding>
@@ -174,6 +177,7 @@ export default function ScheduleScreen() {
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
                     {person.firstName} {person.lastName}
                   </Text>
+                  {crew && <CrewLabel name={crew.name} color={crew.color} style={{ marginTop: 2 }} />}
                   {group.truck && (
                     <View style={styles.truckRow}>
                       <Icon name="truck" size={11} color={colors.textTertiary} />

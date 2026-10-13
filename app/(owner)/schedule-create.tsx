@@ -9,7 +9,9 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useSchedule } from '@/hooks/useSchedule';
-import { Input, Avatar } from '@/components/ui';
+import { Input, Avatar, CrewLabel } from '@/components/ui';
+import { useCrews } from '@/hooks/useCrews';
+import type { Crew } from '@/types/crew';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -75,6 +77,7 @@ export default function ScheduleCreateScreen() {
   const isMove = !!params.moveFrom;
 
   const schedule = useSchedule();
+  const { crews, crewOf } = useCrews();
 
   const v = useDb();
   const activeWorkers = useMemo(() =>
@@ -151,6 +154,52 @@ export default function ScheduleCreateScreen() {
     const msg = `${who} already scheduled at ${selectedProject?.name ?? 'this project'} on ${formatDateFull(d)}. Edit the existing assignment instead.`;
     if (Platform.OS === 'web') alert(msg);
     else Alert.alert('Already Scheduled', msg);
+  }
+
+  // Active crew members who can be added (not already on this job that day).
+  function addableMembers(crew: Crew) {
+    return crew.memberIds.filter(pid =>
+      activeWorkers.some(w => w.personId === pid) && !existingOnJob(pid, projectId, date));
+  }
+
+  /** Adds every member of the crew; tapping again when they're all in removes them. */
+  function toggleCrew(crew: Crew) {
+    const ids = addableMembers(crew);
+    const allIn = ids.length > 0 && ids.every(id => workerIds.includes(id));
+    setWorkerIds(prev => allIn ? prev.filter(id => !ids.includes(id)) : [...prev, ...ids.filter(id => !prev.includes(id))]);
+  }
+
+  function crewChips() {
+    if (isMove || crews.length === 0) return null;
+    return (
+      <View style={styles.crewChipRow}>
+        {crews.map(c => {
+          const ids = addableMembers(c);
+          const allIn = ids.length > 0 && ids.every(id => workerIds.includes(id));
+          return (
+            <Pressable
+              key={c.id}
+              onPress={() => toggleCrew(c)}
+              disabled={ids.length === 0}
+              style={({ pressed }) => [
+                styles.crewChip,
+                { backgroundColor: allIn ? c.color : `${c.color}1F` },
+                ids.length === 0 && { opacity: 0.45 },
+                pressed && { transform: [{ scale: 0.96 }] },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: allIn }}
+              accessibilityLabel={`${allIn ? 'Remove' : 'Add'} ${c.name}`}
+            >
+              <Icon name={allIn ? 'check' : 'plus'} size={13} color={allIn ? '#FFFFFF' : c.color} />
+              <Text style={[typeScale.bodySmall, { color: allIn ? '#FFFFFF' : c.color, fontWeight: '700' }]} numberOfLines={1}>
+                {c.name} · {ids.length}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
   }
 
   function toggleWorker(personId: string) {
@@ -479,6 +528,7 @@ export default function ScheduleCreateScreen() {
               </Text>
             </View>
           )}
+          {crewChips()}
           {!isMove && (
             <Pressable style={[styles.addWorkersPill, { backgroundColor: colors.backgroundTertiary }]} onPress={() => setShowWorkerSheet(true)}>
               <Icon name="plus" size={14} color={colors.textPrimary} />
@@ -652,8 +702,10 @@ export default function ScheduleCreateScreen() {
           </Pressable>
         }
       >
+        {crewChips()}
         {activeWorkers.map(w => {
           const p = w.person!;
+          const crew = crewOf(w.personId);
           const selected = workerIds.includes(w.personId);
           const conflicts = schedule.detectConflicts({
             personId: w.personId,
@@ -680,6 +732,7 @@ export default function ScheduleCreateScreen() {
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
                   {p.firstName} {p.lastName}
                 </Text>
+                {crew && <CrewLabel name={crew.name} color={crew.color} style={{ marginTop: 2 }} />}
                 {onJob ? (
                   <>
                     <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
@@ -847,6 +900,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.full,
+  },
+  crewChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingVertical: spacing.xs },
+  crewChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    maxWidth: '100%',
   },
   addWorkersPill: {
     flexDirection: 'row',

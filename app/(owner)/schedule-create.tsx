@@ -9,13 +9,17 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useSchedule } from '@/hooks/useSchedule';
-import { Input, Avatar } from '@/components/ui';
+import { Input, Avatar, CrewLabel } from '@/components/ui';
+import { useCrews } from '@/hooks/useCrews';
+import type { Crew } from '@/types/crew';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { db, useDb } from '@/data/store';
 import { todayKey, localDateKey } from '@/lib/ids';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import type { RepeatFrequency } from '@/types/schedule';
+import { addMonthsKey, describeRepeat, occurrenceDates } from '@/lib/recurrence';
 
 const today = todayKey();
 
@@ -23,6 +27,18 @@ function formatDateFull(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+function formatDateShort(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+const REPEAT_OPTIONS: { label: string; value: RepeatFrequency | 'none' }[] = [
+  { label: 'Never', value: 'none' },
+  { label: 'Weekly', value: 'weekly' },
+  { label: '2 Weeks', value: 'biweekly' },
+  { label: 'Monthly', value: 'monthly' },
+];
 
 function formatTime(time?: string): string {
   if (!time) return '';
@@ -61,6 +77,7 @@ export default function ScheduleCreateScreen() {
   const isMove = !!params.moveFrom;
 
   const schedule = useSchedule();
+  const { crews, crewOf } = useCrews();
 
   const v = useDb();
   const activeWorkers = useMemo(() =>
@@ -81,16 +98,27 @@ export default function ScheduleCreateScreen() {
   const [endTime, setEndTime] = useState('15:00');
   const [truckId, setTruckId] = useState('');
   const [notes, setNotes] = useState('');
+  const [repeat, setRepeat] = useState<RepeatFrequency | 'none'>('none');
+  const [hasEndDate, setHasEndDate] = useState(false);
+  const [endDate, setEndDate] = useState(() => addMonthsKey(params.date ?? today, 3));
 
   const [showProjectSheet, setShowProjectSheet] = useState(false);
   const [showWorkerSheet, setShowWorkerSheet] = useState(false);
   const [showTruckSheet, setShowTruckSheet] = useState(false);
   const [showAndroidDate, setShowAndroidDate] = useState(false);
-  const [iosPicker, setIosPicker] = useState<'date' | 'start' | 'end' | null>(null);
+  const [showAndroidEndDate, setShowAndroidEndDate] = useState(false);
+  const [iosPicker, setIosPicker] = useState<'date' | 'start' | 'end' | 'endDate' | null>(null);
   const [showAndroidStart, setShowAndroidStart] = useState(false);
   const [showAndroidEnd, setShowAndroidEnd] = useState(false);
 
   const dateObj = useMemo(() => new Date(date + 'T12:00:00'), [date]);
+  const endDateObj = useMemo(() => new Date(endDate + 'T12:00:00'), [endDate]);
+  const isRepeating = !isMove && repeat !== 'none';
+  // The first few days the repeat lands on, for the preview.
+  const upcomingDays = useMemo(() => {
+    if (repeat === 'none') return [];
+    return occurrenceDates({ frequency: repeat, startDate: date, endDate: hasEndDate ? endDate : undefined }, date, '9999-12-31', 4);
+  }, [repeat, date, hasEndDate, endDate]);
   const startTimeObj = useMemo(() => timeStrToDate(date, startTime), [date, startTime]);
   const endTimeObj = useMemo(() => timeStrToDate(date, endTime), [date, endTime]);
 
@@ -128,6 +156,52 @@ export default function ScheduleCreateScreen() {
     else Alert.alert('Already Scheduled', msg);
   }
 
+  // Active crew members who can be added (not already on this job that day).
+  function addableMembers(crew: Crew) {
+    return crew.memberIds.filter(pid =>
+      activeWorkers.some(w => w.personId === pid) && !existingOnJob(pid, projectId, date));
+  }
+
+  /** Adds every member of the crew; tapping again when they're all in removes them. */
+  function toggleCrew(crew: Crew) {
+    const ids = addableMembers(crew);
+    const allIn = ids.length > 0 && ids.every(id => workerIds.includes(id));
+    setWorkerIds(prev => allIn ? prev.filter(id => !ids.includes(id)) : [...prev, ...ids.filter(id => !prev.includes(id))]);
+  }
+
+  function crewChips() {
+    if (isMove || crews.length === 0) return null;
+    return (
+      <View style={styles.crewChipRow}>
+        {crews.map(c => {
+          const ids = addableMembers(c);
+          const allIn = ids.length > 0 && ids.every(id => workerIds.includes(id));
+          return (
+            <Pressable
+              key={c.id}
+              onPress={() => toggleCrew(c)}
+              disabled={ids.length === 0}
+              style={({ pressed }) => [
+                styles.crewChip,
+                { backgroundColor: allIn ? c.color : `${c.color}1F` },
+                ids.length === 0 && { opacity: 0.45 },
+                pressed && { transform: [{ scale: 0.96 }] },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: allIn }}
+              accessibilityLabel={`${allIn ? 'Remove' : 'Add'} ${c.name}`}
+            >
+              <Icon name={allIn ? 'check' : 'plus'} size={13} color={allIn ? '#FFFFFF' : c.color} />
+              <Text style={[typeScale.bodySmall, { color: allIn ? '#FFFFFF' : c.color, fontWeight: '700' }]} numberOfLines={1}>
+                {c.name} · {ids.length}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
+
   function toggleWorker(personId: string) {
     setWorkerIds(prev => prev.includes(personId) ? prev.filter(id => id !== personId) : [...prev, personId]);
   }
@@ -160,6 +234,31 @@ export default function ScheduleCreateScreen() {
     const alreadyOnJob = selectedWorkers.filter(w => existingOnJob(w.personId, projectId, date));
     if (alreadyOnJob.length > 0) {
       showAlreadyScheduled(alreadyOnJob.map(w => w.person!.firstName), date);
+      return;
+    }
+
+    if (isRepeating) {
+      if (hasEndDate && endDate < date) {
+        const msg = 'The end date has to be on or after the first day.';
+        if (Platform.OS === 'web') alert(msg);
+        else Alert.alert('Check the End Date', msg);
+        return;
+      }
+      for (const personId of workerIds) {
+        schedule.createSeries({
+          personId,
+          projectId,
+          scheduledDate: date,
+          startTime: isFullDay ? undefined : startTime,
+          endTime: isFullDay ? undefined : endTime,
+          isFullDay,
+          truckId: truckId || undefined,
+          notes: notes || undefined,
+          frequency: repeat as RepeatFrequency,
+          endDate: hasEndDate ? endDate : undefined,
+        });
+      }
+      router.back();
       return;
     }
 
@@ -315,6 +414,86 @@ export default function ScheduleCreateScreen() {
                 />
               )}
             </Section>
+
+            {/* Repeat */}
+            <Section icon="repeat" title="Repeat">
+              <SegmentedControl
+                values={REPEAT_OPTIONS.map(o => o.label)}
+                selectedIndex={REPEAT_OPTIONS.findIndex(o => o.value === repeat)}
+                onChange={(event) => setRepeat(REPEAT_OPTIONS[event.nativeEvent.selectedSegmentIndex].value)}
+                tintColor={colors.primary}
+                appearance="light"
+                backgroundColor={colors.groupedBackground}
+                fontStyle={{ color: colors.textSecondary }}
+                activeFontStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+                style={styles.segmentControl}
+              />
+
+              {repeat !== 'none' && (
+                <>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', marginTop: spacing.xs }]}>
+                    {describeRepeat(repeat, date)}
+                  </Text>
+
+                  <SegmentedControl
+                    values={['No End Date', 'End Date']}
+                    selectedIndex={hasEndDate ? 1 : 0}
+                    onChange={(event) => setHasEndDate(event.nativeEvent.selectedSegmentIndex === 1)}
+                    tintColor={colors.primary}
+                    appearance="light"
+                    backgroundColor={colors.groupedBackground}
+                    fontStyle={{ color: colors.textSecondary }}
+                    activeFontStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+                    style={styles.segmentControl}
+                  />
+
+                  {hasEndDate && (
+                    <Pressable
+                      style={styles.fieldRow}
+                      onPress={() => (Platform.OS === 'android' ? setShowAndroidEndDate(true) : setIosPicker('endDate'))}
+                      accessibilityRole="button"
+                      accessibilityLabel="Choose end date"
+                    >
+                      <Icon name="flag" size={15} color={colors.textSecondary} />
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', flex: 1 }]}>
+                        Ends {formatDateFull(endDate)}
+                      </Text>
+                      <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+                    </Pressable>
+                  )}
+                  {Platform.OS === 'android' && showAndroidEndDate && (
+                    <DateTimePicker
+                      value={endDateObj}
+                      mode="date"
+                      display="default"
+                      minimumDate={dateObj}
+                      onChange={(_e: DateTimePickerEvent, d?: Date) => { setShowAndroidEndDate(false); if (d) setEndDate(localDateKey(d)); }}
+                    />
+                  )}
+
+                  {hasEndDate && endDate < date ? (
+                    <View style={[styles.conflictBox, { backgroundColor: semantic.warningLight, borderColor: semantic.warning }]}>
+                      <Icon name="alert-triangle" size={14} color={semantic.warning} />
+                      <Text style={[typeScale.caption, { color: colors.textPrimary, flex: 1 }]}>
+                        The end date is before the first day.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.repeatPreview, { backgroundColor: colors.backgroundTertiary }]}>
+                      <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '700' }]}>
+                        {upcomingDays.length > 1 ? 'Next days' : 'Only day'}
+                      </Text>
+                      <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>
+                        {upcomingDays.map(formatDateShort).join(' · ')}{upcomingDays.length === 4 ? ' …' : ''}
+                      </Text>
+                      <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                        Days are added 8 weeks ahead and keep filling in on their own. A day the worker is already on this job is skipped.
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </Section>
           </>
         )}
 
@@ -349,6 +528,7 @@ export default function ScheduleCreateScreen() {
               </Text>
             </View>
           )}
+          {crewChips()}
           {!isMove && (
             <Pressable style={[styles.addWorkersPill, { backgroundColor: colors.backgroundTertiary }]} onPress={() => setShowWorkerSheet(true)}>
               <Icon name="plus" size={14} color={colors.textPrimary} />
@@ -406,11 +586,11 @@ export default function ScheduleCreateScreen() {
             { backgroundColor: pressed ? colors.primaryDark : colors.primary },
           ]}
           accessibilityRole="button"
-          accessibilityLabel={isMove ? 'Move Worker' : 'Schedule Work'}
+          accessibilityLabel={isMove ? 'Move Worker' : isRepeating ? 'Schedule Repeating Work' : 'Schedule Work'}
         >
-          <Icon name="calendar" size={18} color={colors.textOnPrimary} />
+          <Icon name={isRepeating ? 'repeat' : 'calendar'} size={18} color={colors.textOnPrimary} />
           <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary, fontSize: 17 }]}>
-            {isMove ? 'Move Worker' : 'Schedule Work'}
+            {isMove ? 'Move Worker' : isRepeating ? 'Schedule Repeating Work' : 'Schedule Work'}
           </Text>
         </Pressable>
       </KeyboardAwareScrollView>
@@ -423,7 +603,7 @@ export default function ScheduleCreateScreen() {
             <Pressable style={[styles.pickerCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={(e) => e.stopPropagation()}>
               <View style={styles.pickerHeader}>
                 <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
-                  {iosPicker === 'date' ? 'Date' : iosPicker === 'start' ? 'Start Time' : 'End Time'}
+                  {iosPicker === 'date' ? 'Date' : iosPicker === 'endDate' ? 'End Date' : iosPicker === 'start' ? 'Start Time' : 'End Time'}
                 </Text>
                 <Pressable onPress={() => setIosPicker(null)} hitSlop={12} accessibilityRole="button">
                   <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Done</Text>
@@ -436,6 +616,16 @@ export default function ScheduleCreateScreen() {
                   display="inline"
                   accentColor={colors.primary}
                   onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setDate(localDateKey(d)); }}
+                />
+              )}
+              {iosPicker === 'endDate' && (
+                <DateTimePicker
+                  value={endDateObj}
+                  mode="date"
+                  display="inline"
+                  minimumDate={dateObj}
+                  accentColor={colors.primary}
+                  onChange={(_e: DateTimePickerEvent, d?: Date) => { if (d) setEndDate(localDateKey(d)); }}
                 />
               )}
               {(iosPicker === 'start' || iosPicker === 'end') && (
@@ -512,8 +702,10 @@ export default function ScheduleCreateScreen() {
           </Pressable>
         }
       >
+        {crewChips()}
         {activeWorkers.map(w => {
           const p = w.person!;
+          const crew = crewOf(w.personId);
           const selected = workerIds.includes(w.personId);
           const conflicts = schedule.detectConflicts({
             personId: w.personId,
@@ -540,6 +732,7 @@ export default function ScheduleCreateScreen() {
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
                   {p.firstName} {p.lastName}
                 </Text>
+                {crew && <CrewLabel name={crew.name} color={crew.color} style={{ marginTop: 2 }} />}
                 {onJob ? (
                   <>
                     <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
@@ -697,6 +890,7 @@ const styles = StyleSheet.create({
   segmentControl: { height: 34 },
   timeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   timeField: { flex: 1, borderRadius: radius.lg, padding: spacing.md },
+  repeatPreview: { borderRadius: radius.lg, padding: spacing.md, gap: 4 },
 
   workerChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   workerChip: {
@@ -706,6 +900,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.full,
+  },
+  crewChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingVertical: spacing.xs },
+  crewChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    maxWidth: '100%',
   },
   addWorkersPill: {
     flexDirection: 'row',

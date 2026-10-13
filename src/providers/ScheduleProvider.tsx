@@ -1,7 +1,13 @@
-import React, { createContext, useContext, useCallback, useMemo } from 'react';
-import type { Assignment, ScheduleChange, ScheduleChangeType, ScheduleConflict, TravelWarning } from '@/types/schedule';
-import { db, useDb, insertRow, updateRow } from '@/data/store';
+import React, { createContext, useContext, useCallback, useEffect, useMemo } from 'react';
+import type {
+  Assignment, RepeatFrequency, ScheduleChange, ScheduleChangeType, ScheduleConflict, ScheduleSeries, TravelWarning,
+} from '@/types/schedule';
+import { db, useDb, insertRow, updateRow, flushWrites, rpc, refresh, isDemo, rowsOf } from '@/data/store';
 import { todayKey, localDateKey, uuid } from '@/lib/ids';
+import { addDaysKey, occurrenceDates, SERIES_HORIZON_DAYS } from '@/lib/recurrence';
+
+// The day repeats were last topped up on this device (once a day is enough).
+let lastTopUpDay = '';
 
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number);
@@ -19,6 +25,7 @@ function isActive(a: Assignment): boolean {
 
 export interface ScheduleContextValue {
   assignments: Assignment[];
+  series: ScheduleSeries[];
   changes: ScheduleChange[];
   stats: { total: number; confirmed: number; awaiting: number };
   getByDate: (date: string) => Assignment[];
@@ -35,8 +42,18 @@ export interface ScheduleContextValue {
   createAssignment: (params: {
     personId: string; projectId: string; scheduledDate: string;
     startTime?: string; endTime?: string; isFullDay: boolean;
-    truckId?: string; notes?: string;
+    truckId?: string; notes?: string; seriesId?: string;
   }) => Assignment;
+  /** Schedules a worker on a job on repeat from `scheduledDate`. The first
+   * day is created right away; the rest are filled in a few weeks ahead. */
+  createSeries: (params: {
+    personId: string; projectId: string; scheduledDate: string;
+    startTime?: string; endTime?: string; isFullDay: boolean;
+    truckId?: string; notes?: string;
+    frequency: RepeatFrequency; endDate?: string;
+  }) => ScheduleSeries;
+  /** Stops a repeat after `afterDate`: later days that haven't started are cancelled. */
+  endSeriesAfter: (seriesId: string, afterDate: string) => void;
   cancelAssignment: (assignmentId: string, reason?: string) => void;
   moveWorker: (assignmentId: string, newProjectId: string, notes?: string) => Assignment | undefined;
   updateAssignment: (assignmentId: string, updates: Partial<Pick<Assignment, 'startTime' | 'endTime' | 'isFullDay' | 'truckId' | 'notes'>>, changeNotes?: string) => void;
@@ -50,6 +67,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   const v = useDb();
   const assignments = useMemo(() => db.assignments, [v]);
   const changes = useMemo(() => db.scheduleChanges, [v]);
+  const series = useMemo(() => db.scheduleSeries, [v]);
 
   const getByDate = useCallback((date: string) => {
     return assignments.filter(a => a.scheduledDate === date && isActive(a));
@@ -164,7 +182,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   const createAssignment = useCallback((params: {
     personId: string; projectId: string; scheduledDate: string;
     startTime?: string; endTime?: string; isFullDay: boolean;
-    truckId?: string; notes?: string;
+    truckId?: string; notes?: string; seriesId?: string;
   }): Assignment => {
     const person = db.people[params.personId];
     const project = db.projects.find(pr => pr.id === params.projectId);
@@ -189,6 +207,8 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
       confirmationState: 'awaiting',
       truckId: params.truckId,
       notes: params.notes,
+      // Only sent when set, so plain scheduling works before update 012 is run.
+      ...(params.seriesId ? { seriesId: params.seriesId } : {}),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       person: person ? { ...person } : undefined,
@@ -239,8 +259,10 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const newId = uuid();
 
+    // A moved day no longer belongs to its repeat.
+    const { seriesId: _series, ...rest } = original;
     const newAssignment: Assignment = {
-      ...original,
+      ...rest,
       id: newId,
       projectId: newProjectId,
       status: 'scheduled',
@@ -307,6 +329,101 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     });
   }, [assignments, addChange]);
 
+  /** Demo mode: fill in a repeat's days locally, the same way
+   * extend_schedule_series() does in the database. */
+  const extendLocally = useCallback((s: ScheduleSeries, today: string) => {
+    if (s.stoppedAt) return;
+    const to = addDaysKey(today, SERIES_HORIZON_DAYS);
+    for (const d of occurrenceDates(s, today, to)) {
+      // Raw rows, so days added earlier in this loop count too.
+      const taken = (rowsOf('assignments') as Assignment[]).some(a =>
+        (a.seriesId === s.id && a.scheduledDate === d) ||
+        (a.personId === s.personId && a.projectId === s.projectId && a.scheduledDate === d && isActive(a))
+      );
+      if (taken) continue;
+      createAssignment({
+        personId: s.personId, projectId: s.projectId, scheduledDate: d,
+        startTime: s.startTime, endTime: s.endTime, isFullDay: s.isFullDay,
+        truckId: s.truckId, notes: s.notes, seriesId: s.id,
+      });
+    }
+  }, [createAssignment]);
+
+  /** Fills in repeats' days up to a few weeks ahead (one repeat, or all). */
+  const topUp = useCallback(async (only?: ScheduleSeries) => {
+    const today = todayKey();
+    if (isDemo()) {
+      const list = only ? [only] : (rowsOf('schedule_series') as ScheduleSeries[]);
+      for (const s of list) extendLocally(s, today);
+      return;
+    }
+    await flushWrites();
+    const { data, error } = await rpc<number>('extend_schedule_series', {
+      p_series: only?.id ?? null,
+      p_today: today,
+      p_horizon_days: SERIES_HORIZON_DAYS,
+    });
+    if (error) {
+      console.warn('[schedule] filling in repeating schedules failed:', error.message);
+      return;
+    }
+    if (data) await refresh('assignments', 'schedule_changes');
+  }, [extendLocally]);
+
+  // Owner/admin app: top up running repeats once a day.
+  useEffect(() => {
+    if (!db.ready || (db.role !== 'owner' && db.role !== 'admin')) return;
+    if (!db.scheduleSeries.some(s => !s.stoppedAt)) return;
+    const today = todayKey();
+    if (lastTopUpDay === today) return;
+    lastTopUpDay = today;
+    topUp();
+  }, [v, topUp]);
+
+  const createSeries = useCallback((params: {
+    personId: string; projectId: string; scheduledDate: string;
+    startTime?: string; endTime?: string; isFullDay: boolean;
+    truckId?: string; notes?: string;
+    frequency: RepeatFrequency; endDate?: string;
+  }): ScheduleSeries => {
+    const row = insertRow('schedule_series', {
+      projectId: params.projectId,
+      personId: params.personId,
+      frequency: params.frequency,
+      startDate: params.scheduledDate,
+      endDate: params.endDate,
+      startTime: params.isFullDay ? undefined : params.startTime,
+      endTime: params.isFullDay ? undefined : params.endTime,
+      isFullDay: params.isFullDay,
+      truckId: params.truckId,
+      notes: params.notes,
+      createdBy: db.personId || undefined,
+    }) as unknown as ScheduleSeries;
+
+    // The chosen day shows up right away; the database fills in the rest.
+    createAssignment({
+      personId: params.personId, projectId: params.projectId, scheduledDate: params.scheduledDate,
+      startTime: params.startTime, endTime: params.endTime, isFullDay: params.isFullDay,
+      truckId: params.truckId, notes: params.notes, seriesId: row.id,
+    });
+    topUp(row);
+    return row;
+  }, [createAssignment, topUp]);
+
+  const endSeriesAfter = useCallback((seriesId: string, afterDate: string) => {
+    const s = db.scheduleSeries.find(x => x.id === seriesId);
+    if (!s) return;
+    updateRow('schedule_series', seriesId, {
+      stoppedAt: new Date().toISOString(),
+      endDate: afterDate < s.startDate ? s.startDate : afterDate,
+    });
+    const later = assignments.filter(a =>
+      a.seriesId === seriesId && a.scheduledDate > afterDate &&
+      (a.status === 'scheduled' || a.status === 'confirmed')
+    );
+    for (const a of later) cancelAssignment(a.id, 'Repeat ended');
+  }, [assignments, cancelAssignment]);
+
   const getChangesForAssignment = useCallback((assignmentId: string) => {
     return changes.filter(c => c.assignmentId === assignmentId);
   }, [changes]);
@@ -350,18 +467,18 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   }, [todayAssignments]);
 
   const value: ScheduleContextValue = useMemo(() => ({
-    assignments, changes, stats,
+    assignments, series, changes, stats,
     getByDate, getAllByDate, getByWorker, getByProject,
     getGroupedByWorker, weekSummary,
     detectConflicts, detectTravelWarnings,
-    createAssignment, cancelAssignment, moveWorker, updateAssignment,
+    createAssignment, createSeries, endSeriesAfter, cancelAssignment, moveWorker, updateAssignment,
     getChangesForAssignment, getChangesForDate,
   }), [
-    assignments, changes, stats,
+    assignments, series, changes, stats,
     getByDate, getAllByDate, getByWorker, getByProject,
     getGroupedByWorker, weekSummary,
     detectConflicts, detectTravelWarnings,
-    createAssignment, cancelAssignment, moveWorker, updateAssignment,
+    createAssignment, createSeries, endSeriesAfter, cancelAssignment, moveWorker, updateAssignment,
     getChangesForAssignment, getChangesForDate,
   ]);
 

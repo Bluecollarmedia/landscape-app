@@ -26,8 +26,9 @@ import type {
   Project, ProjectTask, ProjectTeamMember, ProjectSettings, ProjectPhoto, ProjectUpdate,
   ProjectRequest, ProjectHistoryEntry, CustomerTimelineEvent, ProjectMessage,
 } from '@/types/project';
-import type { Assignment, ScheduleChange } from '@/types/schedule';
+import type { Assignment, ScheduleChange, ScheduleSeries } from '@/types/schedule';
 import type { Truck } from '@/types/truck';
+import type { Crew } from '@/types/crew';
 import type { Announcement, AnnouncementRead } from '@/types/announcement';
 import type { CheckIn, CheckOut, WorkerActivity, WorkerSettings } from '@/types/worker';
 import type {
@@ -66,7 +67,13 @@ const TABLES = {
   project_history: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'actorId', 'eventType', 'description', 'metadata', 'createdAt'] },
   customer_timeline: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'eventType', 'title', 'description', 'photoUrl', 'timestamp'] },
   trucks: { scope: 'company', cols: ['id', 'companyId', 'name', 'make', 'model', 'year', 'licensePlate', 'vin', 'color', 'photoUrl', 'status', 'notes', 'assignedTo', 'createdAt', 'updatedAt'] },
-  assignments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'scheduledDate', 'startTime', 'endTime', 'isFullDay', 'sortOrder', 'status', 'confirmationState', 'truckId', 'notes', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'reassignedFrom', 'reassignedTo', 'createdAt', 'updatedAt'] },
+  assignments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'scheduledDate', 'startTime', 'endTime', 'isFullDay', 'sortOrder', 'status', 'confirmationState', 'truckId', 'notes', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'reassignedFrom', 'reassignedTo', 'seriesId', 'createdAt', 'updatedAt'] },
+  // Repeating schedules (supabase/updates/012). Their days are filled in as
+  // assignments by extend_schedule_series().
+  // Crews (supabase/updates/014). A worker is in at most one crew.
+  crews: { scope: 'company', cols: ['id', 'companyId', 'name', 'color', 'createdAt', 'updatedAt'] },
+  crew_members: { scope: 'company', cols: ['id', 'companyId', 'crewId', 'personId', 'createdAt'] },
+  schedule_series: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'frequency', 'startDate', 'endDate', 'startTime', 'endTime', 'isFullDay', 'truckId', 'notes', 'createdBy', 'stoppedAt', 'createdAt', 'updatedAt'] },
   schedule_changes: { scope: 'company', cols: ['id', 'companyId', 'assignmentId', 'changedBy', 'changeType', 'previousValue', 'newValue', 'notes', 'createdAt'] },
   announcements: { scope: 'company', cols: ['id', 'companyId', 'createdBy', 'title', 'body', 'audience', 'priority', 'weatherAction', 'recipientIds', 'expiresAt', 'createdAt', 'updatedAt'] },
   announcement_reads: { scope: 'company', cols: ['id', 'companyId', 'announcementId', 'personId', 'readAt'] },
@@ -179,6 +186,10 @@ export interface Db {
   customerTimeline: Record<string, CustomerTimelineEvent[]>;
   trucks: Truck[];
   assignments: Assignment[];
+  scheduleSeries: ScheduleSeries[];
+  crews: Crew[];
+  /** Each worker's crew, by person id. */
+  crewByPerson: Record<string, Crew>;
   scheduleChanges: ScheduleChange[];
   announcements: Announcement[];
   announcementReads: AnnouncementRead[];
@@ -238,6 +249,9 @@ export const db: Db = {
   customerTimeline: {},
   trucks: [],
   assignments: [],
+  scheduleSeries: [],
+  crews: [],
+  crewByPerson: {},
   scheduleChanges: [],
   announcements: [],
   announcementReads: [],
@@ -389,6 +403,16 @@ function derive() {
       project: projectRef[a.projectId],
       truck: a.truckId ? truckRef[a.truckId] : undefined,
     }) as Assignment);
+
+  const crewMemberIds = groupBy(raw.crew_members, 'crewId');
+  db.crews = raw.crews
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    .map((c) => ({ ...c, memberIds: (crewMemberIds[c.id] ?? []).map((m) => m.personId) }) as Crew);
+  db.crewByPerson = {};
+  for (const c of db.crews) for (const pid of c.memberIds) db.crewByPerson[pid] = c;
+
+  db.scheduleSeries = raw.schedule_series.slice().sort(byCreated) as ScheduleSeries[];
 
   db.scheduleChanges = raw.schedule_changes
     .slice()
@@ -722,6 +746,9 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.company_resources = mock.mockResources.map((r) => ({ ...r }));
     raw.resource_access = mock.mockResourceAccess.map((a) => ({ ...a }));
     raw.resource_audit_log = [];
+    // A sample crew so the Crews row has something to show.
+    raw.crews = [{ id: 'crew-maint', companyId: mock.mockCompany.id, name: 'Maintenance Crew', color: '#7CB342', createdAt: '2025-03-01T08:00:00Z', updatedAt: '2025-03-01T08:00:00Z' }];
+    raw.crew_members = ['worker2', 'worker4'].map((pid) => ({ id: `crew-maint-${pid}`, companyId: mock.mockCompany.id, crewId: 'crew-maint', personId: pid, createdAt: '2025-03-01T08:00:00Z' }));
     const fin = (require('./mockFinancials') as typeof import('./mockFinancials')).buildMockFinancials(mock.mockProjects);
     raw.quotes = fin.quotes;
     raw.change_orders = fin.changeOrders;

@@ -7,7 +7,8 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useResources } from '@/hooks/useResources';
-import { StatusBadge, Avatar, EmptyState } from '@/components/ui';
+import { StatusBadge, Avatar, EmptyState, CrewLabel } from '@/components/ui';
+import { useCrews } from '@/hooks/useCrews';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -53,6 +54,7 @@ export default function WorkerDetailScreen() {
   const { getWorker, updateWorker } = useWorkers({ includeInactive: true });
   const schedule = useSchedule();
   const { resourcesFor } = useResources();
+  const { crews, crewOf, setWorkerCrew } = useCrews();
 
   const worker = getWorker(id);
 
@@ -75,6 +77,7 @@ export default function WorkerDetailScreen() {
   const p = w.person;
   const isActive = w.member.status === 'active';
 
+  const crew = crewOf(p.id);
   const todayAssignments = schedule.getByWorker(p.id, today);
   const tomorrowAssignments = schedule.getByWorker(p.id, offsetDate(1));
 
@@ -126,8 +129,9 @@ export default function WorkerDetailScreen() {
                 <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>
                   {p.firstName} {p.lastName}
                 </Text>
-                <View style={{ marginTop: spacing.xs, alignSelf: 'flex-start' }}>
+                <View style={styles.badgeRow}>
                   <StatusBadge label={isActive ? 'Active' : 'Inactive'} status={isActive ? 'success' : 'error'} />
+                  {crew && <CrewLabel name={crew.name} color={crew.color} />}
                 </View>
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
                   Worker · Hired {formatHiredDate(w.member.createdAt)}
@@ -156,6 +160,47 @@ export default function WorkerDetailScreen() {
                   <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Email</Text>
                   <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{p.email}</Text>
                 </View>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Crew */}
+          <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Crew</Text>
+              <Pressable onPress={() => router.push('/(owner)/crews' as any)} hitSlop={8} accessibilityRole="button">
+                <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>Manage Crews</Text>
+              </Pressable>
+            </View>
+            <View style={styles.crewChoices}>
+              {[{ id: null as string | null, name: 'No Crew', color: colors.textTertiary }, ...crews].map(c => {
+                const selected = (crew?.id ?? null) === c.id;
+                return (
+                  <Pressable
+                    key={c.id ?? 'none'}
+                    onPress={() => { haptics.select(); setWorkerCrew(p.id, c.id); }}
+                    style={({ pressed }) => [
+                      styles.crewChoice,
+                      { borderColor: selected ? c.color : colors.border, backgroundColor: selected ? `${c.color}1F` : 'transparent' },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                  >
+                    {c.id && <View style={[styles.crewDot, { backgroundColor: c.color }]} />}
+                    <Text style={[typeScale.bodySmall, { color: selected ? c.color : colors.textSecondary, fontWeight: selected ? '700' : '500' }]}>
+                      {c.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                onPress={() => router.push('/(owner)/crew-edit' as any)}
+                style={[styles.crewChoice, { borderColor: colors.border, borderStyle: 'dashed' }]}
+                accessibilityRole="button"
+              >
+                <Icon name="plus" size={13} color={colors.textSecondary} />
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>New Crew</Text>
               </Pressable>
             </View>
           </View>
@@ -297,6 +342,10 @@ export default function WorkerDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  crewChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  crewChoice: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1.5 },
+  crewDot: { width: 8, height: 8, borderRadius: 4 },
   screen: { flex: 1 },
   header: {
     flexDirection: 'row',

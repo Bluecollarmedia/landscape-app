@@ -89,6 +89,8 @@ const FEATHER_TO_SF: Partial<Record<string, string>> = {
   'plus-circle': 'plus.circle',
   'plus-square': 'plus.square',
   'refresh-cw': 'arrow.clockwise',
+  'repeat': 'repeat',
+  'flag': 'flag',
   'search': 'magnifyingglass',
   'send': 'paperplane',
   'settings': 'gearshape',

@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import { View, Text, FlatList, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorkers, WorkerWithStatus } from '@/hooks/useWorkers';
-import { SearchBar, FilterChips, EmptyState, Avatar, StatusBadge } from '@/components/ui';
+import { SearchBar, FilterChips, EmptyState, Avatar, StatusBadge, CrewLabel } from '@/components/ui';
+import { useCrews } from '@/hooks/useCrews';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
@@ -32,6 +33,8 @@ export default function WorkersListScreen() {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
+  const [crewFilter, setCrewFilter] = useState<string | null>(null);
+  const { crews, crewOf } = useCrews();
 
   // No statusFilter passed to the hook — it only supports the old
   // confirmed/scheduled/not_scheduled/inactive keys. We filter locally
@@ -58,7 +61,9 @@ export default function WorkersListScreen() {
     { key: 'inactive', label: 'Inactive', count: filterCounts.inactive },
   ];
 
-  const displayedWorkers = searched.filter((w) => matchesFilter(w, statusFilter));
+  const activeCrewFilter = crews.some(c => c.id === crewFilter) ? crewFilter : null;
+  const displayedWorkers = searched.filter((w) =>
+    matchesFilter(w, statusFilter) && (!activeCrewFilter || crewOf(w.person.id)?.id === activeCrewFilter));
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -100,6 +105,42 @@ export default function WorkersListScreen() {
           selected={statusFilter}
           onSelect={setStatusFilter}
         />
+        {/* Crews: tap one to show only its workers */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.crewStrip}>
+          {crews.map(c => {
+            const selected = activeCrewFilter === c.id;
+            return (
+              <Pressable
+                key={c.id}
+                onPress={() => setCrewFilter(selected ? null : c.id)}
+                style={({ pressed }) => [
+                  styles.crewChip,
+                  { backgroundColor: selected ? c.color : `${c.color}1F` },
+                  pressed && { transform: [{ scale: 0.96 }] },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${c.name}, ${c.memberIds.length} workers`}
+              >
+                <View style={[styles.crewDot, { backgroundColor: selected ? '#FFFFFF' : c.color }]} />
+                <Text style={[typeScale.labelSmall, { color: selected ? '#FFFFFF' : c.color, fontWeight: '700' }]} numberOfLines={1}>
+                  {c.name} · {c.memberIds.length}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            onPress={() => router.push('/(owner)/crews' as any)}
+            style={({ pressed }) => [styles.crewChip, { backgroundColor: pressed ? colors.border : colors.backgroundTertiary }]}
+            accessibilityRole="button"
+            accessibilityLabel={crews.length ? 'Manage crews' : 'Make a crew'}
+          >
+            <Icon name={crews.length ? 'edit-2' : 'plus'} size={13} color={colors.textPrimary} />
+            <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontWeight: '700' }]}>
+              {crews.length ? 'Crews' : 'Make a Crew'}
+            </Text>
+          </Pressable>
+        </ScrollView>
       </View>
 
       {displayedWorkers.length === 0 ? (
@@ -118,6 +159,7 @@ export default function WorkersListScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const isInactive = item.todayStatus === 'inactive';
+            const crew = crewOf(item.person.id);
             const assignment = item.todayAssignments[0];
             const badge = isInactive
               ? { label: 'Inactive', status: 'error' as const }
@@ -145,6 +187,7 @@ export default function WorkersListScreen() {
                     </Text>
                     <StatusBadge label={badge.label} status={badge.status} />
                   </View>
+                  {crew && <CrewLabel name={crew.name} color={crew.color} style={{ marginTop: 4 }} />}
 
                   {isInactive ? (
                     <>
@@ -212,6 +255,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   searchBar: { marginBottom: spacing.sm },
+  crewStrip: { gap: spacing.sm, paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  crewChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 32,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+  },
+  crewDot: { width: 8, height: 8, borderRadius: 4 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   resourcesPill: {
     flexDirection: 'row',

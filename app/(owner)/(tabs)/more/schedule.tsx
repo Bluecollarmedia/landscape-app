@@ -11,7 +11,8 @@ import { Card, StatusBadge, Avatar, Divider, EmptyState } from '@/components/ui'
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import type { Assignment } from '@/types/schedule';
+import type { Assignment, ScheduleSeries } from '@/types/schedule';
+import { repeatShortLabel } from '@/lib/recurrence';
 import { haptics } from '@/lib/haptics';
 import { todayKey, localDateKey } from '@/lib/ids';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
@@ -108,6 +109,25 @@ export default function ScheduleScreen() {
     }
   }
 
+  function handleEndRepeat(assignment: Assignment) {
+    if (!assignment.seriesId) return;
+    const day = formatDateFull(assignment.scheduledDate);
+    const msg = `${assignment.person?.firstName}'s repeating schedule at ${assignment.project?.name} stops after ${day}. Later days are cancelled; this day and earlier ones stay.`;
+    const end = () => {
+      haptics.destructive();
+      schedule.endSeriesAfter(assignment.seriesId!, assignment.scheduledDate);
+      setSelectedAssignment(null);
+    };
+    if (Platform.OS === 'web') {
+      if (confirm(msg)) end();
+    } else {
+      Alert.alert('End Repeat', msg, [
+        { text: 'Keep Repeating', style: 'cancel' },
+        { text: 'End Repeat', style: 'destructive', onPress: end },
+      ]);
+    }
+  }
+
   function handleMove(assignment: Assignment) {
     setSelectedAssignment(null);
     router.push(`/(owner)/schedule-create?moveFrom=${assignment.id}&workerId=${assignment.personId}&date=${selectedDate}` as any);
@@ -187,9 +207,14 @@ export default function ScheduleScreen() {
                       </Text>
                       <Icon name="home" size={13} color={colors.textTertiary} />
                       <View style={{ flex: 1 }}>
-                        <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
-                          {a.project?.name ?? 'Unknown project'}
-                        </Text>
+                        <View style={styles.projectNameRow}>
+                          <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600', flexShrink: 1 }]} numberOfLines={1}>
+                            {a.project?.name ?? 'Unknown project'}
+                          </Text>
+                          {a.seriesId && (
+                            <Icon name="repeat" size={11} color={colors.primary} />
+                          )}
+                        </View>
                         {a.project?.address && (
                           <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>
                             {a.project.address}
@@ -375,6 +400,8 @@ export default function ScheduleScreen() {
         onMove={handleMove}
         onCancel={handleCancel}
         onViewProject={handleViewProject}
+        onEndRepeat={handleEndRepeat}
+        series={selectedAssignment?.seriesId ? schedule.series.find(s => s.id === selectedAssignment.seriesId) : undefined}
       />
     </View>
   );
@@ -386,12 +413,16 @@ function AssignmentSheet({
   onMove,
   onCancel,
   onViewProject,
+  onEndRepeat,
+  series,
 }: {
   assignment: Assignment | null;
   onClose: () => void;
   onMove: (a: Assignment) => void;
   onCancel: (a: Assignment) => void;
   onViewProject: (a: Assignment) => void;
+  onEndRepeat: (a: Assignment) => void;
+  series?: ScheduleSeries;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -441,6 +472,17 @@ function AssignmentSheet({
         </View>
       )}
 
+      {series && (
+        <View style={styles.sheetDetailRow}>
+          <Icon name="repeat" size={16} color={colors.textSecondary} />
+          <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]}>
+            {series.stoppedAt
+              ? `Repeat ended${series.endDate ? ` after ${formatDateFull(series.endDate)}` : ''}`
+              : `Repeats ${repeatShortLabel(series.frequency).toLowerCase()}${series.endDate ? ` until ${formatDateFull(series.endDate)}` : ''}`}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.sheetDetailRow}>
         <Icon name="check-circle" size={16} color={colors.textSecondary} />
         {(() => {
@@ -465,8 +507,17 @@ function AssignmentSheet({
 
       <Pressable style={styles.sheetActionRow} onPress={() => onCancel(assignment)} accessibilityRole="button">
         <Icon name="x-circle" size={18} color={semantic.error} />
-        <Text style={[typeScale.bodyLarge, { color: semantic.error, flex: 1 }]}>Cancel Assignment</Text>
+        <Text style={[typeScale.bodyLarge, { color: semantic.error, flex: 1 }]}>
+          {series && !series.stoppedAt ? 'Cancel This Day' : 'Cancel Assignment'}
+        </Text>
       </Pressable>
+
+      {series && !series.stoppedAt && (
+        <Pressable style={styles.sheetActionRow} onPress={() => onEndRepeat(assignment)} accessibilityRole="button">
+          <Icon name="slash" size={18} color={semantic.error} />
+          <Text style={[typeScale.bodyLarge, { color: semantic.error, flex: 1 }]}>End Repeat After This Day</Text>
+        </Pressable>
+      )}
     </View>
   );
 
@@ -584,4 +635,5 @@ const styles = StyleSheet.create({
   sheetProjectRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   sheetDetailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sheetActionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  projectNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

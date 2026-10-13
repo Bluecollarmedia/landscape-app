@@ -36,11 +36,40 @@ export interface Assignment {
   cancellationReason?: string;
   reassignedFrom?: string;
   reassignedTo?: string;
+  /** Set when this day was filled in by a repeating schedule. */
+  seriesId?: string;
   createdAt: string;
   updatedAt: string;
   person?: PersonSummary;
   project?: { id: string; name: string; address?: string };
   truck?: { id: string; name: string };
+}
+
+export type RepeatFrequency = 'weekly' | 'biweekly' | 'monthly';
+
+/** A repeating schedule for one worker on one job (e.g. the maintenance crew
+ * every 2 weeks). Its days are filled in as normal assignments a few weeks
+ * ahead, so workers confirm and check in exactly as usual. */
+export interface ScheduleSeries {
+  id: string;
+  companyId: string;
+  projectId: string;
+  personId: string;
+  frequency: RepeatFrequency;
+  /** First day; later days fall on the same weekday (or day of the month). */
+  startDate: string;
+  /** Last day it can land on. Open-ended when missing. */
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  isFullDay: boolean;
+  truckId?: string;
+  notes?: string;
+  createdBy?: string;
+  /** Set when the owner stops it; nothing new is filled in after that. */
+  stoppedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ScheduleChangeType =

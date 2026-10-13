@@ -26,7 +26,7 @@ import type {
   Project, ProjectTask, ProjectTeamMember, ProjectSettings, ProjectPhoto, ProjectUpdate,
   ProjectRequest, ProjectHistoryEntry, CustomerTimelineEvent, ProjectMessage,
 } from '@/types/project';
-import type { Assignment, ScheduleChange } from '@/types/schedule';
+import type { Assignment, ScheduleChange, ScheduleSeries } from '@/types/schedule';
 import type { Truck } from '@/types/truck';
 import type { Announcement, AnnouncementRead } from '@/types/announcement';
 import type { CheckIn, CheckOut, WorkerActivity, WorkerSettings } from '@/types/worker';
@@ -66,7 +66,10 @@ const TABLES = {
   project_history: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'actorId', 'eventType', 'description', 'metadata', 'createdAt'] },
   customer_timeline: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'eventType', 'title', 'description', 'photoUrl', 'timestamp'] },
   trucks: { scope: 'company', cols: ['id', 'companyId', 'name', 'make', 'model', 'year', 'licensePlate', 'vin', 'color', 'photoUrl', 'status', 'notes', 'assignedTo', 'createdAt', 'updatedAt'] },
-  assignments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'scheduledDate', 'startTime', 'endTime', 'isFullDay', 'sortOrder', 'status', 'confirmationState', 'truckId', 'notes', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'reassignedFrom', 'reassignedTo', 'createdAt', 'updatedAt'] },
+  assignments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'scheduledDate', 'startTime', 'endTime', 'isFullDay', 'sortOrder', 'status', 'confirmationState', 'truckId', 'notes', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'reassignedFrom', 'reassignedTo', 'seriesId', 'createdAt', 'updatedAt'] },
+  // Repeating schedules (supabase/updates/012). Their days are filled in as
+  // assignments by extend_schedule_series().
+  schedule_series: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'frequency', 'startDate', 'endDate', 'startTime', 'endTime', 'isFullDay', 'truckId', 'notes', 'createdBy', 'stoppedAt', 'createdAt', 'updatedAt'] },
   schedule_changes: { scope: 'company', cols: ['id', 'companyId', 'assignmentId', 'changedBy', 'changeType', 'previousValue', 'newValue', 'notes', 'createdAt'] },
   announcements: { scope: 'company', cols: ['id', 'companyId', 'createdBy', 'title', 'body', 'audience', 'priority', 'weatherAction', 'recipientIds', 'expiresAt', 'createdAt', 'updatedAt'] },
   announcement_reads: { scope: 'company', cols: ['id', 'companyId', 'announcementId', 'personId', 'readAt'] },
@@ -179,6 +182,7 @@ export interface Db {
   customerTimeline: Record<string, CustomerTimelineEvent[]>;
   trucks: Truck[];
   assignments: Assignment[];
+  scheduleSeries: ScheduleSeries[];
   scheduleChanges: ScheduleChange[];
   announcements: Announcement[];
   announcementReads: AnnouncementRead[];
@@ -238,6 +242,7 @@ export const db: Db = {
   customerTimeline: {},
   trucks: [],
   assignments: [],
+  scheduleSeries: [],
   scheduleChanges: [],
   announcements: [],
   announcementReads: [],
@@ -389,6 +394,8 @@ function derive() {
       project: projectRef[a.projectId],
       truck: a.truckId ? truckRef[a.truckId] : undefined,
     }) as Assignment);
+
+  db.scheduleSeries = raw.schedule_series.slice().sort(byCreated) as ScheduleSeries[];
 
   db.scheduleChanges = raw.schedule_changes
     .slice()

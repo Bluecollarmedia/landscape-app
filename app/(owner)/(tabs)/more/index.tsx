@@ -43,7 +43,7 @@ function MenuItem({ icon, label, subtitle, onPress, colors }: MenuItemProps) {
 export default function MoreScreen() {
   const { colors } = useTheme();
   const tabBarClearance = useTabBarClearance();
-  const { user, signOut } = useAuth();
+  const { user, signOut, memberRole } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -123,6 +123,15 @@ export default function MoreScreen() {
             onPress={() => router.push('/(owner)/more/pending-requests' as any)}
             colors={colors}
           />
+          {memberRole !== 'admin' && (
+            <MenuItem
+              icon="users"
+              label="Accounts"
+              subtitle="Everyone who has signed up"
+              onPress={() => router.push('/(owner)/more/accounts' as any)}
+              colors={colors}
+            />
+          )}
           <MenuItem
             icon="sliders"
             label="Join Settings"

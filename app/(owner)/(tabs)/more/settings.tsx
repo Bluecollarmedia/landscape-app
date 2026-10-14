@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
-import { Avatar } from '@/components/ui';
+import { Avatar, GlassIconButton } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { SettingsGroup, SettingsRow, PressScale, UsageBar, tileColors } from '@/components/settings/SettingsList';
@@ -69,14 +69,7 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <PressScale
-          onPress={() => router.back()}
-          pressedScale={0.9}
-          style={[styles.backButton, { backgroundColor: colors.surface }, shadow.sm]}
-          accessibilityLabel="Go back"
-        >
-          <Icon name="chevron-left" size={22} color={colors.textPrimary} />
-        </PressScale>
+        <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Go back" />
       </View>
 
       <ScrollView
@@ -234,13 +227,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   title: { marginBottom: spacing.lg, marginLeft: spacing.xs },
   scrollContent: { paddingHorizontal: spacing.lg },

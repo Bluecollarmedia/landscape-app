@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
-import { Card, LoadingSpinner } from '@/components/ui';
+import { Card, LoadingSpinner, GlassIconButton } from '@/components/ui';
 import { PressScale, UsageBar } from '@/components/settings/SettingsList';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -278,14 +278,7 @@ function shortLimitLabel(limitGb: number): string {
 function Header({ colors, insets, onBack }: { colors: any; insets: any; onBack: () => void }) {
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-      <PressScale
-        onPress={onBack}
-        pressedScale={0.9}
-        style={[styles.backButton, { backgroundColor: colors.surface }, shadow.sm]}
-        accessibilityLabel="Go back"
-      >
-        <Icon name="chevron-left" size={22} color={colors.textPrimary} />
-      </PressScale>
+      <GlassIconButton icon="chevron-left" onPress={onBack} accessibilityLabel="Go back" />
       <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>
         Storage
       </Text>
@@ -342,13 +335,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing['5xl'],
   },
   card: { marginBottom: spacing.lg },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   segment: { height: 36 },
   customRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   customField: {

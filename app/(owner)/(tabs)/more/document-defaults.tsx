@@ -1,17 +1,16 @@
 /**
- * Quotes & Invoices → Document Defaults: the tax rate, terms, exclusions and
+ * Settings → Quotes & Invoices → Document Defaults (also reachable from the
+ * sliders button on the Quotes & Invoices screen): the tax rate, terms, exclusions and
  * payment instructions every new quote, change order and invoice starts with.
  * Documents already created keep what they have; each draft can still be
  * changed on its own.
  */
 
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { Icon } from '@/components/ui/Icon';
-import { ListSection } from '@/components/ui';
+import { ListSection, ScreenHeader, PressableScale } from '@/components/ui';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { InputRow, NoteField } from '@/components/financials/FormBits';
 import { showMessage } from '@/components/financials/ActionSheet';
@@ -26,7 +25,6 @@ import { spacing } from '@/theme/spacing';
 export default function DocumentDefaultsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const clearance = useTabBarClearance();
   useDb();
   const saved = db.financialSettings;
@@ -55,23 +53,30 @@ export default function DocumentDefaultsScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.btn} accessibilityRole="button" accessibilityLabel="Back">
-          <Icon name="chevron-left" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>Document Defaults</Text>
-        <Pressable onPress={save} hitSlop={12} style={styles.btn} accessibilityRole="button" accessibilityLabel="Save defaults">
-          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Save</Text>
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Document Defaults"
+        subtitle="What new quotes, change orders and invoices start with"
+        right={
+          <PressableScale
+            onPress={save}
+            scaleTo={0.92}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Save defaults"
+            style={[styles.save, { backgroundColor: colors.primary }]}
+          >
+            <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Save</Text>
+          </PressableScale>
+        }
+      />
 
       <KeyboardAwareScrollView
         bottomOffset={KEYBOARD_GAP}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: clearance + spacing['2xl'] }}
+        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: clearance + spacing['2xl'] }}
       >
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.lg, marginHorizontal: spacing.xs }]}>
-          New quotes, change orders and invoices start with these. Documents you already made don’t change, and you can still edit each draft.
+          Documents you already made don’t change, and you can still edit each draft.
         </Text>
         <ListSection title="TAX" footer="Leave empty if you don’t charge tax. Nothing is assumed.">
           <InputRow label="Tax rate" value={tax} onChangeText={setTax} placeholder="0" keyboardType="decimal-pad" suffix="%" error={!taxValid} />
@@ -92,6 +97,5 @@ export default function DocumentDefaultsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  top: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
-  btn: { minWidth: 56, height: 44, alignItems: 'center', justifyContent: 'center' },
+  save: { height: 44, paddingHorizontal: spacing.lg, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });

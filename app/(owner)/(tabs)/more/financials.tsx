@@ -7,9 +7,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
-import { Button, SearchBar, FilterChips, ListSection, EmptyState, LoadingSpinner } from '@/components/ui';
+import { ScreenHeader, GlassIconButton, Button, SearchBar, FilterChips, ListSection, EmptyState, LoadingSpinner } from '@/components/ui';
 import { DocumentRow } from '@/components/financials/DocumentRow';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -38,7 +37,6 @@ function matches(doc: FinancialDoc, f: Filter): boolean {
 export default function FinancialsOverviewScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const clearance = useTabBarClearance();
   const docs = useFinancialDocs();
   const [search, setSearch] = useState('');
@@ -68,23 +66,17 @@ export default function FinancialsOverviewScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]}>
-        <View style={styles.topRow}>
-          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to More">
-            <Icon name="chevron-left" size={24} color={colors.textPrimary} />
-          </Pressable>
-          <Pressable
+      <ScreenHeader
+        title="Quotes & Invoices"
+        subtitle="Quotes, change orders and invoices"
+        right={
+          <GlassIconButton
+            icon="sliders"
             onPress={() => router.push('/(owner)/more/document-defaults' as any)}
-            hitSlop={12}
-            style={styles.back}
-            accessibilityRole="button"
             accessibilityLabel="Document defaults"
-          >
-            <Icon name="sliders" size={20} color={colors.textPrimary} />
-          </Pressable>
-        </View>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Quotes & Invoices</Text>
-      </View>
+          />
+        }
+      />
 
       <KeyboardAwareScrollView
         keyboardShouldPersistTaps="handled"
@@ -151,11 +143,8 @@ export default function FinancialsOverviewScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  top: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  back: { width: 32, height: 32, justifyContent: 'center', marginLeft: -spacing.xs, marginBottom: spacing.xs },
   tiles: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
   tile: { flex: 1, borderRadius: radius.xl, padding: spacing.md, gap: 2 },
   num: { fontVariant: ['tabular-nums'] },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   fab: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
 });

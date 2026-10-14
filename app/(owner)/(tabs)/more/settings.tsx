@@ -17,6 +17,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { brand } from '@/theme/colors';
 import { db, useDb } from '@/data/store';
+import { documentDefaults } from '@/data/financials';
 import { useCompanyYard } from '@/hooks/useCompanyYard';
 import { useStorageInfo, useStorageLimit } from '@/hooks/useStorage';
 import { formatAddress } from '@/lib/address';
@@ -41,6 +42,12 @@ export default function SettingsScreen() {
   const companyAddress = [company?.address, company?.city, [company?.state, company?.zip].filter(Boolean).join(' ')]
     .filter(Boolean)
     .join(', ');
+
+  const docDefaults = documentDefaults();
+  const docDefaultsSummary = [
+    docDefaults.taxRate ? `${docDefaults.taxRate}% tax` : 'No tax',
+    'terms, exclusions and payment instructions',
+  ].join(' · ');
 
   const devStates: { label: string; state: AppState; role?: UserRole }[] = [
     { label: 'Owner', state: 'active', role: 'owner' },
@@ -153,6 +160,16 @@ export default function SettingsScreen() {
               onPress={() => router.push('/(owner)/setup' as any)}
             />
           )}
+        </SettingsGroup>
+
+        <SettingsGroup title="Quotes & Invoices">
+          <SettingsRow
+            icon="file-text"
+            tint={tileColors.orange}
+            title="Document Defaults"
+            subtitle={docDefaultsSummary}
+            onPress={() => router.push('/(owner)/more/document-defaults' as any)}
+          />
         </SettingsGroup>
 
         <SettingsGroup title="Storage">

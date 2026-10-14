@@ -7,9 +7,8 @@
 import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
-import { EmptyState, LoadingSpinner, ProgressBar, StatusBadge } from '@/components/ui';
+import { ScreenHeader, EmptyState, LoadingSpinner, ProgressBar, StatusBadge } from '@/components/ui';
 import { formatReminder } from '@/components/materials/ReminderSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -24,7 +23,6 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 export default function MaterialsOverviewScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const clearance = useTabBarClearance();
   const v = useDb();
   const rows = useMemo(() => materialsOverview(), [v]);
@@ -32,13 +30,7 @@ export default function MaterialsOverviewScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to More">
-          <Icon name="chevron-left" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Materials</Text>
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>Jobs that need materials ordered or picked up, soonest first.</Text>
-      </View>
+      <ScreenHeader title="Materials" subtitle="Jobs that need materials ordered or picked up, soonest first." />
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: clearance + spacing['2xl'], gap: spacing.md }}>
         {!db.ready ? (
@@ -122,8 +114,6 @@ function Meta({ icon, text, warn }: { icon: 'bell' | 'truck'; text: string; warn
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  top: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  back: { width: 32, height: 32, justifyContent: 'center', marginLeft: -spacing.xs, marginBottom: spacing.xs },
   card: { borderRadius: radius.xl, padding: spacing.md, gap: 4 },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },

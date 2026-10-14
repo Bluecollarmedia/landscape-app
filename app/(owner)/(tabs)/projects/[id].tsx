@@ -35,6 +35,8 @@ import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ProjectFinancials } from '@/components/financials/ProjectFinancials';
 import { ProspectBanner } from '@/components/financials/ProspectBanner';
 import { ProjectMaterials } from '@/components/materials/ProjectMaterials';
+import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
+import { pickTaskMedia, saveTaskMedia, removeTaskMedia, type TaskMediaDraft } from '@/data/taskMedia';
 
 const today = todayKey();
 
@@ -251,6 +253,8 @@ export default function ProjectDetailScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [newTaskMedia, setNewTaskMedia] = useState<TaskMediaDraft[]>([]);
+  const [taskMediaViewer, setTaskMediaViewer] = useState<{ items: TaskMediaItem[]; index: number } | null>(null);
   const [showAssigneePicker, setShowAssigneePicker] = useState(false);
   const [photoFilter, setPhotoFilter] = useState<'all' | 'internal' | 'shared'>('all');
   const [showAddPhoto, setShowAddPhoto] = useState(false);
@@ -1174,7 +1178,7 @@ export default function ProjectDetailScreen() {
   function handleAddTask() {
     if (!newTaskTitle.trim()) return;
     const member = team.find(m => m.personId === newTaskAssignee);
-    addTask({
+    const created = addTask({
       title: newTaskTitle.trim(),
       description: newTaskDescription.trim() || undefined,
       status: 'pending',
@@ -1182,10 +1186,33 @@ export default function ProjectDetailScreen() {
       assignedTo: newTaskAssignee || undefined,
       assignee: member?.person,
     });
+    if (newTaskMedia.length > 0) saveTaskMedia(id, created.id, newTaskMedia);
     setShowAddTask(false);
     setNewTaskTitle('');
     setNewTaskDescription('');
     setNewTaskAssignee('');
+    setNewTaskMedia([]);
+  }
+
+  async function handleAddNewTaskMedia() {
+    const picked = await pickTaskMedia(newTaskMedia.length);
+    if (picked.length > 0) setNewTaskMedia(prev => [...prev, ...picked]);
+  }
+
+  async function handleAddTaskMedia(task: ProjectTask) {
+    const picked = await pickTaskMedia((db.taskAttachments[task.id] ?? []).length);
+    if (picked.length > 0) saveTaskMedia(id, task.id, picked);
+  }
+
+  function handleRemoveTaskMedia(taskId: string, attachmentId: string) {
+    const att = (db.taskAttachments[taskId] ?? []).find(a => a.id === attachmentId);
+    if (!att) return;
+    confirmAction(
+      att.mediaType === 'video' ? 'Remove video?' : 'Remove photo?',
+      'The crew will no longer see it on this task.',
+      'Remove',
+      () => removeTaskMedia(att),
+    );
   }
 
   function renderTaskRow(task: ProjectTask) {
@@ -2361,6 +2388,19 @@ export default function ProjectDetailScreen() {
                   multiline
                 />
 
+                <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.md }]}>Photos and videos</Text>
+                {(() => {
+                  const items: TaskMediaItem[] = (db.taskAttachments[selectedTask.id] ?? []).map(a => ({ key: a.id, uri: a.fileUrl, mediaType: a.mediaType }));
+                  return (
+                    <TaskMediaStrip
+                      items={items}
+                      onOpen={(index) => setTaskMediaViewer({ items, index })}
+                      onAdd={() => handleAddTaskMedia(selectedTask)}
+                      onRemove={(key) => handleRemoveTaskMedia(selectedTask.id, key)}
+                    />
+                  );
+                })()}
+
                 <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Status</Text>
                 <View style={styles.taskStatusPickerRow}>
                   {(['pending', 'in_progress', 'completed'] as TaskStatus[]).map(s => (
@@ -2446,6 +2486,12 @@ export default function ProjectDetailScreen() {
                 })()}
               </ScrollView>
             )}
+            <TaskMediaViewer
+              items={taskMediaViewer?.items ?? []}
+              index={taskMediaViewer?.index ?? null}
+              onIndexChange={(index) => setTaskMediaViewer(v => (v ? { ...v, index } : v))}
+              onClose={() => setTaskMediaViewer(null)}
+            />
           </View>
         </View>
       </BottomSheetModal>
@@ -2481,6 +2527,17 @@ export default function ProjectDetailScreen() {
                 multiline
               />
 
+              <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.md }]}>Photos or videos (optional)</Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+                Show the crew what to do. Videos can be up to a minute long.
+              </Text>
+              <TaskMediaStrip
+                items={newTaskMedia}
+                onOpen={(index) => setTaskMediaViewer({ items: newTaskMedia, index })}
+                onAdd={handleAddNewTaskMedia}
+                onRemove={(key) => setNewTaskMedia(prev => prev.filter(m => m.key !== key))}
+              />
+
               <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Assign To (optional)</Text>
               <View style={[styles.pickerList, { backgroundColor: colors.surface, marginTop: spacing.xs }, shadow.sm]}>
                 <Pressable
@@ -2510,6 +2567,12 @@ export default function ProjectDetailScreen() {
                 <Button title="Cancel" onPress={() => setShowAddTask(false)} variant="ghost" fullWidth />
               </View>
             </ScrollView>
+            <TaskMediaViewer
+              items={taskMediaViewer?.items ?? []}
+              index={taskMediaViewer?.index ?? null}
+              onIndexChange={(index) => setTaskMediaViewer(v => (v ? { ...v, index } : v))}
+              onClose={() => setTaskMediaViewer(null)}
+            />
           </View>
         </View>
       </BottomSheetModal>

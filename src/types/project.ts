@@ -86,6 +86,20 @@ export interface ProjectTask {
   assignee?: PersonSummary;
 }
 
+/** A photo or video the owner attached to a task to show what to do. */
+export interface TaskAttachment {
+  id: string;
+  companyId?: string;
+  projectId: string;
+  taskId: string;
+  mediaType: 'image' | 'video';
+  fileUrl: string;
+  fileKey: string;
+  sizeBytes?: number;
+  createdBy?: string;
+  createdAt: string;
+}
+
 export interface ProjectSettings {
   id: string;
   projectId: string;

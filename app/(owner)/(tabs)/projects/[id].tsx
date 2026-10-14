@@ -297,6 +297,32 @@ export default function ProjectDetailScreen() {
     setEditingNotes(false);
   }
 
+  const canComplete = p.status === 'active' || p.status === 'on_hold';
+
+  function askToConfirm(title: string, message: string, ok: string, onOk: () => void) {
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) onOk();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: ok, onPress: onOk },
+    ]);
+  }
+
+  function handleCompleteProject() {
+    askToConfirm(
+      'Complete this project?',
+      'It moves to Completed on the Projects list. You can reopen it any time.',
+      'Complete',
+      () => { haptics.success(); updateProject({ status: 'completed', progress: 100 }); },
+    );
+  }
+
+  function handleReopenProject() {
+    askToConfirm('Reopen this project?', 'It moves back to Active.', 'Reopen', () => updateProject({ status: 'active' }));
+  }
+
   function renderOverview() {
     const customerName = p.customer ? `${p.customer.firstName} ${p.customer.lastName}` : undefined;
     const fullAddress = p.address
@@ -459,6 +485,20 @@ export default function ProjectDetailScreen() {
               </Text>
             )}
           </View>
+
+          {canComplete && (
+            <Button title="Complete Project" icon="check-circle" onPress={handleCompleteProject} fullWidth style={{ marginTop: spacing.xl }} />
+          )}
+          {p.status === 'completed' && (
+            <View style={{ marginTop: spacing.xl }}>
+              {p.completedAt && (
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm }]}>
+                  Completed {formatDate(p.completedAt)}
+                </Text>
+              )}
+              <Button title="Reopen Project" icon="rotate-ccw" variant="secondary" onPress={handleReopenProject} fullWidth />
+            </View>
+          )}
         </View>
       </View>
     );
@@ -2311,6 +2351,17 @@ export default function ProjectDetailScreen() {
                 Edit Project
               </Text>
             </Pressable>
+            {(canComplete || p.status === 'completed') && (
+              <Pressable
+                style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
+                onPress={() => { setShowMoreMenu(false); if (canComplete) handleCompleteProject(); else handleReopenProject(); }}
+              >
+                <Icon name={canComplete ? 'check-circle' : 'rotate-ccw'} size={18} color={colors.textSecondary} />
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>
+                  {canComplete ? 'Complete Project' : 'Reopen Project'}
+                </Text>
+              </Pressable>
+            )}
             {MORE_ITEMS.map((item) => (
               <Pressable
                 key={item.key}

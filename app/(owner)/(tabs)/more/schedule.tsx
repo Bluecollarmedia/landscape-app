@@ -7,11 +7,13 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useSchedule } from '@/hooks/useSchedule';
-import { Card, StatusBadge, Avatar, Divider, EmptyState } from '@/components/ui';
+import { Card, StatusBadge, Avatar, Divider, EmptyState, CrewLabel } from '@/components/ui';
+import { useCrews } from '@/hooks/useCrews';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import type { Assignment } from '@/types/schedule';
+import type { Assignment, ScheduleSeries } from '@/types/schedule';
+import { repeatShortLabel } from '@/lib/recurrence';
 import { haptics } from '@/lib/haptics';
 import { todayKey, localDateKey } from '@/lib/ids';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
@@ -78,6 +80,7 @@ export default function ScheduleScreen() {
   const [showIosPicker, setShowIosPicker] = useState(false);
 
   const schedule = useSchedule();
+  const { crewOf } = useCrews();
   const grouped = schedule.getGroupedByWorker(selectedDate);
   const allDayAssignments = schedule.getAllByDate(selectedDate);
   const cancelledCount = allDayAssignments.filter(a => a.status === 'cancelled' || a.status === 'reassigned').length;
@@ -104,6 +107,25 @@ export default function ScheduleScreen() {
             setSelectedAssignment(null);
           },
         },
+      ]);
+    }
+  }
+
+  function handleEndRepeat(assignment: Assignment) {
+    if (!assignment.seriesId) return;
+    const day = formatDateFull(assignment.scheduledDate);
+    const msg = `${assignment.person?.firstName}'s repeating schedule at ${assignment.project?.name} stops after ${day}. Later days are cancelled; this day and earlier ones stay.`;
+    const end = () => {
+      haptics.destructive();
+      schedule.endSeriesAfter(assignment.seriesId!, assignment.scheduledDate);
+      setSelectedAssignment(null);
+    };
+    if (Platform.OS === 'web') {
+      if (confirm(msg)) end();
+    } else {
+      Alert.alert('End Repeat', msg, [
+        { text: 'Keep Repeating', style: 'cancel' },
+        { text: 'End Repeat', style: 'destructive', onPress: end },
       ]);
     }
   }
@@ -145,6 +167,7 @@ export default function ScheduleScreen() {
           const group = grouped[workerId];
           const person = group.person!;
           const travelWarnings = schedule.detectTravelWarnings(workerId, selectedDate);
+          const crew = crewOf(workerId);
 
           return (
             <Card key={workerId} style={styles.workerCard} noPadding>
@@ -154,6 +177,7 @@ export default function ScheduleScreen() {
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
                     {person.firstName} {person.lastName}
                   </Text>
+                  {crew && <CrewLabel name={crew.name} color={crew.color} style={{ marginTop: 2 }} />}
                   {group.truck && (
                     <View style={styles.truckRow}>
                       <Icon name="truck" size={11} color={colors.textTertiary} />
@@ -187,9 +211,14 @@ export default function ScheduleScreen() {
                       </Text>
                       <Icon name="home" size={13} color={colors.textTertiary} />
                       <View style={{ flex: 1 }}>
-                        <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
-                          {a.project?.name ?? 'Unknown project'}
-                        </Text>
+                        <View style={styles.projectNameRow}>
+                          <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600', flexShrink: 1 }]} numberOfLines={1}>
+                            {a.project?.name ?? 'Unknown project'}
+                          </Text>
+                          {a.seriesId && (
+                            <Icon name="repeat" size={11} color={colors.primary} />
+                          )}
+                        </View>
                         {a.project?.address && (
                           <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>
                             {a.project.address}
@@ -375,6 +404,8 @@ export default function ScheduleScreen() {
         onMove={handleMove}
         onCancel={handleCancel}
         onViewProject={handleViewProject}
+        onEndRepeat={handleEndRepeat}
+        series={selectedAssignment?.seriesId ? schedule.series.find(s => s.id === selectedAssignment.seriesId) : undefined}
       />
     </View>
   );
@@ -386,12 +417,16 @@ function AssignmentSheet({
   onMove,
   onCancel,
   onViewProject,
+  onEndRepeat,
+  series,
 }: {
   assignment: Assignment | null;
   onClose: () => void;
   onMove: (a: Assignment) => void;
   onCancel: (a: Assignment) => void;
   onViewProject: (a: Assignment) => void;
+  onEndRepeat: (a: Assignment) => void;
+  series?: ScheduleSeries;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -441,6 +476,17 @@ function AssignmentSheet({
         </View>
       )}
 
+      {series && (
+        <View style={styles.sheetDetailRow}>
+          <Icon name="repeat" size={16} color={colors.textSecondary} />
+          <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]}>
+            {series.stoppedAt
+              ? `Repeat ended${series.endDate ? ` after ${formatDateFull(series.endDate)}` : ''}`
+              : `Repeats ${repeatShortLabel(series).toLowerCase()}${series.endDate ? ` until ${formatDateFull(series.endDate)}` : ''}`}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.sheetDetailRow}>
         <Icon name="check-circle" size={16} color={colors.textSecondary} />
         {(() => {
@@ -465,8 +511,17 @@ function AssignmentSheet({
 
       <Pressable style={styles.sheetActionRow} onPress={() => onCancel(assignment)} accessibilityRole="button">
         <Icon name="x-circle" size={18} color={semantic.error} />
-        <Text style={[typeScale.bodyLarge, { color: semantic.error, flex: 1 }]}>Cancel Assignment</Text>
+        <Text style={[typeScale.bodyLarge, { color: semantic.error, flex: 1 }]}>
+          {series && !series.stoppedAt ? 'Cancel This Day' : 'Cancel Assignment'}
+        </Text>
       </Pressable>
+
+      {series && !series.stoppedAt && (
+        <Pressable style={styles.sheetActionRow} onPress={() => onEndRepeat(assignment)} accessibilityRole="button">
+          <Icon name="slash" size={18} color={semantic.error} />
+          <Text style={[typeScale.bodyLarge, { color: semantic.error, flex: 1 }]}>End Repeat After This Day</Text>
+        </Pressable>
+      )}
     </View>
   );
 
@@ -584,4 +639,5 @@ const styles = StyleSheet.create({
   sheetProjectRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   sheetDetailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sheetActionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  projectNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

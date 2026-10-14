@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking } from 'react-native';
 import { Switch } from '@/components/ui/Switch';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -33,6 +33,8 @@ import type { ProjectStatus, TaskStatus, HistoryEventType, ProjectPhoto, Project
 import type { Assignment } from '@/types/schedule';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ProjectFinancials } from '@/components/financials/ProjectFinancials';
+import { ProspectBanner } from '@/components/financials/ProspectBanner';
+import { ProjectMaterials } from '@/components/materials/ProjectMaterials';
 
 const today = todayKey();
 
@@ -83,6 +85,11 @@ const MORE_ITEMS = [
     iconBg: '#E3F1E4', iconColor: '#2E7D32',
   },
   {
+    key: 'materials', label: 'Materials', icon: 'clipboard' as const,
+    description: 'Materials to order or pick up, vendor and prep reminder',
+    iconBg: '#F3EEDF', iconColor: '#8A6D1F',
+  },
+  {
     key: 'people', label: 'People', icon: 'users' as const,
     description: 'View and manage the customer and project team members',
     iconBg: '#DCE9FB', iconColor: '#2E6BD6',
@@ -99,7 +106,8 @@ const MORE_ITEMS = [
   },
 ];
 
-type MoreSubSection = 'financials' | 'people' | 'activity' | 'settings';
+type MoreSubSection = 'financials' | 'materials' | 'people' | 'activity' | 'settings';
+const MORE_DEEP_LINKS: string[] = ['financials', 'materials'];
 
 const PHOTO_TYPE_LABEL: Record<string, string> = {
   before: 'Before', after: 'After', progress: 'Progress', issue: 'Issue', general: 'General',
@@ -111,6 +119,7 @@ function getPhotoTypeColor(photoType: string, primaryColor: string): string {
 }
 
 const statusDotColors: Record<ProjectStatus, string> = {
+  prospect: '#9E9E9E',
   active: semantic.success,
   on_hold: semantic.warning,
   completed: semantic.info,
@@ -118,6 +127,7 @@ const statusDotColors: Record<ProjectStatus, string> = {
 };
 
 const statusConfig: Record<ProjectStatus, { label: string; type: 'success' | 'warning' | 'info' | 'neutral' }> = {
+  prospect: { label: 'Prospect', type: 'neutral' },
   active: { label: 'Active', type: 'success' },
   on_hold: { label: 'On Hold', type: 'warning' },
   completed: { label: 'Completed', type: 'info' },
@@ -182,7 +192,7 @@ export default function ProjectDetailScreen() {
   const initialSection = SECTIONS.some(s => s.key === section)
     ? section!
     : (section === 'requests' || section === 'updates' || section === 'messages') ? 'customer'
-    : section === 'financials' ? 'more' : 'overview';
+    : section && MORE_DEEP_LINKS.includes(section) ? 'more' : 'overview';
 
   const [activeSection, setActiveSection] = useState(initialSection);
   const [customerSubTab, setCustomerSubTab] = useState<'updates' | 'requests' | 'messages'>(
@@ -191,8 +201,15 @@ export default function ProjectDetailScreen() {
   const [customerDrilldown, setCustomerDrilldown] = useState(section === 'requests' || section === 'updates' || section === 'messages');
   const [showManageAccess, setShowManageAccess] = useState(false);
   const [showCustomerPreview, setShowCustomerPreview] = useState(false);
-  const [moreSubSection, setMoreSubSection] = useState<MoreSubSection | null>(section === 'financials' ? 'financials' : null);
+  const [moreSubSection, setMoreSubSection] = useState<MoreSubSection | null>(section && MORE_DEEP_LINKS.includes(section) ? section as MoreSubSection : null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  // Opened again with ?section=financials|materials (e.g. a reminder tap) while already showing.
+  useEffect(() => {
+    if (section && MORE_DEEP_LINKS.includes(section)) {
+      setActiveSection('more');
+      setMoreSubSection(section as MoreSubSection);
+    }
+  }, [section]);
 
   const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, editRequestResponse, reopenRequest, deleteRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
   const { user } = useAuth();
@@ -306,6 +323,7 @@ export default function ProjectDetailScreen() {
         </View>
 
         <View style={styles.overviewBody}>
+          <ProspectBanner projectId={p.id} />
           {/* Progress */}
           <View>
             <Text style={[typeScale.overline, { color: colors.textTertiary }]}>PROJECT PROGRESS</Text>
@@ -1093,6 +1111,7 @@ export default function ProjectDetailScreen() {
     return (
       <View>
         {moreSubSection === 'financials' && <ProjectFinancials projectId={p.id} />}
+        {moreSubSection === 'materials' && <ProjectMaterials projectId={p.id} />}
         {moreSubSection === 'people' && renderPeople()}
         {moreSubSection === 'activity' && renderActivity()}
         {moreSubSection === 'settings' && renderSettings()}

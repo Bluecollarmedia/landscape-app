@@ -53,6 +53,19 @@ export interface WorkerHourlyRate {
 
 // ── Overtime ───────────────────────────────────────────────────
 
+/** A worker's own overtime terms. Workers with no row use the company rule. */
+export interface WorkerPaySettings {
+  personId: string;
+  companyId: string;
+  overtimeEnabled: boolean;
+  /** Hours worked in a week before overtime starts. */
+  overtimeAfterHours: number;
+  overtimeMultiplier: number;
+  /** Target-Pay Mode: what the worker should earn per hour worked, overtime included. */
+  targetHourlyRate?: number;
+  updatedAt?: string;
+}
+
 export type OvertimeRuleType = 'weekly_40' | 'daily_8' | 'custom' | 'none';
 
 export interface OvertimeRule {

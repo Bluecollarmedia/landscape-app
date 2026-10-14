@@ -76,7 +76,9 @@ export default function CustomerAccessScreen() {
     } else {
       setError(result.error === 'already_claimed'
         ? 'This project has already been claimed by someone else.'
-        : 'Failed to claim project. Please try again.');
+        : result.error === 'access_removed'
+          ? 'Your access was removed by the company. Contact them to get approved again.'
+          : 'Failed to claim project. Please try again.');
       setStep(signedIn ? 'code_valid' : 'authenticate');
     }
   }

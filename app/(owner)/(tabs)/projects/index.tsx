@@ -14,8 +14,9 @@ import type { ProjectStatus } from '@/types/project';
 
 type FilterKey = ProjectStatus | 'all';
 
-const STATUS_ORDER: ProjectStatus[] = ['active', 'on_hold', 'completed', 'archived'];
+const STATUS_ORDER: ProjectStatus[] = ['active', 'on_hold', 'prospect', 'completed', 'archived'];
 const STATUS_LABELS: Record<ProjectStatus, string> = {
+  prospect: 'Prospects',
   active: 'Active',
   on_hold: 'On Hold',
   completed: 'Completed',
@@ -35,6 +36,7 @@ export default function ProjectsListScreen() {
     { key: 'all', label: 'All', count: counts.all },
     { key: 'active', label: 'Active', count: counts.active },
     { key: 'on_hold', label: 'On Hold', count: counts.on_hold },
+    ...(counts.prospect > 0 ? [{ key: 'prospect' as const, label: 'Prospects', count: counts.prospect }] : []),
     { key: 'completed', label: 'Completed', count: counts.completed },
     { key: 'archived', label: 'Archived', count: counts.archived },
   ];

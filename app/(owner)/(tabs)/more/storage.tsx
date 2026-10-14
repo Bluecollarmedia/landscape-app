@@ -1,22 +1,52 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TextInput, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { Card, ProgressBar, LoadingSpinner } from '@/components/ui';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import { Card, LoadingSpinner, GlassIconButton } from '@/components/ui';
+import { PressScale, UsageBar } from '@/components/settings/SettingsList';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { useStorageInfo } from '@/hooks/useStorage';
-import { formatBytes } from '@/types/storage';
+import { useStorageInfo, useStorageLimit } from '@/hooks/useStorage';
+import { haptics } from '@/lib/haptics';
+import {
+  formatBytes,
+  storageLimitLabel,
+  STORAGE_LIMIT_OPTIONS_GB,
+  SUPABASE_FREE_PLAN_GB,
+} from '@/types/storage';
 
 export default function StorageScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { info, loading, error, refresh } = useStorageInfo();
+  const { limitGb, limitBytes, setLimitGb } = useStorageLimit();
+  const presetIndex = STORAGE_LIMIT_OPTIONS_GB.indexOf(limitGb as typeof STORAGE_LIMIT_OPTIONS_GB[number]);
+  const [customOpen, setCustomOpen] = useState(presetIndex === -1);
+  const [customText, setCustomText] = useState(presetIndex === -1 ? String(limitGb) : '');
+  const customIndex = STORAGE_LIMIT_OPTIONS_GB.length;
+  const selectedIndex = customOpen || presetIndex === -1 ? customIndex : presetIndex;
+  const customGb = Number(customText);
+  const customValid = /^\d+$/.test(customText.trim()) && customGb >= 1 && customGb <= 1_000_000;
+
+  // Keep the box in sync when the limit changes elsewhere (another device, Realtime).
+  useEffect(() => {
+    if (presetIndex === -1) {
+      setCustomOpen(true);
+      setCustomText(String(limitGb));
+    }
+  }, [limitGb, presetIndex]);
+
+  function saveCustom() {
+    if (!customValid) return;
+    haptics.success();
+    setLimitGb(customGb);
+  }
 
   if (loading && !info) {
     return (
@@ -30,7 +60,8 @@ export default function StorageScreen() {
   const usage = info?.usage;
   const settings = info?.settings;
 
-  const usagePercent = usage?.percentUsed ?? 0;
+  const unlimited = limitBytes === 0;
+  const usagePercent = unlimited ? 0 : Math.round(((usage?.totalBytes ?? 0) / limitBytes) * 100);
   const usageColor = usagePercent > 90
     ? semantic.error
     : usagePercent > 75
@@ -65,29 +96,100 @@ export default function StorageScreen() {
                 {formatBytes(usage?.totalBytes ?? 0)}
               </Text>
               <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                of {formatBytes(settings?.maxStorageBytes ?? 0)} used
+                {unlimited ? 'used · no limit set' : `of ${storageLimitLabel(limitGb)} used`}
               </Text>
             </View>
-            <View style={[styles.percentBadge, { backgroundColor: usageColor + '15' }]}>
-              <Text style={[typeScale.labelSmall, { color: usageColor, fontWeight: '700' }]}>
-                {usagePercent}%
-              </Text>
-            </View>
+            {!unlimited && (
+              <View style={[styles.percentBadge, { backgroundColor: usageColor + '15' }]}>
+                <Text style={[typeScale.labelSmall, { color: usageColor, fontWeight: '700' }]}>
+                  {usagePercent}%
+                </Text>
+              </View>
+            )}
           </View>
 
-          <ProgressBar
-            progress={usagePercent}
-            color={usageColor}
-            style={{ marginTop: spacing.md }}
-          />
+          {!unlimited && (
+            <View style={{ marginTop: spacing.md }}>
+              <UsageBar percent={usagePercent} color={usageColor} height={8} />
+            </View>
+          )}
 
           {usagePercent > 90 && (
             <View style={[styles.warningBanner, { backgroundColor: semantic.errorLight }]}>
               <Icon name="alert-triangle" size={14} color={semantic.error} />
               <Text style={[typeScale.caption, { color: semantic.error, flex: 1, marginLeft: spacing.xs }]}>
-                Storage is almost full. Delete unused files or increase your quota.
+                Storage is almost full. Delete unused files or pick a bigger limit below.
               </Text>
             </View>
+          )}
+        </Card>
+
+        {/* Storage Limit */}
+        <Card title="Storage Limit" style={styles.card}>
+          <SegmentedControl
+            values={[...STORAGE_LIMIT_OPTIONS_GB.map(shortLimitLabel), 'Custom']}
+            selectedIndex={selectedIndex}
+            onChange={(event) => {
+              haptics.select();
+              const i = event.nativeEvent.selectedSegmentIndex;
+              if (i === customIndex) {
+                setCustomOpen(true);
+                if (!customText && limitGb > 0) setCustomText(String(limitGb));
+                return;
+              }
+              setCustomOpen(false);
+              setLimitGb(STORAGE_LIMIT_OPTIONS_GB[i]);
+            }}
+            tintColor={colors.primary}
+            appearance="light"
+            backgroundColor={colors.groupedBackground}
+            fontStyle={{ color: colors.textSecondary }}
+            activeFontStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+            style={styles.segment}
+          />
+          {selectedIndex === customIndex && (
+            <View style={styles.customRow}>
+              <View style={[styles.customField, { backgroundColor: colors.groupedBackground }]}>
+                <TextInput
+                  value={customText}
+                  onChangeText={(t) => setCustomText(t.replace(/[^0-9]/g, ''))}
+                  onSubmitEditing={saveCustom}
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                  placeholder="e.g. 250"
+                  placeholderTextColor={colors.textTertiary}
+                  style={[typeScale.bodyLarge, styles.customInput, { color: colors.textPrimary }]}
+                  accessibilityLabel="Custom storage limit in GB"
+                />
+                <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>GB</Text>
+              </View>
+              <PressScale
+                onPress={customValid ? saveCustom : undefined}
+                disabled={!customValid}
+                style={[
+                  styles.customSave,
+                  { backgroundColor: customValid ? colors.primary : colors.backgroundTertiary },
+                ]}
+                accessibilityLabel="Save storage limit"
+              >
+                <Text style={[typeScale.labelLarge, { color: customValid ? '#FFFFFF' : colors.textTertiary }]}>
+                  {customValid && customGb === limitGb ? 'Saved' : 'Save'}
+                </Text>
+              </PressScale>
+            </View>
+          )}
+          {(unlimited || limitGb > SUPABASE_FREE_PLAN_GB) ? (
+            <View style={[styles.noteBox, { backgroundColor: semantic.infoLight }]}>
+              <Icon name="info" size={14} color={semantic.info} />
+              <Text style={[typeScale.caption, { color: semantic.info, flex: 1, marginLeft: spacing.xs }]}>
+                Photos are saved in Supabase. Its Free plan holds 1 GB, so anything over that needs
+                the Supabase Pro plan ($25/month with 100 GB included, then about 2¢ per extra GB).
+              </Text>
+            </View>
+          ) : (
+            <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+              1 GB matches the Supabase Free plan your photos are saved on.
+            </Text>
           )}
         </Card>
 
@@ -122,12 +224,7 @@ export default function StorageScreen() {
         </Card>
 
         {/* Storage Limits */}
-        <Card title="Storage Limits" style={styles.card}>
-          <LimitRow
-            label="Storage Quota"
-            value={formatBytes(settings?.maxStorageBytes ?? 0)}
-            colors={colors}
-          />
+        <Card title="Upload Limits" style={styles.card}>
           <LimitRow
             label="Max File Size"
             value={formatBytes(settings?.maxFileSizeBytes ?? 0)}
@@ -172,12 +269,16 @@ export default function StorageScreen() {
   );
 }
 
+/** Short labels so five options fit across a phone screen. */
+function shortLimitLabel(limitGb: number): string {
+  if (limitGb === 0) return 'Unlimited';
+  return limitGb >= 1000 && limitGb % 1000 === 0 ? `${limitGb / 1000} TB` : `${limitGb} GB`;
+}
+
 function Header({ colors, insets, onBack }: { colors: any; insets: any; onBack: () => void }) {
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-      <Pressable onPress={onBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
-        <Icon name="arrow-left" size={24} color={colors.textPrimary} />
-      </Pressable>
+      <GlassIconButton icon="chevron-left" onPress={onBack} accessibilityLabel="Go back" />
       <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>
         Storage
       </Text>
@@ -234,6 +335,31 @@ const styles = StyleSheet.create({
     paddingBottom: spacing['5xl'],
   },
   card: { marginBottom: spacing.lg },
+  segment: { height: 36 },
+  customRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  customField: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    height: 44,
+  },
+  customInput: { flex: 1, minWidth: 0, paddingVertical: 0 },
+  customSave: {
+    height: 44,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noteBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: spacing.sm,
+    borderRadius: radius.xs,
+    marginTop: spacing.md,
+  },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -12,9 +12,48 @@
  */
 
 import { BRAND_LOGO_DATA_URI } from './brandLogo';
-import { formatMoney, formatQuantity, formatPercent } from './money';
+import { formatMoney, formatQuantity, formatPercent, sumMoney } from './money';
 import { brand } from '@/theme/colors';
-import type { FinancialDoc, DocumentSnapshot, FinancialEvent } from '@/types/financial';
+import type { FinancialDoc, DocumentSnapshot, FinancialEvent, LineItem, LineItemCategory } from '@/types/financial';
+
+/** Line item groups, in the order documents print them. */
+export const CATEGORY_ORDER: LineItemCategory[] = ['labor', 'materials', 'equipment', 'misc'];
+export const CATEGORY_LABEL: Record<LineItemCategory, string> = {
+  labor: 'Labor',
+  materials: 'Materials',
+  equipment: 'Equipment',
+  misc: 'Miscellaneous',
+};
+
+interface LineGroup { title: string; items: LineItem[] }
+
+/** How the line items are grouped on the page, or null for one plain list:
+ *  • invoices that bill change orders: original quote work, then each change
+ *    order, then anything added on the invoice;
+ *  • otherwise, when items have a group (Labor, Materials…): by group, with
+ *    ungrouped items last under "Other". */
+export function lineGroups(doc: FinancialDoc): LineGroup[] | null {
+  const items = doc.lineItems;
+  if (doc.kind === 'invoice' && items.some((li) => li.source?.type === 'change_order')) {
+    const groups: LineGroup[] = [];
+    const add = (title: string, list: LineItem[]) => list.length && groups.push({ title, items: list });
+    add(`Original quote${items.find((li) => li.source?.type === 'quote')?.source?.number ? ` ${items.find((li) => li.source?.type === 'quote')!.source!.number}` : ''}`,
+      items.filter((li) => li.source?.type === 'quote'));
+    const coNumbers = [...new Set(items.filter((li) => li.source?.type === 'change_order').map((li) => li.source!.number))];
+    for (const n of coNumbers) add(`Change order ${n}`, items.filter((li) => li.source?.type === 'change_order' && li.source.number === n));
+    add('Additional items', items.filter((li) => !li.source));
+    return groups;
+  }
+  if (!items.some((li) => li.category)) return null;
+  const groups: LineGroup[] = [];
+  for (const c of CATEGORY_ORDER) {
+    const list = items.filter((li) => li.category === c);
+    if (list.length) groups.push({ title: CATEGORY_LABEL[c], items: list });
+  }
+  const other = items.filter((li) => !li.category);
+  if (other.length) groups.push({ title: 'Other', items: other });
+  return groups;
+}
 
 export interface DocumentHtmlOptions {
   /** 'pdf' lays out for Letter pages; 'preview' is one continuous page for the screen. */
@@ -138,17 +177,20 @@ export function renderDocumentHtml(doc: FinancialDoc, s: DocumentSnapshot, opts:
   const companyCity = cityLine(s.company);
   const propCity = cityLine(s.property);
 
-  const rows = doc.lineItems.map((li) => {
+  const row = (li: LineItem) => {
     const qty = `${formatQuantity(li.quantity)}${li.unit ? ` <span class="unit">${escapeHtml(li.unit)}</span>` : ''}`;
-    const source = li.source && doc.kind === 'invoice' && li.source.type === 'change_order'
-      ? `<span class="tag">${escapeHtml(li.source.number)}</span>` : '';
     return `<tr>
-      <td class="desc"><div class="item">${escapeHtml(li.description)}${source}</div>${li.details ? `<div class="details">${escapeHtml(li.details)}</div>` : ''}<div class="calc">${qty} × ${formatMoney(li.unitPrice)}</div></td>
+      <td class="desc"><div class="item">${escapeHtml(li.description)}</div>${li.details ? `<div class="details">${escapeHtml(li.details)}</div>` : ''}<div class="calc">${qty} × ${formatMoney(li.unitPrice)}</div></td>
       <td class="num c-hide">${qty}</td>
       <td class="num c-hide">${formatMoney(li.unitPrice)}</td>
       <td class="num amt">${formatMoney(li.amount)}</td>
     </tr>`;
-  }).join('');
+  };
+  const groups = lineGroups(doc);
+  const rows = groups
+    ? groups.map((g) => `<tr class="group"><td colspan="4">${escapeHtml(g.title)}</td></tr>${g.items.map(row).join('')}
+      <tr class="gsub"><td class="desc">${escapeHtml(g.title)} subtotal</td><td class="c-hide"></td><td class="c-hide"></td><td class="num">${formatMoney(sumMoney(g.items.map((li) => li.amount)))}</td></tr>`).join('')
+    : doc.lineItems.map(row).join('');
 
   const totalLabel = doc.kind === 'invoice' ? 'Total due' : 'Total';
   const taxRow = doc.taxRate > 0 || doc.taxAmount > 0
@@ -221,9 +263,12 @@ export function renderDocumentHtml(doc: FinancialDoc, s: DocumentSnapshot, opts:
   .details { color: ${MUTED}; font-size: 8.75pt; margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .unit { color: ${MUTED}; }
   .amt { font-weight: 500; }
-  .tag { display: inline-block; margin-left: 6px; font-size: 7.5pt; font-weight: 600; color: ${ACCENT}; background: ${WARM};
-    border-radius: 3px; padding: 0 5px; vertical-align: 1px; }
   .empty { color: ${FAINT}; text-align: center; padding: 22px 10px !important; }
+  table.items tr.group td { padding: 14px 10px 5px; border-bottom: 1px solid ${RULE}; font-size: 7.5pt; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase; color: ${ACCENT}; page-break-after: avoid; break-after: avoid; }
+  table.items tr.group:first-child td { padding-top: 8px; }
+  table.items tr.gsub td { padding-top: 6px; padding-bottom: 6px; font-size: 8.75pt; color: ${MUTED}; }
+  table.items tr.gsub td.num { color: ${INK}; font-weight: 500; }
   .sources { font-size: 8.5pt; color: ${MUTED}; margin-top: 8px; }
 
   .totals-wrap { display: flex; justify-content: flex-end; margin-top: 14px; page-break-inside: avoid; break-inside: avoid; }
@@ -238,7 +283,7 @@ export function renderDocumentHtml(doc: FinancialDoc, s: DocumentSnapshot, opts:
   .prose { white-space: pre-wrap; overflow-wrap: anywhere; color: ${INK}; font-size: 9pt; }
   .approval { padding: 10px 12px; background: ${WARM}; border-radius: 6px; }
   .approval a { color: inherit; overflow-wrap: anywhere; }
-  .thanks { margin-top: 18px; font-size: 9.5pt; color: ${ACCENT}; font-weight: 500; page-break-inside: avoid; }
+  .thanks { margin-top: 18px; font-size: 9.5pt; color: ${ACCENT}; font-weight: 500; page-break-inside: avoid; page-break-before: avoid; break-before: avoid; }
   ${pdf ? '' : `.footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid ${RULE}; font-size: 8pt; color: ${FAINT}; }`}
   .void-mark { position: absolute; top: 34%; left: 0; right: 0; text-align: center; font-size: 96pt; font-weight: 800;
     color: rgba(211, 47, 47, 0.10); transform: rotate(-24deg); pointer-events: none; letter-spacing: 0.1em; }

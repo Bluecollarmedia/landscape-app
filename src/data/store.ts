@@ -26,15 +26,17 @@ import type {
   Project, ProjectTask, ProjectTeamMember, ProjectSettings, ProjectPhoto, ProjectUpdate,
   ProjectRequest, ProjectHistoryEntry, CustomerTimelineEvent, ProjectMessage,
 } from '@/types/project';
-import type { Assignment, ScheduleChange } from '@/types/schedule';
+import type { Assignment, ScheduleChange, ScheduleSeries } from '@/types/schedule';
 import type { Truck } from '@/types/truck';
+import type { Crew } from '@/types/crew';
 import type { Announcement, AnnouncementRead } from '@/types/announcement';
 import type { CheckIn, CheckOut, WorkerActivity, WorkerSettings } from '@/types/worker';
 import type {
-  WorkSession, WorkerHourlyRate, OvertimeRule, CompanyOperationsSettings,
+  WorkSession, WorkerHourlyRate, WorkerPaySettings, OvertimeRule, CompanyOperationsSettings,
   NotificationPreference, AppNotification, WorkerReminder,
 } from '@/types/operations';
-import type { Quote, ChangeOrder, Invoice, FinancialEvent, LineItem } from '@/types/financial';
+import type { Quote, ChangeOrder, Invoice, FinancialEvent, LineItem, FinancialSettings } from '@/types/financial';
+import type { MaterialVendor, ProjectMaterial, MaterialPlan } from '@/types/materials';
 import type {
   TeamCode, CompanyJoinSettings, CompanyInvitation, JoinRequest, MembershipAuditEvent,
   CompanyMembership,
@@ -52,7 +54,7 @@ interface TableDef {
 }
 
 const TABLES = {
-  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
+  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'storageLimitGb', 'targetPayEnabled', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
   people: { scope: 'all', cols: ['id', 'userId', 'email', 'firstName', 'lastName', 'avatarUrl', 'phone', 'createdAt', 'updatedAt'] },
   company_members: { scope: 'company', cols: ['id', 'companyId', 'personId', 'role', 'status', 'joinMethod', 'joinRequestId', 'approvedBy', 'approvedAt', 'deactivatedAt', 'deactivatedBy', 'createdAt', 'updatedAt'] },
   projects: { scope: 'company', cols: ['id', 'companyId', 'customerId', 'name', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'status', 'progress', 'startDate', 'estimatedEndDate', 'completedAt', 'notes', 'coverPhotoUrl', 'customerProjectCode', 'customerClaimedBy', 'customerClaimedAt', 'createdAt', 'updatedAt'] },
@@ -66,7 +68,13 @@ const TABLES = {
   project_history: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'actorId', 'eventType', 'description', 'metadata', 'createdAt'] },
   customer_timeline: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'eventType', 'title', 'description', 'photoUrl', 'timestamp'] },
   trucks: { scope: 'company', cols: ['id', 'companyId', 'name', 'make', 'model', 'year', 'licensePlate', 'vin', 'color', 'photoUrl', 'status', 'notes', 'assignedTo', 'createdAt', 'updatedAt'] },
-  assignments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'scheduledDate', 'startTime', 'endTime', 'isFullDay', 'sortOrder', 'status', 'confirmationState', 'truckId', 'notes', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'reassignedFrom', 'reassignedTo', 'createdAt', 'updatedAt'] },
+  assignments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'scheduledDate', 'startTime', 'endTime', 'isFullDay', 'sortOrder', 'status', 'confirmationState', 'truckId', 'notes', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'reassignedFrom', 'reassignedTo', 'seriesId', 'createdAt', 'updatedAt'] },
+  // Repeating schedules (supabase/updates/012). Their days are filled in as
+  // assignments by extend_schedule_series().
+  // Crews (supabase/updates/014). A worker is in at most one crew.
+  crews: { scope: 'company', cols: ['id', 'companyId', 'name', 'color', 'createdAt', 'updatedAt'] },
+  crew_members: { scope: 'company', cols: ['id', 'companyId', 'crewId', 'personId', 'createdAt'] },
+  schedule_series: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'frequency', 'intervalDays', 'horizonDays', 'startDate', 'endDate', 'startTime', 'endTime', 'isFullDay', 'truckId', 'notes', 'createdBy', 'stoppedAt', 'createdAt', 'updatedAt'] },
   schedule_changes: { scope: 'company', cols: ['id', 'companyId', 'assignmentId', 'changedBy', 'changeType', 'previousValue', 'newValue', 'notes', 'createdAt'] },
   announcements: { scope: 'company', cols: ['id', 'companyId', 'createdBy', 'title', 'body', 'audience', 'priority', 'weatherAction', 'recipientIds', 'expiresAt', 'createdAt', 'updatedAt'] },
   announcement_reads: { scope: 'company', cols: ['id', 'companyId', 'announcementId', 'personId', 'readAt'] },
@@ -75,6 +83,7 @@ const TABLES = {
   worker_activities: { scope: 'company', cols: ['id', 'companyId', 'personId', 'assignmentId', 'projectId', 'activityType', 'description', 'metadata', 'timestamp'] },
   work_sessions: { scope: 'company', cols: ['id', 'companyId', 'personId', 'projectId', 'assignmentId', 'checkInTime', 'checkOutTime', 'durationMinutes', 'checkInGps', 'checkOutGps', 'offlineCheckIn', 'offlineCheckOut', 'syncedCheckInAt', 'syncedCheckOutAt', 'status', 'correction', 'createdAt', 'updatedAt'] },
   worker_hourly_rates: { scope: 'company', cols: ['id', 'companyId', 'personId', 'hourlyRate', 'effectiveDate', 'endDate', 'setBy', 'createdAt'] },
+  worker_pay_settings: { scope: 'company', pk: 'personId', cols: ['personId', 'companyId', 'overtimeEnabled', 'overtimeAfterHours', 'overtimeMultiplier', 'targetHourlyRate', 'updatedAt'] },
   overtime_rules: { scope: 'company', cols: ['id', 'companyId', 'ruleType', 'weeklyThresholdHours', 'dailyThresholdHours', 'overtimeMultiplier', 'isActive', 'createdAt', 'updatedAt'] },
   company_operations_settings: { scope: 'company', cols: ['id', 'companyId', 'missingCheckinGraceMinutes', 'lateCheckinThresholdMinutes', 'pastEndAlertEnabled', 'overtimeRuleId', 'createdAt', 'updatedAt'] },
   notification_preferences: { scope: 'company', cols: ['id', 'companyId', 'personId', 'eventType', 'enabled', 'createdAt', 'updatedAt'] },
@@ -96,6 +105,11 @@ const TABLES = {
   change_orders: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'customerId', 'number', 'title', 'description', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'terms', 'issueDate', 'snapshot', 'sentAt', 'approvedAt', 'approvedBy', 'approvedName', 'shareToken', 'declinedAt', 'declinedBy', 'declineReason', 'createdBy', 'createdAt', 'updatedAt'] },
   invoices: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'changeOrderIds', 'customerId', 'number', 'title', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'paymentInstructions', 'invoiceDate', 'dueDate', 'snapshot', 'issuedAt', 'voidedAt', 'voidReason', 'createdBy', 'createdAt', 'updatedAt'] },
   financial_events: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'documentType', 'documentId', 'eventType', 'actorId', 'note', 'metadata', 'createdAt'] },
+  // Update 015: document defaults and materials preparation (owner/admin only).
+  financial_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'defaultTaxRate', 'defaultTerms', 'defaultExclusions', 'defaultPaymentInstructions', 'updatedAt'] },
+  material_vendors: { scope: 'company', cols: ['id', 'companyId', 'name', 'contactName', 'phone', 'email', 'address', 'pickupInstructions', 'notes', 'createdAt', 'updatedAt'] },
+  project_materials: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'name', 'quantity', 'unit', 'status', 'vendorId', 'notes', 'source', 'sortOrder', 'createdBy', 'createdAt', 'updatedAt'] },
+  project_material_plans: { scope: 'company', pk: 'projectId', cols: ['projectId', 'companyId', 'vendorId', 'pickupLocation', 'pickupInstructions', 'handlingNotes', 'reminderAt', 'reminderJobDate', 'reminderNote', 'dismissedSources', 'updatedAt'] },
 } satisfies Record<string, TableDef>;
 
 export type TableName = keyof typeof TABLES;
@@ -179,6 +193,10 @@ export interface Db {
   customerTimeline: Record<string, CustomerTimelineEvent[]>;
   trucks: Truck[];
   assignments: Assignment[];
+  scheduleSeries: ScheduleSeries[];
+  crews: Crew[];
+  /** Each worker's crew, by person id. */
+  crewByPerson: Record<string, Crew>;
   scheduleChanges: ScheduleChange[];
   announcements: Announcement[];
   announcementReads: AnnouncementRead[];
@@ -187,6 +205,8 @@ export interface Db {
   workerActivities: WorkerActivity[];
   workSessions: WorkSession[];
   hourlyRates: WorkerHourlyRate[];
+  /** Keyed by personId. */
+  paySettings: Record<string, WorkerPaySettings>;
   overtimeRule: OvertimeRule;
   operationsSettings: CompanyOperationsSettings;
   notificationPreferences: NotificationPreference[];
@@ -204,6 +224,11 @@ export interface Db {
   invoices: Invoice[];
   /** Oldest first. */
   financialEvents: FinancialEvent[];
+  financialSettings: FinancialSettings | null;
+  vendors: MaterialVendor[];
+  /** Per project, in checklist order. */
+  materials: Record<string, ProjectMaterial[]>;
+  materialPlans: Record<string, MaterialPlan>;
 }
 
 const DEFAULT_OVERTIME: OvertimeRule = {
@@ -238,6 +263,9 @@ export const db: Db = {
   customerTimeline: {},
   trucks: [],
   assignments: [],
+  scheduleSeries: [],
+  crews: [],
+  crewByPerson: {},
   scheduleChanges: [],
   announcements: [],
   announcementReads: [],
@@ -246,6 +274,7 @@ export const db: Db = {
   workerActivities: [],
   workSessions: [],
   hourlyRates: [],
+  paySettings: {},
   overtimeRule: DEFAULT_OVERTIME,
   operationsSettings: DEFAULT_OPS,
   notificationPreferences: [],
@@ -261,6 +290,10 @@ export const db: Db = {
   changeOrders: [],
   invoices: [],
   financialEvents: [],
+  financialSettings: null,
+  vendors: [],
+  materials: {},
+  materialPlans: {},
 };
 
 function groupBy<T extends Row>(rows: T[], key: string): Record<string, T[]> {
@@ -390,6 +423,16 @@ function derive() {
       truck: a.truckId ? truckRef[a.truckId] : undefined,
     }) as Assignment);
 
+  const crewMemberIds = groupBy(raw.crew_members, 'crewId');
+  db.crews = raw.crews
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    .map((c) => ({ ...c, memberIds: (crewMemberIds[c.id] ?? []).map((m) => m.personId) }) as Crew);
+  db.crewByPerson = {};
+  for (const c of db.crews) for (const pid of c.memberIds) db.crewByPerson[pid] = c;
+
+  db.scheduleSeries = raw.schedule_series.slice().sort(byCreated) as ScheduleSeries[];
+
   db.scheduleChanges = raw.schedule_changes
     .slice()
     .sort((a, b) => byCreated(b, a))
@@ -425,6 +468,17 @@ function derive() {
       project: s.projectId ? projectRef[s.projectId] : undefined,
     }) as WorkSession);
   db.hourlyRates = raw.worker_hourly_rates.map((r) => ({ ...r, hourlyRate: Number(r.hourlyRate), worker: person(r.personId) }) as WorkerHourlyRate);
+
+  db.paySettings = {};
+  for (const p of raw.worker_pay_settings) {
+    db.paySettings[p.personId] = {
+      ...p,
+      overtimeEnabled: p.overtimeEnabled !== false,
+      overtimeAfterHours: Number(p.overtimeAfterHours ?? 40),
+      overtimeMultiplier: Number(p.overtimeMultiplier ?? 1.5),
+      targetHourlyRate: p.targetHourlyRate != null ? Number(p.targetHourlyRate) : undefined,
+    } as WorkerPaySettings;
+  }
 
   const ot = raw.overtime_rules[0];
   db.overtimeRule = ot
@@ -484,6 +538,25 @@ function derive() {
     .slice()
     .sort(byCreated)
     .map((e) => ({ ...e, actor: person(e.actorId) })) as FinancialEvent[];
+
+  const fs = raw.financial_settings[0];
+  db.financialSettings = fs
+    ? ({ ...fs, defaultTaxRate: fs.defaultTaxRate != null ? Number(fs.defaultTaxRate) : undefined } as FinancialSettings)
+    : null;
+  db.vendors = raw.material_vendors
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name))) as MaterialVendor[];
+  const mats = groupBy(
+    raw.project_materials.map((m) => ({ ...m, quantity: m.quantity != null ? Number(m.quantity) : undefined, sortOrder: m.sortOrder ?? 0 })),
+    'projectId',
+  );
+  for (const k of Object.keys(mats)) mats[k].sort((a, b) => a.sortOrder - b.sortOrder || byCreated(a, b));
+  db.materials = mats as Record<string, ProjectMaterial[]>;
+  const plans: Record<string, MaterialPlan> = {};
+  for (const p of raw.project_material_plans) {
+    plans[p.projectId] = { ...p, dismissedSources: Array.isArray(p.dismissedSources) ? p.dismissedSources : [] } as MaterialPlan;
+  }
+  db.materialPlans = plans;
 }
 
 // ── Subscription ────────────────────────────────────────────────────────────
@@ -708,6 +781,7 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.worker_activities = mock.mockWorkerActivities.map(({ project, ...w }) => w);
     raw.work_sessions = ops.mockWorkSessions.map(({ worker, project, ...s }) => s);
     raw.worker_hourly_rates = ops.mockHourlyRates.map(({ worker, ...r }) => r);
+    raw.worker_pay_settings = ops.mockWorkerPaySettings.map((p) => ({ ...p }));
     raw.overtime_rules = [ops.mockOvertimeRule];
     raw.company_operations_settings = [ops.mockOperationsSettings];
     raw.notification_preferences = [...ops.mockNotificationPreferences];
@@ -722,11 +796,18 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.company_resources = mock.mockResources.map((r) => ({ ...r }));
     raw.resource_access = mock.mockResourceAccess.map((a) => ({ ...a }));
     raw.resource_audit_log = [];
+    // A sample crew so the Crews row has something to show.
+    raw.crews = [{ id: 'crew-maint', companyId: mock.mockCompany.id, name: 'Maintenance Crew', color: '#7CB342', createdAt: '2025-03-01T08:00:00Z', updatedAt: '2025-03-01T08:00:00Z' }];
+    raw.crew_members = ['worker2', 'worker4'].map((pid) => ({ id: `crew-maint-${pid}`, companyId: mock.mockCompany.id, crewId: 'crew-maint', personId: pid, createdAt: '2025-03-01T08:00:00Z' }));
     const fin = (require('./mockFinancials') as typeof import('./mockFinancials')).buildMockFinancials(mock.mockProjects);
     raw.quotes = fin.quotes;
     raw.change_orders = fin.changeOrders;
     raw.invoices = fin.invoices;
     raw.financial_events = fin.events;
+    raw.financial_settings = [];
+    raw.material_vendors = fin.vendors;
+    raw.project_materials = fin.materials;
+    raw.project_material_plans = fin.materialPlans;
     for (const r of onb.mockJoinRequests) {
       if (r.person && !raw.people.some((p) => p.id === r.person!.id)) {
         raw.people.push({ ...r.person, avatarUrl: r.person.profilePhotoUrl });

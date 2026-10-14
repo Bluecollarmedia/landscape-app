@@ -20,7 +20,13 @@ import type {
   StorageInfo,
   UploadPurpose,
 } from '@/types/storage';
-import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_DEFAULT, MAX_AVATAR_SIZE } from '@/types/storage';
+import {
+  ALLOWED_MIME_TYPES,
+  MAX_FILE_SIZE_DEFAULT,
+  MAX_AVATAR_SIZE,
+  DEFAULT_STORAGE_LIMIT_GB,
+  storageLimitBytes,
+} from '@/types/storage';
 
 export const R2_PUBLIC_URL = process.env.EXPO_PUBLIC_R2_PUBLIC_URL ?? '';
 
@@ -207,7 +213,7 @@ export async function getStorageInfo(): Promise<StorageInfo> {
       totalBytes += size;
     }
   });
-  const maxStorageBytes = 1024 * 1024 * 1024; // Supabase free plan: 1 GB
+  const maxStorageBytes = companyStorageLimitBytes();
   return {
     usage: {
       totalBytes,
@@ -215,7 +221,7 @@ export async function getStorageInfo(): Promise<StorageInfo> {
       photoCount,
       avatarCount,
       documentCount: 0,
-      percentUsed: Math.round((totalBytes / maxStorageBytes) * 100),
+      percentUsed: percentOf(totalBytes, maxStorageBytes),
     },
     settings: {
       maxStorageBytes,
@@ -299,18 +305,30 @@ function mockPresignedUrl(request: UploadRequest): PresignedUploadResponse {
   };
 }
 
+/** The limit the owner picked in Settings → Storage (0 = no limit). */
+function companyStorageLimitBytes(): number {
+  const { db } = require('@/data/store') as typeof import('@/data/store');
+  return storageLimitBytes(db.company?.storageLimitGb ?? DEFAULT_STORAGE_LIMIT_GB);
+}
+
+function percentOf(used: number, max: number): number {
+  return max > 0 ? Math.round((used / max) * 100) : 0;
+}
+
 function mockStorageInfo(): StorageInfo {
+  const totalBytes = 157_286_400;
+  const maxStorageBytes = companyStorageLimitBytes();
   return {
     usage: {
-      totalBytes: 157_286_400,
+      totalBytes,
       fileCount: 42,
       photoCount: 38,
       avatarCount: 3,
       documentCount: 1,
-      percentUsed: 3,
+      percentUsed: percentOf(totalBytes, maxStorageBytes),
     },
     settings: {
-      maxStorageBytes: 5_368_709_120,
+      maxStorageBytes,
       maxFileSizeBytes: 10_485_760,
       rateLimitPerMinute: 10,
       rateLimitPerHour: 100,

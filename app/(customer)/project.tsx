@@ -25,6 +25,7 @@ const SECTIONS = [
 ];
 
 const statusConfig: Record<ProjectStatus, { label: string; type: 'success' | 'warning' | 'info' | 'neutral' }> = {
+  prospect: { label: 'Quote', type: 'neutral' },
   active: { label: 'In Progress', type: 'success' },
   on_hold: { label: 'On Hold', type: 'warning' },
   completed: { label: 'Completed', type: 'info' },

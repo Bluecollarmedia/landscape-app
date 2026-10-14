@@ -1,6 +1,9 @@
 import type { PersonSummary } from './company';
 
-export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
+/** prospect: created from a quote for a new customer/property; not on the
+ * schedule and without a team until the quote is approved and the owner
+ * starts the project (it then becomes active). */
+export type ProjectStatus = 'prospect' | 'active' | 'on_hold' | 'completed' | 'archived';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed';
 export type PhotoType = 'progress' | 'before' | 'after' | 'issue' | 'general';
 export type RequestStatus = 'pending' | 'acknowledged' | 'completed' | 'declined' | 'converted';

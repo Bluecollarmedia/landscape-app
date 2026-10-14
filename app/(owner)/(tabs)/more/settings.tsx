@@ -14,6 +14,8 @@ import { ListSection, ListRow } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import { db, useDb } from '@/data/store';
+import { useCompanyYard } from '@/hooks/useCompanyYard';
+import { formatAddress } from '@/lib/address';
 import type { UserRole } from '@/types';
 
 export default function SettingsScreen() {
@@ -22,6 +24,7 @@ export default function SettingsScreen() {
   const { user, signOut, switchDevRole, switchDevState, appState } = useAuth();
   useDb();
   const company = db.company;
+  const { yard } = useCompanyYard();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -67,12 +70,20 @@ export default function SettingsScreen() {
             title="Address"
             subtitle={[company?.address, company?.city, [company?.state, company?.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—'}
           />
+          <ListRow
+            icon="navigation"
+            iconColor={colors.primary}
+            title="Yard Location"
+            subtitle={yard ? formatAddress(yard) : 'Not set yet'}
+            showChevron
+            onPress={() => router.push('/(owner)/more/yard-location' as any)}
+          />
           {!db.demo && (
             <>
               <ListRow
                 icon="image"
                 iconColor={colors.primary}
-                title="Company Info & Dashboard Photo"
+                title="Company Info & Header Photos"
                 showChevron
                 onPress={() => router.push({ pathname: '/(owner)/setup', params: { step: 'company' } } as any)}
               />

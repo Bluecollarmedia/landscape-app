@@ -34,6 +34,8 @@ import type {
   WorkSession, WorkerHourlyRate, OvertimeRule, CompanyOperationsSettings,
   NotificationPreference, AppNotification, WorkerReminder,
 } from '@/types/operations';
+import type { Quote, ChangeOrder, Invoice, FinancialEvent, LineItem, FinancialSettings } from '@/types/financial';
+import type { MaterialVendor, ProjectMaterial, MaterialPlan } from '@/types/materials';
 import type {
   TeamCode, CompanyJoinSettings, CompanyInvitation, JoinRequest, MembershipAuditEvent,
   CompanyMembership,
@@ -51,7 +53,7 @@ interface TableDef {
 }
 
 const TABLES = {
-  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'coverPhotoUrl', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
+  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
   people: { scope: 'all', cols: ['id', 'userId', 'email', 'firstName', 'lastName', 'avatarUrl', 'phone', 'createdAt', 'updatedAt'] },
   company_members: { scope: 'company', cols: ['id', 'companyId', 'personId', 'role', 'status', 'joinMethod', 'joinRequestId', 'approvedBy', 'approvedAt', 'deactivatedAt', 'deactivatedBy', 'createdAt', 'updatedAt'] },
   projects: { scope: 'company', cols: ['id', 'companyId', 'customerId', 'name', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'status', 'progress', 'startDate', 'estimatedEndDate', 'completedAt', 'notes', 'coverPhotoUrl', 'customerProjectCode', 'customerClaimedBy', 'customerClaimedAt', 'createdAt', 'updatedAt'] },
@@ -85,6 +87,21 @@ const TABLES = {
   company_invitations: { scope: 'company', cols: ['id', 'companyId', 'email', 'name', 'phone', 'type', 'status', 'projectId', 'invitedBy', 'token', 'expiresAt', 'acceptedAt', 'acceptedBy', 'createdAt'] },
   join_requests: { scope: 'company', cols: ['id', 'companyId', 'personId', 'joinMethod', 'invitationId', 'status', 'requestedRole', 'assignedRole', 'reviewedBy', 'reviewedAt', 'declineReason', 'createdAt', 'updatedAt'] },
   membership_audit_log: { scope: 'company', cols: ['id', 'companyId', 'eventType', 'actorId', 'targetId', 'metadata', 'createdAt'] },
+  // Company Resources. hasSecret/createdBy/updatedBy are set by the database
+  // only, so they aren't listed as writable columns. Codes never come through
+  // here — see reveal_resource_secret() in supabase/updates/006.
+  company_resources: { scope: 'company', cols: ['id', 'companyId', 'category', 'name', 'description', 'truckId', 'itemName', 'cardLastFour', 'cardHolderId', 'createdAt', 'updatedAt'] },
+  resource_access: { scope: 'company', cols: ['id', 'companyId', 'resourceId', 'personId', 'createdAt'] },
+  resource_audit_log: { scope: 'company', cols: ['id', 'companyId', 'resourceId', 'resourceName', 'actorId', 'eventType', 'targetPersonId', 'metadata', 'createdAt'] },
+  quotes: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'customerId', 'number', 'title', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'exclusions', 'terms', 'issueDate', 'validUntil', 'snapshot', 'sentAt', 'approvedAt', 'approvedBy', 'approvedName', 'shareToken', 'declinedAt', 'declinedBy', 'declineReason', 'createdBy', 'createdAt', 'updatedAt'] },
+  change_orders: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'customerId', 'number', 'title', 'description', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'terms', 'issueDate', 'snapshot', 'sentAt', 'approvedAt', 'approvedBy', 'approvedName', 'shareToken', 'declinedAt', 'declinedBy', 'declineReason', 'createdBy', 'createdAt', 'updatedAt'] },
+  invoices: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'changeOrderIds', 'customerId', 'number', 'title', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'paymentInstructions', 'invoiceDate', 'dueDate', 'snapshot', 'issuedAt', 'voidedAt', 'voidReason', 'createdBy', 'createdAt', 'updatedAt'] },
+  financial_events: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'documentType', 'documentId', 'eventType', 'actorId', 'note', 'metadata', 'createdAt'] },
+  // Update 015: document defaults and materials preparation (owner/admin only).
+  financial_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'defaultTaxRate', 'defaultTerms', 'defaultExclusions', 'defaultPaymentInstructions', 'updatedAt'] },
+  material_vendors: { scope: 'company', cols: ['id', 'companyId', 'name', 'contactName', 'phone', 'email', 'address', 'pickupInstructions', 'notes', 'createdAt', 'updatedAt'] },
+  project_materials: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'name', 'quantity', 'unit', 'status', 'vendorId', 'notes', 'source', 'sortOrder', 'createdBy', 'createdAt', 'updatedAt'] },
+  project_material_plans: { scope: 'company', pk: 'projectId', cols: ['projectId', 'companyId', 'vendorId', 'pickupLocation', 'pickupInstructions', 'handlingNotes', 'reminderAt', 'reminderJobDate', 'reminderNote', 'dismissedSources', 'updatedAt'] },
 } satisfies Record<string, TableDef>;
 
 export type TableName = keyof typeof TABLES;
@@ -187,6 +204,17 @@ export interface Db {
   invitations: CompanyInvitation[];
   joinRequests: JoinRequest[];
   auditEvents: MembershipAuditEvent[];
+  /** Newest first. Customers only receive sent/issued ones (database rules). */
+  quotes: Quote[];
+  changeOrders: ChangeOrder[];
+  invoices: Invoice[];
+  /** Oldest first. */
+  financialEvents: FinancialEvent[];
+  financialSettings: FinancialSettings | null;
+  vendors: MaterialVendor[];
+  /** Per project, in checklist order. */
+  materials: Record<string, ProjectMaterial[]>;
+  materialPlans: Record<string, MaterialPlan>;
 }
 
 const DEFAULT_OVERTIME: OvertimeRule = {
@@ -240,6 +268,14 @@ export const db: Db = {
   invitations: [],
   joinRequests: [],
   auditEvents: [],
+  quotes: [],
+  changeOrders: [],
+  invoices: [],
+  financialEvents: [],
+  financialSettings: null,
+  vendors: [],
+  materials: {},
+  materialPlans: {},
 };
 
 function groupBy<T extends Row>(rows: T[], key: string): Record<string, T[]> {
@@ -434,6 +470,54 @@ function derive() {
       return { ...r, person: p ? { ...p, profilePhotoUrl: p.avatarUrl } : undefined } as JoinRequest;
     });
   db.auditEvents = raw.membership_audit_log.slice().sort((a, b) => byCreated(b, a)) as MembershipAuditEvent[];
+
+  // Quotes, change orders, invoices. Postgres numerics can arrive as strings.
+  const projectNames: Record<string, string> = {};
+  for (const p of raw.projects) projectNames[p.id] = p.name;
+  const money = (d: Row): Row => ({
+    ...d,
+    lineItems: (Array.isArray(d.lineItems) ? d.lineItems : []).map((li: Row): LineItem => ({
+      ...(li as LineItem),
+      quantity: Number(li.quantity) || 0,
+      unitPrice: Number(li.unitPrice) || 0,
+      amount: Number(li.amount) || 0,
+    })),
+    taxRate: Number(d.taxRate ?? 0),
+    subtotal: Number(d.subtotal ?? 0),
+    taxAmount: Number(d.taxAmount ?? 0),
+    total: Number(d.total ?? 0),
+    customer: person(d.customerId),
+    projectName: projectNames[d.projectId],
+  });
+  db.quotes = raw.quotes.slice().sort((a, b) => byCreated(b, a)).map(money) as Quote[];
+  db.changeOrders = raw.change_orders.slice().sort((a, b) => byCreated(b, a)).map(money) as ChangeOrder[];
+  db.invoices = raw.invoices
+    .slice()
+    .sort((a, b) => byCreated(b, a))
+    .map((i) => ({ ...money(i), changeOrderIds: Array.isArray(i.changeOrderIds) ? i.changeOrderIds : [] })) as Invoice[];
+  db.financialEvents = raw.financial_events
+    .slice()
+    .sort(byCreated)
+    .map((e) => ({ ...e, actor: person(e.actorId) })) as FinancialEvent[];
+
+  const fs = raw.financial_settings[0];
+  db.financialSettings = fs
+    ? ({ ...fs, defaultTaxRate: fs.defaultTaxRate != null ? Number(fs.defaultTaxRate) : undefined } as FinancialSettings)
+    : null;
+  db.vendors = raw.material_vendors
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name))) as MaterialVendor[];
+  const mats = groupBy(
+    raw.project_materials.map((m) => ({ ...m, quantity: m.quantity != null ? Number(m.quantity) : undefined, sortOrder: m.sortOrder ?? 0 })),
+    'projectId',
+  );
+  for (const k of Object.keys(mats)) mats[k].sort((a, b) => a.sortOrder - b.sortOrder || byCreated(a, b));
+  db.materials = mats as Record<string, ProjectMaterial[]>;
+  const plans: Record<string, MaterialPlan> = {};
+  for (const p of raw.project_material_plans) {
+    plans[p.projectId] = { ...p, dismissedSources: Array.isArray(p.dismissedSources) ? p.dismissedSources : [] } as MaterialPlan;
+  }
+  db.materialPlans = plans;
 }
 
 // ── Subscription ────────────────────────────────────────────────────────────
@@ -488,6 +572,13 @@ function reportError(action: string, error: { message?: string } | null | undefi
 
 // ── Loading ─────────────────────────────────────────────────────────────────
 
+const loadErrors: Partial<Record<TableName, string>> = {};
+
+/** The last load error for a table, if its most recent fetch failed. */
+export function loadErrorOf(table: TableName): string | undefined {
+  return loadErrors[table];
+}
+
 async function fetchTable(table: TableName): Promise<Row[] | null> {
   if (!session) return [];
   const def = TABLES[table] as TableDef;
@@ -498,8 +589,10 @@ async function fetchTable(table: TableName): Promise<Row[] | null> {
   const { data, error } = await q.limit(5000);
   if (error) {
     console.warn(`[store] load ${table} failed:`, error.message);
+    loadErrors[table] = error.message;
     return null;
   }
+  delete loadErrors[table];
   return (data ?? []).map(fromDb);
 }
 
@@ -543,6 +636,9 @@ function applyRealtime(table: TableName, payload: { eventType: string; new: Row;
     else raw[table] = [...raw[table], row];
   }
   emitChange();
+  // A worker who was just granted a resource gets the access row live, but
+  // the resource row itself didn't change, so fetch the ones now visible.
+  if (table === 'resource_access') reloadTable('company_resources');
 }
 
 function startRealtime() {
@@ -657,6 +753,18 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.company_invitations = [...onb.mockInvitations];
     raw.join_requests = onb.mockJoinRequests.map(({ person, ...r }) => r);
     raw.membership_audit_log = [...onb.mockAuditEvents];
+    raw.company_resources = mock.mockResources.map((r) => ({ ...r }));
+    raw.resource_access = mock.mockResourceAccess.map((a) => ({ ...a }));
+    raw.resource_audit_log = [];
+    const fin = (require('./mockFinancials') as typeof import('./mockFinancials')).buildMockFinancials(mock.mockProjects);
+    raw.quotes = fin.quotes;
+    raw.change_orders = fin.changeOrders;
+    raw.invoices = fin.invoices;
+    raw.financial_events = fin.events;
+    raw.financial_settings = [];
+    raw.material_vendors = fin.vendors;
+    raw.project_materials = fin.materials;
+    raw.project_material_plans = fin.materialPlans;
     for (const r of onb.mockJoinRequests) {
       if (r.person && !raw.people.some((p) => p.id === r.person!.id)) {
         raw.people.push({ ...r.person, avatarUrl: r.person.profilePhotoUrl });

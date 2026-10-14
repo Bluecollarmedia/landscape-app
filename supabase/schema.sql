@@ -42,7 +42,16 @@ create table public.companies (
   city text,
   state text,
   zip text,
+  -- Yard: where crews start and end the day (not the office, not a jobsite).
+  yard_address text,
+  yard_city text,
+  yard_state text,
+  yard_zip text,
+  yard_latitude double precision,
+  yard_longitude double precision,
   cover_photo_url text,
+  -- Header photo on the workers' home screens (cover_photo_url is the owner dashboard's).
+  worker_cover_photo_url text,
   setup_state jsonb not null default '{}'::jsonb,
   setup_completed_at timestamptz,
   created_at timestamptz not null default now(),
@@ -266,6 +275,10 @@ create table public.assignments (
 );
 create index idx_assignments_company_date on public.assignments(company_id, scheduled_date);
 create index idx_assignments_person_date on public.assignments(person_id, scheduled_date);
+-- A worker can only be on the same job once per day (cancelled/moved don't count).
+create unique index uq_assignments_worker_job_day
+  on public.assignments (person_id, project_id, scheduled_date)
+  where status not in ('cancelled', 'reassigned');
 
 create table public.schedule_changes (
   id uuid primary key default gen_random_uuid(),

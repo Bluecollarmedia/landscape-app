@@ -8,8 +8,18 @@ export interface Company {
   city?: string;
   state?: string;
   zip?: string;
+  /** Where crews start and end the day (the yard). Separate from the office address above and from any jobsite. */
+  yardAddress?: string;
+  yardCity?: string;
+  yardState?: string;
+  yardZip?: string;
+  /** Exact map spot of the yard, when the address was found on the map. */
+  yardLatitude?: number;
+  yardLongitude?: number;
   /** Owner's own photo for the dashboard header. */
   coverPhotoUrl?: string;
+  /** Owner's own photo for the top of the workers' home screens. */
+  workerCoverPhotoUrl?: string;
   /** First-time setup progress: which steps were finished or skipped. */
   setupState?: CompanySetupState;
   setupCompletedAt?: string;

@@ -17,6 +17,8 @@ export default function WorkerLayout() {
         <Stack.Screen name="day/[date]" />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="my-resources" />
+        <Stack.Screen name="resource/[id]" />
       </Stack>
     </WorkerProvider>
   );

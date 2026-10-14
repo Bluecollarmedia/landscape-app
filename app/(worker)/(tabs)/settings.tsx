@@ -87,6 +87,16 @@ export default function WorkerSettingsScreen() {
         />
       </ListSection>
 
+      <ListSection title="Company">
+        <ListRow
+          icon="key"
+          title="Company Resources"
+          subtitle="Codes and info shared with you"
+          showChevron
+          onPress={() => router.push('/(worker)/my-resources' as any)}
+        />
+      </ListSection>
+
       <ListSection title="App">
         <ListRow title="Version" value="1.0.0" />
       </ListSection>

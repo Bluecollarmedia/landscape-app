@@ -70,13 +70,24 @@ export default function WorkersListScreen() {
               {allWorkers.length} team member{allWorkers.length === 1 ? '' : 's'}
             </Text>
           </View>
-          <Pressable
-            onPress={() => router.push('/(owner)/worker-new')}
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            accessibilityLabel="Add worker"
-          >
-            <Icon name="plus" size={22} color={colors.textOnPrimary} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => router.push('/(owner)/resources' as any)}
+              style={({ pressed }) => [styles.resourcesPill, { backgroundColor: pressed ? colors.border : colors.primarySurface }]}
+              accessibilityRole="button"
+              accessibilityLabel="Resources and access"
+            >
+              <Icon name="key" size={14} color={colors.primaryDark} />
+              <Text style={[typeScale.labelSmall, { color: colors.primaryDark, marginLeft: 6 }]}>Resources & Access</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/(owner)/worker-new')}
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              accessibilityLabel="Add worker"
+            >
+              <Icon name="plus" size={22} color={colors.textOnPrimary} />
+            </Pressable>
+          </View>
         </View>
         <SearchBar
           value={search}
@@ -201,6 +212,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   searchBar: { marginBottom: spacing.sm },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  resourcesPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+  },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing['3xl'], paddingTop: spacing.xs },
   emptyContainer: { flex: 1, justifyContent: 'center' },
   workerCard: {

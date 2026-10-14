@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useWorkerContext } from '@/providers/WorkerProvider';
+import { useResources } from '@/hooks/useResources';
 import { StatusBadge } from '@/components/ui';
 import { PhotoViewer } from '@/components/worker/PhotoViewer';
 import { typeScale } from '@/theme/typography';
@@ -16,6 +17,7 @@ import { db } from '@/data/store';
 import { todayKey, localDateKey } from '@/lib/ids';
 import type { ProjectPhoto } from '@/types/project';
 import { getProjectImageUriById } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
@@ -57,6 +59,7 @@ export default function JobDetailScreen() {
   } = useWorkerContext();
   const [viewer, setViewer] = useState<ProjectPhoto[] | null>(null);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const { resources } = useResources();
 
   const assignment = [...todayAssignments, ...upcomingAssignments, ...completedAssignments]
     .find(a => a.id === id);
@@ -97,7 +100,7 @@ export default function JobDetailScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
         <View style={styles.hero}>
-          <Image source={{ uri: getProjectImageUriById(assignment.projectId, 1200) }} style={styles.heroImage} resizeMode="cover" />
+          <BrandCover uri={getProjectImageUriById(assignment.projectId)} style={styles.heroImage} />
           <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.sm }]}>
             <Pressable onPress={() => router.back()} hitSlop={12}>
               {HAS_LIQUID_GLASS ? (
@@ -154,9 +157,22 @@ export default function JobDetailScreen() {
             {assignment.truck && (
               <View style={styles.metaRow}>
                 <Feather name="truck" size={14} color={colors.textTertiary} />
-                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
+                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm, flex: 1 }]}>
                   {assignment.truck.name}
                 </Text>
+                {/* Only shows when the owner gave this worker codes for this truck. */}
+                {resources.some((r) => r.truckId === assignment.truck!.id) && (
+                  <Pressable
+                    onPress={() => router.push(`/(worker)/my-resources?truckId=${assignment.truck!.id}` as any)}
+                    style={[styles.truckCodes, { backgroundColor: colors.primarySurface }]}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Truck codes"
+                  >
+                    <Feather name="key" size={12} color={colors.primaryDark} />
+                    <Text style={[typeScale.labelSmall, { color: colors.primaryDark, marginLeft: 4 }]}>Codes</Text>
+                  </Pressable>
+                )}
               </View>
             )}
           </View>
@@ -323,6 +339,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing.lg },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  truckCodes: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.full },
   navDot: {
     width: 28,
     height: 28,

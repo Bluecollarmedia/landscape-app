@@ -16,6 +16,7 @@ import { ThemeProvider } from '@/providers/ThemeProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { SplashScreen } from '@/components/branding/SplashScreen';
 import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 ExpoSplashScreen.preventAutoHideAsync();
 
@@ -24,6 +25,10 @@ function RootNavigator() {
   const segments = useSegments();
   const router = useRouter();
   const [splashDone, setSplashDone] = useState(false);
+  // The approval page (/approve/<token>) is public: no sign-in, no redirects.
+  const isPublicPage = (segments as string[])[0] === 'approve';
+
+  usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
 
   useEffect(() => {
     if (!isLoading) {
@@ -32,7 +37,7 @@ function RootNavigator() {
   }, [isLoading]);
 
   useEffect(() => {
-    if (isLoading || !splashDone) return;
+    if (isLoading || !splashDone || isPublicPage) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
@@ -87,11 +92,15 @@ function RootNavigator() {
         }
       }
     }
-  }, [isLoading, isAuthenticated, user, appState, onboardingStep, segments, splashDone]);
+  }, [isLoading, isAuthenticated, user, appState, onboardingStep, segments, splashDone, isPublicPage]);
 
   const handleSplashFinish = useCallback(() => {
     setSplashDone(true);
   }, []);
+
+  if (isPublicPage) {
+    return <Slot />;
+  }
 
   if (isLoading || !splashDone) {
     return <SplashScreen onFinish={handleSplashFinish} />;

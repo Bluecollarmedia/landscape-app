@@ -11,6 +11,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { SectionTabs, ProgressBar, Card, EmptyState, StatusBadge, Button, OptimizedImage } from '@/components/ui';
 import { useProject } from '@/hooks/useProject';
 import { db } from '@/data/store';
+import { CustomerDocuments } from '@/components/financials/CustomerDocuments';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic, brand } from '@/theme/colors';
@@ -24,6 +25,7 @@ const SECTIONS = [
 ];
 
 const statusConfig: Record<ProjectStatus, { label: string; type: 'success' | 'warning' | 'info' | 'neutral' }> = {
+  prospect: { label: 'Quote', type: 'neutral' },
   active: { label: 'In Progress', type: 'success' },
   on_hold: { label: 'On Hold', type: 'warning' },
   completed: { label: 'Completed', type: 'info' },
@@ -133,6 +135,7 @@ export default function CustomerProjectScreen() {
             </View>
           </View>
         )}
+        <CustomerDocuments projectId={project.id} />
         <Card>
           <View style={styles.progressSection}>
             <Text style={[typeScale.displayLarge, { color: colors.primary }]}>{project.progress}%</Text>

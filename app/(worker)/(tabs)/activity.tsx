@@ -9,7 +9,8 @@ import { EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { useWorkerActivitySummary, formatWorkedDuration, ACTIVITY_PERIODS, type ActivityPeriod, type DayGroup } from '@/hooks/useWorkerActivitySummary';
-import { getCompanyImageUri } from '@/lib/projectImages';
+import { getWorkerHeaderImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 
 
 function formatDayHeading(dateKey: string): string {
@@ -105,7 +106,7 @@ export default function WorkerActivityScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={styles.hero}>
-        <Image source={{ uri: getCompanyImageUri() }} style={[styles.heroImage, { opacity: 0.16 }]} resizeMode="cover" />
+        <BrandCover uri={getWorkerHeaderImageUri()} style={[styles.heroImage, { opacity: 0.16 }]} />
         <View style={[styles.headerContent, { paddingTop: insets.top + spacing.md }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>

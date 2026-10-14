@@ -14,6 +14,7 @@ import type { Assignment, ScheduleChange } from '@/types/schedule';
 import type { Truck } from '@/types/truck';
 import type { Announcement, AnnouncementRead } from '@/types/announcement';
 import type { WorkerActivity, CheckIn, CheckOut, WorkerSettings } from '@/types/worker';
+import type { CompanyResource, ResourceAccess } from '@/types/resource';
 
 // ── People ──────────────────────────────────────────────────────
 
@@ -114,6 +115,10 @@ export const mockCompany: Company = {
   city: 'Cleveland',
   state: 'OH',
   zip: '44144',
+  yardAddress: '4521 Ridge Rd',
+  yardCity: 'Cleveland',
+  yardState: 'OH',
+  yardZip: '44144',
   createdAt: '2024-01-15T10:00:00Z',
   updatedAt: '2026-09-01T08:00:00Z',
 };
@@ -1293,3 +1298,22 @@ export const mockCustomerTimeline: Record<string, CustomerTimelineEvent[]> = {
     },
   ],
 };
+
+// ── Company Resources (demo mode only) ─────────────────────────
+// Codes for these live in src/hooks/useResources.ts (demo stand-in for
+// Supabase Vault), never on the resource objects themselves.
+
+export const mockResources: CompanyResource[] = [
+  { id: 'res1', companyId: 'company1', category: 'access_code', name: 'Main yard gate', description: 'Keypad on the left post. Close the gate behind you after 6 PM.', hasSecret: true, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-01T10:00:00Z' },
+  { id: 'res2', companyId: 'company1', category: 'vehicle', name: 'Truck #1 key lockbox', description: 'Lockbox is on the driver-side hitch.', truckId: 'truck1', hasSecret: true, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-01T10:00:00Z' },
+  { id: 'res3', companyId: 'company1', category: 'vehicle', name: 'Trailer hitch lock', truckId: 'truck4', hasSecret: true, createdAt: '2026-09-02T10:00:00Z', updatedAt: '2026-09-02T10:00:00Z' },
+  { id: 'res4', companyId: 'company1', category: 'equipment', name: 'Storage shed padlock', itemName: 'Equipment shed', description: 'Mowers and trimmers. Return fuel cans to the back shelf.', hasSecret: true, createdAt: '2026-09-03T10:00:00Z', updatedAt: '2026-09-03T10:00:00Z' },
+  { id: 'res5', companyId: 'company1', category: 'company_card', name: 'Fuel card', cardLastFour: '4417', cardHolderId: 'worker1', description: 'Fuel only. Keep receipts in the truck folder.', createdAt: '2026-09-04T10:00:00Z', updatedAt: '2026-09-04T10:00:00Z' },
+];
+
+export const mockResourceAccess: ResourceAccess[] = [
+  { id: 'ra1', companyId: 'company1', resourceId: 'res1', personId: 'worker1', createdAt: '2026-09-01T10:00:00Z' },
+  { id: 'ra2', companyId: 'company1', resourceId: 'res1', personId: 'worker3', createdAt: '2026-09-01T10:00:00Z' },
+  { id: 'ra3', companyId: 'company1', resourceId: 'res2', personId: 'worker1', createdAt: '2026-09-01T10:00:00Z' },
+  { id: 'ra4', companyId: 'company1', resourceId: 'res5', personId: 'worker1', createdAt: '2026-09-04T10:00:00Z' },
+];

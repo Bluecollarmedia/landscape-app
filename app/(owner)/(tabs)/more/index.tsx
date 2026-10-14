@@ -76,10 +76,31 @@ export default function MoreScreen() {
             MANAGE
           </Text>
           <MenuItem
+            icon="file-text"
+            label="Quotes & Invoices"
+            subtitle="Quotes, change orders and invoices"
+            onPress={() => router.push('/(owner)/more/financials' as any)}
+            colors={colors}
+          />
+          <MenuItem
+            icon="clipboard"
+            label="Materials"
+            subtitle="What to order or pick up for upcoming jobs"
+            onPress={() => router.push('/(owner)/more/materials' as any)}
+            colors={colors}
+          />
+          <MenuItem
             icon="truck"
             label="Trucks"
             subtitle="Vehicles and equipment"
             onPress={() => router.push('/(owner)/more/trucks' as any)}
+            colors={colors}
+          />
+          <MenuItem
+            icon="key"
+            label="Company Resources"
+            subtitle="Codes and info, and who can see them"
+            onPress={() => router.push('/(owner)/resources' as any)}
             colors={colors}
           />
           <MenuItem

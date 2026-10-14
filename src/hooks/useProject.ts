@@ -4,6 +4,7 @@ import { db, useDb, insertRow, updateRow, deleteRow, findRow } from '@/data/stor
 import { logProjectHistory, addCustomerTimeline, addProjectPhoto, notifyStaff, type NewPhoto } from '@/data/actions';
 
 const STATUS_LABELS: Record<string, string> = {
+  prospect: 'Prospect',
   active: 'Active',
   on_hold: 'On Hold',
   completed: 'Completed',

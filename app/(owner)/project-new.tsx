@@ -179,7 +179,7 @@ export default function NewProjectScreen() {
           {isEdit && (
             <Card title="Status & Progress" style={{ marginBottom: spacing.lg }}>
               <View style={styles.chipRow}>
-                {STATUS_OPTIONS.map((opt) => {
+                {(existing?.status === 'prospect' ? [{ key: 'prospect' as const, label: 'Prospect' }, ...STATUS_OPTIONS] : STATUS_OPTIONS).map((opt) => {
                   const active = status === opt.key;
                   return (
                     <Pressable

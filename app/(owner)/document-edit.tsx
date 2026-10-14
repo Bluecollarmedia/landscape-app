@@ -17,7 +17,7 @@ import { LineItemSheet } from '@/components/financials/LineItemSheet';
 import { showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useFinancialDoc } from '@/hooks/useFinancials';
-import { DOC_LABEL, saveDraft, deleteDraft, newLineItem, recentLineItems, readinessProblems, getDoc } from '@/data/financials';
+import { DOC_LABEL, CATEGORY_LABEL, saveDraft, deleteDraft, discardEmptyProspect, newLineItem, recentLineItems, readinessProblems, getDoc } from '@/data/financials';
 import { calcTotals, formatMoney, formatQuantity, formatPercent, parseAmount } from '@/lib/money';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -39,7 +39,7 @@ interface Form {
 }
 
 export default function DocumentEditScreen() {
-  const { kind, id, fresh, from, step: initialStep } = useLocalSearchParams<{ kind: FinancialDocType; id: string; fresh?: string; from?: string; step?: string }>();
+  const { kind, id, fresh, from, step: initialStep, newProject } = useLocalSearchParams<{ kind: FinancialDocType; id: string; fresh?: string; from?: string; step?: string; newProject?: string }>();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -136,6 +136,8 @@ export default function DocumentEditScreen() {
     // A brand-new draft that was never filled in isn't kept.
     if (fresh === '1' && !touched.current && form.lineItems.length === 0) {
       deleteDraft(doc.kind, doc.id);
+      // The prospect made just for this quote goes too; an existing project is never touched.
+      if (newProject === '1') discardEmptyProspect(doc.projectId);
       router.back();
       return;
     }
@@ -236,7 +238,7 @@ export default function DocumentEditScreen() {
           <>
             <ListSection title="CUSTOMER & PROJECT" footer="The customer comes from the project. To change it, edit the project.">
               <ValueRow label="Customer" value={customer ? `${customer.firstName} ${customer.lastName}`.trim() : 'None'} sub={customer?.email} />
-              <ValueRow label="Project" value={project?.name ?? '—'} sub={address} />
+              <ValueRow label="Project" value={project?.name ?? '—'} sub={project?.status === 'prospect' ? `${address ? `${address} · ` : ''}Prospect until approved` : address} />
               {linkedQuote && <ValueRow label="Original quote" value={linkedQuote.number} sub={formatMoney(linkedQuote.total)} />}
             </ListSection>
 
@@ -294,6 +296,7 @@ export default function DocumentEditScreen() {
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]} numberOfLines={2}>{li.description || 'Untitled item'}</Text>
                       <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {li.category ? `${CATEGORY_LABEL[li.category]}  ·  ` : ''}
                         {formatQuantity(li.quantity)}{li.unit ? ` ${li.unit}` : ''} × {formatMoney(li.unitPrice)}
                         {li.source ? `  ·  from ${li.source.number}` : ''}
                       </Text>

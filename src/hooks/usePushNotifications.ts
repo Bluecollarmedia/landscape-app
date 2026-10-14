@@ -19,6 +19,7 @@ function targetFor(role: UserRole, d: PushData): string | { pathname: string; pa
   if (role === 'owner' || role === 'admin') {
     if (DOC_TYPES.has(type) && id) return { pathname: '/(owner)/document', params: { kind: type, id } };
     if (type === 'project' && id) return `/(owner)/projects/${id}`;
+    if (type === 'materials' && id) return `/(owner)/projects/${id}?section=materials`;
     return '/(owner)/notification-center';
   }
   if (role === 'customer') {

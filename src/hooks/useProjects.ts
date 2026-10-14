@@ -36,6 +36,7 @@ export function useProjects(options: UseProjectsOptions = {}) {
 
   const grouped = useMemo(() => {
     const groups: Record<ProjectStatus, Project[]> = {
+      prospect: [],
       active: [],
       on_hold: [],
       completed: [],
@@ -50,6 +51,7 @@ export function useProjects(options: UseProjectsOptions = {}) {
   const counts = useMemo(() => {
     const c: Record<ProjectStatus | 'all', number> = {
       all: projects.length,
+      prospect: 0,
       active: 0,
       on_hold: 0,
       completed: 0,

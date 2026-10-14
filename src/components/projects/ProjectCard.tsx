@@ -15,6 +15,7 @@ interface ProjectCardProps {
 }
 
 const statusConfig: Record<ProjectStatus, { label: string; type: 'success' | 'warning' | 'error' | 'info' | 'neutral' }> = {
+  prospect: { label: 'Prospect', type: 'neutral' },
   active: { label: 'Active', type: 'success' },
   on_hold: { label: 'On Hold', type: 'warning' },
   completed: { label: 'Completed', type: 'info' },

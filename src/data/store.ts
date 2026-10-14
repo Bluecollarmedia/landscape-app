@@ -35,7 +35,8 @@ import type {
   WorkSession, WorkerHourlyRate, WorkerPaySettings, OvertimeRule, CompanyOperationsSettings,
   NotificationPreference, AppNotification, WorkerReminder,
 } from '@/types/operations';
-import type { Quote, ChangeOrder, Invoice, FinancialEvent, LineItem } from '@/types/financial';
+import type { Quote, ChangeOrder, Invoice, FinancialEvent, LineItem, FinancialSettings } from '@/types/financial';
+import type { MaterialVendor, ProjectMaterial, MaterialPlan } from '@/types/materials';
 import type {
   TeamCode, CompanyJoinSettings, CompanyInvitation, JoinRequest, MembershipAuditEvent,
   CompanyMembership,
@@ -104,6 +105,11 @@ const TABLES = {
   change_orders: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'customerId', 'number', 'title', 'description', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'terms', 'issueDate', 'snapshot', 'sentAt', 'approvedAt', 'approvedBy', 'approvedName', 'shareToken', 'declinedAt', 'declinedBy', 'declineReason', 'createdBy', 'createdAt', 'updatedAt'] },
   invoices: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'changeOrderIds', 'customerId', 'number', 'title', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'paymentInstructions', 'invoiceDate', 'dueDate', 'snapshot', 'issuedAt', 'voidedAt', 'voidReason', 'createdBy', 'createdAt', 'updatedAt'] },
   financial_events: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'documentType', 'documentId', 'eventType', 'actorId', 'note', 'metadata', 'createdAt'] },
+  // Update 015: document defaults and materials preparation (owner/admin only).
+  financial_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'defaultTaxRate', 'defaultTerms', 'defaultExclusions', 'defaultPaymentInstructions', 'updatedAt'] },
+  material_vendors: { scope: 'company', cols: ['id', 'companyId', 'name', 'contactName', 'phone', 'email', 'address', 'pickupInstructions', 'notes', 'createdAt', 'updatedAt'] },
+  project_materials: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'name', 'quantity', 'unit', 'status', 'vendorId', 'notes', 'source', 'sortOrder', 'createdBy', 'createdAt', 'updatedAt'] },
+  project_material_plans: { scope: 'company', pk: 'projectId', cols: ['projectId', 'companyId', 'vendorId', 'pickupLocation', 'pickupInstructions', 'handlingNotes', 'reminderAt', 'reminderJobDate', 'reminderNote', 'dismissedSources', 'updatedAt'] },
 } satisfies Record<string, TableDef>;
 
 export type TableName = keyof typeof TABLES;
@@ -218,6 +224,11 @@ export interface Db {
   invoices: Invoice[];
   /** Oldest first. */
   financialEvents: FinancialEvent[];
+  financialSettings: FinancialSettings | null;
+  vendors: MaterialVendor[];
+  /** Per project, in checklist order. */
+  materials: Record<string, ProjectMaterial[]>;
+  materialPlans: Record<string, MaterialPlan>;
 }
 
 const DEFAULT_OVERTIME: OvertimeRule = {
@@ -279,6 +290,10 @@ export const db: Db = {
   changeOrders: [],
   invoices: [],
   financialEvents: [],
+  financialSettings: null,
+  vendors: [],
+  materials: {},
+  materialPlans: {},
 };
 
 function groupBy<T extends Row>(rows: T[], key: string): Record<string, T[]> {
@@ -523,6 +538,25 @@ function derive() {
     .slice()
     .sort(byCreated)
     .map((e) => ({ ...e, actor: person(e.actorId) })) as FinancialEvent[];
+
+  const fs = raw.financial_settings[0];
+  db.financialSettings = fs
+    ? ({ ...fs, defaultTaxRate: fs.defaultTaxRate != null ? Number(fs.defaultTaxRate) : undefined } as FinancialSettings)
+    : null;
+  db.vendors = raw.material_vendors
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name))) as MaterialVendor[];
+  const mats = groupBy(
+    raw.project_materials.map((m) => ({ ...m, quantity: m.quantity != null ? Number(m.quantity) : undefined, sortOrder: m.sortOrder ?? 0 })),
+    'projectId',
+  );
+  for (const k of Object.keys(mats)) mats[k].sort((a, b) => a.sortOrder - b.sortOrder || byCreated(a, b));
+  db.materials = mats as Record<string, ProjectMaterial[]>;
+  const plans: Record<string, MaterialPlan> = {};
+  for (const p of raw.project_material_plans) {
+    plans[p.projectId] = { ...p, dismissedSources: Array.isArray(p.dismissedSources) ? p.dismissedSources : [] } as MaterialPlan;
+  }
+  db.materialPlans = plans;
 }
 
 // ── Subscription ────────────────────────────────────────────────────────────
@@ -770,6 +804,10 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.change_orders = fin.changeOrders;
     raw.invoices = fin.invoices;
     raw.financial_events = fin.events;
+    raw.financial_settings = [];
+    raw.material_vendors = fin.vendors;
+    raw.project_materials = fin.materials;
+    raw.project_material_plans = fin.materialPlans;
     for (const r of onb.mockJoinRequests) {
       if (r.person && !raw.people.some((p) => p.id === r.person!.id)) {
         raw.people.push({ ...r.person, avatarUrl: r.person.profilePhotoUrl });

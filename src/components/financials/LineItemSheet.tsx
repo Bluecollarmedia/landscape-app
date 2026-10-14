@@ -13,15 +13,16 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { formatMoney, lineAmount, parseAmount } from '@/lib/money';
-import type { LineItem } from '@/types/financial';
+import { CATEGORY_ORDER, CATEGORY_LABEL } from '@/data/financials';
+import type { LineItem, LineItemCategory } from '@/types/financial';
 
-const UNITS = ['ea', 'sq ft', 'ln ft', 'yd', 'ton', 'plant', 'hr', 'visit', 'lot'];
+const UNITS = ['ea', 'sq ft', 'ln ft', 'yd', 'ton', 'bag', 'plant', 'hr', 'visit', 'lot'];
 
 interface Props {
   visible: boolean;
   item: LineItem | null;
   isNew: boolean;
-  suggestions: Pick<LineItem, 'description' | 'unit' | 'unitPrice' | 'details'>[];
+  suggestions: Pick<LineItem, 'description' | 'unit' | 'unitPrice' | 'details' | 'category'>[];
   onSave: (item: LineItem) => void;
   onDelete: () => void;
   onClose: () => void;
@@ -35,6 +36,7 @@ export function LineItemSheet({ visible, item, isNew, suggestions, onSave, onDel
   const [qty, setQty] = useState('');
   const [unit, setUnit] = useState('');
   const [price, setPrice] = useState('');
+  const [category, setCategory] = useState<LineItemCategory | undefined>();
   const [tried, setTried] = useState(false);
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export function LineItemSheet({ visible, item, isNew, suggestions, onSave, onDel
     setQty(isNew && item.quantity === 1 ? '1' : String(item.quantity));
     setUnit(item.unit ?? '');
     setPrice(isNew && !item.unitPrice ? '' : String(item.unitPrice));
+    setCategory(item.category);
     setTried(false);
   }, [visible, item, isNew]);
 
@@ -68,6 +71,7 @@ export function LineItemSheet({ visible, item, isNew, suggestions, onSave, onDel
     if (!valid || !item) return;
     onSave({
       ...item,
+      category,
       description: description.trim(),
       details: details.trim() || undefined,
       quantity: q,
@@ -113,6 +117,7 @@ export function LineItemSheet({ visible, item, isNew, suggestions, onSave, onDel
                       if (s.unit) setUnit(s.unit);
                       if (s.unitPrice) setPrice(String(s.unitPrice));
                       if (s.details && !details) setDetails(s.details);
+                      if (s.category && !category) setCategory(s.category);
                     }}
                     style={[styles.chip, { backgroundColor: colors.primarySurface }]}
                   >
@@ -155,6 +160,24 @@ export function LineItemSheet({ visible, item, isNew, suggestions, onSave, onDel
               ))}
             </ScrollView>
 
+            <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>Group (optional)</Text>
+            <View style={styles.cats}>
+              {CATEGORY_ORDER.map((c) => {
+                const on = category === c;
+                return (
+                  <Pressable
+                    key={c}
+                    onPress={() => setCategory(on ? undefined : c)}
+                    style={[styles.chip, { backgroundColor: on ? colors.primary : colors.backgroundTertiary }]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                  >
+                    <Text style={[typeScale.labelSmall, { color: on ? colors.textOnPrimary : colors.textSecondary }]}>{CATEGORY_LABEL[c]}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             {tried && !valid && (
               <Text style={[typeScale.caption, { color: colors.error }]}>
                 {[errors.description, errors.qty, errors.price].filter(Boolean).join(' · ')}
@@ -181,6 +204,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   field: { borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, minHeight: 44, fontSize: 16 },
   trio: { flexDirection: 'row', gap: spacing.sm },
+  cats: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   chip: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full, maxWidth: 260 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.md, marginTop: spacing.xs, marginBottom: spacing.sm },
 });

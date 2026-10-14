@@ -11,8 +11,10 @@
  *    change orders.
  */
 
-import { db, insertRow, updateRow, deleteRow, findRow, rpc, refresh, isDemo } from './store';
-import { notifyPeople } from './actions';
+import { db, insertRow, updateRow, deleteRow, findRow, upsertRow, rowsOf, rpc, refresh, isDemo } from './store';
+import { notifyPeople, logProjectHistory, addCustomerTimeline } from './actions';
+import { generateProjectCode } from '@/hooks/useCustomerAccess';
+import { DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
 import { supabase } from '@/lib/supabase';
 import { config } from '@/lib/config';
 import { uuid, todayKey, localDateKey } from '@/lib/ids';
@@ -21,6 +23,7 @@ import type {
   FinancialDocType, FinancialDoc, FinancialEventType, LineItem, DocumentSnapshot,
   Quote, ChangeOrder, Invoice, ProjectFinancialSummary, FinancialStatus,
 } from '@/types/financial';
+import type { Project } from '@/types/project';
 
 type TableFor = 'quotes' | 'change_orders' | 'invoices';
 
@@ -43,6 +46,8 @@ const PREFIX: Record<FinancialDocType, string> = {
 };
 
 const FIRST_NUMBER = 1001;
+
+export { CATEGORY_ORDER, CATEGORY_LABEL } from '@/lib/documentHtml';
 
 // ── Reading ─────────────────────────────────────────────────────────────────
 
@@ -139,19 +144,27 @@ export function nextNumber(kind: FinancialDocType): string {
   return `${prefix}${max + 1}`;
 }
 
-/** Tax rate, terms and payment instructions from the most recent document,
- * so the owner sets them once and every new document starts from them. */
-function lastUsed() {
+/** What a new document starts with: the company's saved defaults
+ * (Quotes & Invoices → Document Defaults). Anything not set there falls back
+ * to the most recent document, so the owner never types the same terms twice.
+ * With neither, there's no tax (nothing is assumed). */
+export function documentDefaults() {
+  const s = db.financialSettings;
   const recent = allDocs();
-  const taxRate = recent.find((d) => d.taxRate > 0)?.taxRate ?? 0;
   const quote = db.quotes.find((q) => q.terms || q.exclusions);
   const invoice = db.invoices.find((i) => i.paymentInstructions);
   return {
-    taxRate,
-    terms: quote?.terms,
-    exclusions: quote?.exclusions,
-    paymentInstructions: invoice?.paymentInstructions,
+    taxRate: s?.defaultTaxRate ?? recent.find((d) => d.taxRate > 0)?.taxRate ?? 0,
+    terms: s?.defaultTerms ?? quote?.terms,
+    exclusions: s?.defaultExclusions ?? quote?.exclusions,
+    paymentInstructions: s?.defaultPaymentInstructions ?? invoice?.paymentInstructions,
   };
+}
+const lastUsed = documentDefaults;
+
+/** Saves the company's document defaults. Existing documents don't change. */
+export function saveDocumentDefaults(patch: { defaultTaxRate?: number; defaultTerms?: string; defaultExclusions?: string; defaultPaymentInstructions?: string }) {
+  upsertRow('financial_settings', { companyId: db.companyId, ...db.financialSettings, ...patch });
 }
 
 export function newLineItem(partial: Partial<LineItem> = {}): LineItem {
@@ -216,6 +229,84 @@ function logEvent(kind: FinancialDocType, doc: { id?: unknown; projectId?: unkno
 
 export function eventsFor(documentId: string) {
   return db.financialEvents.filter((e) => e.documentId === documentId);
+}
+
+// ── Quotes for a new project (prospects) ───────────────────────────────────
+
+const normalize = (s?: string) => (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** The customer's existing projects at this address, so a quote for a
+ * property that's already a project goes on that project instead of a copy. */
+export function matchingProjects(customerId: string | undefined, address: string): Project[] {
+  const a = normalize(address);
+  if (!a) return [];
+  return db.projects.filter((p) =>
+    p.status !== 'archived' && normalize(p.address) === a && (!customerId || !p.customerId || p.customerId === customerId));
+}
+
+/** Creates the project for a quote on a new job as a Prospect: no team, not
+ * on the schedule, not shown to workers. It becomes Active only when the
+ * owner starts it after the quote is approved (startProjectFromQuote). */
+export function createProspectProject(input: {
+  customerId?: string;
+  name: string;
+  address: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+}): Project {
+  const project = insertRow('projects', {
+    customerId: input.customerId,
+    name: input.name.trim(),
+    address: input.address.trim() || undefined,
+    city: input.city?.trim() || undefined,
+    state: input.state?.trim().toUpperCase() || undefined,
+    zip: input.zip?.trim() || undefined,
+    status: 'prospect',
+    progress: 0,
+    customerProjectCode: generateProjectCode(),
+  });
+  insertRow('project_settings', {
+    projectId: project.id,
+    customerInteractionEnabled: true,
+    completionPhotoRequired: false,
+    checkinRadiusMeters: DEFAULT_CHECKIN_RADIUS_M,
+    customerCanRequest: true,
+    customerCanViewPhotos: true,
+    customerCanComment: true,
+  });
+  logProjectHistory(project.id as string, 'project_created', `Prospect created for a quote: ${input.name.trim()}`);
+  return project as unknown as Project;
+}
+
+/** Removes a prospect that was created for a quote the owner then cancelled
+ * before adding anything. Only an untouched prospect with no documents left. */
+export function discardEmptyProspect(projectId: string) {
+  const p = db.projects.find((x) => x.id === projectId);
+  if (p?.status !== 'prospect') return;
+  // Raw rows: the draft deleted a moment ago is already gone from these.
+  if ((['quotes', 'change_orders', 'invoices'] as const).some((t) => rowsOf(t).some((r) => r.projectId === projectId))) return;
+  if ((db.tasks[projectId] ?? []).length || (db.photos[projectId] ?? []).length || db.assignments.some((a) => a.projectId === projectId)) return;
+  deleteRow('projects', projectId);
+}
+
+/** A prospect whose quote was approved and is ready to become a project. */
+export function canStartProject(projectId: string): boolean {
+  const p = db.projects.find((x) => x.id === projectId);
+  return p?.status === 'prospect' && db.quotes.some((q) => q.projectId === projectId && q.status === 'approved');
+}
+
+/** Turns a prospect into an active project, keeping everything already on it
+ * (customer, address, the approved quote). Doesn't schedule anyone. */
+export function startProjectFromQuote(projectId: string): boolean {
+  if (!canStartProject(projectId)) return false;
+  const quote = db.quotes.find((q) => q.projectId === projectId && q.status === 'approved');
+  updateRow('projects', projectId, { status: 'active' });
+  logProjectHistory(projectId, 'status_changed', `Project started from approved quote ${quote?.number ?? ''}`.trim(), {
+    from: 'prospect', to: 'active', quoteId: quote?.id,
+  });
+  addCustomerTimeline(projectId, 'project_started', 'Your project is confirmed');
+  return true;
 }
 
 // ── Creating ────────────────────────────────────────────────────────────────
@@ -523,15 +614,15 @@ export function templateOptionsFor(doc: FinancialDoc) {
 
 /** Line items used before (most recent first, one per description) — offered
  * as suggestions when adding a new item. */
-export function recentLineItems(limit = 40): Pick<LineItem, 'description' | 'unit' | 'unitPrice' | 'details'>[] {
+export function recentLineItems(limit = 40): Pick<LineItem, 'description' | 'unit' | 'unitPrice' | 'details' | 'category'>[] {
   const seen = new Set<string>();
-  const out: Pick<LineItem, 'description' | 'unit' | 'unitPrice' | 'details'>[] = [];
+  const out: Pick<LineItem, 'description' | 'unit' | 'unitPrice' | 'details' | 'category'>[] = [];
   for (const d of allDocs()) {
     for (const li of d.lineItems) {
       const key = li.description.trim().toLowerCase();
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      out.push({ description: li.description, unit: li.unit, unitPrice: li.unitPrice, details: li.details });
+      out.push({ description: li.description, unit: li.unit, unitPrice: li.unitPrice, details: li.details, category: li.category });
       if (out.length >= limit) return out;
     }
   }

@@ -45,7 +45,7 @@ export default function FinancialsOverviewScreen() {
   const [filter, setFilter] = useState<Filter>('all');
 
   const awaiting = docs.filter((d) => matches(d, 'awaiting'));
-  const issued = docs.filter((d) => d.kind === 'invoice' && d.status === 'issued');
+  const draftInvoices = docs.filter((d) => d.kind === 'invoice' && d.status === 'draft');
   const drafts = docs.filter((d) => d.status === 'draft');
 
   const list = useMemo(() => {
@@ -69,9 +69,20 @@ export default function FinancialsOverviewScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to More">
-          <Icon name="chevron-left" size={24} color={colors.textPrimary} />
-        </Pressable>
+        <View style={styles.topRow}>
+          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to More">
+            <Icon name="chevron-left" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/(owner)/more/document-defaults' as any)}
+            hitSlop={12}
+            style={styles.back}
+            accessibilityRole="button"
+            accessibilityLabel="Document defaults"
+          >
+            <Icon name="sliders" size={20} color={colors.textPrimary} />
+          </Pressable>
+        </View>
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Quotes & Invoices</Text>
       </View>
 
@@ -86,10 +97,10 @@ export default function FinancialsOverviewScreen() {
             <Text style={[typeScale.headingLarge, styles.num, { color: colors.textPrimary }]}>{awaiting.length}</Text>
             <Text style={[typeScale.bodySmall, styles.num, { color: colors.textSecondary }]}>{formatMoney(sumMoney(awaiting.map((d) => d.total)))}</Text>
           </Pressable>
-          <Pressable onPress={() => setFilter('invoices')} style={[styles.tile, { backgroundColor: colors.surface }, shadow.sm]} accessibilityRole="button">
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Issued invoices</Text>
-            <Text style={[typeScale.headingLarge, styles.num, { color: colors.textPrimary }]}>{issued.length}</Text>
-            <Text style={[typeScale.bodySmall, styles.num, { color: colors.textSecondary }]}>{formatMoney(sumMoney(issued.map((d) => d.total)))}</Text>
+          <Pressable onPress={() => setFilter('drafts')} style={[styles.tile, { backgroundColor: colors.surface }, shadow.sm]} accessibilityRole="button">
+            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Invoices in draft</Text>
+            <Text style={[typeScale.headingLarge, styles.num, { color: colors.textPrimary }]}>{draftInvoices.length}</Text>
+            <Text style={[typeScale.bodySmall, styles.num, { color: colors.textSecondary }]}>{formatMoney(sumMoney(draftInvoices.map((d) => d.total)))}</Text>
           </Pressable>
         </View>
 
@@ -121,9 +132,16 @@ export default function FinancialsOverviewScreen() {
 
       <View style={[styles.fab, { bottom: clearance + spacing.sm }]} pointerEvents="box-none">
         <Button
-          title="Create Quote or Invoice"
+          title="Create Quote"
           icon="plus"
-          onPress={() => router.push('/(owner)/document-new' as any)}
+          onPress={() => router.push({ pathname: '/(owner)/document-new', params: { kind: 'quote' } } as any)}
+          style={shadow.md}
+        />
+        <Button
+          title="Invoice"
+          icon="dollar-sign"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/(owner)/document-new', params: { kind: 'invoice' } } as any)}
           style={shadow.md}
         />
       </View>
@@ -138,5 +156,6 @@ const styles = StyleSheet.create({
   tiles: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
   tile: { flex: 1, borderRadius: radius.xl, padding: spacing.md, gap: 2 },
   num: { fontVariant: ['tabular-nums'] },
-  fab: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  fab: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
 });

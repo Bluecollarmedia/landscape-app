@@ -112,6 +112,7 @@ export default function MoreScreen() {
         <FadeInItem index={5}>
           <MenuGroup title="BUSINESS">
             <MenuRow icon="file-text" label="Quotes & Invoices" subtitle="Quotes, change orders and invoices" onPress={() => go('/(owner)/more/financials')} />
+            <MenuRow icon="clipboard" label="Materials" subtitle="What to order or pick up for upcoming jobs" onPress={() => go('/(owner)/more/materials')} />
             <MenuRow icon="key" label="Company Resources" subtitle="Codes and info, and who can see them" onPress={() => go('/(owner)/resources')} />
             <MenuRow icon="volume-2" label="Announcements" subtitle="Company-wide messages" onPress={() => go('/(owner)/more/announcements')} />
           </MenuGroup>

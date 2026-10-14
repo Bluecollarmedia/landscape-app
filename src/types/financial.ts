@@ -16,8 +16,12 @@ export type ChangeOrderStatus = 'draft' | 'sent' | 'approved' | 'declined';
 export type InvoiceStatus = 'draft' | 'issued' | 'void';
 export type FinancialStatus = QuoteStatus | ChangeOrderStatus | InvoiceStatus;
 
+/** Optional grouping for line items; documents show a subtotal per group. */
+export type LineItemCategory = 'labor' | 'materials' | 'equipment' | 'misc';
+
 export interface LineItem {
   id: string;
+  category?: LineItemCategory;
   description: string;
   /** Optional second line (scope details, materials, etc.). */
   details?: string;
@@ -159,4 +163,14 @@ export interface ProjectFinancialSummary {
   /** Change orders sent but not answered yet (not counted above). */
   pendingChanges: number;
   invoiced: number;
+}
+
+/** What every new document starts with (Quotes & Invoices → Defaults). */
+export interface FinancialSettings {
+  companyId: string;
+  defaultTaxRate?: number;
+  defaultTerms?: string;
+  defaultExclusions?: string;
+  defaultPaymentInstructions?: string;
+  updatedAt?: string;
 }

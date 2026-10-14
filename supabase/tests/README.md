@@ -34,3 +34,17 @@ but not change crews.
 psql -d t -f supabase/updates/014_crews.sql
 psql -d t -f supabase/tests/014_crews_test.sql
 ```
+
+`018_maintenance_test.sql` checks Maintenance: landscaping workers can't be
+put on a route or made its lead and can't see maintenance data, crew members
+can't change stops directly, start day is recorded once and never blocked by
+GPS, a worker can't finish before I'm Here, open checklist items and missing
+photos block finishing, crew photos stay internal, a second worker's arrival
+is logged separately, finishing twice records one completion, owner
+attendance corrections keep the original time, and worked routes/properties
+can't be deleted.
+
+```sh
+psql -d t -f supabase/updates/018_maintenance.sql
+psql -d t -f supabase/tests/018_maintenance_test.sql
+```

@@ -31,7 +31,7 @@ import type { Truck } from '@/types/truck';
 import type { Announcement, AnnouncementRead } from '@/types/announcement';
 import type { CheckIn, CheckOut, WorkerActivity, WorkerSettings } from '@/types/worker';
 import type {
-  WorkSession, WorkerHourlyRate, OvertimeRule, CompanyOperationsSettings,
+  WorkSession, WorkerHourlyRate, WorkerPaySettings, OvertimeRule, CompanyOperationsSettings,
   NotificationPreference, AppNotification, WorkerReminder,
 } from '@/types/operations';
 import type { Quote, ChangeOrder, Invoice, FinancialEvent, LineItem } from '@/types/financial';
@@ -52,7 +52,7 @@ interface TableDef {
 }
 
 const TABLES = {
-  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'storageLimitGb', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
+  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'storageLimitGb', 'targetPayEnabled', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
   people: { scope: 'all', cols: ['id', 'userId', 'email', 'firstName', 'lastName', 'avatarUrl', 'phone', 'createdAt', 'updatedAt'] },
   company_members: { scope: 'company', cols: ['id', 'companyId', 'personId', 'role', 'status', 'joinMethod', 'joinRequestId', 'approvedBy', 'approvedAt', 'deactivatedAt', 'deactivatedBy', 'createdAt', 'updatedAt'] },
   projects: { scope: 'company', cols: ['id', 'companyId', 'customerId', 'name', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'status', 'progress', 'startDate', 'estimatedEndDate', 'completedAt', 'notes', 'coverPhotoUrl', 'customerProjectCode', 'customerClaimedBy', 'customerClaimedAt', 'createdAt', 'updatedAt'] },
@@ -75,6 +75,7 @@ const TABLES = {
   worker_activities: { scope: 'company', cols: ['id', 'companyId', 'personId', 'assignmentId', 'projectId', 'activityType', 'description', 'metadata', 'timestamp'] },
   work_sessions: { scope: 'company', cols: ['id', 'companyId', 'personId', 'projectId', 'assignmentId', 'checkInTime', 'checkOutTime', 'durationMinutes', 'checkInGps', 'checkOutGps', 'offlineCheckIn', 'offlineCheckOut', 'syncedCheckInAt', 'syncedCheckOutAt', 'status', 'correction', 'createdAt', 'updatedAt'] },
   worker_hourly_rates: { scope: 'company', cols: ['id', 'companyId', 'personId', 'hourlyRate', 'effectiveDate', 'endDate', 'setBy', 'createdAt'] },
+  worker_pay_settings: { scope: 'company', pk: 'personId', cols: ['personId', 'companyId', 'overtimeEnabled', 'overtimeAfterHours', 'overtimeMultiplier', 'targetHourlyRate', 'updatedAt'] },
   overtime_rules: { scope: 'company', cols: ['id', 'companyId', 'ruleType', 'weeklyThresholdHours', 'dailyThresholdHours', 'overtimeMultiplier', 'isActive', 'createdAt', 'updatedAt'] },
   company_operations_settings: { scope: 'company', cols: ['id', 'companyId', 'missingCheckinGraceMinutes', 'lateCheckinThresholdMinutes', 'pastEndAlertEnabled', 'overtimeRuleId', 'createdAt', 'updatedAt'] },
   notification_preferences: { scope: 'company', cols: ['id', 'companyId', 'personId', 'eventType', 'enabled', 'createdAt', 'updatedAt'] },
@@ -187,6 +188,8 @@ export interface Db {
   workerActivities: WorkerActivity[];
   workSessions: WorkSession[];
   hourlyRates: WorkerHourlyRate[];
+  /** Keyed by personId. */
+  paySettings: Record<string, WorkerPaySettings>;
   overtimeRule: OvertimeRule;
   operationsSettings: CompanyOperationsSettings;
   notificationPreferences: NotificationPreference[];
@@ -246,6 +249,7 @@ export const db: Db = {
   workerActivities: [],
   workSessions: [],
   hourlyRates: [],
+  paySettings: {},
   overtimeRule: DEFAULT_OVERTIME,
   operationsSettings: DEFAULT_OPS,
   notificationPreferences: [],
@@ -425,6 +429,17 @@ function derive() {
       project: s.projectId ? projectRef[s.projectId] : undefined,
     }) as WorkSession);
   db.hourlyRates = raw.worker_hourly_rates.map((r) => ({ ...r, hourlyRate: Number(r.hourlyRate), worker: person(r.personId) }) as WorkerHourlyRate);
+
+  db.paySettings = {};
+  for (const p of raw.worker_pay_settings) {
+    db.paySettings[p.personId] = {
+      ...p,
+      overtimeEnabled: p.overtimeEnabled !== false,
+      overtimeAfterHours: Number(p.overtimeAfterHours ?? 40),
+      overtimeMultiplier: Number(p.overtimeMultiplier ?? 1.5),
+      targetHourlyRate: p.targetHourlyRate != null ? Number(p.targetHourlyRate) : undefined,
+    } as WorkerPaySettings;
+  }
 
   const ot = raw.overtime_rules[0];
   db.overtimeRule = ot
@@ -708,6 +723,7 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.worker_activities = mock.mockWorkerActivities.map(({ project, ...w }) => w);
     raw.work_sessions = ops.mockWorkSessions.map(({ worker, project, ...s }) => s);
     raw.worker_hourly_rates = ops.mockHourlyRates.map(({ worker, ...r }) => r);
+    raw.worker_pay_settings = ops.mockWorkerPaySettings.map((p) => ({ ...p }));
     raw.overtime_rules = [ops.mockOvertimeRule];
     raw.company_operations_settings = [ops.mockOperationsSettings];
     raw.notification_preferences = [...ops.mockNotificationPreferences];

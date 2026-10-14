@@ -2,6 +2,7 @@ import { useMemo, useCallback } from 'react';
 import type {
   WorkSession,
   WorkerHourlyRate,
+  WorkerPaySettings,
   OvertimeRule,
   NotificationPreference,
   AppNotification,
@@ -13,8 +14,9 @@ import type {
 } from '@/types/operations';
 import type { Assignment } from '@/types/schedule';
 import type { PersonSummary } from '@/types/company';
-import { db, useDb, updateRow, insertRow } from '@/data/store';
+import { db, useDb, updateRow, insertRow, upsertRow } from '@/data/store';
 import { todayKey, localDateKey, isoToLocalDateKey, localDateTime } from '@/lib/ids';
+import { computeTargetPay, type TargetPayBreakdown } from '@/lib/targetPay';
 
 // ── Hours Calculation ─────────────────────────────────────────
 
@@ -136,10 +138,34 @@ export interface PayrollEstimate {
   overtimeHours: number;
   regularRate: number;
   overtimeRate: number;
+  /** This worker's overtime terms (their own, or the company default). */
+  overtime: OvertimeTerms;
   regularPay: number;
   overtimePay: number;
+  /** What the worker is paid: the target-pay gross when that applies, else standard overtime pay. */
   totalPay: number;
+  /** Standard overtime math at the stored hourly rate (shown for comparison in Target-Pay Mode). */
+  standardPay: number;
+  /** Set when Target-Pay Mode is on and this worker has a target rate. */
+  targetPay?: TargetPayBreakdown & { targetRate: number };
   sessions: WorkSession[];
+}
+
+export interface OvertimeTerms {
+  enabled: boolean;
+  afterHours: number;
+  multiplier: number;
+  /** False when the worker has no settings of their own and uses the company rule. */
+  isCustom: boolean;
+}
+
+function companyOvertimeTerms(rule: OvertimeRule): OvertimeTerms {
+  return {
+    enabled: rule.isActive && rule.ruleType === 'weekly_40',
+    afterHours: rule.weeklyThresholdHours ?? 40,
+    multiplier: rule.overtimeMultiplier,
+    isCustom: false,
+  };
 }
 
 function getRateForDate(rates: WorkerHourlyRate[], date: string): number {
@@ -153,6 +179,8 @@ export function usePayroll() {
   const v = useDb();
   const rates = useMemo<WorkerHourlyRate[]>(() => db.hourlyRates, [v]);
   const overtimeRule = useMemo<OvertimeRule>(() => db.overtimeRule, [v]);
+  const paySettings = useMemo<Record<string, WorkerPaySettings>>(() => db.paySettings, [v]);
+  const targetPayEnabled = useMemo(() => db.company?.targetPayEnabled === true, [v]);
   const { sessions, getAllWorkersWeeklyHours } = useWorkSessions();
 
   const getRatesForWorker = useCallback(
@@ -165,19 +193,29 @@ export function usePayroll() {
     [getRatesForWorker],
   );
 
+  const getOvertimeTerms = useCallback(
+    (personId: string): OvertimeTerms => {
+      const own = paySettings[personId];
+      if (!own) return companyOvertimeTerms(overtimeRule);
+      return { enabled: own.overtimeEnabled, afterHours: own.overtimeAfterHours, multiplier: own.overtimeMultiplier, isCustom: true };
+    },
+    [paySettings, overtimeRule],
+  );
+
   const getPayrollEstimates = useCallback(
     (weekOfDate: string): PayrollEstimate[] => {
       const allWeekly = getAllWorkersWeeklyHours(weekOfDate);
 
       return allWeekly.map((wh) => {
         const workerRates = getRatesForWorker(wh.personId);
+        const overtime = getOvertimeTerms(wh.personId);
         let regularHours = 0;
         let overtimeHours = 0;
         let regularPay = 0;
         let overtimePay = 0;
 
-        if (overtimeRule.isActive && overtimeRule.ruleType === 'weekly_40') {
-          const threshold = overtimeRule.weeklyThresholdHours ?? 40;
+        if (overtime.enabled) {
+          const threshold = overtime.afterHours;
           let cumulativeHours = 0;
 
           for (const day of wh.dailyHours) {
@@ -189,14 +227,14 @@ export function usePayroll() {
               regularPay += dayHours * dayRate;
             } else if (cumulativeHours >= threshold) {
               overtimeHours += dayHours;
-              overtimePay += dayHours * dayRate * overtimeRule.overtimeMultiplier;
+              overtimePay += dayHours * dayRate * overtime.multiplier;
             } else {
               const regPortion = threshold - cumulativeHours;
               const otPortion = dayHours - regPortion;
               regularHours += regPortion;
               overtimeHours += otPortion;
               regularPay += regPortion * dayRate;
-              overtimePay += otPortion * dayRate * overtimeRule.overtimeMultiplier;
+              overtimePay += otPortion * dayRate * overtime.multiplier;
             }
             cumulativeHours += dayHours;
           }
@@ -209,6 +247,11 @@ export function usePayroll() {
         }
 
         const rate = getCurrentRate(wh.personId);
+        const standardPay = Math.round((regularPay + overtimePay) * 100) / 100;
+        const targetRate = paySettings[wh.personId]?.targetHourlyRate;
+        const targetPay = targetPayEnabled && targetRate
+          ? { ...computeTargetPay(targetRate, regularHours + overtimeHours, overtime), targetRate }
+          : undefined;
         return {
           personId: wh.personId,
           worker: wh.worker,
@@ -217,17 +260,55 @@ export function usePayroll() {
           regularHours: Math.round(regularHours * 100) / 100,
           overtimeHours: Math.round(overtimeHours * 100) / 100,
           regularRate: rate,
-          overtimeRate: Math.round(rate * overtimeRule.overtimeMultiplier * 100) / 100,
+          overtimeRate: Math.round(rate * overtime.multiplier * 100) / 100,
+          overtime,
           regularPay: Math.round(regularPay * 100) / 100,
           overtimePay: Math.round(overtimePay * 100) / 100,
-          totalPay: Math.round((regularPay + overtimePay) * 100) / 100,
+          totalPay: targetPay ? targetPay.grossPay : standardPay,
+          standardPay,
+          targetPay,
           sessions: sessions.filter(
             (s) => s.personId === wh.personId && getSessionDate(s) >= wh.weekStart && getSessionDate(s) <= wh.weekEnd,
           ),
         };
       });
     },
-    [sessions, getAllWorkersWeeklyHours, getRatesForWorker, getCurrentRate, overtimeRule],
+    [sessions, getAllWorkersWeeklyHours, getRatesForWorker, getCurrentRate, getOvertimeTerms, paySettings, targetPayEnabled],
+  );
+
+  /** Saves a worker's target hourly rate (Target-Pay Mode). Keeps their current overtime terms. */
+  const setTargetRate = useCallback(
+    (personId: string, targetHourlyRate: number) => {
+      const terms = getOvertimeTerms(personId);
+      upsertRow('worker_pay_settings', {
+        personId,
+        companyId: db.companyId,
+        overtimeEnabled: terms.enabled,
+        overtimeAfterHours: terms.afterHours,
+        overtimeMultiplier: terms.multiplier,
+        targetHourlyRate,
+      });
+    },
+    [getOvertimeTerms],
+  );
+
+  /** Turns Target-Pay Mode on or off for the whole company. */
+  const setTargetPayEnabled = useCallback((enabled: boolean) => {
+    if (db.company) updateRow('companies', db.company.id, { targetPayEnabled: enabled });
+  }, []);
+
+  /** Saves a worker's own overtime terms (on/off, hours a week before it starts, multiplier). */
+  const setWorkerOvertime = useCallback(
+    (personId: string, terms: { enabled: boolean; afterHours: number; multiplier: number }) => {
+      upsertRow('worker_pay_settings', {
+        personId,
+        companyId: db.companyId,
+        overtimeEnabled: terms.enabled,
+        overtimeAfterHours: terms.afterHours,
+        overtimeMultiplier: terms.multiplier,
+      });
+    },
+    [],
   );
 
   /**
@@ -252,7 +333,10 @@ export function usePayroll() {
     insertRow('worker_hourly_rates', { personId, hourlyRate, effectiveDate: from, setBy: db.personId || undefined });
   }, []);
 
-  return { rates, overtimeRule, getRatesForWorker, getCurrentRate, getPayrollEstimates, setHourlyRate };
+  return {
+    rates, overtimeRule, targetPayEnabled, getRatesForWorker, getCurrentRate, getOvertimeTerms, getPayrollEstimates,
+    setHourlyRate, setWorkerOvertime, setTargetRate, setTargetPayEnabled,
+  };
 }
 
 // ── Attendance ────────────────────────────────────────────────

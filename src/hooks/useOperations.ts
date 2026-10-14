@@ -16,6 +16,7 @@ import type { Assignment } from '@/types/schedule';
 import type { PersonSummary } from '@/types/company';
 import { db, useDb, updateRow, insertRow, upsertRow } from '@/data/store';
 import { todayKey, localDateKey, isoToLocalDateKey, localDateTime } from '@/lib/ids';
+import { computeTargetPay, type TargetPayBreakdown } from '@/lib/targetPay';
 
 // ── Hours Calculation ─────────────────────────────────────────
 
@@ -141,7 +142,12 @@ export interface PayrollEstimate {
   overtime: OvertimeTerms;
   regularPay: number;
   overtimePay: number;
+  /** What the worker is paid: the target-pay gross when that applies, else standard overtime pay. */
   totalPay: number;
+  /** Standard overtime math at the stored hourly rate (shown for comparison in Target-Pay Mode). */
+  standardPay: number;
+  /** Set when Target-Pay Mode is on and this worker has a target rate. */
+  targetPay?: TargetPayBreakdown & { targetRate: number };
   sessions: WorkSession[];
 }
 
@@ -174,6 +180,7 @@ export function usePayroll() {
   const rates = useMemo<WorkerHourlyRate[]>(() => db.hourlyRates, [v]);
   const overtimeRule = useMemo<OvertimeRule>(() => db.overtimeRule, [v]);
   const paySettings = useMemo<Record<string, WorkerPaySettings>>(() => db.paySettings, [v]);
+  const targetPayEnabled = useMemo(() => db.company?.targetPayEnabled === true, [v]);
   const { sessions, getAllWorkersWeeklyHours } = useWorkSessions();
 
   const getRatesForWorker = useCallback(
@@ -240,6 +247,11 @@ export function usePayroll() {
         }
 
         const rate = getCurrentRate(wh.personId);
+        const standardPay = Math.round((regularPay + overtimePay) * 100) / 100;
+        const targetRate = paySettings[wh.personId]?.targetHourlyRate;
+        const targetPay = targetPayEnabled && targetRate
+          ? { ...computeTargetPay(targetRate, regularHours + overtimeHours, overtime), targetRate }
+          : undefined;
         return {
           personId: wh.personId,
           worker: wh.worker,
@@ -252,15 +264,38 @@ export function usePayroll() {
           overtime,
           regularPay: Math.round(regularPay * 100) / 100,
           overtimePay: Math.round(overtimePay * 100) / 100,
-          totalPay: Math.round((regularPay + overtimePay) * 100) / 100,
+          totalPay: targetPay ? targetPay.grossPay : standardPay,
+          standardPay,
+          targetPay,
           sessions: sessions.filter(
             (s) => s.personId === wh.personId && getSessionDate(s) >= wh.weekStart && getSessionDate(s) <= wh.weekEnd,
           ),
         };
       });
     },
-    [sessions, getAllWorkersWeeklyHours, getRatesForWorker, getCurrentRate, getOvertimeTerms],
+    [sessions, getAllWorkersWeeklyHours, getRatesForWorker, getCurrentRate, getOvertimeTerms, paySettings, targetPayEnabled],
   );
+
+  /** Saves a worker's target hourly rate (Target-Pay Mode). Keeps their current overtime terms. */
+  const setTargetRate = useCallback(
+    (personId: string, targetHourlyRate: number) => {
+      const terms = getOvertimeTerms(personId);
+      upsertRow('worker_pay_settings', {
+        personId,
+        companyId: db.companyId,
+        overtimeEnabled: terms.enabled,
+        overtimeAfterHours: terms.afterHours,
+        overtimeMultiplier: terms.multiplier,
+        targetHourlyRate,
+      });
+    },
+    [getOvertimeTerms],
+  );
+
+  /** Turns Target-Pay Mode on or off for the whole company. */
+  const setTargetPayEnabled = useCallback((enabled: boolean) => {
+    if (db.company) updateRow('companies', db.company.id, { targetPayEnabled: enabled });
+  }, []);
 
   /** Saves a worker's own overtime terms (on/off, hours a week before it starts, multiplier). */
   const setWorkerOvertime = useCallback(
@@ -298,7 +333,10 @@ export function usePayroll() {
     insertRow('worker_hourly_rates', { personId, hourlyRate, effectiveDate: from, setBy: db.personId || undefined });
   }, []);
 
-  return { rates, overtimeRule, getRatesForWorker, getCurrentRate, getOvertimeTerms, getPayrollEstimates, setHourlyRate, setWorkerOvertime };
+  return {
+    rates, overtimeRule, targetPayEnabled, getRatesForWorker, getCurrentRate, getOvertimeTerms, getPayrollEstimates,
+    setHourlyRate, setWorkerOvertime, setTargetRate, setTargetPayEnabled,
+  };
 }
 
 // ── Attendance ────────────────────────────────────────────────

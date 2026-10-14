@@ -20,6 +20,8 @@ export interface Company {
   coverPhotoUrl?: string;
   /** Owner's own photo for the top of the workers' home screens. */
   workerCoverPhotoUrl?: string;
+  /** Payroll: pay each worker's target rate × hours, absorbing overtime into a lower base. */
+  targetPayEnabled?: boolean;
   /** First-time setup progress: which steps were finished or skipped. */
   setupState?: CompanySetupState;
   setupCompletedAt?: string;

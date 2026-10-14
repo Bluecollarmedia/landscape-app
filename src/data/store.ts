@@ -52,7 +52,7 @@ interface TableDef {
 }
 
 const TABLES = {
-  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
+  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'targetPayEnabled', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
   people: { scope: 'all', cols: ['id', 'userId', 'email', 'firstName', 'lastName', 'avatarUrl', 'phone', 'createdAt', 'updatedAt'] },
   company_members: { scope: 'company', cols: ['id', 'companyId', 'personId', 'role', 'status', 'joinMethod', 'joinRequestId', 'approvedBy', 'approvedAt', 'deactivatedAt', 'deactivatedBy', 'createdAt', 'updatedAt'] },
   projects: { scope: 'company', cols: ['id', 'companyId', 'customerId', 'name', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'status', 'progress', 'startDate', 'estimatedEndDate', 'completedAt', 'notes', 'coverPhotoUrl', 'customerProjectCode', 'customerClaimedBy', 'customerClaimedAt', 'createdAt', 'updatedAt'] },
@@ -75,7 +75,7 @@ const TABLES = {
   worker_activities: { scope: 'company', cols: ['id', 'companyId', 'personId', 'assignmentId', 'projectId', 'activityType', 'description', 'metadata', 'timestamp'] },
   work_sessions: { scope: 'company', cols: ['id', 'companyId', 'personId', 'projectId', 'assignmentId', 'checkInTime', 'checkOutTime', 'durationMinutes', 'checkInGps', 'checkOutGps', 'offlineCheckIn', 'offlineCheckOut', 'syncedCheckInAt', 'syncedCheckOutAt', 'status', 'correction', 'createdAt', 'updatedAt'] },
   worker_hourly_rates: { scope: 'company', cols: ['id', 'companyId', 'personId', 'hourlyRate', 'effectiveDate', 'endDate', 'setBy', 'createdAt'] },
-  worker_pay_settings: { scope: 'company', pk: 'personId', cols: ['personId', 'companyId', 'overtimeEnabled', 'overtimeAfterHours', 'overtimeMultiplier', 'updatedAt'] },
+  worker_pay_settings: { scope: 'company', pk: 'personId', cols: ['personId', 'companyId', 'overtimeEnabled', 'overtimeAfterHours', 'overtimeMultiplier', 'targetHourlyRate', 'updatedAt'] },
   overtime_rules: { scope: 'company', cols: ['id', 'companyId', 'ruleType', 'weeklyThresholdHours', 'dailyThresholdHours', 'overtimeMultiplier', 'isActive', 'createdAt', 'updatedAt'] },
   company_operations_settings: { scope: 'company', cols: ['id', 'companyId', 'missingCheckinGraceMinutes', 'lateCheckinThresholdMinutes', 'pastEndAlertEnabled', 'overtimeRuleId', 'createdAt', 'updatedAt'] },
   notification_preferences: { scope: 'company', cols: ['id', 'companyId', 'personId', 'eventType', 'enabled', 'createdAt', 'updatedAt'] },
@@ -437,6 +437,7 @@ function derive() {
       overtimeEnabled: p.overtimeEnabled !== false,
       overtimeAfterHours: Number(p.overtimeAfterHours ?? 40),
       overtimeMultiplier: Number(p.overtimeMultiplier ?? 1.5),
+      targetHourlyRate: p.targetHourlyRate != null ? Number(p.targetHourlyRate) : undefined,
     } as WorkerPaySettings;
   }
 

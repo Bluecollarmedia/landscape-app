@@ -52,6 +52,7 @@ create table public.companies (
   cover_photo_url text,
   -- Header photo on the workers' home screens (cover_photo_url is the owner dashboard's).
   worker_cover_photo_url text,
+  target_pay_enabled boolean not null default false,
   setup_state jsonb not null default '{}'::jsonb,
   setup_completed_at timestamptz,
   created_at timestamptz not null default now(),
@@ -395,6 +396,7 @@ create table public.worker_pay_settings (
   overtime_enabled boolean not null default true,
   overtime_after_hours numeric(5,2) not null default 40 check (overtime_after_hours > 0),
   overtime_multiplier numeric(4,2) not null default 1.5 check (overtime_multiplier >= 1),
+  target_hourly_rate numeric(8,2) check (target_hourly_rate > 0),
   updated_at timestamptz not null default now()
 );
 

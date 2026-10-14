@@ -5,7 +5,11 @@
 --    Estimate by opening a worker's card. Hourly rates stay where they were
 --    (worker_hourly_rates).
 --  • Workers without a row here use the company default (1.5x after 40h).
---  • Only the owner/admin can see or change it, like hourly rates.
+--  • Target-Pay Mode: a company on/off switch (companies.target_pay_enabled)
+--    and a target hourly rate per worker (worker_pay_settings.target_hourly_rate).
+--    When on, the Payroll estimate pays the target × hours by back-solving
+--    a lower base rate in overtime weeks.
+--  • Only the owner/admin can see or change worker pay, like hourly rates.
 -- ============================================================================
 
 create table if not exists public.worker_pay_settings (
@@ -16,6 +20,12 @@ create table if not exists public.worker_pay_settings (
   overtime_multiplier numeric(4,2) not null default 1.5 check (overtime_multiplier >= 1),
   updated_at timestamptz not null default now()
 );
+
+alter table public.worker_pay_settings
+  add column if not exists target_hourly_rate numeric(8,2) check (target_hourly_rate > 0);
+
+alter table public.companies
+  add column if not exists target_pay_enabled boolean not null default false;
 
 drop trigger if exists worker_pay_settings_updated_at on public.worker_pay_settings;
 create trigger worker_pay_settings_updated_at before update on public.worker_pay_settings

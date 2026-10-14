@@ -61,6 +61,8 @@ export interface WorkerPaySettings {
   /** Hours worked in a week before overtime starts. */
   overtimeAfterHours: number;
   overtimeMultiplier: number;
+  /** Target-Pay Mode: what the worker should earn per hour worked, overtime included. */
+  targetHourlyRate?: number;
   updatedAt?: string;
 }
 

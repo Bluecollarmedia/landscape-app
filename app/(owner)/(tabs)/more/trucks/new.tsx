@@ -10,7 +10,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { db } from '@/data/store';
 import { attachImage } from '@/data/actions';
 import { useTrucks } from '@/hooks/useTrucks';
-import { OptimizedImage } from '@/components/ui';
+import { OptimizedImage, GlassIconButton } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -92,12 +92,9 @@ export default function AddTruckScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} style={styles.backRow} accessibilityRole="button" accessibilityLabel="Back to Trucks">
-          <Icon name="chevron-left" size={22} color={colors.primary} />
-          <Text style={[typeScale.bodyLarge, { color: colors.primary }]}>Trucks</Text>
-        </Pressable>
+        <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back to Trucks" />
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>Add Truck</Text>
-        <View style={{ width: 70 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
       <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -288,7 +285,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
   },
-  backRow: { flexDirection: 'row', alignItems: 'center', width: 70 },
+  headerSpacer: { width: 44 },
   scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing['5xl'] + 90 },
   photoBox: {
     borderWidth: 1,

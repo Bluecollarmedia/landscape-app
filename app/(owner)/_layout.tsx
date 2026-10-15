@@ -31,6 +31,8 @@ export default function OwnerLayout() {
         {/* Crews: opened from Workers and from a worker's profile. */}
         <Stack.Screen name="crews" />
         <Stack.Screen name="crew-edit" options={{ presentation: 'modal' }} />
+        {/* Maintenance: New Route opens from the Maintenance tab and a property. */}
+        <Stack.Screen name="route-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="document" />
         <Stack.Screen name="document-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="document-edit" options={{ presentation: 'modal', gestureEnabled: false }} />

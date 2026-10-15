@@ -31,12 +31,7 @@ function formatShortDate(iso: string | null): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function dueLabel(days: number): { label: string; status: 'error' | 'warning' | 'neutral' } {
-  if (days > 0) return { label: `Overdue by ${days} day${days === 1 ? '' : 's'}`, status: 'error' };
-  if (days === 0) return { label: 'Due today', status: 'warning' };
-  const ahead = -days;
-  return { label: `Due in ${ahead} day${ahead === 1 ? '' : 's'}`, status: 'neutral' };
-}
+const DUE_BADGE = { overdue: 'error', due: 'warning', upcoming: 'neutral' } as const;
 
 export default function MaintenanceHomeScreen() {
   const { colors } = useTheme();
@@ -57,8 +52,8 @@ export default function MaintenanceHomeScreen() {
     setRefreshing(false);
   }
 
-  const overdueCount = home.dueItems.filter((d) => d.daysOverdue > 0).length;
-  const dueTodayCount = home.dueItems.filter((d) => d.daysOverdue === 0).length;
+  const overdueCount = home.dueItems.filter((d) => d.status === 'overdue').length;
+  const dueTodayCount = home.dueItems.filter((d) => d.status === 'due').length;
   const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   let body: React.ReactNode;
@@ -105,7 +100,7 @@ export default function MaintenanceHomeScreen() {
                   ? 'Nothing due right now'
                   : [
                       overdueCount > 0 ? `${overdueCount} overdue` : null,
-                      dueTodayCount > 0 ? `${dueTodayCount} due today` : null,
+                      dueTodayCount > 0 ? `${dueTodayCount} due now` : null,
                       home.dueItems.length - overdueCount - dueTodayCount > 0
                         ? `${home.dueItems.length - overdueCount - dueTodayCount} coming up`
                         : null,
@@ -205,12 +200,12 @@ function TodaySection({
             onPress={() => onOpen(r.id)}
             scaleTo={0.98}
             accessibilityRole="button"
-            accessibilityLabel={`${r.name || "Today's route"}, ${r.completedCount} of ${r.stopCount} stops done`}
+            accessibilityLabel={`${r.name || 'Maintenance route'}, ${r.completedCount} of ${r.stopCount} stops done`}
             style={[styles.card, styles.routeCard, { backgroundColor: colors.surface }]}
           >
             <View style={styles.routeTop}>
               <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
-                {r.name || "Today's route"}
+                {r.name || 'Maintenance route'}
               </Text>
               <StatusBadge label={done ? 'Done' : r.completedCount > 0 ? 'In progress' : 'Not started'} status={done ? 'success' : r.completedCount > 0 ? 'info' : 'neutral'} />
             </View>
@@ -255,14 +250,13 @@ function EntryTile({ icon, title, subtitle, onPress }: { icon: string; title: st
 
 function DueRow({ item, first, onPress }: { item: MaintenanceDueItem; first: boolean; onPress: () => void }) {
   const { colors } = useTheme();
-  const due = dueLabel(item.daysOverdue);
   const hasSeason = item.seasonalTotal != null && item.seasonalTotal > 0;
   return (
     <PressableScale
       onPress={onPress}
       scaleTo={0.98}
       accessibilityRole="button"
-      accessibilityLabel={`${item.propertyName}, ${item.serviceName}, ${due.label}`}
+      accessibilityLabel={`${item.propertyName}, ${item.serviceName}, ${item.label}`}
       style={[styles.dueRow, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}
     >
       <View style={{ flex: 1 }}>
@@ -273,8 +267,9 @@ function DueRow({ item, first, onPress }: { item: MaintenanceDueItem; first: boo
           {item.serviceName} · Last {formatShortDate(item.lastServiceDate)}
           {hasSeason ? ` · ${item.seasonalCompleted ?? 0} of ${item.seasonalTotal} done` : ''}
         </Text>
+        <StatusBadge label={item.label} status={DUE_BADGE[item.status]} style={styles.dueBadge} />
       </View>
-      <StatusBadge label={due.label} status={due.status} />
+      <Icon name="chevron-right" size={17} color={colors.textTertiary} />
     </PressableScale>
   );
 }
@@ -336,5 +331,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 4,
     paddingHorizontal: spacing.md,
   },
+  dueBadge: { alignSelf: 'flex-start', marginTop: spacing.xs + 2 },
   allClear: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md },
 });

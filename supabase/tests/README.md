@@ -34,3 +34,15 @@ but not change crews.
 psql -d t -f supabase/updates/014_crews.sql
 psql -d t -f supabase/tests/014_crews_test.sql
 ```
+
+`020_snow_access_test.sql` checks Snow Mode access: snow-only employees (and
+pending or revoked ones) see zero rows in every landscaping table, a
+dual-mode worker keeps landscaping, plowing / shoveling / salting are
+separate, only the owner can grant or revoke, switching the company to Snow
+Mode grants nothing, and grants and revokes are logged once. Run it after all
+the other updates so the landscaping sweep covers every table.
+
+```sh
+for f in supabase/updates/0*.sql; do grep -v supabase_vault "$f" | psql -d t; done
+psql -d t -f supabase/tests/020_snow_access_test.sql
+```

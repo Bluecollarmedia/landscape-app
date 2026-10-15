@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { db, rpc, isDemo } from '@/data/store';
 
 /**
- * The Owner's Snow Mode activity log (supabase/updates/029). Events are
+ * The Owner's Snow Mode activity log (supabase/snow/029). Events are
  * written by the database whenever a snow record changes; this only reads
  * them, newest first, through snow_activity_feed (owner/admin only).
  */

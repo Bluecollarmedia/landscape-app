@@ -1,5 +1,5 @@
 /**
- * Words for the Snow Mode activity log (supabase/updates/029).
+ * Words for the Snow Mode activity log (supabase/snow/029).
  *
  * The database records actions as '<entity>.<verb>' (storm.dispatched,
  * visit.completed, route.lead_changed …). Snow tables are logged

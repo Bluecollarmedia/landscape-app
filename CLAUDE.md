@@ -89,3 +89,8 @@ Scrollable tab screens need `useTabBarClearance()` (`src/hooks/`) as bottom padd
 - Apple Team: `93LDR9MQMF` (David Cohen, Individual).
 - `eas build`/`eas submit` need interactive Apple sign-in the first time (distribution certificate, provisioning profile, App Store Connect app lookup) — can't be run `--non-interactive` from a fresh environment.
 - As of the last iOS build (`eas build --platform ios --profile production`), the build succeeded but was **not yet submitted** to App Store Connect/TestFlight — check `eas submit:list --platform ios` before assuming it's live.
+
+## Snow Mode routing
+- `companies.active_mode` (`landscaping` | `snow`, update 021) is display only, never permission. The owner switches it from Settings → Mode (or Snow More → Mode); the database stamps who and when.
+- `src/hooks/useModeAccess.ts` is the one place that decides which experience a signed-in person sees (`shellFor`), from the company mode plus that person's own access (`get_my_snow_access()` for workers). `app/_layout.tsx` routes on its result.
+- Snow screens live under `app/snow/` (`owner/`, `worker/`, `notice`) inside `<SnowThemeScope>`, separate from the landscaping groups. Landscaping-only workers see `snow/notice` while the company is in Snow Mode. Customers stay in their landscaping app.

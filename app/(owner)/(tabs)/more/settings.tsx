@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Avatar, GlassIconButton } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
+import { ModeSwitchRow } from '@/components/snow/ModeSwitchRow';
 import { SettingsGroup, SettingsRow, PressScale, UsageBar, tileColors } from '@/components/settings/SettingsList';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useAuth } from '@/providers/AuthProvider';
@@ -153,6 +154,10 @@ export default function SettingsScreen() {
               onPress={() => router.push('/(owner)/setup' as any)}
             />
           )}
+        </SettingsGroup>
+
+        <SettingsGroup title="Mode" footer="Snow Mode gives you and your snow crew the snow dashboard. Landscaping records stay as they are.">
+          <ModeSwitchRow />
         </SettingsGroup>
 
         <SettingsGroup title="Quotes & Invoices">

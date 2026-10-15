@@ -5,6 +5,9 @@ export interface Crew {
   name: string;
   /** Hex color for the crew's label. */
   color: string;
+  /** The company's maintenance crew (at most one). Its maintenance-type
+   * workers are who "Assign Maintenance Crew" puts on a route. */
+  isMaintenance?: boolean;
   createdAt: string;
   updatedAt: string;
   /** People in this crew (derived from crew_members). */

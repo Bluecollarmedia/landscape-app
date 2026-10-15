@@ -34,6 +34,7 @@ export default function JoinTeamScreen() {
   const [teamCode, setTeamCode] = useState('');
   const [codeError, setCodeError] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [joiningAsMaintenance, setJoiningAsMaintenance] = useState(false);
   const [codeValid, setCodeValid] = useState(false);
 
   const [email, setEmail] = useState('');
@@ -54,6 +55,7 @@ export default function JoinTeamScreen() {
       setCodeValid(true);
       setCodeError('');
       setCompanyName(result.companyName ?? '');
+      setJoiningAsMaintenance(result.workerType === 'maintenance');
     } else {
       setCodeValid(false);
       setCodeError('Invalid team code. Please check and try again.');
@@ -244,7 +246,9 @@ export default function JoinTeamScreen() {
                 <Icon name="check-circle" size={16} color={semantic.success} />
                 <View style={{ marginLeft: spacing.sm, flex: 1 }}>
                   <Text style={[typeScale.bodySmall, { color: semantic.success, fontWeight: '600' }]}>Code verified!</Text>
-                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>You're joining {companyName}</Text>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                    You're joining {companyName}{joiningAsMaintenance ? ' as a maintenance worker' : ''}. The owner approves your request first.
+                  </Text>
                 </View>
               </View>
             ) : null}

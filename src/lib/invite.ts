@@ -9,11 +9,12 @@
 import { Linking, Platform, Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
-export function inviteMessage(code: string, companyName?: string, workerName?: string): string {
+export function inviteMessage(code: string, companyName?: string, workerName?: string, workerType: 'landscaping' | 'maintenance' = 'landscaping'): string {
   const hi = workerName?.trim() ? `Hi ${workerName.trim().split(' ')[0]}! ` : '';
   const company = companyName?.trim() || 'our company';
+  const as = workerType === 'maintenance' ? ' as a maintenance worker' : '';
   return (
-    `${hi}You're invited to join ${company} on the Brighton Lawn + Landscape app. ` +
+    `${hi}You're invited to join ${company}${as} on the Brighton Lawn + Landscape app. ` +
     `Open the app, tap "Join a Team" and enter this code: ${code}`
   );
 }

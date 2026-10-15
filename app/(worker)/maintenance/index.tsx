@@ -8,16 +8,16 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useWorkerContext } from '@/providers/WorkerProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
-import { useCompanyYard } from '@/hooks/useCompanyYard';
+import { useMaintenanceCheckIn } from '@/hooks/useMaintenanceCheckIn';
 import { useMyMaintenanceRoute } from '@/hooks/useMaintenance';
 import { useDb, db } from '@/data/store';
-import { myAttendance, startDay, markArrived, finishStop, finishBlockers, locationLabel } from '@/data/maintenance';
+import { finishStop, finishBlockers, locationLabel } from '@/data/maintenance';
 import { getCurrentGps } from '@/lib/location';
-import { formatAddress } from '@/lib/address';
 import { haptics } from '@/lib/haptics';
 import { Avatar, EmptyState } from '@/components/ui';
 import { BrandCover } from '@/components/branding/BrandCover';
 import { JobMap } from '@/components/maps/JobMap';
+import { YardStartCard } from '@/components/maintenance/YardStartCard';
 import { RouteProgress } from '@/components/maintenance/RouteProgress';
 import { StopRow, StopStatusPill } from '@/components/maintenance/StopRow';
 import { displayStatus } from '@/components/maintenance/types';
@@ -30,8 +30,6 @@ import type { MaintenanceStopDetail } from '@/types/maintenance';
 const HERO_HEIGHT = 260;
 /** Room the fixed action button takes at the bottom of the scroll. */
 const ACTION_AREA = 96;
-
-type Busy = null | 'start' | 'arrive' | 'finish';
 
 function showMessage(title: string, message: string) {
   if (Platform.OS === 'web') alert(`${title}\n\n${message}`);
@@ -55,17 +53,18 @@ export default function MaintenanceTodayScreen() {
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
   const { openMapsNavigation } = useWorkerContext();
-  const { yard, label: yardName } = useCompanyYard();
+  const checkIn = useMaintenanceCheckIn();
+  const { yard, yardName, dayStart } = checkIn;
   useDb();
 
   const route = useMyMaintenanceRoute();
-  const attendance = myAttendance();
   const stops = route?.stops ?? [];
   const next = route?.nextStop;
   const upcoming = stops.filter(s => s.status === 'pending' || s.status === 'arrived');
   const allDone = !!route && stops.length > 0 && !next;
 
-  const [busy, setBusy] = useState<Busy>(null);
+  const [finishing, setFinishing] = useState(false);
+  const busy = finishing || checkIn.busy != null;
   // A worker who goes straight to a property (missed the yard) can still work;
   // their day start stays missing for the owner to see.
   const [skippedYard, setSkippedYard] = useState(false);
@@ -74,34 +73,30 @@ export default function MaintenanceTodayScreen() {
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  async function run(kind: Exclude<Busy, null>, action: () => Promise<{ ok: boolean; error?: string }>) {
+  // Start Day and I'M HERE (with their honest GPS prompts) come from useMaintenanceCheckIn.
+  const handleStartDay = () => { haptics.select(); checkIn.startDay(route?.id); };
+  const handleArrive = (stop: MaintenanceStopDetail) => { haptics.select(); checkIn.arriveAtStop(stop.id); };
+  async function handleFinish(stop: MaintenanceStopDetail) {
     if (busy) return;
-    haptics.select();
-    setBusy(kind);
-    try {
-      const result = await action();
-      if (result.ok) haptics.success();
-      else {
-        haptics.warning();
-        showMessage("Couldn't save that", result.error ?? 'Please try again.');
-      }
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const handleStartDay = () => run('start', async () => startDay({ gps: await getCurrentGps(), routeId: route?.id }));
-  const handleArrive = (stop: MaintenanceStopDetail) => run('arrive', async () => markArrived(stop.id, await getCurrentGps()));
-  const handleFinish = (stop: MaintenanceStopDetail) => {
-    const blockers = finishBlockers(stop);
-    if (blockers.length) {
+    if (finishBlockers(stop).length) {
       haptics.warning();
       // The stop screen is where the checklist and photos get done.
       openStop(stop);
       return;
     }
-    run('finish', async () => finishStop(stop.id, { gps: await getCurrentGps() }));
-  };
+    haptics.select();
+    setFinishing(true);
+    try {
+      const result = await finishStop(stop.id, { gps: await getCurrentGps() });
+      if (result.ok) haptics.success();
+      else {
+        haptics.warning();
+        showMessage("Couldn't save that", result.error);
+      }
+    } finally {
+      setFinishing(false);
+    }
+  }
 
   function openStop(stop: MaintenanceStopDetail) {
     router.push(`/(worker)/maintenance-stop/${stop.id}` as any);
@@ -109,17 +104,19 @@ export default function MaintenanceTodayScreen() {
 
   // ── Bottom action: one primary button for where the worker is in the day ──
   let action: { title: string; subtitle: string; icon: keyof typeof Feather.glyphMap; onPress: () => void; muted?: boolean } | null = null;
-  if (!attendance && !skippedYard && !allDone) {
+  // Each worker checks in at each stop themselves, even when a crewmate got there first.
+  const iCheckedIn = next ? !!checkIn.arrivalFor(next.id)?.mine : false;
+  if (!dayStart.started && !skippedYard && !allDone) {
     action = {
       title: 'START DAY',
-      subtitle: busy === 'start' ? 'Finding your location…' : `Check in at ${yardName}`,
+      subtitle: checkIn.busy === 'day' ? 'Finding your location…' : `Check in at ${yardName}`,
       icon: 'sunrise',
       onPress: handleStartDay,
     };
-  } else if (next && next.status === 'pending') {
+  } else if (next && (next.status === 'pending' || !iCheckedIn)) {
     action = {
       title: "I'M HERE",
-      subtitle: busy === 'arrive' ? 'Finding your location…' : 'Check in to start this stop',
+      subtitle: checkIn.busy === next.id ? 'Finding your location…' : 'Check in to start this stop',
       icon: 'map-pin',
       onPress: () => handleArrive(next),
     };
@@ -127,14 +124,14 @@ export default function MaintenanceTodayScreen() {
     const blockers = finishBlockers(next);
     action = {
       title: 'FINISH STOP',
-      subtitle: busy === 'finish' ? 'Saving…' : blockers[0] ?? 'Mark this property done',
+      subtitle: finishing ? 'Saving…' : blockers[0] ?? 'Mark this property done',
       icon: 'check-circle',
       onPress: () => handleFinish(next),
       muted: blockers.length > 0,
     };
   }
 
-  const scrollPadding = tabBarClearance + (action ? ACTION_AREA + (attendance || !route ? 0 : 24) : 0);
+  const scrollPadding = tabBarClearance + (action ? ACTION_AREA + (dayStart.started || !route ? 0 : 24) : 0);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -159,13 +156,11 @@ export default function MaintenanceTodayScreen() {
         </View>
 
         <View style={styles.content}>
-          <DayStatus
-            startedAt={attendance?.startedAt}
-            locationStatus={attendance?.locationStatus}
-            yardText={yard ? `${yardName} · ${yard.address}` : undefined}
+          <YardStartCard
+            dayStart={dayStart}
+            yard={yard}
+            yardName={yardName}
             onYardPress={yard ? () => { haptics.select(); openMapsNavigation(yard); } : undefined}
-            yardAddressLabel={yard ? formatAddress(yard) : undefined}
-            lead={route?.lead ? (route.lead.id === user?.id ? 'You are the route lead' : `Lead: ${route.lead.firstName} ${route.lead.lastName}`.trim()) : undefined}
           />
 
           {!route ? (
@@ -186,6 +181,14 @@ export default function MaintenanceTodayScreen() {
                   Today's Route
                 </Text>
               </View>
+              {route.lead && (
+                <View style={styles.leadRow}>
+                  <Feather name="star" size={13} color={colors.textTertiary} />
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
+                    {route.lead.id === user?.id ? 'You are the route lead' : `Lead: ${route.lead.firstName} ${route.lead.lastName}`.trim()}
+                  </Text>
+                </View>
+              )}
               {stops.length > 0 ? (
                 <View style={{ marginTop: spacing.md }}>
                   <RouteProgress stops={stops} nextStopId={next?.id} />
@@ -290,59 +293,6 @@ export default function MaintenanceTodayScreen() {
               <Text style={[typeScale.labelLarge, { color: colors.primaryDark }]}>Already at a property? Check in there</Text>
             </Pressable>
           )}
-        </View>
-      )}
-    </View>
-  );
-}
-
-function DayStatus({
-  startedAt, locationStatus, yardText, yardAddressLabel, onYardPress, lead,
-}: {
-  startedAt?: string;
-  locationStatus?: Parameters<typeof locationLabel>[0];
-  yardText?: string;
-  yardAddressLabel?: string;
-  onYardPress?: () => void;
-  lead?: string;
-}) {
-  const { colors } = useTheme();
-  const verified = locationStatus === 'verified';
-  return (
-    <View style={[styles.card, styles.dayCard, { backgroundColor: colors.surface }, shadow.sm]}>
-      <View style={styles.dayRow}>
-        <View style={[styles.dayDot, { backgroundColor: startedAt ? colors.success : colors.warning }]} />
-        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', flex: 1, marginLeft: spacing.sm }]}>
-          {startedAt ? `Day started ${formatClock(startedAt)}` : "You haven't started your day"}
-        </Text>
-        {startedAt && (
-          <View style={[styles.chip, { backgroundColor: verified ? colors.successLight : colors.backgroundTertiary }]}>
-            <Feather name={verified ? 'check' : 'alert-circle'} size={11} color={verified ? colors.success : colors.textSecondary} />
-            <Text style={[typeScale.caption, { color: verified ? colors.success : colors.textSecondary, marginLeft: 3 }]}>
-              {locationLabel(locationStatus)}
-            </Text>
-          </View>
-        )}
-      </View>
-      {!startedAt && yardText && (
-        <Pressable
-          onPress={onYardPress}
-          style={({ pressed }) => [styles.yardRow, pressed && { opacity: 0.7 }]}
-          accessibilityRole="button"
-          accessibilityLabel={`Yard, ${yardAddressLabel}`}
-          accessibilityHint="Opens directions to the yard"
-        >
-          <Feather name="home" size={13} color={colors.textTertiary} />
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs, flex: 1 }]} numberOfLines={1}>
-            {yardText}
-          </Text>
-          <Feather name="chevron-right" size={15} color={colors.textTertiary} />
-        </Pressable>
-      )}
-      {lead && (
-        <View style={styles.yardRow}>
-          <Feather name="star" size={13} color={colors.textTertiary} />
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>{lead}</Text>
         </View>
       )}
     </View>
@@ -455,13 +405,9 @@ const styles = StyleSheet.create({
   heroShadow: { textShadowColor: 'rgba(0, 0, 0, 0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   content: { paddingHorizontal: spacing.lg, gap: spacing.lg, marginTop: -spacing.md },
   card: { borderRadius: radius.xl, padding: spacing.lg },
-  dayCard: { paddingVertical: spacing.md },
-  dayRow: { flexDirection: 'row', alignItems: 'center' },
-  dayDot: { width: 9, height: 9, borderRadius: 5 },
-  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.full, marginLeft: spacing.sm },
-  yardRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, minHeight: 24 },
   routeCard: { paddingBottom: spacing.lg },
   routeHeader: { flexDirection: 'row', alignItems: 'center' },
+  leadRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   headerIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   note: { flexDirection: 'row', alignItems: 'flex-start', padding: spacing.sm, borderRadius: radius.sm },
   noteText: { marginLeft: spacing.xs, flex: 1 },

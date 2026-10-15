@@ -169,7 +169,7 @@ export default function PropertyHistoryScreen() {
                 <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>Instructions: {stop.instructions}</Text>
               ) : null}
               <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                {arrival?.at ? `Arrived ${formatTime(arrival.correction?.at ?? arrival.at)}${arrival.by ? ` (${arrival.by.firstName})` : ''}` : 'No arrival recorded'}
+                {arrival?.at ? `Arrived ${formatTime(arrival.correction?.at ?? arrival.at)}${arrival.by ? ` (${arrival.by.firstName})` : ''}` : stop.status === 'pending' ? 'Not started yet' : 'No arrival recorded'}
                 {completion?.at ? ` · Finished ${formatTime(completion.correction?.at ?? completion.at)}${completion.by ? ` (${completion.by.firstName})` : ''}` : ''}
                 {(arrival?.correction || completion?.correction) ? ' · corrected by owner' : ''}
               </Text>

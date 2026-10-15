@@ -263,7 +263,9 @@ export default function NewRouteScreen() {
         return notify('Couldn\'t Save Route', result.error);
       }
       haptics.success();
-      router.back();
+      // Opened from a link (web) there's nothing underneath, so go to the owner home.
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
     };
     if (!crewAssigned) {
       confirmAction('No Crew Assigned', 'Save this route without a crew? Nobody will see it until you assign the maintenance crew.', 'Save Anyway', run);
@@ -360,6 +362,7 @@ export default function NewRouteScreen() {
                 <CandidateRow
                   key={c.propertyId}
                   candidate={c}
+                  serviceDate={serviceDate}
                   selected={selectedIds.has(c.propertyId)}
                   onPress={() => toggleProperty(c)}
                 />
@@ -634,7 +637,7 @@ export default function NewRouteScreen() {
   );
 }
 
-function CandidateRow({ candidate: c, selected, onPress }: { candidate: RouteCandidate; selected: boolean; onPress: () => void }) {
+function CandidateRow({ candidate: c, serviceDate, selected, onPress }: { candidate: RouteCandidate; serviceDate: string; selected: boolean; onPress: () => void }) {
   const { colors } = useTheme();
   const quiet = { fg: colors.textSecondary, bg: colors.backgroundTertiary };
   const tone: Record<DueStatus, { fg: string; bg: string; label: string }> = {
@@ -677,7 +680,7 @@ function CandidateRow({ candidate: c, selected, onPress }: { candidate: RouteCan
         ))}
         {c.scheduledOn && (
           <Text style={[typeScale.caption, { color: colors.warning, fontWeight: '600' }]}>
-            Already on the {formatDay(c.scheduledOn, 'short')} route
+            {c.scheduledOn === serviceDate ? 'Already on a route this day' : `Already on the ${formatDay(c.scheduledOn, 'short')} route`}
           </Text>
         )}
       </View>

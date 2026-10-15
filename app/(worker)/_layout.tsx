@@ -19,6 +19,7 @@ export default function WorkerLayout() {
         <Stack.Screen name="notifications" />
         <Stack.Screen name="my-resources" />
         <Stack.Screen name="resource/[id]" />
+        <Stack.Screen name="maintenance-stop/[id]" />
       </Stack>
     </WorkerProvider>
   );

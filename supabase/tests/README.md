@@ -48,3 +48,20 @@ can't be deleted.
 psql -d t -f supabase/updates/018_maintenance.sql
 psql -d t -f supabase/tests/018_maintenance_test.sql
 ```
+
+`020b_snow_foundation_test.sql` checks the Snow Mode base tables (run 020
+first): the same property twice on one route and on another route as separate
+visits, a lead must hold the route's service and can lead several routes, lead
+reassignment keeps history, no work before dispatch, required photos and
+arrival-first block completion, completing one pass leaves the other pending,
+completed visits can't be reopened, media can't be replaced or deleted, a
+visit is skipped only after its request is approved (denied stays pending),
+property edits don't rewrite old visits, ended storms take no new visits until
+reopened, draft storms delete cleanly, the activity log is append-only, and
+workers/customers see nothing from these tables.
+
+```sh
+psql -d t -f supabase/updates/020_snow_access.sql
+psql -d t -f supabase/updates/020b_snow_foundation.sql
+psql -d t -f supabase/tests/020b_snow_foundation_test.sql
+```

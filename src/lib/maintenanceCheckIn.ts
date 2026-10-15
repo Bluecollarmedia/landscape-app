@@ -1,4 +1,12 @@
+import { locationLabel } from '@/data/maintenance';
 import type { LocationStatus } from '@/types/maintenance';
+
+/** locationLabel() speaks of "the property"; day starts are checked against the yard. */
+export function yardLocationLabel(status?: LocationStatus): string {
+  if (status === 'outside_radius') return 'Not at the yard (GPS)';
+  if (status === 'no_target_location') return 'Yard not on the map';
+  return locationLabel(status);
+}
 
 /**
  * What to tell a maintenance worker before saving a check-in whose location

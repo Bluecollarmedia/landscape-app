@@ -5,10 +5,9 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { formatAddress } from '@/lib/address';
-import { locationLabel } from '@/data/maintenance';
+import { yardLocationLabel } from '@/lib/maintenanceCheckIn';
 import type { YardLocation } from '@/hooks/useCompanyYard';
 import type { DayStartState } from '@/hooks/useMaintenanceCheckIn';
-import type { LocationStatus } from '@/types/maintenance';
 
 interface YardStartCardProps {
   dayStart: DayStartState;
@@ -16,13 +15,6 @@ interface YardStartCardProps {
   yardName: string;
   /** Opens directions to the yard in the worker's map app. */
   onYardPress?: () => void;
-}
-
-/** locationLabel() speaks of "the property"; the day start is checked against the yard. */
-function yardLocationLabel(status?: LocationStatus): string {
-  if (status === 'outside_radius') return 'Not at the yard (GPS)';
-  if (status === 'no_target_location') return 'Yard not on the map';
-  return locationLabel(status);
 }
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });

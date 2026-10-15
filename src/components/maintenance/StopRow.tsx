@@ -4,8 +4,9 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import { formatClock, servicesLabel } from './format';
-import type { RouteStopView, StopDisplayStatus } from './types';
+import { formatClock, servicesLabel, stopAddress } from './format';
+import { displayStatus, type StopDisplayStatus } from './types';
+import type { MaintenanceStopDetail } from '@/types/maintenance';
 
 const STATUS_LABEL: Record<StopDisplayStatus, string> = {
   upcoming: 'Upcoming',
@@ -31,7 +32,10 @@ export function StopStatusPill({ status }: { status: StopDisplayStatus }) {
 }
 
 interface StopRowProps {
-  stop: RouteStopView;
+  stop: MaintenanceStopDetail;
+  nextStopId?: string;
+  /** Names for "Finished 10:42 AM by Tyler". */
+  nameOf?: (personId?: string) => string | undefined;
   first?: boolean;
   /** Show the visit's instructions inline (Today shows them for the current stop only). */
   showInstructions?: boolean;
@@ -39,11 +43,14 @@ interface StopRowProps {
 }
 
 /** One numbered stop in route order, as in the "Upcoming Stops" list. */
-export function StopRow({ stop, first, showInstructions, onPress }: StopRowProps) {
+export function StopRow({ stop, nextStopId, nameOf, first, showInstructions, onPress }: StopRowProps) {
   const { colors } = useTheme();
-  const active = stop.status === 'next' || stop.status === 'arrived';
-  const done = stop.status === 'completed';
-  const muted = done || stop.status === 'skipped';
+  const status = displayStatus(stop, nextStopId);
+  const active = status === 'next' || status === 'arrived';
+  const done = status === 'completed';
+  const muted = done || status === 'skipped';
+  const property = stop.property?.name ?? 'Property';
+  const finishedBy = nameOf?.(stop.completedBy);
 
   return (
     <Pressable
@@ -55,7 +62,7 @@ export function StopRow({ stop, first, showInstructions, onPress }: StopRowProps
         pressed && { backgroundColor: colors.surfacePressed },
       ]}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`Stop ${stop.position}, ${stop.propertyName}, ${STATUS_LABEL[stop.status]}`}
+      accessibilityLabel={`Stop ${stop.number}, ${property}, ${STATUS_LABEL[status]}`}
     >
       <View
         style={[
@@ -66,7 +73,7 @@ export function StopRow({ stop, first, showInstructions, onPress }: StopRowProps
         {done ? (
           <Feather name="check" size={16} color="#FFFFFF" />
         ) : (
-          <Text style={[typeScale.labelLarge, { color: active ? '#FFFFFF' : colors.textSecondary }]}>{stop.position}</Text>
+          <Text style={[typeScale.labelLarge, { color: active ? '#FFFFFF' : colors.textSecondary }]}>{stop.number}</Text>
         )}
       </View>
 
@@ -74,29 +81,29 @@ export function StopRow({ stop, first, showInstructions, onPress }: StopRowProps
         <View style={styles.titleRow}>
           <Text
             style={[typeScale.headingSmall, { color: muted ? colors.textSecondary : colors.textPrimary, flex: 1 }]}
-            numberOfLines={1}
+            numberOfLines={2}
           >
-            {stop.propertyName}
+            {property}
           </Text>
-          <StopStatusPill status={stop.status} />
+          <StopStatusPill status={status} />
         </View>
         <View style={styles.meta}>
           <Feather name="map-pin" size={13} color={colors.textTertiary} />
           <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
-            {stop.address}
+            {stopAddress(stop)}
           </Text>
         </View>
         <View style={styles.meta}>
           <Feather name="scissors" size={13} color={colors.primary} />
           <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]} numberOfLines={2}>
-            {servicesLabel(stop.services)}
+            {servicesLabel(stop)}
           </Text>
         </View>
         {done && stop.completedAt && (
           <View style={styles.meta}>
             <Feather name="check-circle" size={13} color={colors.success} />
             <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
-              Finished {formatClock(stop.completedAt)}{stop.completedByName ? ` by ${stop.completedByName}` : ''}
+              Finished {formatClock(stop.completedAt)}{finishedBy ? ` by ${finishedBy}` : ''}
             </Text>
           </View>
         )}
@@ -117,7 +124,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   number: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   body: { flex: 1, marginLeft: spacing.md },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   meta: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   metaText: { marginLeft: spacing.xs, flexShrink: 1 },
   note: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.sm },

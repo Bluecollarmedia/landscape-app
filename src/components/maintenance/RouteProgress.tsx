@@ -4,13 +4,14 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
-import type { RouteStopView } from './types';
+import type { MaintenanceStopDetail } from '@/types/maintenance';
+import { displayStatus } from './types';
 
 /** Past this many stops the dots get too small to read, so a bar is shown instead. */
 const MAX_DOTS = 10;
 
 /** The step tracker under "Today's Route": one dot per stop, in route order. */
-export function RouteProgress({ stops }: { stops: RouteStopView[] }) {
+export function RouteProgress({ stops, nextStopId }: { stops: MaintenanceStopDetail[]; nextStopId?: string }) {
   const { colors } = useTheme();
   const done = stops.filter(s => s.status === 'completed' || s.status === 'skipped').length;
   const completed = stops.filter(s => s.status === 'completed').length;
@@ -23,7 +24,8 @@ export function RouteProgress({ stops }: { stops: RouteStopView[] }) {
           {stops.map((s, i) => {
             const isDone = s.status === 'completed';
             const isSkipped = s.status === 'skipped';
-            const isCurrent = s.status === 'next' || s.status === 'arrived';
+            const shown = displayStatus(s, nextStopId);
+            const isCurrent = shown === 'next' || shown === 'arrived';
             return (
               <React.Fragment key={s.id}>
                 {i > 0 && (
@@ -57,7 +59,7 @@ export function RouteProgress({ stops }: { stops: RouteStopView[] }) {
           <View style={[styles.barFill, { backgroundColor: colors.primary, width: `${(done / stops.length) * 100}%` }]} />
         </View>
       )}
-      <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.sm }]}>{label}</Text>
+      <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>{label}</Text>
     </View>
   );
 }

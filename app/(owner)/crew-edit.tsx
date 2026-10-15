@@ -5,9 +5,10 @@ import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
-import { Input, Avatar, CrewLabel } from '@/components/ui';
+import { Input, Avatar, CrewLabel, Switch, InlineNotice } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCrews } from '@/hooks/useCrews';
+import { useMaintenanceCrew, isMaintenanceWorker } from '@/hooks/useMaintenanceCrew';
 import { db, useDb } from '@/data/store';
 import { CREW_COLORS } from '@/types/crew';
 import { typeScale } from '@/theme/typography';
@@ -28,15 +29,27 @@ export default function CrewEditScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const { crews, crewOf, isNameFree, createCrew, updateCrew, setCrewMembers, deleteCrew } = useCrews();
   const existing = crews.find(c => c.id === params.id);
-
-  const v = useDb();
-  const workers = useMemo(() =>
-    db.members.filter(m => m.role === 'worker' && m.status === 'active' && !!m.person),
-  [v]);
+  const { maintenanceCrew, setMaintenanceCrew } = useMaintenanceCrew();
 
   const [name, setName] = useState(existing?.name ?? '');
   const [color, setColor] = useState(existing?.color ?? CREW_COLORS[crews.length % CREW_COLORS.length]);
   const [memberIds, setMemberIds] = useState<string[]>(existing?.memberIds ?? []);
+  const [isMaintenance, setIsMaintenance] = useState(!!existing?.isMaintenance);
+  const otherMaintenance = maintenanceCrew && maintenanceCrew.id !== existing?.id ? maintenanceCrew : undefined;
+
+  const v = useDb();
+  // The Maintenance Crew only lists maintenance workers.
+  const workers = useMemo(() =>
+    db.members.filter(m => m.role === 'worker' && m.status === 'active' && !!m.person &&
+      (!isMaintenance || isMaintenanceWorker(m.personId))),
+  [v, isMaintenance]);
+
+  function toggleMaintenance(on: boolean) {
+    haptics.select();
+    setIsMaintenance(on);
+    // Landscaping workers can't stay in the Maintenance Crew.
+    if (on) setMemberIds(prev => prev.filter(isMaintenanceWorker));
+  }
 
   function toggle(personId: string) {
     haptics.select();
@@ -47,11 +60,18 @@ export default function CrewEditScreen() {
     const trimmed = name.trim();
     if (!trimmed) return notify('Name Needed', 'Give the crew a name, like "Maintenance Crew".');
     if (!isNameFree(trimmed, existing?.id)) return notify('Name Taken', `There's already a crew called "${trimmed}".`);
+    const ids = isMaintenance ? memberIds.filter(isMaintenanceWorker) : memberIds;
+    let crewId: string;
     if (existing) {
       if (trimmed !== existing.name || color !== existing.color) updateCrew(existing.id, { name: trimmed, color });
-      setCrewMembers(existing.id, memberIds);
+      setCrewMembers(existing.id, ids);
+      crewId = existing.id;
     } else {
-      createCrew(trimmed, color, memberIds);
+      crewId = createCrew(trimmed, color, ids).id;
+    }
+    if (isMaintenance !== !!existing?.isMaintenance) {
+      const res = setMaintenanceCrew(isMaintenance ? crewId : null, ids);
+      if (!res.ok) return notify('Not Maintenance Workers', res.error);
     }
     haptics.success();
     router.back();
@@ -119,11 +139,28 @@ export default function CrewEditScreen() {
 
         <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
           <View style={styles.cardHeader}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Maintenance Crew</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                Gets assigned to maintenance routes. Only maintenance workers can be in it.
+              </Text>
+            </View>
+            <Switch value={isMaintenance} onValueChange={toggleMaintenance} accessibilityLabel="Maintenance Crew" />
+          </View>
+          {isMaintenance && otherMaintenance && (
+            <InlineNotice icon="info" tone="warning" text={`${otherMaintenance.name} is the Maintenance Crew now. Saving moves that to this crew.`} />
+          )}
+        </View>
+
+        <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
+          <View style={styles.cardHeader}>
             <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700', flex: 1 }]}>Workers</Text>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{memberIds.length} selected</Text>
           </View>
           {workers.length === 0 && (
-            <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>No active workers yet.</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>
+              {isMaintenance ? 'No approved maintenance workers yet. Add one from Workers, then Add Maintenance Worker.' : 'No active workers yet.'}
+            </Text>
           )}
           {workers.map(w => {
             const p = w.person!;
@@ -181,7 +218,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: spacing.lg },
   closeButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   card: { borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.lg, gap: spacing.sm },
-  cardHeader: { flexDirection: 'row', alignItems: 'center' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   swatch: {
     width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',

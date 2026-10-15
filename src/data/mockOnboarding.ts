@@ -28,6 +28,17 @@ export const mockDeactivatedCode: TeamCode = {
   deactivatedAt: '2026-01-15T09:55:00Z',
 };
 
+/** Sample maintenance sign-up code. Requests made with it still need approval. */
+export const mockMaintenanceTeamCode: TeamCode = {
+  id: 'tc-maint1',
+  companyId: 'company1',
+  code: 'BRIGHTON-MAINT-7K2P',
+  workerType: 'maintenance',
+  isActive: true,
+  createdBy: 'owner1',
+  createdAt: '2026-03-01T10:00:00Z',
+};
+
 // ── Join Settings ──────────────────────────────────────────────
 
 export const mockJoinSettings: CompanyJoinSettings = {
@@ -76,6 +87,25 @@ export const mockJoinRequests: JoinRequest[] = [
       email: 'maria.garcia@email.com',
       phone: '(216) 555-0987',
       profilePhotoUrl: 'https://ui-avatars.com/api/?name=Maria+Garcia&background=1976D2&color=fff&size=200',
+    },
+  },
+  {
+    id: 'jr5',
+    companyId: 'company1',
+    personId: 'pending3',
+    joinMethod: 'team_code',
+    status: 'pending',
+    requestedRole: 'worker',
+    requestedWorkerType: 'maintenance',
+    createdAt: '2026-09-08T11:05:00Z',
+    updatedAt: '2026-09-08T11:05:00Z',
+    person: {
+      id: 'pending3',
+      firstName: 'Luis',
+      lastName: 'Ortega',
+      email: 'luis.ortega@example.com',
+      phone: '(216) 555-0442',
+      profilePhotoUrl: 'https://ui-avatars.com/api/?name=Luis+Ortega&background=00897B&color=fff&size=200',
     },
   },
   {

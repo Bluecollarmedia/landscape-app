@@ -8,6 +8,7 @@ import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { useJoinRequests } from '@/hooks/useOnboarding';
 import type { JoinRequest } from '@/types/onboarding';
+import type { WorkerType } from '@/types/maintenance';
 import { haptics } from '@/lib/haptics';
 
 function formatTimeAgo(isoStr: string): string {
@@ -43,11 +44,15 @@ export default function PendingRequestsScreen() {
   const { pendingRequests, allRequests, approveRequest, declineRequest } = useJoinRequests();
   const [activeTab, setActiveTab] = useState<Tab>('pending');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // The owner's pick per request; starts as what they applied as.
+  const [typeChoice, setTypeChoice] = useState<Record<string, WorkerType>>({});
+  const typeFor = (r: JoinRequest): WorkerType => typeChoice[r.id] ?? r.requestedWorkerType ?? 'landscaping';
 
   function handleApprove(request: JoinRequest) {
     haptics.success();
-    // Also makes them an active worker (see approve_join_request in supabase/schema.sql).
-    approveRequest(request.id, 'worker');
+    // Also makes them an active worker of the chosen type (see approve_join_request
+    // in supabase/updates/019). A maintenance code never skips this step.
+    approveRequest(request.id, 'worker', typeFor(request));
   }
 
   function handleDecline(request: JoinRequest) {
@@ -112,12 +117,50 @@ export default function PendingRequestsScreen() {
               </View>
             </View>
             <View style={styles.metaItem}>
+              <Text style={[typeScale.overline, { color: colors.textTertiary }]}>APPLIED AS</Text>
+              <View style={styles.metaValue}>
+                <Icon name={request.requestedWorkerType === 'maintenance' ? 'repeat' : 'tool'} size={12} color={colors.textSecondary} />
+                <Text style={[typeScale.caption, { color: colors.textPrimary, marginLeft: 4 }]}>
+                  {request.requestedWorkerType === 'maintenance' ? 'Maintenance' : 'Worker'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.metaItem}>
               <Text style={[typeScale.overline, { color: colors.textTertiary }]}>REQUESTED</Text>
               <Text style={[typeScale.caption, { color: colors.textPrimary }]}>
                 {formatDate(request.createdAt)}
               </Text>
             </View>
           </View>
+
+          {request.status === 'pending' && (
+            <View style={styles.typePicker}>
+              <Text style={[typeScale.overline, { color: colors.textTertiary }]}>APPROVE AS</Text>
+              <View style={styles.typeOptions} accessibilityRole="radiogroup">
+                {([['landscaping', 'Worker'], ['maintenance', 'Maintenance']] as const).map(([value, label]) => {
+                  const selected = typeFor(request) === value;
+                  return (
+                    <PressableScale
+                      key={value}
+                      style={[styles.typeOption, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primarySurface : colors.surface }]}
+                      scaleTo={0.96}
+                      onPress={() => setTypeChoice((prev) => ({ ...prev, [request.id]: value }))}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: selected }}
+                    >
+                      <Icon name={selected ? 'check-circle' : 'circle'} size={14} color={selected ? colors.primary : colors.textTertiary} />
+                      <Text style={[typeScale.labelSmall, { color: selected ? colors.primary : colors.textSecondary, marginLeft: 6 }]} numberOfLines={1}>{label}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+              {request.requestedWorkerType === 'maintenance' && typeFor(request) === 'landscaping' && (
+                <Text style={[typeScale.caption, { color: semantic.warning, marginTop: spacing.xs }]}>
+                  They used your maintenance code. Approving as a landscaping worker keeps them off maintenance routes.
+                </Text>
+              )}
+            </View>
+          )}
 
           {request.status === 'pending' && (
             <View style={styles.actions}>
@@ -148,7 +191,7 @@ export default function PendingRequestsScreen() {
             <View style={[styles.reviewInfo, { backgroundColor: semantic.successLight }]}>
               <Icon name="check-circle" size={14} color={semantic.success} />
               <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-                Approved {formatTimeAgo(request.reviewedAt)} — Role: {request.assignedRole ?? 'Worker'}
+                Approved {formatTimeAgo(request.reviewedAt)} as {request.assignedWorkerType === 'maintenance' ? 'a maintenance worker' : (request.assignedRole === 'admin' ? 'an admin' : request.assignedRole === 'customer' ? 'a customer' : 'a worker')}
               </Text>
             </View>
           )}
@@ -245,6 +288,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 2,
+  },
+  typePicker: {
+    marginTop: spacing.md,
+  },
+  typeOptions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  typeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
   },
   actions: {
     flexDirection: 'row',

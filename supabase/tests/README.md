@@ -48,3 +48,16 @@ can't be deleted.
 psql -d t -f supabase/updates/018_maintenance.sql
 psql -d t -f supabase/tests/018_maintenance_test.sql
 ```
+
+`019_maintenance_workers_test.sql` checks maintenance sign-up: a maintenance
+team code only files a pending request (no access, can't self-approve), the
+owner picks the type when approving, maintenance workers join the
+Maintenance Crew, landscaping workers can't be put in it, a plain update can't
+reclassify anyone, and set_worker_type is owner-only and audit-logged. Run
+after update 018.
+
+```sh
+psql -d t -f supabase/updates/018_maintenance.sql
+psql -d t -f supabase/updates/019_maintenance_workers.sql
+psql -d t -f supabase/tests/019_maintenance_workers_test.sql
+```

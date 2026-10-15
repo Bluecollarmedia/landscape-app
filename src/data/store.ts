@@ -91,10 +91,10 @@ const TABLES = {
   app_notifications: { scope: 'company', cols: ['id', 'companyId', 'recipientId', 'eventType', 'title', 'body', 'status', 'linkedEntityType', 'linkedEntityId', 'metadata', 'createdAt', 'readAt'] },
   worker_reminders: { scope: 'company', cols: ['id', 'companyId', 'personId', 'assignmentId', 'reminderType', 'title', 'body', 'nextAssignment', 'actions', 'createdAt', 'readAt'] },
   worker_settings: { scope: 'me', pk: 'personId', cols: ['personId', 'navApp', 'notificationsEnabled', 'updatedAt'] },
-  team_codes: { scope: 'company', cols: ['id', 'companyId', 'code', 'isActive', 'createdBy', 'createdAt', 'deactivatedAt'] },
+  team_codes: { scope: 'company', cols: ['id', 'companyId', 'code', 'workerType', 'isActive', 'createdBy', 'createdAt', 'deactivatedAt'] },
   company_join_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'joinByCodeEnabled', 'directInvitationsEnabled', 'requireEmailVerification', 'currentTeamCodeId'] },
   company_invitations: { scope: 'company', cols: ['id', 'companyId', 'email', 'name', 'phone', 'type', 'status', 'projectId', 'invitedBy', 'token', 'expiresAt', 'acceptedAt', 'acceptedBy', 'createdAt'] },
-  join_requests: { scope: 'company', cols: ['id', 'companyId', 'personId', 'joinMethod', 'invitationId', 'status', 'requestedRole', 'assignedRole', 'reviewedBy', 'reviewedAt', 'declineReason', 'createdAt', 'updatedAt'] },
+  join_requests: { scope: 'company', cols: ['id', 'companyId', 'personId', 'joinMethod', 'invitationId', 'status', 'requestedRole', 'assignedRole', 'requestedWorkerType', 'assignedWorkerType', 'reviewedBy', 'reviewedAt', 'declineReason', 'createdAt', 'updatedAt'] },
   membership_audit_log: { scope: 'company', cols: ['id', 'companyId', 'eventType', 'actorId', 'targetId', 'metadata', 'createdAt'] },
   // Company Resources. hasSecret/createdBy/updatedBy are set by the database
   // only, so they aren't listed as writable columns. Codes never come through
@@ -808,7 +808,7 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.app_notifications = [...ops.mockNotifications];
     raw.worker_reminders = [...ops.mockWorkerReminders];
     raw.worker_settings = [{ personId, ...mock.mockWorkerSettings }];
-    raw.team_codes = [onb.mockDeactivatedCode, onb.mockTeamCode];
+    raw.team_codes = [onb.mockDeactivatedCode, onb.mockTeamCode, onb.mockMaintenanceTeamCode];
     raw.company_join_settings = [onb.mockJoinSettings];
     raw.company_invitations = [...onb.mockInvitations];
     raw.join_requests = onb.mockJoinRequests.map(({ person, ...r }) => r);

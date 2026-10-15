@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { db, useDb, insertRow, updateRow, deleteRow, rowsOf } from '@/data/store';
 import type { Crew, CrewMember } from '@/types/crew';
+import { isMaintenanceWorker } from '@/hooks/useMaintenanceCrew';
 
 /** Crews: named groups of workers (e.g. "Maintenance Crew"). A worker is in at
  * most one crew. Owner/admin can change them; everyone in the company can see. */
@@ -13,13 +14,16 @@ export function useCrews() {
     (personId ? crewByPerson[personId] : undefined), [crewByPerson]);
 
   /** Puts `personId` in `crewId`, taking them out of any other crew first.
-   * `null` takes them out of every crew. */
-  const setWorkerCrew = useCallback((personId: string, crewId: string | null) => {
+   * `null` takes them out of every crew. Landscaping workers can't join the
+   * Maintenance Crew (returns false). */
+  const setWorkerCrew = useCallback((personId: string, crewId: string | null): boolean => {
+    if (crewId && db.crews.find(c => c.id === crewId)?.isMaintenance && !isMaintenanceWorker(personId)) return false;
     const rows = rowsOf('crew_members') as CrewMember[];
     const current = rows.find(r => r.personId === personId);
-    if (current?.crewId === crewId) return;
+    if (current?.crewId === crewId) return true;
     if (current) deleteRow('crew_members', current.id);
     if (crewId) insertRow('crew_members', { crewId, personId });
+    return true;
   }, []);
 
   /** Makes `personIds` exactly the crew's members. */

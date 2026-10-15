@@ -71,6 +71,17 @@ export default function SetupScreen() {
             </View>
           </Pressable>
 
+          <Pressable
+            style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
+            onPress={() => router.push('/(auth)/join-team?kind=snow' as any)}
+          >
+            <Icon name="cloud-snow" size={20} color={brand.accent} />
+            <View style={styles.optionText}>
+              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Join the Snow Team</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>I have a Snow code for the winter crew</Text>
+            </View>
+          </Pressable>
+
           {canCreateCompany && (
             <Pressable
               style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}

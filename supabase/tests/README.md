@@ -34,3 +34,16 @@ but not change crews.
 psql -d t -f supabase/updates/014_crews.sql
 psql -d t -f supabase/tests/014_crews_test.sql
 ```
+
+`snow_onboarding_test.sql` checks the separate Snow signup code: regenerate
+and turn off, a pending applicant sees nothing, an old code stops working
+while waiting requests stay, an existing landscaping worker asks with the same
+account, approve with services, decline, remove, change services and revoke
+(landscaping access untouched). Run after update 020 (Snow access, PR #22) or
+the small stand-in here:
+
+```sh
+psql -d t -f supabase/tests/snow_roles_standin.sql   # or 020_snow_access.sql
+psql -d t -f supabase/updates/snow_onboarding.sql
+psql -d t -f supabase/tests/snow_onboarding_test.sql
+```

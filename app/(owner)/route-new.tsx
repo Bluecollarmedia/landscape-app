@@ -7,10 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Input, Avatar, CrewLabel, InlineNotice, Switch } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
-import {
-  useRouteBuilder, personById,
-  type RouteCandidate, type StopDraft, type DueState, type CandidateService,
-} from '@/hooks/useRouteBuilder';
+import { useMaintenanceDue, useMaintenanceWorkers } from '@/hooks/useMaintenance';
+import { createRoute } from '@/data/maintenance';
+import { dueLabel } from '@/lib/maintenanceSchedule';
+import type { DueStatus, PropertyDueInfo } from '@/types/maintenance';
 import { offsetDateKey, todayKey } from '@/lib/ids';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -40,33 +40,97 @@ function formatDay(key: string, style: 'chip' | 'full' | 'short') {
 /** The owner picks two weeks ahead; routes are made the day of or the day before. */
 const DATE_CHOICES = Array.from({ length: 14 }, (_, i) => offsetDateKey(i));
 
+/** One contract service as the route builder shows it. */
+interface CandidateService {
+  ruleId: string;
+  name: string;
+  state: DueStatus;
+  dueDate?: string;
+  lastServiceDate?: string;
+  daysOverdue?: number;
+  completedCount: number;
+  seasonTarget?: number;
+  scheduledOn?: string;
+}
+
+/** A property the owner can put on the route. */
+interface RouteCandidate {
+  propertyId: string;
+  label: string;
+  address: string;
+  customerName?: string;
+  accessNotes?: string;
+  services: CandidateService[];
+  urgency: DueStatus;
+  /** Another unfinished route already has one of its services, on this date. */
+  scheduledOn?: string;
+}
+
+interface StopDraft {
+  propertyId: string;
+  ruleIds: string[];
+  instructions: string;
+  checklist: string[];
+  photoRequired: boolean;
+}
+
+function toCandidate(info: PropertyDueInfo): RouteCandidate {
+  const p = info.property;
+  const services = info.services
+    .filter(s => s.status !== 'inactive')
+    .map(s => ({
+      ruleId: s.rule.id,
+      name: s.rule.label,
+      state: s.status,
+      dueDate: s.dueDate,
+      lastServiceDate: s.lastServiceDate,
+      daysOverdue: s.daysOverdue,
+      completedCount: s.completedCount,
+      seasonTarget: s.rule.seasonQuantity,
+      scheduledOn: s.scheduledOn,
+    }));
+  const customer = p.customer ? `${p.customer.firstName} ${p.customer.lastName}`.trim() : undefined;
+  return {
+    propertyId: p.id,
+    label: p.name,
+    address: [p.address, p.city].filter(Boolean).join(', '),
+    customerName: customer || undefined,
+    accessNotes: p.accessNotes,
+    services,
+    urgency: info.status,
+    scheduledOn: services.find(s => s.scheduledOn)?.scheduledOn,
+  };
+}
+
 function serviceLine(s: CandidateService): string {
-  const parts: string[] = [s.name];
-  if (s.state === 'overdue' && s.daysOverdue) parts.push(`Overdue by ${s.daysOverdue} day${s.daysOverdue === 1 ? '' : 's'}`);
-  else if (s.state === 'due') parts.push('Due');
-  else if (s.state === 'upcoming' && s.dueDate) parts.push(`Next ${formatDay(s.dueDate, 'short')}`);
-  else if (s.state === 'unknown') parts.push('Schedule not set');
-  return parts.join(' · ');
+  let status: string;
+  if (s.state === 'due') status = 'Due';
+  else if (s.state === 'upcoming' && s.dueDate) status = `Next ${formatDay(s.dueDate, 'short')}`;
+  else status = dueLabel({ status: s.state, daysOverdue: s.daysOverdue, dueDate: s.dueDate });
+  return `${s.name} · ${status}`;
 }
 
 function serviceDetail(s: CandidateService): string | undefined {
   const parts: string[] = [];
   parts.push(s.lastServiceDate ? `Last ${formatDay(s.lastServiceDate, 'short')}` : 'No service yet');
   if (s.seasonTarget) {
-    const done = s.completedCount ?? 0;
+    const done = s.completedCount;
     parts.push(`${done} of ${s.seasonTarget} done, ${Math.max(0, s.seasonTarget - done)} left`);
   }
   return parts.join(' · ');
 }
 
-const emptyStop = (c: RouteCandidate): StopDraft => ({
-  propertyId: c.propertyId,
+function emptyStop(c: RouteCandidate, rulePhotos: Record<string, boolean>): StopDraft {
   // Due and overdue services are the reason for the visit; the owner can add others.
-  serviceIds: c.services.filter(s => s.state === 'overdue' || s.state === 'due').map(s => s.serviceId),
-  instructions: '',
-  checklist: [],
-  photoRequired: false,
-});
+  const ruleIds = c.services.filter(s => s.state === 'overdue' || s.state === 'due').map(s => s.ruleId);
+  return {
+    propertyId: c.propertyId,
+    ruleIds,
+    instructions: '',
+    checklist: [],
+    photoRequired: ruleIds.some(id => rulePhotos[id]),
+  };
+}
 
 /**
  * New maintenance route: date, which properties (most urgent first), their
@@ -81,7 +145,19 @@ export default function NewRouteScreen() {
   const params = useLocalSearchParams<{ date?: string }>();
 
   const [serviceDate, setServiceDate] = useState(params.date ?? todayKey());
-  const { candidates, maintenanceCrew, createRoute } = useRouteBuilder(serviceDate);
+  const due = useMaintenanceDue(serviceDate);
+  const candidates = useMemo(() => due.map(toCandidate), [due]);
+  // Which services ask for photos, and their standing checklists, from the contract.
+  const ruleInfo = useMemo(() => {
+    const photos: Record<string, boolean> = {};
+    const checklist: Record<string, string[]> = {};
+    for (const d of due) for (const s of d.services) {
+      photos[s.rule.id] = s.rule.requiresPhotos;
+      checklist[s.rule.id] = s.rule.defaultChecklist;
+    }
+    return { photos, checklist };
+  }, [due]);
+  const { eligibleCrew: crewMembers, maintenanceCrew } = useMaintenanceWorkers();
 
   const [stops, setStops] = useState<StopDraft[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -98,14 +174,13 @@ export default function NewRouteScreen() {
   const overdueCount = candidates.filter(c => c.urgency === 'overdue').length;
   const listed = showAll ? candidates : needsAttention;
   const selectedIds = new Set(stops.map(s => s.propertyId));
-  const crewMembers = maintenanceCrew.members;
 
   function toggleProperty(c: RouteCandidate) {
     haptics.select();
     setStops(prev => prev.some(s => s.propertyId === c.propertyId)
       ? prev.filter(s => s.propertyId !== c.propertyId)
       // New picks go to the end, so the owner's existing order never shifts.
-      : [...prev, emptyStop(c)]);
+      : [...prev, emptyStop(c, ruleInfo.photos)]);
   }
 
   function move(index: number, delta: -1 | 1) {
@@ -130,10 +205,13 @@ export default function NewRouteScreen() {
     setNewItem(prev => ({ ...prev, [stop.propertyId]: '' }));
   }
 
-  function toggleService(stop: StopDraft, serviceId: string) {
+  function toggleService(stop: StopDraft, ruleId: string) {
     haptics.select();
-    const has = stop.serviceIds.includes(serviceId);
-    patchStop(stop.propertyId, { serviceIds: has ? stop.serviceIds.filter(id => id !== serviceId) : [...stop.serviceIds, serviceId] });
+    const has = stop.ruleIds.includes(ruleId);
+    patchStop(stop.propertyId, has
+      ? { ruleIds: stop.ruleIds.filter(id => id !== ruleId) }
+      // Adding a service whose contract asks for photos turns photos on (the owner can still turn it off).
+      : { ruleIds: [...stop.ruleIds, ruleId], photoRequired: stop.photoRequired || !!ruleInfo.photos[ruleId] });
   }
 
   function changeDate(key: string) {
@@ -156,7 +234,7 @@ export default function NewRouteScreen() {
 
   function goToReview() {
     if (stops.length === 0) return notify('Pick Properties', 'Add at least one property to the route.');
-    const noService = stops.filter(s => s.serviceIds.length === 0).map(s => byId[s.propertyId]?.label ?? 'A stop');
+    const noService = stops.filter(s => s.ruleIds.length === 0).map(s => byId[s.propertyId]?.label ?? 'A stop');
     if (noService.length) {
       return notify('Pick a Service', `Choose what to do at ${noService.join(', ')}. Open the stop and tap a service.`);
     }
@@ -167,21 +245,25 @@ export default function NewRouteScreen() {
     if (saving) return;
     const run = () => {
       setSaving(true);
-      try {
-        createRoute({
-          serviceDate,
-          notes: notes.trim(),
-          stops: stops.map(s => ({ ...s, instructions: s.instructions.trim() })),
-          crewId: crewAssigned ? maintenanceCrew.crew?.id ?? null : null,
-          crewPersonIds: crewAssigned ? crewMembers.map(p => p.id) : [],
-          leadPersonId: crewAssigned ? leadPersonId : null,
-        });
-        haptics.success();
-        router.back();
-      } catch (e) {
+      const result = createRoute({
+        serviceDate,
+        notes: notes.trim() || undefined,
+        stops: stops.map(s => ({
+          propertyId: s.propertyId,
+          ruleIds: s.ruleIds,
+          instructions: s.instructions.trim() || undefined,
+          tasks: s.checklist.map(title => ({ title, isRequired: true })),
+          requiresPhotos: s.photoRequired,
+        })),
+        crewIds: crewAssigned ? crewMembers.map(p => p.id) : [],
+        leadPersonId: crewAssigned && leadPersonId ? leadPersonId : undefined,
+      });
+      if (!result.ok) {
         setSaving(false);
-        notify('Couldn\'t Save Route', e instanceof Error ? e.message : 'Try again.');
+        return notify('Couldn\'t Save Route', result.error);
       }
+      haptics.success();
+      router.back();
     };
     if (!crewAssigned) {
       confirmAction('No Crew Assigned', 'Save this route without a crew? Nobody will see it until you assign the maintenance crew.', 'Save Anyway', run);
@@ -214,7 +296,7 @@ export default function NewRouteScreen() {
   const card = [styles.card, { backgroundColor: colors.surface }, shadow.sm];
   const sectionTitle = [typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' as const, flex: 1 }];
 
-  const lead = leadPersonId ? personById(leadPersonId) : undefined;
+  const lead = leadPersonId ? crewMembers.find(p => p.id === leadPersonId) : undefined;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -332,11 +414,11 @@ export default function NewRouteScreen() {
                           <Text style={[typeScale.labelSmall, { color: colors.textSecondary }]}>Services this visit</Text>
                           <View style={styles.chipWrap}>
                             {c.services.map(s => {
-                              const on = stop.serviceIds.includes(s.serviceId);
+                              const on = stop.ruleIds.includes(s.ruleId);
                               return (
                                 <Pressable
-                                  key={s.serviceId}
-                                  onPress={() => toggleService(stop, s.serviceId)}
+                                  key={s.ruleId}
+                                  onPress={() => toggleService(stop, s.ruleId)}
                                   style={[styles.chip, { backgroundColor: on ? colors.primarySurface : colors.backgroundTertiary, borderColor: on ? colors.primary : 'transparent' }]}
                                   accessibilityRole="checkbox"
                                   accessibilityState={{ checked: on }}
@@ -346,6 +428,14 @@ export default function NewRouteScreen() {
                               );
                             })}
                           </View>
+                          {(() => {
+                            const fromContract = stop.ruleIds.flatMap(id => ruleInfo.checklist[id] ?? []);
+                            return fromContract.length ? (
+                              <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                                From the contract: {fromContract.join(', ')}
+                              </Text>
+                            ) : null;
+                          })()}
                           {c.accessNotes ? (
                             <InlineNotice icon="info" tone="neutral" text={`Property notes: ${c.accessNotes}`} />
                           ) : null}
@@ -416,8 +506,8 @@ export default function NewRouteScreen() {
             <View style={card}>
               <View style={styles.cardHeader}>
                 <Text style={sectionTitle}>Crew</Text>
-                {crewAssigned && maintenanceCrew.crew && (
-                  <CrewLabel name={maintenanceCrew.crew.name} color={maintenanceCrew.crew.color} />
+                {crewAssigned && maintenanceCrew && (
+                  <CrewLabel name={maintenanceCrew.name} color={maintenanceCrew.color} />
                 )}
               </View>
               {crewMembers.length === 0 ? (
@@ -477,7 +567,7 @@ export default function NewRouteScreen() {
               <Text style={sectionTitle}>Stops</Text>
               {stops.map((stop, i) => {
                 const c = byId[stop.propertyId];
-                const services = c?.services.filter(s => stop.serviceIds.includes(s.serviceId)).map(s => s.name).join(', ');
+                const services = c?.services.filter(s => stop.ruleIds.includes(s.ruleId)).map(s => s.name).join(', ');
                 return (
                   <View key={stop.propertyId} style={styles.reviewStop}>
                     <View style={[styles.stopNumber, { backgroundColor: colors.primary }]}>
@@ -546,11 +636,16 @@ export default function NewRouteScreen() {
 
 function CandidateRow({ candidate: c, selected, onPress }: { candidate: RouteCandidate; selected: boolean; onPress: () => void }) {
   const { colors } = useTheme();
-  const tone: Record<DueState, { fg: string; bg: string; label: string }> = {
+  const quiet = { fg: colors.textSecondary, bg: colors.backgroundTertiary };
+  const tone: Record<DueStatus, { fg: string; bg: string; label: string }> = {
     overdue: { fg: colors.error, bg: colors.errorLight, label: 'Overdue' },
     due: { fg: colors.warning, bg: colors.warningLight, label: 'Due' },
-    upcoming: { fg: colors.textSecondary, bg: colors.backgroundTertiary, label: 'Not due' },
-    unknown: { fg: colors.textSecondary, bg: colors.backgroundTertiary, label: 'Not set up' },
+    upcoming: { ...quiet, label: 'Not due' },
+    not_configured: { ...quiet, label: 'Not set up' },
+    not_scheduled: { ...quiet, label: 'As needed' },
+    done_for_season: { ...quiet, label: 'Season done' },
+    out_of_season: { ...quiet, label: 'Out of season' },
+    inactive: { ...quiet, label: 'Inactive' },
   };
   const t = tone[c.urgency];
   const shown = c.services.filter(s => s.state === 'overdue' || s.state === 'due');
@@ -575,13 +670,15 @@ function CandidateRow({ candidate: c, selected, onPress }: { candidate: RouteCan
           {c.customerName ? `${c.customerName} · ` : ''}{c.address}
         </Text>
         {lines.map(s => (
-          <View key={s.serviceId}>
+          <View key={s.ruleId}>
             <Text style={[typeScale.bodySmall, { color: s.state === 'overdue' ? colors.error : colors.textPrimary, fontWeight: '600' }]}>{serviceLine(s)}</Text>
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{serviceDetail(s)}</Text>
           </View>
         ))}
-        {c.alreadyRouted && (
-          <Text style={[typeScale.caption, { color: colors.warning, fontWeight: '600' }]}>Already on a route this day</Text>
+        {c.scheduledOn && (
+          <Text style={[typeScale.caption, { color: colors.warning, fontWeight: '600' }]}>
+            Already on the {formatDay(c.scheduledOn, 'short')} route
+          </Text>
         )}
       </View>
     </Pressable>

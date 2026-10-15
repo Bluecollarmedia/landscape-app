@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCustomers } from '@/hooks/useCustomers';
-import { SearchBar, EmptyState, Avatar, StatusBadge } from '@/components/ui';
+import { SearchBar, EmptyState, Avatar, StatusBadge, ScreenHeader, RaisedAddButton } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
@@ -19,17 +19,17 @@ export default function CustomersListScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <View style={styles.titleRow}>
-          <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Customers</Text>
-          <Pressable
+      <ScreenHeader
+        title="Customers"
+        subtitle="Everyone you do work for"
+        right={
+          <RaisedAddButton
             onPress={() => router.push('/(owner)/customers/new')}
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
             accessibilityLabel="Add customer"
-          >
-            <Icon name="plus" size={22} color={colors.textOnPrimary} />
-          </Pressable>
-        </View>
+          />
+        }
+      />
+      <View style={styles.searchWrap}>
         <SearchBar
           value={search}
           onChangeText={setSearch}
@@ -50,7 +50,7 @@ export default function CustomersListScreen() {
         <FlatList
           data={customers}
           keyExtractor={(item) => item.person.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + spacing['3xl'] }]}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const firstProject = item.projects[0];
@@ -117,20 +117,7 @@ export default function CustomersListScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  searchWrap: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
   searchBar: { marginBottom: spacing.sm },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing['3xl'], paddingTop: spacing.xs },
   emptyContainer: { flex: 1, justifyContent: 'center' },

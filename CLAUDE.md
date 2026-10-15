@@ -53,12 +53,14 @@ Import from `@/theme`. Brand colors derived from the Brighton logos in `src/them
 
 ## Owner Navigation Architecture
 `app/(owner)/_layout.tsx` is a `Stack` (not the tab bar itself). It wraps two things:
-- `(tabs)` — a route group holding the actual 5-tab navigator (`index`, `projects/`, `workers/`, `customers/`, `more/`). Its `_layout.tsx` has the `Tabs`/`NativeTabs` code.
+- `(tabs)` — a route group holding the actual 5-tab navigator (`index`, `projects/`, `maintenance/`, `workers/`, `more/`). Its `_layout.tsx` has the `Tabs`/`NativeTabs` code.
 - A handful of screens presented as **modals**, declared as siblings of `(tabs)`: `worker-new`, `project-new`, `schedule-create`, `search`, `notification-center`.
 
 Why: those 5 screens are opened from multiple tabs (e.g. Dashboard's quick actions, or a project detail's "Schedule worker" button). When a screen lives inside one tab's own folder, navigating to it from a *different* tab switches the selected bottom tab and breaks `Back`. Moving them above the tab navigator as modals means opening/closing them never touches tab-selection state — you always return to whatever tab/screen you were on.
 
-Rule of thumb: if you add a new screen that's reachable from more than one tab and is a "do a thing, then return" flow (not an intentional "go look at this record" navigation like viewing a project), put it here as a sibling modal route, not inside a tab's folder. Detail-view navigation (View Project, View Worker, View Customer) is intentionally left as normal cross-tab pushes — that's expected to switch tabs.
+Rule of thumb: if you add a new screen that's reachable from more than one tab and is a "do a thing, then return" flow (not an intentional "go look at this record" navigation like viewing a project), put it here as a sibling modal route, not inside a tab's folder. Detail-view navigation (View Project, View Worker) is intentionally left as normal cross-tab pushes — that's expected to switch tabs.
+
+Customers is no longer a tab: `app/(owner)/customers/` sits above `(tabs)` as a normal push (like `resources`), opened from More and from project / maintenance property records. Its URL (`/(owner)/customers/[id]`) is unchanged.
 
 Quotes & invoices follow the same rule: `document` (view a quote / change order / invoice, a normal card push), `document-new` and `document-edit` (modals) are siblings of `(tabs)`, opened from Owner → More → Quotes & Invoices, a project's More → Financials, or a notification. The customer side has its own `(customer)/document`.
 

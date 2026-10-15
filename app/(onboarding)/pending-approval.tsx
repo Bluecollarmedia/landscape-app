@@ -9,6 +9,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
+import { withdrawMySnowRequest } from '@/hooks/useSnowOnboarding';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
@@ -16,8 +17,20 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
 export default function PendingApprovalScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { signOut, pendingCompanyName, user, refreshContext } = useAuth();
+  const { signOut, pendingCompanyName, pendingKind, user, refreshContext } = useAuth();
   const [checking, setChecking] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const isSnow = pendingKind === 'snow';
+
+  async function handleWithdraw() {
+    setWithdrawing(true);
+    try {
+      await withdrawMySnowRequest();
+      await refreshContext();
+    } finally {
+      setWithdrawing(false);
+    }
+  }
 
   // Look for an approval every so often, so the app moves on by itself once
   // the owner approves (no need to sign out and back in).
@@ -52,7 +65,7 @@ export default function PendingApprovalScreen() {
           </View>
 
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.lg }]}>
-            Request Submitted
+            {isSnow ? 'Snow Request Submitted' : 'Request Submitted'}
           </Text>
 
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
@@ -61,6 +74,11 @@ export default function PendingApprovalScreen() {
           <Text style={[typeScale.bodyLarge, { color: colors.primary, fontWeight: '600', textAlign: 'center' }]}>
             {pendingCompanyName ?? 'your company'}
           </Text>
+          {isSnow && (
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
+              The owner picks which snow work you'll do when they approve you. Until then there's nothing to see here yet.
+            </Text>
+          )}
 
           <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
 
@@ -92,6 +110,9 @@ export default function PendingApprovalScreen() {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
         <Button title="Check Again" onPress={handleCheckAgain} loading={checking} variant="secondary" icon="refresh-cw" fullWidth />
+        {isSnow && (
+          <Button title="Withdraw Request" onPress={handleWithdraw} loading={withdrawing} variant="ghost" icon="x" fullWidth />
+        )}
         <Button title="Sign Out" onPress={signOut} variant="ghost" icon="log-out" fullWidth />
         <DeleteAccountRow />
       </View>

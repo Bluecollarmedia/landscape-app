@@ -4,8 +4,11 @@ import { SettingsGroup, SettingsRow } from '@/components/settings/SettingsList';
 import { ModeSwitchRow } from '@/components/snow/ModeSwitchRow';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
+import { db, useDb } from '@/data/store';
+import { OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
 
 export default function SnowOwnerMoreScreen() {
+  useDb();
   const { signOut } = useAuth();
   const router = useRouter();
   return (
@@ -34,6 +37,11 @@ export default function SnowOwnerMoreScreen() {
           onPress={() => router.push('/snow/owner/review')}
         />
       </SettingsGroup>
+      {db.companyId ? (
+        <SettingsGroup title="Alerts">
+          <OwnerStopAlertsToggle companyId={db.companyId} />
+        </SettingsGroup>
+      ) : null}
       <SettingsGroup title="Mode">
         <ModeSwitchRow />
       </SettingsGroup>

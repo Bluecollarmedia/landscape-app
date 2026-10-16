@@ -130,3 +130,17 @@ export function describeDelivery(d: SnowNotificationDelivery, now = Date.now()):
   }
   return { label: `${channel}: sending…`, tone: 'waiting' };
 }
+
+// ── A customer's own properties ─────────────────────────────────────────────
+
+/** The properties this signed-in customer is a linked contact for. */
+export async function loadMySnowProperties(): Promise<Result<{ id: string; name: string; address: string }[]>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data, error } = await supabase.rpc('snow_my_properties');
+  if (error) return fail(error.message);
+  return ok(((data ?? []) as Row[]).map((p) => ({
+    id: p.id as string,
+    name: p.name as string,
+    address: [p.address, p.city].filter(Boolean).join(', '),
+  })));
+}

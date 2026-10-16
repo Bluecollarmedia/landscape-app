@@ -17,6 +17,7 @@ import {
   loadCustomerSnowUpdates, loadReviewQueue, reviewMedia, sendCustomerUpdate,
   type CustomerSnowUpdate, type ReviewMedia, type ReviewStop,
 } from '@/data/snowMediaReview';
+import { CustomerNotifyPrefs } from '@/components/snow/notifications/SnowNotifySettings';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -182,6 +183,7 @@ export function CustomerSnowUpdatesScreen() {
             {u.media.length ? <View style={styles.thumbs}>{u.media.map((m) => <Thumb key={m.id} m={m} />)}</View> : null}
           </View>
         ))}
+        <CustomerNotifyPrefs />
       </ScrollView>
     </View>
   );

@@ -5,7 +5,8 @@
  * only shared media for their own properties.
  */
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { signedSnowMediaUrls } from '@/lib/snowMedia';
+import { discardSnowUpload, signedSnowMediaUrls, uploadSnowMedia } from '@/lib/snowMedia';
+import type { SnowMediaDraft } from '@/data/snowProperties';
 import type { SnowService } from '@/types/snow';
 
 export type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -87,4 +88,33 @@ export async function loadCustomerSnowUpdates(): Promise<Result<CustomerSnowUpda
     completedAt: r.completed_at,
     media: r.media.map((m) => ({ id: m.id, kind: m.kind, url: urls[m.file_key] })),
   })));
+}
+
+/**
+ * Owner/admin: add photos or videos to a completed stop (update 032). Each
+ * file counts once it is both uploaded and saved; the owner added it, so it
+ * starts approved, and it is still not shared with the customer until sent.
+ * Returns how many were saved.
+ */
+export async function addOwnerMedia(companyId: string, visitId: string, drafts: SnowMediaDraft[]): Promise<Result<number>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  let saved = 0;
+  for (const d of drafts) {
+    let key: string | null = null;
+    try {
+      key = await uploadSnowMedia(d.uri, `${companyId}/completion/${visitId}`, d.mimeType);
+      const { error } = await supabase.rpc('snow_owner_add_media', {
+        p_visit_id: visitId,
+        p_kind: d.mediaType === 'video' ? 'video' : 'photo',
+        p_file_key: key,
+        p_size_bytes: d.sizeBytes ?? null,
+      });
+      if (error) throw new Error(message(error, "Couldn't save the photo."));
+      saved += 1;
+    } catch (e) {
+      if (key) await discardSnowUpload(key);
+      return saved ? ok(saved) : fail(e instanceof Error ? e.message : 'Upload failed.');
+    }
+  }
+  return ok(saved);
 }

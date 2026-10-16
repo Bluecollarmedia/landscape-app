@@ -11,8 +11,8 @@ import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenanceCheckIn } from '@/hooks/useMaintenanceCheckIn';
 import { useMyMaintenanceRoute } from '@/hooks/useMaintenance';
 import { useDb, db } from '@/data/store';
-import { finishStop, finishBlockers, locationLabel } from '@/data/maintenance';
-import { getCurrentGps } from '@/lib/location';
+import { locationLabel } from '@/data/maintenance';
+import { missingRequirements, finishStopAndAdvance, useFinishingStop } from '@/data/maintenanceFinish';
 import { haptics } from '@/lib/haptics';
 import { Avatar, EmptyState } from '@/components/ui';
 import { BrandCover } from '@/components/branding/BrandCover';
@@ -63,7 +63,8 @@ export default function MaintenanceTodayScreen() {
   const upcoming = stops.filter(s => s.status === 'pending' || s.status === 'arrived');
   const allDone = !!route && stops.length > 0 && !next;
 
-  const [finishing, setFinishing] = useState(false);
+  // Shared with the stop screen, so a tap in either place can't finish twice.
+  const finishing = useFinishingStop(next?.id);
   const busy = finishing || checkIn.busy != null;
   // A worker who goes straight to a property (missed the yard) can still work;
   // their day start stays missing for the owner to see.
@@ -78,23 +79,19 @@ export default function MaintenanceTodayScreen() {
   const handleArrive = (stop: MaintenanceStopDetail) => { haptics.select(); checkIn.arriveAtStop(stop.id); };
   async function handleFinish(stop: MaintenanceStopDetail) {
     if (busy) return;
-    if (finishBlockers(stop).length) {
+    if (missingRequirements(stop).length) {
       haptics.warning();
       // The stop screen is where the checklist and photos get done.
       openStop(stop);
       return;
     }
     haptics.select();
-    setFinishing(true);
-    try {
-      const result = await finishStop(stop.id, { gps: await getCurrentGps() });
-      if (result.ok) haptics.success();
-      else {
-        haptics.warning();
-        showMessage("Couldn't save that", result.error);
-      }
-    } finally {
-      setFinishing(false);
+    const result = await finishStopAndAdvance(stop.id);
+    if (result.ok) haptics.success();
+    else if (result.missing.length) openStop(stop);
+    else {
+      haptics.warning();
+      showMessage("Couldn't save that", result.error ?? 'Please try again.');
     }
   }
 
@@ -121,10 +118,12 @@ export default function MaintenanceTodayScreen() {
       onPress: () => handleArrive(next),
     };
   } else if (next && next.status === 'arrived') {
-    const blockers = finishBlockers(next);
+    const blockers = missingRequirements(next);
     action = {
       title: 'FINISH STOP',
-      subtitle: finishing ? 'Saving…' : blockers[0] ?? 'Mark this property done',
+      subtitle: finishing
+        ? 'Saving…'
+        : blockers.length > 1 ? `${blockers[0]} and ${blockers.length - 1} more` : blockers[0] ?? 'Mark this property done',
       icon: 'check-circle',
       onPress: () => handleFinish(next),
       muted: blockers.length > 0,

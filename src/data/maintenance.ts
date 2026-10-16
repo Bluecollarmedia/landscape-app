@@ -151,7 +151,9 @@ export type ServiceRuleInput = Partial<Omit<MaintenanceServiceRule, 'id' | 'comp
   & Pick<MaintenanceServiceRule, 'serviceType' | 'label' | 'frequency'>;
 
 export function addServiceRule(contractId: string, input: ServiceRuleInput): Result<MaintenanceServiceRule> {
-  const contract = db.maintenance.contracts.find((c) => c.id === contractId);
+  // Raw rows, not db.maintenance: a contract created a moment ago (same save)
+  // isn't in the shaped data until the next derive.
+  const contract = rowsOf('maintenance_contracts').find((c) => c.id === contractId) as MaintenanceContract | undefined;
   if (!contract) return fail('Contract not found.');
   const problem = ruleProblem(input);
   if (problem) return fail(problem);

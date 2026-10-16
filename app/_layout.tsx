@@ -66,7 +66,7 @@ function RootNavigator() {
     }
 
     if (appState === 'pending_approval') {
-      if (!inOnboardingGroup || segments[1] !== 'pending-approval') {
+      if (!inOnboardingGroup || (segments as string[])[1] !== 'pending-approval') {
         router.replace('/(onboarding)/pending-approval');
       }
       return;

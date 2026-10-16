@@ -323,7 +323,7 @@ export default function WorkerTodayScreen() {
           <LinearGradient
             colors={['transparent', 'transparent', colors.groupedBackground]}
             locations={[0, 0.78, 1]}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
 
           <View style={[styles.avatarWrap, { top: insets.top + spacing.sm }]}>

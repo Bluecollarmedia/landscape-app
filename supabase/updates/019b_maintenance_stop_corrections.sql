@@ -1,5 +1,5 @@
 -- ============================================================================
--- Update 19 — run once in Supabase → SQL Editor (safe to run again).
+-- Update 19b — run once in Supabase → SQL Editor (safe to run again).
 -- Needs update 18 (maintenance) first.
 --  • Owner/admin corrections of a stop's arrival or finish time, for when the
 --    crew forgot to tap I'm Here or tapped Finish Stop late.

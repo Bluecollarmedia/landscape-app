@@ -121,6 +121,8 @@ export interface ProjectPhoto {
   uploadedBy: string;
   fileKey: string;
   fileUrl: string;
+  /** Tiny placeholder hash shown while the photo loads, when the upload recorded one. */
+  blurhash?: string;
   caption?: string;
   customerDescription?: string;
   isCustomerVisible: boolean;

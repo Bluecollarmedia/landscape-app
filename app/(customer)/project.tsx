@@ -111,7 +111,9 @@ export default function CustomerProjectScreen() {
     );
   }
 
-  const config = statusConfig[project.status];
+  // Narrowed copy: nested render functions below lose the `if (!project)` narrowing.
+  const p = project;
+  const config = statusConfig[p.status];
 
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -135,48 +137,48 @@ export default function CustomerProjectScreen() {
             </View>
           </View>
         )}
-        <CustomerDocuments projectId={project.id} />
+        <CustomerDocuments projectId={p.id} />
         <Card>
           <View style={styles.progressSection}>
-            <Text style={[typeScale.displayLarge, { color: colors.primary }]}>{project.progress}%</Text>
+            <Text style={[typeScale.displayLarge, { color: colors.primary }]}>{p.progress}%</Text>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>complete</Text>
           </View>
-          <ProgressBar progress={project.progress} height={10} style={{ marginTop: spacing.sm }} />
+          <ProgressBar progress={p.progress} height={10} style={{ marginTop: spacing.sm }} />
           <View style={{ marginTop: spacing.md }}>
             <StatusBadge label={config.label} status={config.type} />
           </View>
         </Card>
 
         <Card title="Project Details" style={{ marginTop: spacing.lg }}>
-          {project.address && (
+          {p.address && (
             <View style={styles.detailRow}>
               <Icon name="map-pin" size={16} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                {project.address}{project.city ? `, ${project.city}` : ''}{project.state ? ` ${project.state}` : ''} {project.zip ?? ''}
+                {p.address}{p.city ? `, ${p.city}` : ''}{p.state ? ` ${p.state}` : ''} {p.zip ?? ''}
               </Text>
             </View>
           )}
-          {project.startDate && (
+          {p.startDate && (
             <View style={styles.detailRow}>
               <Icon name="calendar" size={16} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                Started {formatDate(project.startDate)}
+                Started {formatDate(p.startDate)}
               </Text>
             </View>
           )}
-          {project.estimatedEndDate && (
+          {p.estimatedEndDate && (
             <View style={styles.detailRow}>
               <Icon name="clock" size={16} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                Est. completion: {formatDate(project.estimatedEndDate)}
+                Est. completion: {formatDate(p.estimatedEndDate)}
               </Text>
             </View>
           )}
-          {project.completedAt && (
+          {p.completedAt && (
             <View style={styles.detailRow}>
               <Icon name="check-circle" size={16} color={semantic.success} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                Completed {formatDate(project.completedAt)}
+                Completed {formatDate(p.completedAt)}
               </Text>
             </View>
           )}
@@ -441,7 +443,7 @@ export default function CustomerProjectScreen() {
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} numberOfLines={1}>
-              {project.name}
+              {p.name}
             </Text>
           </View>
         </View>

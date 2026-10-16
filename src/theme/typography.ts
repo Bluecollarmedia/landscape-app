@@ -95,6 +95,15 @@ export const typeScale = {
     letterSpacing: 0.15,
   } satisfies TextStyle,
 
+  /** Body text between bodyLarge and bodySmall (worker screens use it). */
+  bodyMedium: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: fontWeight.regular,
+    fontFamily: fontFamily.regular,
+    letterSpacing: 0.1,
+  } satisfies TextStyle,
+
   /** Secondary body text */
   bodySmall: {
     fontSize: 14,

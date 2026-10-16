@@ -139,7 +139,7 @@ export default function DayDetailScreen() {
       )}
 
       {viewerPhotos && (
-        <View style={StyleSheet.absoluteFillObject}>
+        <View style={StyleSheet.absoluteFill}>
           <PhotoViewer
             photos={viewerPhotos.filter((p): p is NonNullable<typeof p> => !!p)}
             index={viewerIndex}

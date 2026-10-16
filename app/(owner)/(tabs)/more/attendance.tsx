@@ -9,8 +9,8 @@ import { Avatar, EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { useAttendance, type WorkerAttendance } from '@/hooks/useOperations';
-import type { AttendanceStatus } from '@/types/operations';
+import { useAttendance } from '@/hooks/useOperations';
+import type { AttendanceStatus, WorkerAttendance } from '@/types/operations';
 import { todayKey, localDateKey } from '@/lib/ids';
 
 function formatTime(iso: string): string {

@@ -83,3 +83,21 @@ cuts the lead off.
 psql -d t -f supabase/updates/022_snow_property_details.sql
 psql -d t -f supabase/tests/022_snow_property_details_test.sql
 ```
+
+`030_snow_media_review_test.sql` checks Owner review and customer sharing of
+snow completion media (run 020, 020b, 022 and 030 first, with the same
+storage stand-ins as 022): new uploads start unreviewed and unshared even if
+the app sends otherwise, only the owner/admin can approve, remove or share,
+review/share columns and share history can't be changed directly, only
+approved items on a completed visit can be shared, sharing twice doesn't
+double up, removing keeps the upload and stops sharing it, the customer's
+history shows only completed visits and shared items for properties they are
+a contact on (another customer sees nothing, and no snow table is readable
+directly), customers can open only shared files, a lead can upload only to
+their own open visits and delete only unsaved uploads, and ending or
+reopening a storm never re-shares anything.
+
+```sh
+psql -d t -f supabase/updates/030_snow_media_review.sql
+psql -d t -f supabase/tests/030_snow_media_review_test.sql
+```

@@ -1,0 +1,177 @@
+/**
+ * Edge Function: send-snow-notification
+ *
+ * Called by the database (update 031, trigger snow_visits_notify) when a snow
+ * visit's arrival or completion creates a notification. It sends that
+ * notification's pending channels and records what actually happened:
+ *   push  → Expo push service, to the recipient's registered phones
+ *   email → Resend, to the property contact's email
+ * The in-app copy is already saved by the database before this runs.
+ *
+ * Results go to snow_notification_deliveries via snow_record_delivery:
+ *   accepted     the provider took it (Expo ticket "ok" / Resend 200). Neither
+ *                confirms it reached the phone or inbox; that would need Expo
+ *                receipts or Resend webhooks, which aren't set up.
+ *   failed       the provider refused it
+ *   unavailable  nothing to send with (no phone registered, no RESEND_API_KEY)
+ *
+ * The request carries only the notification's id. The function claims it once
+ * (snow_claim_notification, within 15 minutes of creation), so it can't be
+ * used to send anything else or to send twice.
+ *
+ * Deploy:  supabase functions deploy send-snow-notification --no-verify-jwt
+ *          (or paste this file into the dashboard editor as
+ *          send-snow-notification and turn off "Enforce JWT verification")
+ * Secrets: the same RESEND_API_KEY and NOTIFY_EMAIL_FROM as send-notification.
+ */
+import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0';
+
+// Self-contained (no ../_shared import) so it can be pasted into the dashboard.
+const getServiceClient = () =>
+  createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+
+const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+type Db = ReturnType<typeof getServiceClient>;
+interface SnowNotification {
+  id: string;
+  company_id: string;
+  category: 'owner_alert' | 'customer' | 'employee';
+  event: string;
+  property_id: string | null;
+  visit_id: string | null;
+  recipient_person_id: string | null;
+  recipient_name: string | null;
+  recipient_email: string | null;
+  title: string;
+  body: string;
+}
+type Outcome = { status: 'accepted' | 'failed' | 'unavailable'; ref?: string; detail?: string };
+
+serve(async (req: Request) => {
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+
+  let id: string | undefined;
+  try {
+    id = (await req.json())?.id;
+  } catch {
+    return json({ error: 'bad_request' }, 400);
+  }
+  if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'bad_request' }, 400);
+
+  const db = getServiceClient();
+  const { data: claimed, error } = await db.rpc('snow_claim_notification', { p_id: id });
+  if (error) return json({ error: error.message }, 500);
+  const n = (claimed as SnowNotification[] | null)?.[0];
+  if (!n) return json({ skipped: true });
+
+  const { data: pending } = await db
+    .from('snow_notification_deliveries')
+    .select('channel')
+    .eq('notification_id', n.id)
+    .eq('status', 'pending');
+  const channels = new Set((pending ?? []).map((d: { channel: string }) => d.channel));
+
+  const results: Record<string, Outcome> = {};
+  const run = async (channel: string, send: () => Promise<Outcome>) => {
+    let out: Outcome;
+    try {
+      out = await send();
+    } catch (e) {
+      out = { status: 'failed', detail: e instanceof Error ? e.message : String(e) };
+    }
+    results[channel] = out;
+    await db.rpc('snow_record_delivery', {
+      p_notification_id: n.id,
+      p_channel: channel,
+      p_status: out.status,
+      p_provider_ref: out.ref ?? null,
+      p_detail: out.detail ?? null,
+    });
+  };
+
+  await Promise.all([
+    channels.has('push') ? run('push', () => sendPush(db, n)) : null,
+    channels.has('email') ? run('email', () => sendEmail(db, n)) : null,
+  ]);
+  return json(results);
+});
+
+async function sendPush(db: Db, n: SnowNotification): Promise<Outcome> {
+  if (!n.recipient_person_id) return { status: 'unavailable', detail: 'No app account' };
+  const { data: tokens } = await db.from('push_tokens').select('token').eq('person_id', n.recipient_person_id);
+  if (!tokens?.length) return { status: 'unavailable', detail: 'No phone registered for notifications' };
+
+  const messages = tokens.map(({ token }: { token: string }) => ({
+    to: token,
+    title: n.title,
+    body: n.body || undefined,
+    sound: 'default',
+    data: {
+      eventType: `snow_${n.event.replace('.', '_')}`,
+      linkedEntityType: n.category === 'customer' ? 'snow_property' : 'snow_visit',
+      linkedEntityId: n.category === 'customer' ? n.property_id : n.visit_id,
+    },
+  }));
+  const res = await fetch(EXPO_PUSH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(messages),
+  });
+  const out = await res.json().catch(() => null);
+  if (!res.ok) return { status: 'failed', detail: `Expo error ${res.status}` };
+
+  const tickets: { status: string; id?: string; message?: string; details?: { error?: string } }[] = out?.data ?? [];
+  // Forget phones that uninstalled the app or turned notifications off for good.
+  const dead = tickets
+    .map((t, i) => (t.status === 'error' && t.details?.error === 'DeviceNotRegistered' ? messages[i].to : null))
+    .filter((t): t is string => !!t);
+  if (dead.length) await db.from('push_tokens').delete().in('token', dead);
+
+  const ok = tickets.filter((t) => t.status === 'ok');
+  if (!ok.length) {
+    return { status: 'failed', detail: tickets.map((t) => t.details?.error ?? t.message).filter(Boolean).join('; ') || 'No ticket' };
+  }
+  return {
+    status: 'accepted',
+    ref: ok.map((t) => t.id).filter(Boolean).join(','),
+    detail: `Accepted for ${ok.length} of ${messages.length} phones`,
+  };
+}
+
+async function sendEmail(db: Db, n: SnowNotification): Promise<Outcome> {
+  const apiKey = Deno.env.get('RESEND_API_KEY');
+  if (!apiKey) return { status: 'unavailable', detail: 'Email not set up (no RESEND_API_KEY)' };
+  if (!n.recipient_email) return { status: 'unavailable', detail: 'No email address' };
+
+  const { data: company } = await db.from('companies').select('name, phone').eq('id', n.company_id).maybeSingle();
+  const companyName = company?.name || 'Brighton Lawn + Landscape';
+  const html = `
+<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#14263A;max-width:520px">
+  <p style="font-size:18px;font-weight:600;margin:0 0 6px">${esc(n.title)}</p>
+  <p style="font-size:15px;margin:0 0 18px;color:#3C4E60">${esc(n.body)}</p>
+  <p style="font-size:12px;color:#7A8896;margin:0">${esc(companyName)}${company?.phone ? ` · ${esc(company.phone)}` : ''}</p>
+</div>`;
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: Deno.env.get('NOTIFY_EMAIL_FROM') ?? `${companyName} <onboarding@resend.dev>`,
+      to: [n.recipient_email],
+      subject: `${n.title} · ${n.body}`,
+      html,
+    }),
+  });
+  if (!res.ok) return { status: 'failed', detail: `Resend error ${res.status}: ${(await res.text()).slice(0, 200)}` };
+  const out = await res.json().catch(() => null);
+  return { status: 'accepted', ref: out?.id };
+}
+
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}

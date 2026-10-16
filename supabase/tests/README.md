@@ -83,3 +83,19 @@ cuts the lead off.
 psql -d t -f supabase/updates/022_snow_property_details.sql
 psql -d t -f supabase/tests/022_snow_property_details_test.sql
 ```
+
+`031_snow_notifications_test.sql` checks snow notifications (run 008, 020,
+020b, 022 and 031 first): new properties start with arrival off and
+completion on, a linked customer can change only their own property's
+preferences and owner sees who changed them, arrival and completion notify
+each contact per those preferences, owner and admins get one alert per
+completed stop only while the toggle is on, the toggle never touches customer
+notices or the visit, a double tap or a reopened storm sends nothing twice
+while a new pass notifies once, a contact with no email or app account is
+recorded as not sent, nothing is shown as sent when no sender is set up, and
+with a sender the result is recorded once per channel.
+
+```sh
+psql -d t -f supabase/updates/031_snow_notifications.sql
+psql -d t -f supabase/tests/031_snow_notifications_test.sql
+```

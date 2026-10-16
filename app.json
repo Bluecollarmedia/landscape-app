@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.brightonlawn.app",
-      "buildNumber": "2",
+      "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -38,10 +38,12 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Brighton Lawn to access your photos for profile pictures.",
-          "cameraPermission": "Allow Brighton Lawn to use the camera for profile pictures."
+          "photosPermission": "Allow Brighton Lawn to access your photos for profile pictures, job photos and task instructions.",
+          "cameraPermission": "Allow Brighton Lawn to use the camera for profile pictures, job photos and task instructions.",
+          "microphonePermission": "Allow Brighton Lawn to record sound when you film a video for a task."
         }
       ],
+      "expo-video",
       [
         "expo-splash-screen",
         {
@@ -50,7 +52,19 @@
           "imageWidth": 240
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Brighton Lawn uses your location to check you in when you arrive at a job site."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7CB342"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

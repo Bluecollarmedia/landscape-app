@@ -6,6 +6,7 @@
 
 import React, { useState, useRef } from 'react';
 import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
@@ -16,12 +17,14 @@ import { Button, Input } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
+import { startWelcome, cancelWelcome } from '@/lib/welcomeAnimation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 240);
 
 export default function LoginScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { signIn } = useAuth();
   const router = useRouter();
 
@@ -41,9 +44,11 @@ export default function LoginScreen() {
     setError('');
     setLoading(true);
 
+    startWelcome();
     try {
       await signIn(email.trim(), password);
     } catch (err: any) {
+      cancelWelcome();
       setError(err?.message ?? 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
@@ -55,7 +60,7 @@ export default function LoginScreen() {
       scrollable
       padded
       keyboardAvoiding
-      contentStyle={styles.content}
+      contentStyle={{ ...styles.content, paddingTop: insets.top + spacing.lg }}
     >
       {/* Back to welcome */}
       <Pressable onPress={() => router.back()} style={styles.backRow}>
@@ -111,6 +116,10 @@ export default function LoginScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          textContentType="password"
+          autoComplete="current-password"
+          autoCapitalize="none"
+          autoCorrect={false}
           returnKeyType="done"
           onSubmitEditing={handleLogin}
           icon="lock"
@@ -131,6 +140,12 @@ export default function LoginScreen() {
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
             Don't have an account?{' '}
             <Text style={{ color: colors.primary, fontWeight: '600' }}>Get started</Text>
+          </Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/(auth)/signup')} style={{ marginTop: spacing.md }}>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+            Invited by email?{' '}
+            <Text style={{ color: colors.primary, fontWeight: '600' }}>Create your account</Text>
           </Text>
         </Pressable>
       </View>
@@ -166,7 +181,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
   },
   footer: {
     alignItems: 'center',

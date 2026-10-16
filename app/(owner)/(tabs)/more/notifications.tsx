@@ -1,85 +1,51 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
+import { Switch } from '@/components/ui/Switch';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { Avatar } from '@/components/ui';
+import { Avatar, ScreenHeader, GlassIconButton, SegmentedTabs, PressableScale, FadeInItem, IconTile } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius, shadow } from '@/theme/spacing';
+import { spacing, radius } from '@/theme/spacing';
 import { useNotifications } from '@/hooks/useOperations';
-import type { NotificationEventType } from '@/types/operations';
-import { mockMembers } from '@/data/mock';
-
-const EVENT_LABELS: Record<NotificationEventType, { label: string; icon: string; description: string }> = {
-  worker_checked_in: { label: 'Worker Checked In', icon: 'log-in', description: 'When a worker checks in at a job site' },
-  worker_checked_out: { label: 'Worker Checked Out', icon: 'log-out', description: 'When a worker checks out from a job site' },
-  worker_checked_in_late: { label: 'Late Check-In', icon: 'alert-circle', description: 'When a worker checks in after the scheduled time' },
-  worker_outside_radius: { label: 'Outside Job Radius', icon: 'map-pin', description: 'When a worker checks in far from the job site' },
-  worker_not_checked_in: { label: 'Missing Check-In', icon: 'x-circle', description: 'When a worker hasn\'t checked in after grace period' },
-  worker_past_scheduled_end: { label: 'Past Scheduled End', icon: 'clock', description: 'When a worker is still checked in past their end time' },
-  worker_completed_task: { label: 'Task Completed', icon: 'check-square', description: 'When a worker marks a task as done' },
-  worker_completed_job: { label: 'Job Completed', icon: 'check-circle', description: 'When all tasks at a job site are finished' },
-  photo_waiting_review: { label: 'Photos Pending', icon: 'camera', description: 'When new photos need your review' },
-  customer_request_submitted: { label: 'Customer Request', icon: 'message-square', description: 'When a customer submits a request' },
-  schedule_changed: { label: 'Schedule Changed', icon: 'calendar', description: 'When the schedule is modified' },
-  schedule_conflict: { label: 'Schedule Conflict', icon: 'alert-triangle', description: 'When a scheduling conflict is detected' },
-};
-
-const ALL_EVENTS: NotificationEventType[] = [
-  'worker_checked_in', 'worker_checked_out', 'worker_checked_in_late',
-  'worker_outside_radius', 'worker_not_checked_in', 'worker_past_scheduled_end',
-  'worker_completed_task', 'worker_completed_job',
-  'photo_waiting_review', 'customer_request_submitted',
-  'schedule_changed', 'schedule_conflict',
-];
+import { EVENT_LABELS, ALL_EVENTS } from '@/lib/notificationEvents';
+import { db, useDb } from '@/data/store';
 
 type Tab = 'defaults' | 'overrides';
 
 export default function NotificationPreferencesScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { preferences, getCompanyDefault, getWorkerOverride, updatePreference, setWorkerOverride } = useNotifications();
 
   const [tab, setTab] = useState<Tab>('defaults');
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
 
-  const workers = mockMembers.filter((m) => m.role === 'worker' && m.status === 'active');
+  useDb();
+  const workers = db.members.filter((m) => m.role === 'worker' && m.status === 'active' && !!m.person);
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm, borderBottomColor: colors.borderLight }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
-          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
-          Notifications
-        </Text>
-        <Pressable onPress={() => router.push('/(owner)/notification-center' as any)} hitSlop={12} accessibilityRole="button" accessibilityLabel="Notification history">
-          <Icon name="bell" size={22} color={colors.primary} />
-        </Pressable>
-      </View>
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+      <ScreenHeader
+        title="Notifications"
+        subtitle="What gets sent, and to whom"
+        right={
+          <GlassIconButton
+            icon="bell"
+            onPress={() => router.push('/(owner)/notification-center' as any)}
+            accessibilityLabel="Notification history"
+          />
+        }
+      />
 
-      <View style={[styles.tabs, { borderBottomColor: colors.borderLight }]}>
-        <Pressable
-          style={[styles.tab, tab === 'defaults' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-          onPress={() => setTab('defaults')}
-        >
-          <Text style={[typeScale.labelSmall, { color: tab === 'defaults' ? colors.primary : colors.textSecondary }]}>
-            Company Defaults
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, tab === 'overrides' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-          onPress={() => setTab('overrides')}
-        >
-          <Text style={[typeScale.labelSmall, { color: tab === 'overrides' ? colors.primary : colors.textSecondary }]}>
-            Worker Overrides
-          </Text>
-        </Pressable>
-      </View>
+      <SegmentedTabs
+        options={[
+          { value: 'defaults' as Tab, label: 'Company Defaults' },
+          { value: 'overrides' as Tab, label: 'Worker Overrides' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {tab === 'defaults' && (
@@ -87,15 +53,14 @@ export default function NotificationPreferencesScreen() {
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
               These are the default notification settings for all workers. You can override these per-worker in the Overrides tab.
             </Text>
-            {ALL_EVENTS.map((eventType) => {
+            <FadeInItem style={[styles.group, { backgroundColor: colors.surface }]}>
+            {ALL_EVENTS.map((eventType, i) => {
               const pref = getCompanyDefault(eventType);
               const info = EVENT_LABELS[eventType];
               const enabled = pref?.enabled ?? true;
               return (
-                <View key={eventType} style={[styles.prefRow, { borderBottomColor: colors.borderLight }]}>
-                  <View style={[styles.prefIcon, { backgroundColor: enabled ? colors.primarySurface : colors.backgroundSecondary }]}>
-                    <Icon name={info.icon as any} size={16} color={enabled ? colors.primary : colors.textTertiary} />
-                  </View>
+                <View key={eventType} style={[styles.prefRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
+                  <IconTile name={info.icon} size={32} muted={!enabled} />
                   <View style={styles.prefInfo}>
                     <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>{info.label}</Text>
                     <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{info.description}</Text>
@@ -105,12 +70,11 @@ export default function NotificationPreferencesScreen() {
                     onValueChange={(val) => {
                       if (pref) updatePreference(pref.id, val);
                     }}
-                    trackColor={{ false: colors.border, true: colors.primaryLight }}
-                    thumbColor={enabled ? colors.primary : colors.textTertiary}
                   />
                 </View>
               );
             })}
+            </FadeInItem>
           </>
         )}
 
@@ -119,13 +83,16 @@ export default function NotificationPreferencesScreen() {
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
               Select a worker to set notification overrides that differ from company defaults.
             </Text>
-            {workers.map((m) => {
+            <FadeInItem style={[styles.group, { backgroundColor: colors.surface }]}>
+            {workers.map((m, i) => {
               const overrideCount = preferences.filter((p) => p.personId === m.personId).length;
               return (
-                <Pressable
+                <PressableScale
                   key={m.personId}
-                  style={[styles.workerRow, { borderBottomColor: colors.borderLight }]}
+                  style={[styles.workerRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}
+                  scaleTo={0.98}
                   onPress={() => setSelectedWorker(m.personId)}
+                  accessibilityRole="button"
                 >
                   <Avatar firstName={m.person!.firstName} lastName={m.person!.lastName} size={36} uri={m.person!.avatarUrl} />
                   <View style={styles.workerInfo}>
@@ -139,21 +106,23 @@ export default function NotificationPreferencesScreen() {
                     )}
                   </View>
                   <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-                </Pressable>
+                </PressableScale>
               );
             })}
+            </FadeInItem>
           </>
         )}
 
         {tab === 'overrides' && selectedWorker && (
           <>
-            <Pressable
+            <PressableScale
               style={styles.backLink}
               onPress={() => setSelectedWorker(null)}
+              accessibilityRole="button"
             >
               <Icon name="arrow-left" size={16} color={colors.primary} />
               <Text style={[typeScale.labelSmall, { color: colors.primary }]}>All Workers</Text>
-            </Pressable>
+            </PressableScale>
             {(() => {
               const w = workers.find((m) => m.personId === selectedWorker);
               return (
@@ -165,7 +134,8 @@ export default function NotificationPreferencesScreen() {
                 </View>
               );
             })()}
-            {ALL_EVENTS.map((eventType) => {
+            <FadeInItem style={[styles.group, { backgroundColor: colors.surface }]}>
+            {ALL_EVENTS.map((eventType, i) => {
               const companyDefault = getCompanyDefault(eventType);
               const override = getWorkerOverride(selectedWorker, eventType);
               const info = EVENT_LABELS[eventType];
@@ -173,10 +143,8 @@ export default function NotificationPreferencesScreen() {
               const currentEnabled = override?.enabled ?? defaultEnabled;
               const hasOverride = override !== undefined;
               return (
-                <View key={eventType} style={[styles.prefRow, { borderBottomColor: colors.borderLight }]}>
-                  <View style={[styles.prefIcon, { backgroundColor: currentEnabled ? colors.primarySurface : colors.backgroundSecondary }]}>
-                    <Icon name={info.icon as any} size={16} color={currentEnabled ? colors.primary : colors.textTertiary} />
-                  </View>
+                <View key={eventType} style={[styles.prefRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
+                  <IconTile name={info.icon} size={32} muted={!currentEnabled} />
                   <View style={styles.prefInfo}>
                     <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>{info.label}</Text>
                     {hasOverride && (
@@ -193,12 +161,11 @@ export default function NotificationPreferencesScreen() {
                   <Switch
                     value={currentEnabled}
                     onValueChange={(val) => setWorkerOverride(selectedWorker, eventType, val)}
-                    trackColor={{ false: colors.border, true: colors.primaryLight }}
-                    thumbColor={currentEnabled ? colors.primary : colors.textTertiary}
                   />
                 </View>
               );
             })}
+            </FadeInItem>
           </>
         )}
       </ScrollView>
@@ -208,36 +175,25 @@ export default function NotificationPreferencesScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
+  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing['5xl'] },
+  group: {
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.md,
+    ...Platform.select({
+      android: { elevation: 2 },
+      default: {
+        shadowColor: '#1B3A2D',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+    }),
   },
-  tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  content: { padding: spacing.lg, paddingBottom: spacing['5xl'] },
   prefRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-  },
-  prefIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   prefInfo: { flex: 1 },
   workerRow: {
@@ -245,10 +201,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.md,
-    borderBottomWidth: 1,
   },
   workerInfo: { flex: 1 },
   backLink: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { useCompanySlotOpen } from '@/hooks/useCompanySlot';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { brand } from '@/theme/colors';
@@ -15,6 +16,7 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 240);
 export default function WelcomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const canCreateCompany = useCompanySlotOpen();
   const insets = useSafeAreaInsets();
 
   return (
@@ -39,66 +41,44 @@ export default function WelcomeScreen() {
 
         <View style={styles.actions}>
           <Pressable
-            style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+            style={({ pressed }) => [styles.primaryBtn, { backgroundColor: pressed ? colors.primaryDark : colors.primary }, pressed && styles.pressed]}
             onPress={() => router.push('/(auth)/login')}
           >
-            <Icon name="log-in" size={20} color="#FFFFFF" />
-            <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>
-              Sign In
-            </Text>
+            <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Sign In</Text>
+            <Icon name="arrow-right" size={20} color="#FFFFFF" />
           </Pressable>
 
-          <Pressable
-            style={[styles.secondaryBtn, { backgroundColor: brand.primarySurface }]}
-            onPress={() => router.push('/(auth)/create-company')}
-          >
-            <Icon name="briefcase" size={20} color={colors.primary} />
-            <View style={styles.btnTextGroup}>
-              <Text style={[typeScale.labelLarge, { color: colors.primary }]}>
-                Create a Company
-              </Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                Start managing your business
-              </Text>
-            </View>
-          </Pressable>
+          {canCreateCompany && (
+            <ChoiceCard
+              icon="briefcase"
+              title="Create a Company"
+              subtitle="Start managing your business"
+              onPress={() => router.push('/(auth)/create-company')}
+            />
+          )}
 
-          <Pressable
-            style={[styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
+          <ChoiceCard
+            icon="users"
+            title="Join a Team"
+            subtitle="Enter your team code or invitation"
             onPress={() => router.push('/(auth)/join-team')}
-          >
-            <Icon name="users" size={20} color={brand.accent} />
-            <View style={styles.btnTextGroup}>
-              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>
-                Join a Team
-              </Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                Enter your team code or invitation
-              </Text>
-            </View>
-          </Pressable>
+          />
 
-          <View style={styles.dividerRow}>
-            <View style={[styles.dividerLine, { backgroundColor: colors.borderLight }]} />
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginHorizontal: spacing.md }]}>
-              or
-            </Text>
-            <View style={[styles.dividerLine, { backgroundColor: colors.borderLight }]} />
-          </View>
+          <ChoiceCard
+            icon="cloud-snow"
+            title="Join the Snow Team"
+            subtitle="Seasonal snow crew with a Snow code"
+            onPress={() => router.push('/(auth)/join-team?kind=snow' as any)}
+          />
 
           <Pressable
-            style={[styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
+            style={({ pressed }) => [styles.customerLink, pressed && { opacity: 0.6 }]}
             onPress={() => router.push('/(auth)/customer-access' as any)}
+            hitSlop={8}
           >
-            <Icon name="eye" size={20} color={brand.accent} />
-            <View style={styles.btnTextGroup}>
-              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>
-                Customer Project Access
-              </Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                Enter your project code to view progress
-              </Text>
-            </View>
+            <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Customer? </Text>
+            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>View your project</Text>
+            <Icon name="chevron-right" size={16} color={colors.primary} />
           </Pressable>
         </View>
       </View>
@@ -109,6 +89,35 @@ export default function WelcomeScreen() {
         </Text>
       </View>
     </View>
+  );
+}
+
+/** White rounded card with a green icon circle, used for the secondary welcome choices. */
+function ChoiceCard({ icon, title, subtitle, onPress }: {
+  icon: React.ComponentProps<typeof Icon>['name'];
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: pressed ? colors.primary : colors.border },
+        pressed && styles.pressed,
+      ]}
+      onPress={onPress}
+    >
+      <View style={[styles.iconCircle, { backgroundColor: brand.primarySurface }]}>
+        <Icon name={icon} size={20} color={colors.primary} />
+      </View>
+      <View style={styles.btnTextGroup}>
+        <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{title}</Text>
+        <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 2 }]}>{subtitle}</Text>
+      </View>
+      <Icon name="chevron-right" size={20} color={colors.textTertiary} />
+    </Pressable>
   );
 }
 
@@ -137,28 +146,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.sm,
     paddingVertical: spacing.lg,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
+    marginBottom: spacing.xs,
   },
-  secondaryBtn: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.xl,
+    borderWidth: 1,
     gap: spacing.md,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   btnTextGroup: {
     flex: 1,
   },
-  dividerRow: {
+  pressed: {
+    transform: [{ scale: 0.98 }],
+  },
+  customerLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.xs,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
   },
   footer: {
     alignItems: 'center',

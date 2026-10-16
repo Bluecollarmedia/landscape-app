@@ -1,6 +1,9 @@
 import type { PersonSummary } from './company';
 
-export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
+/** prospect: created from a quote for a new customer/property; not on the
+ * schedule and without a team until the quote is approved and the owner
+ * starts the project (it then becomes active). */
+export type ProjectStatus = 'prospect' | 'active' | 'on_hold' | 'completed' | 'archived';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed';
 export type PhotoType = 'progress' | 'before' | 'after' | 'issue' | 'general';
 export type RequestStatus = 'pending' | 'acknowledged' | 'completed' | 'declined' | 'converted';
@@ -25,6 +28,8 @@ export interface Project {
   companyId: string;
   customerId?: string;
   name: string;
+  /** The one worker who can start/complete this job's tasks (update 016). */
+  taskLeadId?: string;
   address?: string;
   city?: string;
   state?: string;
@@ -37,6 +42,8 @@ export interface Project {
   estimatedEndDate?: string;
   completedAt?: string;
   notes?: string;
+  /** Owner-uploaded cover photo (falls back to a stock photo). */
+  coverPhotoUrl?: string;
   createdAt: string;
   updatedAt: string;
   customer?: PersonSummary;
@@ -76,9 +83,27 @@ export interface ProjectTask {
   sortOrder: number;
   assignedTo?: string;
   completedAt?: string;
+  /** Stamped by the database when the task is completed (update 016). */
+  completedBy?: string;
   createdAt: string;
   updatedAt: string;
   assignee?: PersonSummary;
+  /** Who completed it (stamped by the database, update 016). */
+  completer?: PersonSummary;
+}
+
+/** A photo or video the owner attached to a task to show what to do. */
+export interface TaskAttachment {
+  id: string;
+  companyId?: string;
+  projectId: string;
+  taskId: string;
+  mediaType: 'image' | 'video';
+  fileUrl: string;
+  fileKey: string;
+  sizeBytes?: number;
+  createdBy?: string;
+  createdAt: string;
 }
 
 export interface ProjectSettings {
@@ -102,6 +127,8 @@ export interface ProjectPhoto {
   uploadedBy: string;
   fileKey: string;
   fileUrl: string;
+  /** Tiny placeholder hash shown while the photo loads, when the upload recorded one. */
+  blurhash?: string;
   caption?: string;
   customerDescription?: string;
   isCustomerVisible: boolean;
@@ -143,6 +170,17 @@ export interface ProjectRequest {
   createdAt: string;
   updatedAt: string;
   requester?: PersonSummary;
+}
+
+/** One message in the customer ↔ owner conversation on a project. */
+export interface ProjectMessage {
+  id: string;
+  companyId?: string;
+  projectId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  sender?: PersonSummary;
 }
 
 export type CustomerTimelineType =

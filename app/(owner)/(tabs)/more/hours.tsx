@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { useWorkSessions, type WorkerWeeklyHours, type DailyHours } from '@/hooks/useOperations';
+import { localDateKey } from '@/lib/ids';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -40,7 +41,7 @@ export default function HoursScreen() {
   const referenceDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + weekOffset * 7);
-    return d.toISOString().split('T')[0];
+    return localDateKey(d);
   }, [weekOffset]);
 
   const weeklyData = useMemo(

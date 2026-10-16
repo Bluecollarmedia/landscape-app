@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Modal } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -8,17 +8,19 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useWorkerContext } from '@/providers/WorkerProvider';
+import { useResources } from '@/hooks/useResources';
 import { StatusBadge } from '@/components/ui';
 import { PhotoViewer } from '@/components/worker/PhotoViewer';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
-import { mockProjectPhotos } from '@/data/mock';
+import { db } from '@/data/store';
+import { todayKey, localDateKey } from '@/lib/ids';
 import type { ProjectPhoto } from '@/types/project';
+import { getProjectImageUriById } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
-const HERO_IMAGE_URI =
-  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=1200&q=80';
 const HERO_HEIGHT = 220;
 
 function formatTime(time?: string) {
@@ -39,7 +41,7 @@ function formatDateLabel(dateStr: string): string {
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const iso = (x: Date) => x.toISOString().split('T')[0];
+  const iso = (x: Date) => localDateKey(x);
   if (dateStr === iso(today)) return 'Today';
   if (dateStr === iso(tomorrow)) return 'Tomorrow';
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -57,6 +59,7 @@ export default function JobDetailScreen() {
   } = useWorkerContext();
   const [viewer, setViewer] = useState<ProjectPhoto[] | null>(null);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const { resources } = useResources();
 
   const assignment = [...todayAssignments, ...upcomingAssignments, ...completedAssignments]
     .find(a => a.id === id);
@@ -64,7 +67,7 @@ export default function JobDetailScreen() {
   if (!assignment) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <Header onBack={() => router.replace('/(worker)/jobs' as any)} colors={colors} insets={insets} />
+        <Header onBack={() => router.back()} colors={colors} insets={insets} />
         <View style={styles.center}>
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Job not found</Text>
         </View>
@@ -72,12 +75,12 @@ export default function JobDetailScreen() {
     );
   }
 
-  const isPast = assignment.status === 'completed' || assignment.scheduledDate < new Date().toISOString().split('T')[0];
+  const isPast = assignment.status === 'completed' || assignment.scheduledDate < todayKey();
 
   // Only this worker's own photos, scoped to this exact task — never another
   // worker's upload, another task, or another project's photo library.
   function getTaskPhotos(taskId: string): ProjectPhoto[] {
-    const projectPhotos = mockProjectPhotos[assignment!.projectId] ?? [];
+    const projectPhotos = db.photos[assignment!.projectId] ?? [];
     return projectPhotos.filter(p => p.taskId === taskId && p.uploadedBy === user?.id);
   }
 
@@ -90,16 +93,16 @@ export default function JobDetailScreen() {
   const tasks = projectTasks(assignment.projectId);
 
   function handleOpenMaps() {
-    if (assignment!.project?.address) openMapsNavigation(assignment!.project.address);
+    if (assignment!.project?.address) openMapsNavigation(assignment!.project);
   }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
         <View style={styles.hero}>
-          <Image source={{ uri: HERO_IMAGE_URI }} style={styles.heroImage} resizeMode="cover" />
+          <BrandCover uri={getProjectImageUriById(assignment.projectId)} style={styles.heroImage} />
           <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.sm }]}>
-            <Pressable onPress={() => router.replace('/(worker)/jobs' as any)} hitSlop={12}>
+            <Pressable onPress={() => router.back()} hitSlop={12}>
               {HAS_LIQUID_GLASS ? (
                 <GlassView glassEffectStyle="regular" isInteractive style={styles.backChip}>
                   <Feather name="chevron-left" size={20} color="#FFFFFF" />
@@ -154,9 +157,22 @@ export default function JobDetailScreen() {
             {assignment.truck && (
               <View style={styles.metaRow}>
                 <Feather name="truck" size={14} color={colors.textTertiary} />
-                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
+                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm, flex: 1 }]}>
                   {assignment.truck.name}
                 </Text>
+                {/* Only shows when the owner gave this worker codes for this truck. */}
+                {resources.some((r) => r.truckId === assignment.truck!.id) && (
+                  <Pressable
+                    onPress={() => router.push(`/(worker)/my-resources?truckId=${assignment.truck!.id}` as any)}
+                    style={[styles.truckCodes, { backgroundColor: colors.primarySurface }]}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Truck codes"
+                  >
+                    <Feather name="key" size={12} color={colors.primaryDark} />
+                    <Text style={[typeScale.labelSmall, { color: colors.primaryDark, marginLeft: 4 }]}>Codes</Text>
+                  </Pressable>
+                )}
               </View>
             )}
           </View>
@@ -323,6 +339,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing.lg },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  truckCodes: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.full },
   navDot: {
     width: 28,
     height: 28,

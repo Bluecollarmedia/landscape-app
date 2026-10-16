@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Modal, Alert, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { db } from '@/data/store';
+import { attachImage } from '@/data/actions';
 import { useTrucks } from '@/hooks/useTrucks';
-import { OptimizedImage } from '@/components/ui';
+import { OptimizedImage, GlassIconButton } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import type { TruckStatus } from '@/types/truck';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const STATUS_OPTIONS: { key: TruckStatus; label: string; dot: string }[] = [
   { key: 'available', label: 'Available', dot: semantic.success },
@@ -70,8 +75,8 @@ export default function AddTruckScreen() {
       else Alert.alert('Required', msg);
       return;
     }
-    addTruck({
-      companyId: 'company1',
+    const truck = addTruck({
+      companyId: db.companyId,
       name: name.trim(),
       make: make.trim() || undefined,
       model: model.trim() || undefined,
@@ -79,23 +84,20 @@ export default function AddTruckScreen() {
       licensePlate: plate.trim() || undefined,
       status,
       notes: notes.trim() || undefined,
-      photoUrl: photoUri,
     });
+    attachImage('trucks', truck.id, 'photoUrl', photoUri, 'trucks');
     router.back();
   }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} style={styles.backRow} accessibilityRole="button" accessibilityLabel="Back to Trucks">
-          <Icon name="chevron-left" size={22} color={colors.primary} />
-          <Text style={[typeScale.bodyLarge, { color: colors.primary }]}>Trucks</Text>
-        </Pressable>
+        <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back to Trucks" />
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>Add Truck</Text>
-        <View style={{ width: 70 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <Pressable
           style={[styles.photoBox, { borderColor: colors.borderLight }]}
           onPress={() => setShowPhotoSheet(true)}
@@ -221,10 +223,10 @@ export default function AddTruckScreen() {
           <Icon name="plus" size={18} color="#FFFFFF" />
           <Text style={[typeScale.labelLarge, { color: '#FFFFFF', fontWeight: '700', marginLeft: spacing.xs }]}>Add Truck</Text>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* Photo source sheet */}
-      <Modal visible={showPhotoSheet} transparent animationType="slide" onRequestClose={() => setShowPhotoSheet(false)}>
+      <BottomSheetModal visible={showPhotoSheet} onRequestClose={() => setShowPhotoSheet(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setShowPhotoSheet(false)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -254,7 +256,7 @@ export default function AddTruckScreen() {
             </Pressable>
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Permission error */}
       <Modal visible={!!permissionError} transparent animationType="fade" onRequestClose={() => setPermissionError(null)}>
@@ -283,7 +285,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
   },
-  backRow: { flexDirection: 'row', alignItems: 'center', width: 70 },
+  headerSpacer: { width: 44 },
   scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing['5xl'] + 90 },
   photoBox: {
     borderWidth: 1,
@@ -321,7 +323,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.md },
   input: {
     borderWidth: 1,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typeScale.bodyLarge.fontSize,
@@ -342,7 +344,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     paddingVertical: spacing.md,
     marginTop: spacing.lg,
     ...shadow.sm,
@@ -355,5 +357,5 @@ const styles = StyleSheet.create({
   sheetCancel: { marginTop: spacing.sm, borderRadius: radius.sm, paddingVertical: spacing.md, alignItems: 'center' },
   confirmBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   confirmCard: { width: '100%', borderRadius: radius.md, padding: spacing.lg },
-  confirmButton: { marginTop: spacing.lg, borderRadius: radius.sm, paddingVertical: spacing.md, alignItems: 'center' },
+  confirmButton: { marginTop: spacing.lg, borderRadius: radius.full, paddingVertical: spacing.md, alignItems: 'center' },
 });

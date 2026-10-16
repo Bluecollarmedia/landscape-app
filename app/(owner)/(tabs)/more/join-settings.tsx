@@ -1,45 +1,41 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Switch, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { Easing, FadeInDown, FadeOut, ZoomIn, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { Switch } from '@/components/ui/Switch';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { Card } from '@/components/ui';
+import { Card, ScreenHeader, PressableScale } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import { semantic } from '@/theme/colors';
+import { brand, semantic } from '@/theme/colors';
 import { useTeamCode, useJoinSettings, useJoinRequests, useInvitations } from '@/hooks/useOnboarding';
 
 export default function JoinSettingsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { activeCode, regenerateCode } = useTeamCode();
   const { settings, updateSettings } = useJoinSettings();
   const { pendingRequests } = useJoinRequests();
   const { pendingInvitations } = useInvitations();
   const [justRegenerated, setJustRegenerated] = useState(false);
+  const spin = useSharedValue(0);
+  const spinStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }));
 
   function handleRegenerate() {
     if (Platform.OS === 'web') {
       if (!confirm('Regenerate the team code? The current code will immediately stop working for new requests.')) return;
     }
-    const newCode = regenerateCode();
+    spin.value = withTiming(spin.value + 360, { duration: 600, easing: Easing.out(Easing.cubic) });
+    regenerateCode();
     setJustRegenerated(true);
     setTimeout(() => setJustRegenerated(false), 3000);
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
-          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>
-          Join Settings
-        </Text>
-      </View>
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+      <ScreenHeader title="Join Settings" subtitle="How new people join your team" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Team Code Toggle */}
@@ -56,38 +52,50 @@ export default function JoinSettingsScreen() {
             <Switch
               value={settings.joinByCodeEnabled}
               onValueChange={(v) => updateSettings({ joinByCodeEnabled: v })}
-              trackColor={{ false: colors.borderLight, true: colors.primary + '60' }}
-              thumbColor={settings.joinByCodeEnabled ? colors.primary : colors.textTertiary}
             />
           </View>
 
           {settings.joinByCodeEnabled && activeCode && (
             <>
-              <View style={[styles.codeBox, { backgroundColor: colors.primarySurface }]}>
-                <Text style={[typeScale.overline, { color: colors.textTertiary }]}>CURRENT CODE</Text>
-                <Text style={[typeScale.headingLarge, { color: colors.primary, fontWeight: '700', letterSpacing: 2, marginTop: spacing.xs }]}>
-                  {activeCode.code}
-                </Text>
-              </View>
+              <Animated.View key={activeCode.code} entering={ZoomIn.springify().damping(14)} style={styles.codeShadow}>
+                <LinearGradient
+                  colors={[brand.primaryDark, brand.primary, '#7CB342']}
+                  locations={[0, 0.6, 1]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.codeBox}
+                >
+                  <Text style={[typeScale.overline, { color: 'rgba(255,255,255,0.8)' }]}>CURRENT CODE</Text>
+                  <Text style={[typeScale.displaySmall, styles.codeText]}>
+                    {activeCode.code}
+                  </Text>
+                </LinearGradient>
+              </Animated.View>
 
               {justRegenerated && (
-                <View style={[styles.successBanner, { backgroundColor: semantic.successLight }]}>
+                <Animated.View entering={FadeInDown.springify().damping(16)} exiting={FadeOut} style={[styles.successBanner, { backgroundColor: semantic.successLight }]}>
                   <Icon name="check-circle" size={16} color={semantic.success} />
                   <Text style={[typeScale.caption, { color: semantic.success, marginLeft: spacing.sm }]}>
                     New code generated! Previous code is now inactive.
                   </Text>
-                </View>
+                </Animated.View>
               )}
 
-              <Pressable
-                style={[styles.regenBtn, { borderColor: colors.border }]}
+              <PressableScale
+                style={[styles.regenBtn, { backgroundColor: colors.primarySurface }]}
+                scaleTo={0.95}
+                haptic="light"
                 onPress={handleRegenerate}
+                accessibilityRole="button"
+                accessibilityLabel="Regenerate code"
               >
-                <Icon name="refresh-cw" size={16} color={colors.textSecondary} />
-                <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
+                <Animated.View style={spinStyle}>
+                  <Icon name="refresh-cw" size={16} color={colors.primaryDark} />
+                </Animated.View>
+                <Text style={[typeScale.labelSmall, { color: colors.primaryDark, marginLeft: spacing.sm }]}>
                   Regenerate Code
                 </Text>
-              </Pressable>
+              </PressableScale>
               <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
                 This will deactivate the current code. Already approved workers are not affected.
               </Text>
@@ -109,8 +117,6 @@ export default function JoinSettingsScreen() {
             <Switch
               value={settings.directInvitationsEnabled}
               onValueChange={(v) => updateSettings({ directInvitationsEnabled: v })}
-              trackColor={{ false: colors.borderLight, true: colors.primary + '60' }}
-              thumbColor={settings.directInvitationsEnabled ? colors.primary : colors.textTertiary}
             />
           </View>
 
@@ -138,17 +144,17 @@ export default function JoinSettingsScreen() {
             <Switch
               value={settings.requireEmailVerification}
               onValueChange={(v) => updateSettings({ requireEmailVerification: v })}
-              trackColor={{ false: colors.borderLight, true: colors.primary + '60' }}
-              thumbColor={settings.requireEmailVerification ? colors.primary : colors.textTertiary}
             />
           </View>
         </Card>
 
         {/* Quick Stats */}
         <Card title="Overview" style={styles.card}>
-          <Pressable
+          <PressableScale
             style={[styles.overviewRow, { borderBottomColor: colors.borderLight }]}
+            scaleTo={0.98}
             onPress={() => router.push('/(owner)/more/pending-requests' as any)}
+            accessibilityRole="button"
           >
             <Icon name="user-plus" size={16} color={semantic.warning} />
             <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm }]}>
@@ -158,7 +164,7 @@ export default function JoinSettingsScreen() {
               {pendingRequests.length}
             </Text>
             <Icon name="chevron-right" size={16} color={colors.textTertiary} style={{ marginLeft: spacing.sm }} />
-          </Pressable>
+          </PressableScale>
           <View style={styles.overviewRow}>
             <Icon name="mail" size={16} color={colors.primary} />
             <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm }]}>
@@ -176,30 +182,49 @@ export default function JoinSettingsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
-  },
   content: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing['5xl'],
   },
-  card: { marginBottom: spacing.lg },
+  card: {
+    marginBottom: spacing.lg,
+    borderRadius: radius.xl,
+    ...Platform.select({
+      android: { elevation: 2 },
+      default: {
+        shadowColor: '#1B3A2D',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+    }),
+  },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     marginBottom: spacing.md,
   },
+  codeShadow: {
+    borderRadius: radius.lg,
+    marginBottom: spacing.md,
+    ...Platform.select({
+      android: { elevation: 5 },
+      default: {
+        shadowColor: brand.primaryDark,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 14,
+      },
+    }),
+  },
   codeBox: {
     alignItems: 'center',
-    padding: spacing.lg,
-    borderRadius: radius.sm,
-    marginBottom: spacing.md,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
   },
+  codeText: { color: '#FFFFFF', letterSpacing: 4, marginTop: spacing.xs },
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -211,15 +236,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
-    borderWidth: 1,
+    paddingVertical: spacing.sm + 4,
+    borderRadius: radius.full,
   },
   statRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.lg,
     borderWidth: 1,
   },
   overviewRow: {

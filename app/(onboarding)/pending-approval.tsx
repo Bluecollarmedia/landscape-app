@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
+import { withdrawMySnowRequest } from '@/hooks/useSnowOnboarding';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
@@ -15,7 +17,36 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
 export default function PendingApprovalScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { signOut, pendingCompanyName, user } = useAuth();
+  const { signOut, pendingCompanyName, pendingKind, user, refreshContext } = useAuth();
+  const [checking, setChecking] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const isSnow = pendingKind === 'snow';
+
+  async function handleWithdraw() {
+    setWithdrawing(true);
+    try {
+      await withdrawMySnowRequest();
+      await refreshContext();
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
+  // Look for an approval every so often, so the app moves on by itself once
+  // the owner approves (no need to sign out and back in).
+  useEffect(() => {
+    const timer = setInterval(() => { refreshContext().catch(() => {}); }, 15000);
+    return () => clearInterval(timer);
+  }, [refreshContext]);
+
+  async function handleCheckAgain() {
+    setChecking(true);
+    try {
+      await refreshContext();
+    } finally {
+      setChecking(false);
+    }
+  }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -34,7 +65,7 @@ export default function PendingApprovalScreen() {
           </View>
 
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.lg }]}>
-            Request Submitted
+            {isSnow ? 'Snow Request Submitted' : 'Request Submitted'}
           </Text>
 
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
@@ -43,6 +74,11 @@ export default function PendingApprovalScreen() {
           <Text style={[typeScale.bodyLarge, { color: colors.primary, fontWeight: '600', textAlign: 'center' }]}>
             {pendingCompanyName ?? 'your company'}
           </Text>
+          {isSnow && (
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
+              The owner picks which snow work you'll do when they approve you. Until then there's nothing to see here yet.
+            </Text>
+          )}
 
           <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
 
@@ -73,7 +109,12 @@ export default function PendingApprovalScreen() {
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <Button title="Check Again" onPress={handleCheckAgain} loading={checking} variant="secondary" icon="refresh-cw" fullWidth />
+        {isSnow && (
+          <Button title="Withdraw Request" onPress={handleWithdraw} loading={withdrawing} variant="ghost" icon="x" fullWidth />
+        )}
         <Button title="Sign Out" onPress={signOut} variant="ghost" icon="log-out" fullWidth />
+        <DeleteAccountRow />
       </View>
     </View>
   );
@@ -122,5 +163,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
   },
 });

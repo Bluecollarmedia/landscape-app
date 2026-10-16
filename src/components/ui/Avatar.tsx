@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle, ImageStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from 'react-native';
 import { fontWeight } from '@/theme/typography';
@@ -37,7 +37,7 @@ export function Avatar({ firstName, lastName, size = 40, style, uri }: AvatarPro
         source={{ uri }}
         style={[
           { width: size, height: size, borderRadius },
-          style,
+          style as ImageStyle | undefined,
         ]}
         contentFit="cover"
         transition={200}

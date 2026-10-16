@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensions } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensions, Alert } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -7,9 +9,11 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { Input, Button } from '@/components/ui';
+import { AddressFields, missingAddressPart } from '@/components/ui/AddressFields';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.4, 180);
@@ -20,7 +24,9 @@ export default function CreateCompanyScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { switchDevRole } = useAuth();
+  const { switchDevRole, signUp, isAuthenticated, user, refreshContext } = useAuth();
+  // Already signed in (came from "Finish setting up"): skip the account step.
+  const signedIn = isSupabaseConfigured && isAuthenticated && !!user;
 
   const [step, setStep] = useState<Step>('company');
 
@@ -46,6 +52,15 @@ export default function CreateCompanyScreen() {
   function validateCompany() {
     if (!companyName.trim()) {
       setError('Please enter your company name.');
+      return false;
+    }
+    if (companyPhone.replace(/\D/g, '').length < 10) {
+      setError('Please enter the company phone number.');
+      return false;
+    }
+    const missing = missingAddressPart({ address: companyAddress, city: companyCity, state: companyState, zip: companyZip });
+    if (missing) {
+      setError(missing);
       return false;
     }
     setError('');
@@ -79,7 +94,7 @@ export default function CreateCompanyScreen() {
 
   function handleNext() {
     if (step === 'company' && validateCompany()) {
-      setStep('owner');
+      setStep(signedIn ? 'review' : 'owner');
     } else if (step === 'owner' && validateOwner()) {
       setStep('review');
     }
@@ -87,17 +102,66 @@ export default function CreateCompanyScreen() {
 
   function handleBack() {
     if (step === 'owner') setStep('company');
-    else if (step === 'review') setStep('owner');
+    else if (step === 'review') setStep(signedIn ? 'company' : 'owner');
     else router.back();
   }
 
   async function handleCreate() {
+    if (!isSupabaseConfigured) {
+      // Demo mode: no backend, just show the owner screens.
+      setLoading(true);
+      await new Promise((r) => setTimeout(r, 800));
+      switchDevRole('owner');
+      setLoading(false);
+      return;
+    }
+
+    const company = {
+      name: companyName.trim(),
+      phone: companyPhone.trim() || undefined,
+      address: companyAddress.trim() || undefined,
+      city: companyCity.trim() || undefined,
+      state: companyState.trim() || undefined,
+      zip: companyZip.trim() || undefined,
+    };
+
+    setError('');
     setLoading(true);
-    // In production: create company + owner membership via Supabase
-    // For now: switch to owner role in dev mode
-    await new Promise((r) => setTimeout(r, 800));
-    switchDevRole('owner');
-    setLoading(false);
+    try {
+      if (signedIn) {
+        const { error: rpcError } = await supabase.rpc('create_company', {
+          data: {
+            company_name: company.name,
+            company_phone: company.phone ?? '',
+            company_address: company.address ?? '',
+            company_city: company.city ?? '',
+            company_state: company.state ?? '',
+            company_zip: company.zip ?? '',
+          },
+        });
+        if (rpcError) throw rpcError;
+        await refreshContext();
+        return;
+      }
+
+      const result = await signUp(
+        email.trim(),
+        password,
+        { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() },
+        { company: { ...company, email: email.trim() } },
+      );
+      if (result.needsEmailConfirmation) {
+        const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in. Your company is already set up.`;
+        if (Platform.OS === 'web') alert(msg);
+        else Alert.alert('Check your email', msg);
+        router.replace('/(auth)/login');
+      }
+      // Otherwise the new session routes straight to the owner screens.
+    } catch (err: any) {
+      setError(err?.message ?? 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const stepLabels: Record<Step, string> = {
@@ -138,7 +202,7 @@ export default function CreateCompanyScreen() {
         Step {stepNumber} of 3 — {stepLabels[step]}
       </Text>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {error ? (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
             <Icon name="alert-circle" size={16} color={semantic.error} />
@@ -149,13 +213,12 @@ export default function CreateCompanyScreen() {
         {step === 'company' && (
           <View style={styles.form}>
             <Input label="Company Name *" placeholder="e.g. Brighton Lawn + Landscape" value={companyName} onChangeText={setCompanyName} icon="briefcase" />
-            <Input label="Company Phone" placeholder="(555) 555-0100" value={companyPhone} onChangeText={setCompanyPhone} keyboardType="phone-pad" icon="phone" />
-            <Input label="Street Address" placeholder="123 Main St" value={companyAddress} onChangeText={setCompanyAddress} icon="map-pin" />
-            <View style={styles.row}>
-              <Input label="City" placeholder="Cleveland" value={companyCity} onChangeText={setCompanyCity} containerStyle={styles.flex2} />
-              <Input label="State" placeholder="OH" value={companyState} onChangeText={setCompanyState} containerStyle={styles.flex1} />
-              <Input label="ZIP" placeholder="44101" value={companyZip} onChangeText={setCompanyZip} keyboardType="number-pad" containerStyle={styles.flex1} />
-            </View>
+            <Input label="Company Phone *" placeholder="(555) 555-0100" value={companyPhone} onChangeText={setCompanyPhone} keyboardType="phone-pad" icon="phone" textContentType="telephoneNumber" />
+            <AddressFields
+              required
+              value={{ address: companyAddress, city: companyCity, state: companyState, zip: companyZip }}
+              onChange={(a) => { setCompanyAddress(a.address); setCompanyCity(a.city); setCompanyState(a.state); setCompanyZip(a.zip); }}
+            />
             <Button title="Next" onPress={handleNext} fullWidth size="lg" icon="arrow-right" />
           </View>
         )}
@@ -171,8 +234,8 @@ export default function CreateCompanyScreen() {
             </View>
             <Input label="Email *" placeholder="you@company.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />
             <Input label="Phone *" placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
-            <Input label="Password *" placeholder="At least 6 characters" value={password} onChangeText={setPassword} secureTextEntry icon="lock" />
-            <Input label="Confirm Password *" placeholder="Re-enter password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry icon="lock" />
+            <Input label="Password *" placeholder="At least 6 characters" value={password} onChangeText={setPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
+            <Input label="Confirm Password *" placeholder="Re-enter password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
             <Button title="Next" onPress={handleNext} fullWidth size="lg" icon="arrow-right" />
           </View>
         )}
@@ -195,10 +258,10 @@ export default function CreateCompanyScreen() {
               <View style={styles.reviewSection}>
                 <Text style={[typeScale.overline, { color: colors.textTertiary }]}>OWNER</Text>
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', marginTop: spacing.xs }]}>
-                  {firstName} {lastName}
+                  {signedIn ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}` : `${firstName} ${lastName}`}
                 </Text>
-                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{email}</Text>
-                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{phone}</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{signedIn ? user?.email : email}</Text>
+                {!signedIn && <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{phone}</Text>}
                 <View style={[styles.roleBadge, { backgroundColor: colors.primarySurface }]}>
                   <Icon name="shield" size={12} color={colors.primary} />
                   <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '600', marginLeft: 4 }]}>
@@ -218,7 +281,7 @@ export default function CreateCompanyScreen() {
             <Button title="Create Company" onPress={handleCreate} loading={loading} fullWidth size="lg" icon="check-circle" />
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -251,7 +314,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     marginBottom: spacing.lg,
   },
   form: {
@@ -283,7 +346,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
     borderLeftWidth: 3,
   },
 });

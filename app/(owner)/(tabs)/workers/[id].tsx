@@ -6,18 +6,22 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useSchedule } from '@/hooks/useSchedule';
-import { StatusBadge, Avatar, EmptyState } from '@/components/ui';
+import { useResources } from '@/hooks/useResources';
+import { StatusBadge, Avatar, EmptyState, CrewLabel } from '@/components/ui';
+import { useCrews } from '@/hooks/useCrews';
+import { workerTypeOf, setWorkerType } from '@/hooks/useMaintenanceCrew';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { haptics } from '@/lib/haptics';
+import { todayKey, localDateKey } from '@/lib/ids';
 
-const today = new Date().toISOString().split('T')[0];
+const today = todayKey();
 
 function offsetDate(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 function formatTime(time?: string): string {
@@ -50,6 +54,8 @@ export default function WorkerDetailScreen() {
   const insets = useSafeAreaInsets();
   const { getWorker, updateWorker } = useWorkers({ includeInactive: true });
   const schedule = useSchedule();
+  const { resourcesFor } = useResources();
+  const { crews, crewOf, setWorkerCrew } = useCrews();
 
   const worker = getWorker(id);
 
@@ -72,6 +78,32 @@ export default function WorkerDetailScreen() {
   const p = w.person;
   const isActive = w.member.status === 'active';
 
+  const crew = crewOf(p.id);
+  const workerType = workerTypeOf(w.member);
+  const isMaint = workerType === 'maintenance';
+
+  /** Owner-only, always confirmed: never changes anyone's type silently. */
+  function handleChangeType() {
+    const next = isMaint ? 'landscaping' : 'maintenance';
+    const msg = isMaint
+      ? `${p.firstName} will become a landscaping worker and leave the Maintenance Crew. They won't be listed for maintenance routes.`
+      : `${p.firstName} will become a maintenance worker and can be put on the Maintenance Crew and maintenance routes.`;
+    const run = async () => {
+      haptics.success();
+      const res = await setWorkerType(p.id, next);
+      if (!res.ok) {
+        const error = res.error;
+        if (Platform.OS === 'web') alert(`Couldn't change the worker type: ${error}`);
+        else Alert.alert('Not Changed', error);
+      }
+    };
+    const title = isMaint ? 'Make Landscaping Worker?' : 'Make Maintenance Worker?';
+    if (Platform.OS === 'web') {
+      if (confirm(`${title}\n\n${msg}`)) run();
+    } else {
+      Alert.alert(title, msg, [{ text: 'Cancel', style: 'cancel' }, { text: 'Change', onPress: run }]);
+    }
+  }
   const todayAssignments = schedule.getByWorker(p.id, today);
   const tomorrowAssignments = schedule.getByWorker(p.id, offsetDate(1));
 
@@ -123,11 +155,12 @@ export default function WorkerDetailScreen() {
                 <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>
                   {p.firstName} {p.lastName}
                 </Text>
-                <View style={{ marginTop: spacing.xs, alignSelf: 'flex-start' }}>
+                <View style={styles.badgeRow}>
                   <StatusBadge label={isActive ? 'Active' : 'Inactive'} status={isActive ? 'success' : 'error'} />
+                  {crew && <CrewLabel name={crew.name} color={crew.color} />}
                 </View>
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-                  Worker · Hired {formatHiredDate(w.member.createdAt)}
+                  {isMaint ? 'Maintenance worker' : 'Worker'} · Hired {formatHiredDate(w.member.createdAt)}
                 </Text>
               </View>
             </View>
@@ -153,6 +186,73 @@ export default function WorkerDetailScreen() {
                   <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Email</Text>
                   <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{p.email}</Text>
                 </View>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Worker type */}
+          <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Worker Type</Text>
+              <Pressable onPress={handleChangeType} hitSlop={8} accessibilityRole="button" accessibilityLabel={isMaint ? 'Change to landscaping worker' : 'Change to maintenance worker'}>
+                <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>Change</Text>
+              </Pressable>
+            </View>
+            <View style={styles.typeRow}>
+              <Icon name={isMaint ? 'repeat' : 'tool'} size={18} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
+                  {isMaint ? 'Maintenance worker' : 'Landscaping worker'}
+                </Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                  {isMaint ? 'Works maintenance routes with the Maintenance Crew' : 'Works landscaping projects and tasks'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Crew */}
+          <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Crew</Text>
+              <Pressable onPress={() => router.push('/(owner)/crews' as any)} hitSlop={8} accessibilityRole="button">
+                <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>Manage Crews</Text>
+              </Pressable>
+            </View>
+            <View style={styles.crewChoices}>
+              {[{ id: null as string | null, name: 'No Crew', color: colors.textTertiary }, ...crews].map(c => {
+                const selected = (crew?.id ?? null) === c.id;
+                // Landscaping workers can't join the Maintenance Crew.
+                const blocked = 'isMaintenance' in c && !!c.isMaintenance && !isMaint;
+                return (
+                  <Pressable
+                    key={c.id ?? 'none'}
+                    onPress={() => { haptics.select(); setWorkerCrew(p.id, c.id); }}
+                    disabled={blocked}
+                    style={({ pressed }) => [
+                      styles.crewChoice,
+                      { borderColor: selected ? c.color : colors.border, backgroundColor: selected ? `${c.color}1F` : 'transparent' },
+                      blocked && { opacity: 0.4 },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected, disabled: blocked }}
+                    accessibilityHint={blocked ? 'Only maintenance workers can join this crew' : undefined}
+                  >
+                    {c.id && <View style={[styles.crewDot, { backgroundColor: c.color }]} />}
+                    <Text style={[typeScale.bodySmall, { color: selected ? c.color : colors.textSecondary, fontWeight: selected ? '700' : '500' }]}>
+                      {c.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                onPress={() => router.push('/(owner)/crew-edit' as any)}
+                style={[styles.crewChoice, { borderColor: colors.border, borderStyle: 'dashed' }]}
+                accessibilityRole="button"
+              >
+                <Icon name="plus" size={13} color={colors.textSecondary} />
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>New Crew</Text>
               </Pressable>
             </View>
           </View>
@@ -249,6 +349,29 @@ export default function WorkerDetailScreen() {
             )}
           </View>
 
+          {isActive && (
+            <Pressable
+              style={({ pressed }) => [styles.sectionCard, styles.resourceRow, { backgroundColor: colors.surface }, shadow.sm, pressed && { opacity: 0.92 }]}
+              onPress={() => router.push(`/(owner)/worker-access?personId=${p.id}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Manage resource access"
+            >
+              <View style={[styles.resourceIcon, { backgroundColor: colors.primarySurface }]}>
+                <Icon name="key" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Manage Resource Access</Text>
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                  {(() => {
+                    const n = resourcesFor(p.id).length;
+                    return n === 0 ? 'No company resources yet' : `Can open ${n} resource${n === 1 ? '' : 's'}`;
+                  })()}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+            </Pressable>
+          )}
+
           {isActive ? (
             <Pressable onPress={handleDeactivate} style={[styles.deactivateRow, { backgroundColor: semantic.errorLight }]}>
               <Icon name="user-x" size={16} color={semantic.error} />
@@ -271,6 +394,11 @@ export default function WorkerDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  typeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
+  crewChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  crewChoice: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1.5 },
+  crewDot: { width: 8, height: 8, borderRadius: 4 },
   screen: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -302,7 +430,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
   },
   sectionCard: {
     borderRadius: radius.md,
@@ -334,15 +462,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
     paddingVertical: spacing.md,
     marginTop: spacing.xs,
   },
+  resourceRow: { flexDirection: 'row', alignItems: 'center' },
+  resourceIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   deactivateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
     marginBottom: spacing.lg,
   },

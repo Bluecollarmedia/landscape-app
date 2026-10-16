@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Platform, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
@@ -11,12 +12,16 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic, brand } from '@/theme/colors';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 type Step = 'enter_code' | 'code_valid' | 'authenticate' | 'claiming' | 'success';
 
 export default function CustomerAccessScreen() {
   const { colors } = useTheme();
-  const { signIn, signUp, switchDevRole } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { signIn, signUp, switchDevRole, isAuthenticated, user, refreshContext } = useAuth();
+  // Already signed in (came from "Finish setting up"): no need to sign in again.
+  const signedIn = isSupabaseConfigured && isAuthenticated && !!user;
   const router = useRouter();
   const { validateCode, claimProject, isLoading } = useCustomerAccess();
 
@@ -26,6 +31,9 @@ export default function CustomerAccessScreen() {
   const [projectId, setProjectId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signup');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -59,6 +67,22 @@ export default function CustomerAccessScreen() {
     }
   }
 
+  async function claimForSignedInUser() {
+    setStep('claiming');
+    const result = await claimProject(code, user?.id ?? '');
+    if (result.success) {
+      setStep('success');
+      await refreshContext();
+    } else {
+      setError(result.error === 'already_claimed'
+        ? 'This project has already been claimed by someone else.'
+        : result.error === 'access_removed'
+          ? 'Your access was removed by the company. Contact them to get approved again.'
+          : 'Failed to claim project. Please try again.');
+      setStep(signedIn ? 'code_valid' : 'authenticate');
+    }
+  }
+
   async function handleAuthenticate() {
     if (!email.trim()) {
       setError('Please enter your email address.');
@@ -69,17 +93,49 @@ export default function CustomerAccessScreen() {
     setAuthLoading(true);
 
     try {
-      // In mock mode, simulate claiming as a new customer
-      switchDevRole('customer');
-      setStep('claiming');
-
-      const result = await claimProject(code, 'customer1');
-      if (result.success) {
-        setStep('success');
-      } else {
-        setError('Failed to claim project. Please try again.');
-        setStep('authenticate');
+      if (!isSupabaseConfigured) {
+        // Demo mode: simulate claiming as the sample customer
+        switchDevRole('customer');
+        setStep('claiming');
+        const result = await claimProject(code, 'customer1');
+        if (result.success) {
+          setStep('success');
+        } else {
+          setError('Failed to claim project. Please try again.');
+          setStep('authenticate');
+        }
+        return;
       }
+
+      if (!password) {
+        setError('Please enter a password.');
+        return;
+      }
+
+      if (mode === 'signup') {
+        if (!firstName.trim() || !lastName.trim()) {
+          setError('Please enter your first and last name.');
+          return;
+        }
+        if (password.length < 6) {
+          setError('Password must be at least 6 characters.');
+          return;
+        }
+        // The database claims the project as part of creating the account.
+        const result = await signUp(email.trim(), password, { firstName: firstName.trim(), lastName: lastName.trim() }, { projectCode: code.trim() });
+        if (result.needsEmailConfirmation) {
+          const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in to see ${projectName}.`;
+          if (Platform.OS === 'web') alert(msg);
+          else Alert.alert('Check your email', msg);
+          router.replace('/(auth)/login');
+          return;
+        }
+        setStep('success');
+        return;
+      }
+
+      await signIn(email.trim(), password);
+      await claimForSignedInUser();
     } catch (err: any) {
       setError(err?.message ?? 'Authentication failed. Please try again.');
       setStep('authenticate');
@@ -167,9 +223,21 @@ export default function CustomerAccessScreen() {
         </Card>
 
         <View style={styles.form}>
+          {error ? (
+            <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
+              <Icon name="alert-circle" size={16} color={semantic.error} />
+              <Text style={[typeScale.bodySmall, { color: semantic.error, marginLeft: spacing.sm, flex: 1 }]}>
+                {error}
+              </Text>
+            </View>
+          ) : null}
           <Button
-            title="Continue to Sign In"
-            onPress={() => { setError(''); setStep('authenticate'); }}
+            title={signedIn ? 'Add This Project' : 'Continue'}
+            onPress={() => {
+              setError('');
+              if (signedIn) claimForSignedInUser();
+              else setStep('authenticate');
+            }}
             fullWidth
             size="lg"
           />
@@ -190,10 +258,10 @@ export default function CustomerAccessScreen() {
       <>
         <View style={styles.header}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>
-            Sign In
+            {mode === 'signup' ? 'Create Account' : 'Sign In'}
           </Text>
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
-            Sign in to claim access to{' '}
+            {mode === 'signup' ? 'Create an account to follow' : 'Sign in to claim access to'}{' '}
             <Text style={{ fontWeight: '600', color: colors.textPrimary }}>{projectName}</Text>
           </Text>
         </View>
@@ -207,6 +275,13 @@ export default function CustomerAccessScreen() {
               </Text>
             </View>
           ) : null}
+
+          {mode === 'signup' && (
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Input label="First Name" placeholder="Sarah" value={firstName} onChangeText={setFirstName} containerStyle={{ flex: 1 }} />
+              <Input label="Last Name" placeholder="Mitchell" value={lastName} onChangeText={setLastName} containerStyle={{ flex: 1 }} />
+            </View>
+          )}
 
           <Input
             label="Email"
@@ -224,22 +299,33 @@ export default function CustomerAccessScreen() {
           <Input
             ref={passwordRef}
             label="Password"
-            placeholder="Enter your password"
+            placeholder={mode === 'signup' ? 'At least 6 characters' : 'Enter your password'}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+            autoCapitalize="none"
+            autoCorrect={false}
             returnKeyType="done"
             onSubmitEditing={handleAuthenticate}
             icon="lock"
           />
 
           <Button
-            title="Sign In & Claim Project"
+            title={mode === 'signup' ? 'Create Account & View Project' : 'Sign In & Claim Project'}
             onPress={handleAuthenticate}
             loading={authLoading}
             fullWidth
             size="lg"
           />
+
+          <Pressable onPress={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); }}>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>
+              {mode === 'signup' ? 'Already have an account? ' : 'New here? '}
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>{mode === 'signup' ? 'Sign in instead' : 'Create an account'}</Text>
+            </Text>
+          </Pressable>
 
           <Button
             title="Back"
@@ -298,7 +384,7 @@ export default function CustomerAccessScreen() {
   };
 
   return (
-    <ScreenContainer scrollable padded keyboardAvoiding contentStyle={styles.content}>
+    <ScreenContainer scrollable padded keyboardAvoiding contentStyle={{ ...styles.content, paddingTop: insets.top + spacing.lg }}>
       <Pressable onPress={() => router.back()} style={styles.backRow}>
         <Icon name="arrow-left" size={20} color={colors.textSecondary} />
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
@@ -338,7 +424,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
   },
   projectCard: {
     marginBottom: spacing.xl,

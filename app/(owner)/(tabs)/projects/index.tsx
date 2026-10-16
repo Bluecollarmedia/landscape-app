@@ -14,8 +14,9 @@ import type { ProjectStatus } from '@/types/project';
 
 type FilterKey = ProjectStatus | 'all';
 
-const STATUS_ORDER: ProjectStatus[] = ['active', 'on_hold', 'completed', 'archived'];
+const STATUS_ORDER: ProjectStatus[] = ['active', 'on_hold', 'prospect', 'completed', 'archived'];
 const STATUS_LABELS: Record<ProjectStatus, string> = {
+  prospect: 'Prospects',
   active: 'Active',
   on_hold: 'On Hold',
   completed: 'Completed',
@@ -27,16 +28,17 @@ export default function ProjectsListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
+  const [statusFilter, setStatusFilter] = useState<FilterKey>('active');
 
   const { grouped, counts } = useProjects({ search, statusFilter });
 
   const filterOptions: { key: FilterKey; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: counts.all },
     { key: 'active', label: 'Active', count: counts.active },
     { key: 'on_hold', label: 'On Hold', count: counts.on_hold },
+    ...(counts.prospect > 0 ? [{ key: 'prospect' as const, label: 'Prospects', count: counts.prospect }] : []),
     { key: 'completed', label: 'Completed', count: counts.completed },
     { key: 'archived', label: 'Archived', count: counts.archived },
+    { key: 'all', label: 'All', count: counts.all },
   ];
 
   const sections = STATUS_ORDER
@@ -78,11 +80,13 @@ export default function ProjectsListScreen() {
         <View style={styles.emptyContainer}>
           <EmptyState
             icon="folder"
-            title={search ? 'No matching projects' : 'No projects yet'}
+            title={search ? 'No matching projects' : counts.all > 0 ? 'Nothing here right now' : 'No projects yet'}
             description={
               search
                 ? 'Try adjusting your search or filter.'
-                : 'Tap the + button to create your first project.'
+                : counts.all > 0
+                  ? 'Pick another filter, or tap All to see every project.'
+                  : 'Tap the + button to create your first project.'
             }
           />
         </View>

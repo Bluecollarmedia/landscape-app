@@ -32,11 +32,21 @@
       "ios": {
         "image": "latest"
       }
+    },
+    "live-test": {
+      "extends": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ahvzdvzxpadfitouyxng.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_xSURIebG8cawmPmRhN5mPA_Fk9ZU6pv",
+        "EXPO_PUBLIC_WEB_URL": "https://brighton-app.netlify.app"
+      }
     }
   },
   "submit": {
     "development": {},
     "preview": {},
-    "production": {}
+    "production": {},
+    "live-test": {}
   }
 }

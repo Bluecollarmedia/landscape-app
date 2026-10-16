@@ -7,14 +7,18 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useSchedule } from '@/hooks/useSchedule';
-import { Card, StatusBadge, Avatar, Divider, EmptyState } from '@/components/ui';
+import { Card, StatusBadge, Avatar, Divider, EmptyState, CrewLabel } from '@/components/ui';
+import { useCrews } from '@/hooks/useCrews';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import type { Assignment } from '@/types/schedule';
+import type { Assignment, ScheduleSeries } from '@/types/schedule';
+import { repeatShortLabel } from '@/lib/recurrence';
 import { haptics } from '@/lib/haptics';
+import { todayKey, localDateKey } from '@/lib/ids';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
-const today = new Date().toISOString().split('T')[0];
+const today = todayKey();
 
 function formatDateTop(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -47,14 +51,14 @@ function formatTimeRange(a: Assignment): string {
 function offsetDateStr(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 function getWeekStart(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
   const day = d.getDay();
   d.setDate(d.getDate() - day);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 const confirmBadge = (state: string) => {
@@ -73,8 +77,10 @@ export default function ScheduleScreen() {
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
+  const [showIosPicker, setShowIosPicker] = useState(false);
 
   const schedule = useSchedule();
+  const { crewOf } = useCrews();
   const grouped = schedule.getGroupedByWorker(selectedDate);
   const allDayAssignments = schedule.getAllByDate(selectedDate);
   const cancelledCount = allDayAssignments.filter(a => a.status === 'cancelled' || a.status === 'reassigned').length;
@@ -105,6 +111,25 @@ export default function ScheduleScreen() {
     }
   }
 
+  function handleEndRepeat(assignment: Assignment) {
+    if (!assignment.seriesId) return;
+    const day = formatDateFull(assignment.scheduledDate);
+    const msg = `${assignment.person?.firstName}'s repeating schedule at ${assignment.project?.name} stops after ${day}. Later days are cancelled; this day and earlier ones stay.`;
+    const end = () => {
+      haptics.destructive();
+      schedule.endSeriesAfter(assignment.seriesId!, assignment.scheduledDate);
+      setSelectedAssignment(null);
+    };
+    if (Platform.OS === 'web') {
+      if (confirm(msg)) end();
+    } else {
+      Alert.alert('End Repeat', msg, [
+        { text: 'Keep Repeating', style: 'cancel' },
+        { text: 'End Repeat', style: 'destructive', onPress: end },
+      ]);
+    }
+  }
+
   function handleMove(assignment: Assignment) {
     setSelectedAssignment(null);
     router.push(`/(owner)/schedule-create?moveFrom=${assignment.id}&workerId=${assignment.personId}&date=${selectedDate}` as any);
@@ -118,7 +143,7 @@ export default function ScheduleScreen() {
   function handleDatePicked(event: DateTimePickerEvent, date?: Date) {
     if (Platform.OS === 'android') setShowAndroidPicker(false);
     if (event.type === 'dismissed' || !date) return;
-    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedDate(localDateKey(date));
   }
 
   function renderDayView() {
@@ -142,6 +167,7 @@ export default function ScheduleScreen() {
           const group = grouped[workerId];
           const person = group.person!;
           const travelWarnings = schedule.detectTravelWarnings(workerId, selectedDate);
+          const crew = crewOf(workerId);
 
           return (
             <Card key={workerId} style={styles.workerCard} noPadding>
@@ -151,6 +177,7 @@ export default function ScheduleScreen() {
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
                     {person.firstName} {person.lastName}
                   </Text>
+                  {crew && <CrewLabel name={crew.name} color={crew.color} style={{ marginTop: 2 }} />}
                   {group.truck && (
                     <View style={styles.truckRow}>
                       <Icon name="truck" size={11} color={colors.textTertiary} />
@@ -184,9 +211,14 @@ export default function ScheduleScreen() {
                       </Text>
                       <Icon name="home" size={13} color={colors.textTertiary} />
                       <View style={{ flex: 1 }}>
-                        <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
-                          {a.project?.name ?? 'Unknown project'}
-                        </Text>
+                        <View style={styles.projectNameRow}>
+                          <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600', flexShrink: 1 }]} numberOfLines={1}>
+                            {a.project?.name ?? 'Unknown project'}
+                          </Text>
+                          {a.seriesId && (
+                            <Icon name="repeat" size={11} color={colors.primary} />
+                          )}
+                        </View>
                         {a.project?.address && (
                           <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>
                             {a.project.address}
@@ -298,7 +330,7 @@ export default function ScheduleScreen() {
           </Pressable>
         ) : (
           <Pressable
-            onPress={() => { if (Platform.OS === 'android') setShowAndroidPicker(true); else if (Platform.OS === 'web') setSelectedDate(today); }}
+            onPress={() => { if (Platform.OS === 'android') setShowAndroidPicker(true); else if (Platform.OS === 'ios') setShowIosPicker(true); else setSelectedDate(today); }}
             style={styles.dateCenter}
             accessibilityRole="button"
             accessibilityLabel="Choose date"
@@ -310,19 +342,6 @@ export default function ScheduleScreen() {
               </Text>
             </View>
             <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{formatDateFull(selectedDate)}</Text>
-
-            {Platform.OS === 'ios' && (
-              // Invisible native compact picker layered over our styled label — tapping it
-              // opens Apple's own calendar popover; opacity must stay >0 or iOS drops hit testing.
-              <DateTimePicker
-                value={selectedDateObj}
-                mode="date"
-                display="compact"
-                onChange={handleDatePicked}
-                style={styles.iosDatePickerOverlay}
-                accessibilityLabel="Choose date"
-              />
-            )}
           </Pressable>
         )}
 
@@ -338,6 +357,27 @@ export default function ScheduleScreen() {
 
       {Platform.OS === 'android' && showAndroidPicker && (
         <DateTimePicker value={selectedDateObj} mode="date" display="default" onChange={handleDatePicked} />
+      )}
+      {Platform.OS === 'ios' && (
+        <BottomSheetModal visible={showIosPicker} onRequestClose={() => setShowIosPicker(false)}>
+          <Pressable style={styles.pickerOverlay} onPress={() => setShowIosPicker(false)}>
+            <Pressable style={[styles.pickerCard, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.pickerHeader}>
+                <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Go to Date</Text>
+                <Pressable onPress={() => setShowIosPicker(false)} hitSlop={12} accessibilityRole="button">
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Done</Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={selectedDateObj}
+                mode="date"
+                display="inline"
+                accentColor={colors.primary}
+                onChange={(e: DateTimePickerEvent, d?: Date) => { handleDatePicked(e, d); setShowIosPicker(false); }}
+              />
+            </Pressable>
+          </Pressable>
+        </BottomSheetModal>
       )}
 
       <View style={styles.segmentWrap}>
@@ -364,6 +404,8 @@ export default function ScheduleScreen() {
         onMove={handleMove}
         onCancel={handleCancel}
         onViewProject={handleViewProject}
+        onEndRepeat={handleEndRepeat}
+        series={selectedAssignment?.seriesId ? schedule.series.find(s => s.id === selectedAssignment.seriesId) : undefined}
       />
     </View>
   );
@@ -375,12 +417,16 @@ function AssignmentSheet({
   onMove,
   onCancel,
   onViewProject,
+  onEndRepeat,
+  series,
 }: {
   assignment: Assignment | null;
   onClose: () => void;
   onMove: (a: Assignment) => void;
   onCancel: (a: Assignment) => void;
   onViewProject: (a: Assignment) => void;
+  onEndRepeat: (a: Assignment) => void;
+  series?: ScheduleSeries;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -430,6 +476,17 @@ function AssignmentSheet({
         </View>
       )}
 
+      {series && (
+        <View style={styles.sheetDetailRow}>
+          <Icon name="repeat" size={16} color={colors.textSecondary} />
+          <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]}>
+            {series.stoppedAt
+              ? `Repeat ended${series.endDate ? ` after ${formatDateFull(series.endDate)}` : ''}`
+              : `Repeats ${repeatShortLabel(series).toLowerCase()}${series.endDate ? ` until ${formatDateFull(series.endDate)}` : ''}`}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.sheetDetailRow}>
         <Icon name="check-circle" size={16} color={colors.textSecondary} />
         {(() => {
@@ -454,8 +511,17 @@ function AssignmentSheet({
 
       <Pressable style={styles.sheetActionRow} onPress={() => onCancel(assignment)} accessibilityRole="button">
         <Icon name="x-circle" size={18} color={semantic.error} />
-        <Text style={[typeScale.bodyLarge, { color: semantic.error, flex: 1 }]}>Cancel Assignment</Text>
+        <Text style={[typeScale.bodyLarge, { color: semantic.error, flex: 1 }]}>
+          {series && !series.stoppedAt ? 'Cancel This Day' : 'Cancel Assignment'}
+        </Text>
       </Pressable>
+
+      {series && !series.stoppedAt && (
+        <Pressable style={styles.sheetActionRow} onPress={() => onEndRepeat(assignment)} accessibilityRole="button">
+          <Icon name="slash" size={18} color={semantic.error} />
+          <Text style={[typeScale.bodyLarge, { color: semantic.error, flex: 1 }]}>End Repeat After This Day</Text>
+        </Pressable>
+      )}
     </View>
   );
 
@@ -468,14 +534,14 @@ function AssignmentSheet({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <BottomSheetModal visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.sheetOverlay} onPress={onClose}>
         <Pressable style={[styles.sheetCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.sheetGrabber, { backgroundColor: colors.border }]} />
           {body}
         </Pressable>
       </Pressable>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
@@ -499,14 +565,9 @@ const styles = StyleSheet.create({
   },
   dateCenter: { alignItems: 'center' },
   dateCenterTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  iosDatePickerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: -40,
-    right: -40,
-    bottom: 0,
-    opacity: 0.02,
-  },
+  pickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  pickerCard: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   segmentWrap: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
@@ -536,7 +597,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   timeCol: { width: 64 },
   travelWarning: {
@@ -578,4 +639,5 @@ const styles = StyleSheet.create({
   sheetProjectRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   sheetDetailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sheetActionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  projectNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

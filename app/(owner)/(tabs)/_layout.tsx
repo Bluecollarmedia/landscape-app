@@ -36,20 +36,20 @@ function OwnerNativeTabs() {
         <NativeTabs.Trigger.Label>Projects</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="maintenance">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'leaf', selected: 'leaf.fill' }}
+          src={<NativeTabs.Trigger.VectorIcon family={Feather} name="feather" />}
+        />
+        <NativeTabs.Trigger.Label>Maintenance</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="workers">
         <NativeTabs.Trigger.Icon
           sf={{ default: 'person.2', selected: 'person.2.fill' }}
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="users" />}
         />
         <NativeTabs.Trigger.Label>Workers</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="customers">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'person', selected: 'person.fill' }}
-          src={<NativeTabs.Trigger.VectorIcon family={Feather} name="user" />}
-        />
-        <NativeTabs.Trigger.Label>Customers</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="more">
@@ -81,6 +81,10 @@ function OwnerJSTabs() {
         },
         tabBarLabelStyle: {
           ...typeScale.caption,
+          // Tighter than caption so "Maintenance" fits on a 375pt-wide phone
+          // (about the size of the iOS tab bar's own labels).
+          fontSize: 10.5,
+          letterSpacing: 0,
           marginTop: 2,
         },
       }}
@@ -104,20 +108,20 @@ function OwnerJSTabs() {
         }}
       />
       <Tabs.Screen
+        name="maintenance"
+        options={{
+          title: 'Maintenance',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="feather" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="workers"
         options={{
           title: 'Workers',
           tabBarIcon: ({ color, size }) => (
             <Feather name="users" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="customers"
-        options={{
-          title: 'Customers',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="user" size={size} color={color} />
           ),
         }}
       />

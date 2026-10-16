@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import type { Project, ProjectStatus } from '@/types/project';
-import { mockProjects } from '@/data/mock';
+import { db, useDb } from '@/data/store';
 
 interface UseProjectsOptions {
   search?: string;
@@ -9,7 +9,8 @@ interface UseProjectsOptions {
 
 export function useProjects(options: UseProjectsOptions = {}) {
   const { search = '', statusFilter = 'all' } = options;
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const v = useDb();
+  const projects = useMemo(() => db.projects, [v]);
 
   const filtered = useMemo(() => {
     let result = projects;
@@ -35,6 +36,7 @@ export function useProjects(options: UseProjectsOptions = {}) {
 
   const grouped = useMemo(() => {
     const groups: Record<ProjectStatus, Project[]> = {
+      prospect: [],
       active: [],
       on_hold: [],
       completed: [],
@@ -49,6 +51,7 @@ export function useProjects(options: UseProjectsOptions = {}) {
   const counts = useMemo(() => {
     const c: Record<ProjectStatus | 'all', number> = {
       all: projects.length,
+      prospect: 0,
       active: 0,
       on_hold: 0,
       completed: 0,
@@ -60,15 +63,5 @@ export function useProjects(options: UseProjectsOptions = {}) {
     return c;
   }, [projects]);
 
-  const addProject = useCallback((project: Project) => {
-    setProjects((prev) => [project, ...prev]);
-  }, []);
-
-  const updateProject = useCallback((id: string, updates: Partial<Project>) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p)),
-    );
-  }, []);
-
-  return { projects: filtered, grouped, counts, addProject, updateProject };
+  return { projects: filtered, grouped, counts };
 }

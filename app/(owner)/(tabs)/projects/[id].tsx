@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Switch, Alert, Linking } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking } from 'react-native';
+import { Switch } from '@/components/ui/Switch';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -9,24 +12,38 @@ import { PhotoViewer } from '@/components/worker/PhotoViewer';
 import { useTheme } from '@/providers/ThemeProvider';
 import { SectionTabs, StatusBadge, ProgressBar, Card, EmptyState, Divider, Avatar, Button, OptimizedImage } from '@/components/ui';
 import { useProject } from '@/hooks/useProject';
+import { useAuth } from '@/providers/AuthProvider';
+import { attachImage } from '@/data/actions';
+import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
+import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
+import { MessageThread } from '@/components/messages/MessageThread';
+import { db } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
 import { getProjectImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
 import { getMockPhotoImageUri } from '@/lib/mockPhotoImages';
 import { haptics } from '@/lib/haptics';
+import { todayKey, localDateKey, isoToLocalDateKey } from '@/lib/ids';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import type { ProjectStatus, TaskStatus, HistoryEventType, ProjectPhoto, ProjectTask, PhotoType } from '@/types/project';
 import type { Assignment } from '@/types/schedule';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { ProjectFinancials } from '@/components/financials/ProjectFinancials';
+import { ProspectBanner } from '@/components/financials/ProspectBanner';
+import { ProjectMaterials } from '@/components/materials/ProjectMaterials';
+import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
+import { pickTaskMedia, saveTaskMedia, removeTaskMedia, type TaskMediaDraft } from '@/data/taskMedia';
 
-const today = new Date().toISOString().split('T')[0];
+const today = todayKey();
 
 function offsetDateStr(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 function formatTimeLabel(time?: string): string {
@@ -65,6 +82,16 @@ const SECTIONS = [
 
 const MORE_ITEMS = [
   {
+    key: 'financials', label: 'Financials', icon: 'file-text' as const,
+    description: 'Quotes, change orders and invoices for this project',
+    iconBg: '#E3F1E4', iconColor: '#2E7D32',
+  },
+  {
+    key: 'materials', label: 'Materials', icon: 'clipboard' as const,
+    description: 'Materials to order or pick up, vendor and prep reminder',
+    iconBg: '#F3EEDF', iconColor: '#8A6D1F',
+  },
+  {
     key: 'people', label: 'People', icon: 'users' as const,
     description: 'View and manage the customer and project team members',
     iconBg: '#DCE9FB', iconColor: '#2E6BD6',
@@ -81,6 +108,9 @@ const MORE_ITEMS = [
   },
 ];
 
+type MoreSubSection = 'financials' | 'materials' | 'people' | 'activity' | 'settings';
+const MORE_DEEP_LINKS: string[] = ['financials', 'materials'];
+
 const PHOTO_TYPE_LABEL: Record<string, string> = {
   before: 'Before', after: 'After', progress: 'Progress', issue: 'Issue', general: 'General',
 };
@@ -91,6 +121,7 @@ function getPhotoTypeColor(photoType: string, primaryColor: string): string {
 }
 
 const statusDotColors: Record<ProjectStatus, string> = {
+  prospect: '#9E9E9E',
   active: semantic.success,
   on_hold: semantic.warning,
   completed: semantic.info,
@@ -98,6 +129,7 @@ const statusDotColors: Record<ProjectStatus, string> = {
 };
 
 const statusConfig: Record<ProjectStatus, { label: string; type: 'success' | 'warning' | 'info' | 'neutral' }> = {
+  prospect: { label: 'Prospect', type: 'neutral' },
   active: { label: 'Active', type: 'success' },
   on_hold: { label: 'On Hold', type: 'warning' },
   completed: { label: 'Completed', type: 'info' },
@@ -150,6 +182,15 @@ const historyIconColors: Record<string, { bg: string; fg: string }> = {
   note_added: { bg: '#E9E9EC', fg: '#5B5B63' },
 };
 
+/** "Completed by Rosa Lopez · Oct 15 at 2:30 PM" */
+function completedLabel(task: ProjectTask): string {
+  const who = task.completer ? ` by ${task.completer.firstName} ${task.completer.lastName}`.trimEnd() : '';
+  if (!task.completedAt) return `Completed${who}`;
+  const d = new Date(task.completedAt);
+  const when = `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+  return `Completed${who} · ${when}`;
+}
+
 export default function ProjectDetailScreen() {
   const { id, section } = useLocalSearchParams<{ id: string; section?: string }>();
   const { colors } = useTheme();
@@ -161,19 +202,28 @@ export default function ProjectDetailScreen() {
   // Customer tab rather than as their own top-level section.
   const initialSection = SECTIONS.some(s => s.key === section)
     ? section!
-    : (section === 'requests' || section === 'updates') ? 'customer' : 'overview';
+    : (section === 'requests' || section === 'updates' || section === 'messages') ? 'customer'
+    : section && MORE_DEEP_LINKS.includes(section) ? 'more' : 'overview';
 
   const [activeSection, setActiveSection] = useState(initialSection);
-  const [customerSubTab, setCustomerSubTab] = useState<'updates' | 'requests'>(
-    section === 'requests' ? 'requests' : 'updates',
+  const [customerSubTab, setCustomerSubTab] = useState<'updates' | 'requests' | 'messages'>(
+    section === 'requests' ? 'requests' : section === 'messages' ? 'messages' : 'updates',
   );
-  const [customerDrilldown, setCustomerDrilldown] = useState(section === 'requests' || section === 'updates');
+  const [customerDrilldown, setCustomerDrilldown] = useState(section === 'requests' || section === 'updates' || section === 'messages');
   const [showManageAccess, setShowManageAccess] = useState(false);
   const [showCustomerPreview, setShowCustomerPreview] = useState(false);
-  const [moreSubSection, setMoreSubSection] = useState<'people' | 'activity' | 'settings' | null>(null);
+  const [moreSubSection, setMoreSubSection] = useState<MoreSubSection | null>(section && MORE_DEEP_LINKS.includes(section) ? section as MoreSubSection : null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  // Opened again with ?section=financials|materials (e.g. a reminder tap) while already showing.
+  useEffect(() => {
+    if (section && MORE_DEEP_LINKS.includes(section)) {
+      setActiveSection('more');
+      setMoreSubSection(section as MoreSubSection);
+    }
+  }, [section]);
 
-  const { project, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, requests, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
+  const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, editRequestResponse, reopenRequest, deleteRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
+  const { user } = useAuth();
   const schedule = useSchedule();
   const customerAccess = useCustomerAccess();
   const { workers: companyWorkers } = useWorkers();
@@ -187,6 +237,8 @@ export default function ProjectDetailScreen() {
   const [updateBody, setUpdateBody] = useState('');
   const [updateVisible, setUpdateVisible] = useState(true);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
+  const [editingResponseFor, setEditingResponseFor] = useState<string | null>(null);
+  const [responseDraft, setResponseDraft] = useState('');
   const [responseNote, setResponseNote] = useState('');
   const [codeCopied, setCodeCopied] = useState(false);
   const [accessVersion, setAccessVersion] = useState(0);
@@ -210,6 +262,8 @@ export default function ProjectDetailScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [newTaskMedia, setNewTaskMedia] = useState<TaskMediaDraft[]>([]);
+  const [taskMediaViewer, setTaskMediaViewer] = useState<{ items: TaskMediaItem[]; index: number } | null>(null);
   const [showAssigneePicker, setShowAssigneePicker] = useState(false);
   const [photoFilter, setPhotoFilter] = useState<'all' | 'internal' | 'shared'>('all');
   const [showAddPhoto, setShowAddPhoto] = useState(false);
@@ -238,10 +292,48 @@ export default function ProjectDetailScreen() {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
 
+  async function handleChangeCoverPhoto() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      const msg = 'Photo library access is needed to choose a project photo.';
+      if (Platform.OS === 'web') alert(msg);
+      else Alert.alert('Permission Needed', msg);
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+    if (result.canceled || !result.assets?.[0]) return;
+    attachImage('projects', p.id, 'coverPhotoUrl', result.assets[0].uri, `projects/${p.id}`);
+  }
+
   function handleSaveNotes() {
-    p.notes = notesDraft.trim() || undefined;
-    p.updatedAt = new Date().toISOString();
+    updateProject({ notes: notesDraft.trim() || undefined });
     setEditingNotes(false);
+  }
+
+  const canComplete = p.status === 'active' || p.status === 'on_hold';
+
+  function askToConfirm(title: string, message: string, ok: string, onOk: () => void) {
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) onOk();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: ok, onPress: onOk },
+    ]);
+  }
+
+  function handleCompleteProject() {
+    askToConfirm(
+      'Complete this project?',
+      'It moves to Completed on the Projects list. You can reopen it any time.',
+      'Complete',
+      () => { haptics.success(); updateProject({ status: 'completed', progress: 100 }); },
+    );
+  }
+
+  function handleReopenProject() {
+    askToConfirm('Reopen this project?', 'It moves back to Active.', 'Reopen', () => updateProject({ status: 'active' }));
   }
 
   function renderOverview() {
@@ -253,14 +345,24 @@ export default function ProjectDetailScreen() {
     return (
       <View>
         <View style={styles.coverWrap}>
-          <OptimizedImage source={getProjectImageUri(p, 900)} style={styles.coverImage} />
+          <BrandCover uri={getProjectImageUri(p)} style={styles.coverImage} />
           <View style={[styles.coverStatusPill, { backgroundColor: 'rgba(20,20,20,0.55)' }]}>
             <View style={[styles.coverStatusDot, { backgroundColor: statusDotColors[p.status] }]} />
             <Text style={[typeScale.labelSmall, { color: '#FFFFFF' }]}>{config.label}</Text>
           </View>
+          <Pressable
+            onPress={handleChangeCoverPhoto}
+            style={[styles.coverChangeButton, { backgroundColor: 'rgba(20,20,20,0.55)' }]}
+            accessibilityRole="button"
+            accessibilityLabel="Change project photo"
+          >
+            <Icon name="camera" size={14} color="#FFFFFF" />
+            <Text style={[typeScale.labelSmall, { color: '#FFFFFF' }]}>Change photo</Text>
+          </Pressable>
         </View>
 
         <View style={styles.overviewBody}>
+          <ProspectBanner projectId={p.id} />
           {/* Progress */}
           <View>
             <Text style={[typeScale.overline, { color: colors.textTertiary }]}>PROJECT PROGRESS</Text>
@@ -298,13 +400,16 @@ export default function ProjectDetailScreen() {
             {fullAddress && (
               <>
                 <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
-                <View style={styles.infoRow}>
+                <Pressable style={styles.infoRow} onPress={() => openDirections(p)} accessibilityRole="button" accessibilityLabel="Open address in Maps">
                   <Icon name="map-pin" size={16} color={colors.textTertiary} />
                   <View style={styles.infoText}>
-                    <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Address</Text>
+                    <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                      {p.latitude != null && p.longitude != null ? 'Address · found on the map' : 'Address'}
+                    </Text>
                     <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{fullAddress}</Text>
                   </View>
-                </View>
+                  <Icon name="navigation" size={16} color={colors.primary} />
+                </Pressable>
               </>
             )}
 
@@ -393,6 +498,20 @@ export default function ProjectDetailScreen() {
               </Text>
             )}
           </View>
+
+          {canComplete && (
+            <Button title="Complete Project" icon="check-circle" onPress={handleCompleteProject} fullWidth style={{ marginTop: spacing.xl }} />
+          )}
+          {p.status === 'completed' && (
+            <View style={{ marginTop: spacing.xl }}>
+              {p.completedAt && (
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm }]}>
+                  Completed {formatDate(p.completedAt)}
+                </Text>
+              )}
+              <Button title="Reopen Project" icon="rotate-ccw" variant="secondary" onPress={handleReopenProject} fullWidth />
+            </View>
+          )}
         </View>
       </View>
     );
@@ -563,7 +682,7 @@ export default function ProjectDetailScreen() {
     return (
       <View style={styles.sectionContent}>
         <View style={[styles.moreSummaryCard, { backgroundColor: colors.surface }, shadow.sm]}>
-          <OptimizedImage source={getProjectImageUri(p, 200)} style={styles.moreSummaryImage} />
+          <BrandCover uri={getProjectImageUri(p)} style={styles.moreSummaryImage} variant="tile" />
           <View style={{ marginLeft: spacing.md, flex: 1 }}>
             <StatusBadge label={config.label} status={config.type} style={{ alignSelf: 'flex-start' }} />
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
@@ -641,7 +760,7 @@ export default function ProjectDetailScreen() {
           </Text>
         </View>
 
-        <Modal visible={showAddTeamMember} animationType="slide" transparent onRequestClose={() => setShowAddTeamMember(false)}>
+        <BottomSheetModal visible={showAddTeamMember} onRequestClose={() => setShowAddTeamMember(false)}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -677,13 +796,14 @@ export default function ProjectDetailScreen() {
               </ScrollView>
             </View>
           </View>
-        </Modal>
+        </BottomSheetModal>
       </View>
     );
   }
 
   function renderCustomerUpdatesRequests() {
     const pendingCount = requests.filter(r => r.status === 'pending').length;
+    const messageCount = db.messages[p.id]?.length ?? 0;
     return (
       <View>
         <View style={styles.pillToggleRow}>
@@ -703,8 +823,23 @@ export default function ProjectDetailScreen() {
               Requests{pendingCount > 0 ? ` (${pendingCount})` : ''}
             </Text>
           </Pressable>
+          <Pressable
+            style={[styles.pillToggle, { backgroundColor: customerSubTab === 'messages' ? colors.primary : colors.backgroundTertiary }]}
+            onPress={() => setCustomerSubTab('messages')}
+          >
+            <Text style={[typeScale.labelSmall, { color: customerSubTab === 'messages' ? colors.textOnPrimary : colors.textSecondary }]}>
+              Messages{messageCount > 0 ? ` (${messageCount})` : ''}
+            </Text>
+          </Pressable>
         </View>
-        {customerSubTab === 'updates' ? renderUpdates() : renderRequests()}
+        {customerSubTab === 'updates' ? renderUpdates() : customerSubTab === 'requests' ? renderRequests() : (
+          <View style={styles.sectionContent}>
+            <MessageThread
+              projectId={p.id}
+              emptyText={p.customerId ? 'Send your customer a message. They\u2019ll see it in their app under Messages.' : 'Add a customer to this project to message them.'}
+            />
+          </View>
+        )}
       </View>
     );
   }
@@ -866,7 +1001,6 @@ export default function ProjectDetailScreen() {
                   <Switch
                     value={settings.customerCanComment}
                     onValueChange={handleToggleComments}
-                    trackColor={{ true: colors.primary, false: colors.borderLight }}
                   />
                 </View>
 
@@ -882,7 +1016,6 @@ export default function ProjectDetailScreen() {
                   <Switch
                     value={settings.customerCanRequest}
                     onValueChange={handleToggleRequests}
-                    trackColor={{ true: colors.primary, false: colors.borderLight }}
                   />
                 </View>
               </View>
@@ -944,6 +1077,23 @@ export default function ProjectDetailScreen() {
                 </View>
                 <Icon name="chevron-right" size={16} color={colors.textTertiary} />
               </Pressable>
+              <Divider style={{ marginVertical: spacing.xs }} />
+
+              <Pressable
+                style={styles.customerContentRow}
+                onPress={() => { setCustomerSubTab('messages'); setCustomerDrilldown(true); }}
+              >
+                <View style={[styles.customerContentIcon, { backgroundColor: colors.primarySurface }]}>
+                  <Icon name="send" size={16} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Messages</Text>
+                  <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                    {(db.messages[p.id]?.length ?? 0) === 0 ? 'No messages yet' : `${db.messages[p.id].length} message${db.messages[p.id].length === 1 ? '' : 's'}`}
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              </Pressable>
             </View>
 
             <Pressable style={[styles.previewBtn, { backgroundColor: colors.primary }]} onPress={handlePreviewCustomerView}>
@@ -970,7 +1120,7 @@ export default function ProjectDetailScreen() {
       return (
         <View style={styles.sectionContent}>
           <View style={[styles.moreSummaryCard, { backgroundColor: colors.surface }, shadow.sm]}>
-            <OptimizedImage source={getProjectImageUri(p, 200)} style={styles.moreSummaryImage} />
+            <BrandCover uri={getProjectImageUri(p)} style={styles.moreSummaryImage} variant="tile" />
             <View style={{ marginLeft: spacing.md, flex: 1 }}>
               <StatusBadge label={config.label} status={config.type} style={{ alignSelf: 'flex-start' }} />
               <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
@@ -991,7 +1141,7 @@ export default function ProjectDetailScreen() {
             <Pressable
               key={item.key}
               style={[styles.moreCardRow, { backgroundColor: colors.surface }, shadow.sm]}
-              onPress={() => setMoreSubSection(item.key as 'people' | 'activity' | 'settings')}
+              onPress={() => setMoreSubSection(item.key as MoreSubSection)}
             >
               <View style={[styles.moreCardIcon, { backgroundColor: item.iconBg }]}>
                 <Icon name={item.icon} size={18} color={item.iconColor} />
@@ -1013,6 +1163,8 @@ export default function ProjectDetailScreen() {
 
     return (
       <View>
+        {moreSubSection === 'financials' && <ProjectFinancials projectId={p.id} />}
+        {moreSubSection === 'materials' && <ProjectMaterials projectId={p.id} />}
         {moreSubSection === 'people' && renderPeople()}
         {moreSubSection === 'activity' && renderActivity()}
         {moreSubSection === 'settings' && renderSettings()}
@@ -1075,7 +1227,7 @@ export default function ProjectDetailScreen() {
   function handleAddTask() {
     if (!newTaskTitle.trim()) return;
     const member = team.find(m => m.personId === newTaskAssignee);
-    addTask({
+    const created = addTask({
       title: newTaskTitle.trim(),
       description: newTaskDescription.trim() || undefined,
       status: 'pending',
@@ -1083,10 +1235,33 @@ export default function ProjectDetailScreen() {
       assignedTo: newTaskAssignee || undefined,
       assignee: member?.person,
     });
+    if (newTaskMedia.length > 0) saveTaskMedia(id, created.id, newTaskMedia);
     setShowAddTask(false);
     setNewTaskTitle('');
     setNewTaskDescription('');
     setNewTaskAssignee('');
+    setNewTaskMedia([]);
+  }
+
+  async function handleAddNewTaskMedia() {
+    const picked = await pickTaskMedia(newTaskMedia.length);
+    if (picked.length > 0) setNewTaskMedia(prev => [...prev, ...picked]);
+  }
+
+  async function handleAddTaskMedia(task: ProjectTask) {
+    const picked = await pickTaskMedia((db.taskAttachments[task.id] ?? []).length);
+    if (picked.length > 0) saveTaskMedia(id, task.id, picked);
+  }
+
+  function handleRemoveTaskMedia(taskId: string, attachmentId: string) {
+    const att = (db.taskAttachments[taskId] ?? []).find(a => a.id === attachmentId);
+    if (!att) return;
+    confirmAction(
+      att.mediaType === 'video' ? 'Remove video?' : 'Remove photo?',
+      'The crew will no longer see it on this task.',
+      'Remove',
+      () => removeTaskMedia(att),
+    );
   }
 
   function renderTaskRow(task: ProjectTask) {
@@ -1125,6 +1300,11 @@ export default function ProjectDetailScreen() {
               <Icon name="camera" size={11} color={semantic.warning} />
               <Text style={[typeScale.caption, { color: semantic.warning }]}>Photo required</Text>
             </View>
+          )}
+          {task.status === 'completed' && (task.completer || task.completedAt) && (
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+              {completedLabel(task)}
+            </Text>
           )}
           {task.status === 'completed' && taskPhoto && (
             <View style={styles.taskPhotoRequiredRow}>
@@ -1210,6 +1390,40 @@ export default function ProjectDetailScreen() {
           />
         </View>
 
+        {/* Task Lead (update 016): only this worker can start/complete tasks on the job. */}
+        <View style={[styles.taskStatsHeader, { gap: spacing.sm }]}>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>Task Lead</Text>
+          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+            {p.taskLeadId
+              ? 'Only the Task Lead can start and complete tasks. The rest of the crew can see them.'
+              : 'Pick one worker to run the task list. Until then, workers can\'t change tasks.'}
+          </Text>
+          {team.length ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {team.map(tm => {
+                const on = tm.personId === p.taskLeadId;
+                const label = tm.person ? `${tm.person.firstName} ${tm.person.lastName}`.trim() : 'Worker';
+                return (
+                  <Pressable
+                    key={tm.personId}
+                    onPress={() => updateProject({ taskLeadId: tm.personId })}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    style={{
+                      paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.full,
+                      backgroundColor: on ? colors.primary : colors.primarySurface,
+                    }}
+                  >
+                    <Text style={[typeScale.labelLarge, { color: on ? '#fff' : colors.primary }]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Add workers to the project team first.</Text>
+          )}
+        </View>
+
         <View style={styles.taskFilterRow}>
           {filterOptions.map(opt => (
             <Pressable
@@ -1261,7 +1475,7 @@ export default function ProjectDetailScreen() {
     updatePhoto(reviewPhoto.id, {
       isCustomerVisible: true,
       customerDescription: customerDesc,
-      sharedBy: 'owner1',
+      sharedBy: user?.id,
       sharedAt: new Date().toISOString(),
     });
     setReviewPhoto(null);
@@ -1337,15 +1551,12 @@ export default function ProjectDetailScreen() {
     const task = tasks.find(t => t.id === newPhotoTaskId);
     addPhoto({
       taskId: newPhotoTaskId || undefined,
-      taskTitle: task?.title,
-      uploadedBy: 'owner1',
-      fileKey: `${p.id}/owner-${Date.now()}.jpg`,
+      uploadedBy: user?.id ?? '',
       fileUrl: newPhotoUri,
       caption: newPhotoCaption.trim() || undefined,
       isCustomerVisible: false,
       photoType: newPhotoType,
       takenAt: new Date().toISOString(),
-      uploader: { id: 'owner1', firstName: 'Joey', lastName: 'Angeloco', email: 'joey@brightonlawn.com' },
     });
     setShowAddPhoto(false);
     setNewPhotoUri(null);
@@ -1461,14 +1672,7 @@ export default function ProjectDetailScreen() {
 
   function handlePostUpdate() {
     if (!updateTitle.trim()) return;
-    const newUpdate = {
-      id: `u${Date.now()}`, projectId: id, createdBy: 'owner1',
-      title: updateTitle.trim(), body: updateBody.trim(),
-      isCustomerVisible: updateVisible,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      author: { id: 'owner1', firstName: 'Joey', lastName: 'Angeloco', email: 'joey@brightonlawn.com' },
-    };
-    updates.unshift(newUpdate);
+    postUpdate({ title: updateTitle.trim(), body: updateBody.trim(), isCustomerVisible: updateVisible });
     setUpdateTitle('');
     setUpdateBody('');
     setUpdateVisible(true);
@@ -1559,11 +1763,28 @@ export default function ProjectDetailScreen() {
   function handleRequestAction(reqId: string, action: 'acknowledged' | 'declined' | 'converted') {
     const req = requests.find(r => r.id === reqId);
     if (!req) return;
-    req.status = action;
-    req.respondedAt = new Date().toISOString();
-    req.responseNote = responseNote.trim() || undefined;
+    // "Convert to task" adds the request to the project's task list.
+    const task = action === 'converted'
+      ? addTask({ title: req.title, description: req.description, status: 'pending', sortOrder: tasks.length })
+      : undefined;
+    respondToRequest(reqId, action, responseNote.trim() || undefined, task?.id);
     setRespondingTo(null);
     setResponseNote('');
+  }
+
+  function confirmAction(title: string, message: string, ok: string, onOk: () => void) {
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) onOk();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: ok, style: 'destructive', onPress: onOk },
+    ]);
+  }
+
+  function handleDeleteRequest(reqId: string) {
+    confirmAction('Delete this request?', 'It will be removed for you and the customer. This can\u2019t be undone.', 'Delete', () => deleteRequest(reqId));
   }
 
   function renderRequests() {
@@ -1641,14 +1862,17 @@ export default function ProjectDetailScreen() {
                           </View>
                         </View>
                       ) : (
-                        <Button
-                          title="Respond"
-                          onPress={() => { setRespondingTo(req.id); setResponseNote(''); }}
-                          variant="secondary"
-                          size="sm"
-                          icon="message-square"
-                          style={{ marginTop: spacing.md }}
-                        />
+                        <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md }}>
+                          <Button
+                            title="Respond"
+                            onPress={() => { setRespondingTo(req.id); setResponseNote(''); }}
+                            variant="secondary"
+                            size="sm"
+                            icon="message-square"
+                            style={{ flex: 1 }}
+                          />
+                          <Button title="Delete" onPress={() => handleDeleteRequest(req.id)} variant="ghost" size="sm" icon="trash-2" />
+                        </View>
                       )}
                     </Card>
                   );
@@ -1693,6 +1917,39 @@ export default function ProjectDetailScreen() {
                   <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.md }]}>
                     {req.requester ? `${req.requester.firstName} ${req.requester.lastName}` : 'Customer'} · {formatDateTime(req.createdAt)}
                   </Text>
+
+                  {editingResponseFor === req.id ? (
+                    <View style={{ marginTop: spacing.md }}>
+                      <TextInput
+                        style={[styles.composerInput, { backgroundColor: colors.surface, borderColor: colors.borderLight, color: colors.textPrimary }]}
+                        value={responseDraft}
+                        onChangeText={setResponseDraft}
+                        placeholder="Response to the customer"
+                        placeholderTextColor={colors.textTertiary}
+                        multiline
+                        autoFocus
+                      />
+                      <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm }}>
+                        <Button title="Save" onPress={() => { editRequestResponse(req.id, responseDraft); setEditingResponseFor(null); }} size="sm" icon="check" style={{ flex: 1 }} />
+                        <Button title="Cancel" onPress={() => setEditingResponseFor(null)} variant="secondary" size="sm" style={{ flex: 1 }} />
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md, flexWrap: 'wrap' }}>
+                      <Button
+                        title={req.responseNote ? 'Edit Response' : 'Add Response'}
+                        onPress={() => { setEditingResponseFor(req.id); setResponseDraft(req.responseNote ?? ''); }}
+                        variant="secondary"
+                        size="sm"
+                        icon="edit-2"
+                      />
+                      {req.status !== 'completed' && (
+                        <Button title="Mark Done" onPress={() => respondToRequest(req.id, 'completed', req.responseNote)} variant="secondary" size="sm" icon="check-circle" />
+                      )}
+                      <Button title="Reopen" onPress={() => reopenRequest(req.id)} variant="secondary" size="sm" icon="rotate-ccw" />
+                      <Button title="Delete" onPress={() => handleDeleteRequest(req.id)} variant="ghost" size="sm" icon="trash-2" />
+                    </View>
+                  )}
                 </Card>
               );
             })}
@@ -1718,7 +1975,7 @@ export default function ProjectDetailScreen() {
     const groups: { dateKey: string; entries: typeof history }[] = [];
     const groupIndex = new Map<string, number>();
     for (const entry of history) {
-      const dateKey = entry.createdAt.split('T')[0];
+      const dateKey = isoToLocalDateKey(entry.createdAt);
       if (!groupIndex.has(dateKey)) {
         groupIndex.set(dateKey, groups.length);
         groups.push({ dateKey, entries: [] });
@@ -1744,7 +2001,7 @@ export default function ProjectDetailScreen() {
     return (
       <View style={styles.sectionContent}>
         <View style={[styles.moreSummaryCard, { backgroundColor: colors.surface }, shadow.sm]}>
-          <OptimizedImage source={getProjectImageUri(p, 200)} style={styles.moreSummaryImage} />
+          <BrandCover uri={getProjectImageUri(p)} style={styles.moreSummaryImage} variant="tile" />
           <View style={{ marginLeft: spacing.md, flex: 1 }}>
             <StatusBadge label={config.label} status={config.type} style={{ alignSelf: 'flex-start' }} />
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
@@ -1884,7 +2141,6 @@ export default function ProjectDetailScreen() {
     }
 
     const access = customerAccess.getAccessForProject(p.id);
-    const radiusOptions = [50, 100, 150, 200, 300, 500];
 
     return (
       <View style={styles.sectionContent}>
@@ -1996,7 +2252,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerInteractionEnabled}
               onValueChange={(v) => updateSettings({ customerInteractionEnabled: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
           <Divider style={{ marginVertical: spacing.xs }} />
@@ -2009,7 +2264,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerCanRequest}
               onValueChange={(v) => updateSettings({ customerCanRequest: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
           <Divider style={{ marginVertical: spacing.xs }} />
@@ -2022,7 +2276,6 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.customerCanViewPhotos}
               onValueChange={(v) => updateSettings({ customerCanViewPhotos: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
         </View>
@@ -2048,21 +2301,20 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.completionPhotoRequired}
               onValueChange={(v) => updateSettings({ completionPhotoRequired: v })}
-              trackColor={{ true: colors.primary, false: colors.borderLight }}
             />
           </View>
 
-          {settings.checkinRadiusMeters != null && (
+          {(
             <>
               <Divider style={{ marginVertical: spacing.xs }} />
               <Pressable style={styles.settingsDetailRow} onPress={() => setShowRadiusPicker(true)}>
                 <View style={{ flex: 1, marginRight: spacing.sm }}>
-                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Check-in radius</Text>
-                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Distance from project address for on-site check-in.</Text>
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Check-in distance</Text>
+                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Workers can only tap I'm here within this distance of the address.</Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginRight: spacing.xs }]}>
-                    {settings.checkinRadiusMeters}m
+                    {formatDistance(settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M)}
                   </Text>
                   <Icon name="chevron-right" size={16} color={colors.textTertiary} />
                 </View>
@@ -2071,25 +2323,13 @@ export default function ProjectDetailScreen() {
           )}
         </View>
 
-        <Modal visible={showRadiusPicker} animationType="fade" transparent onRequestClose={() => setShowRadiusPicker(false)}>
-          <Pressable style={styles.moreMenuOverlay} onPress={() => setShowRadiusPicker(false)}>
-            <View style={[styles.moreMenuCard, { backgroundColor: colors.surface, right: spacing.xl, left: spacing.xl, top: '38%' }]}>
-              <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
-                <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Check-in Radius</Text>
-              </View>
-              {radiusOptions.map((meters) => (
-                <Pressable
-                  key={meters}
-                  style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
-                  onPress={() => handleSetRadius(meters)}
-                >
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{meters}m</Text>
-                  {settings.checkinRadiusMeters === meters && <Icon name="check" size={18} color={colors.primary} />}
-                </Pressable>
-              ))}
-            </View>
-          </Pressable>
-        </Modal>
+        <CheckInRadiusSheet
+          visible={showRadiusPicker}
+          place={p}
+          radiusMeters={settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M}
+          onClose={() => setShowRadiusPicker(false)}
+          onSave={handleSetRadius}
+        />
       </View>
     );
   }
@@ -2166,22 +2406,42 @@ export default function ProjectDetailScreen() {
         />
       )}
 
-      <ScrollView
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {sectionRenderers[activeSection]?.()}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* More Menu */}
       <Modal visible={showMoreMenu} animationType="fade" transparent onRequestClose={() => setShowMoreMenu(false)}>
         <Pressable style={styles.moreMenuOverlay} onPress={() => setShowMoreMenu(false)}>
           <View style={[styles.moreMenuCard, { backgroundColor: colors.surface, top: insets.top + 56 }]}>
+            <Pressable
+              style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
+              onPress={() => { setShowMoreMenu(false); router.push({ pathname: '/(owner)/project-new', params: { editId: p.id } } as any); }}
+            >
+              <Icon name="edit-2" size={18} color={colors.textSecondary} />
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>
+                Edit Project
+              </Text>
+            </Pressable>
+            {(canComplete || p.status === 'completed') && (
+              <Pressable
+                style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
+                onPress={() => { setShowMoreMenu(false); if (canComplete) handleCompleteProject(); else handleReopenProject(); }}
+              >
+                <Icon name={canComplete ? 'check-circle' : 'rotate-ccw'} size={18} color={colors.textSecondary} />
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>
+                  {canComplete ? 'Complete Project' : 'Reopen Project'}
+                </Text>
+              </Pressable>
+            )}
             {MORE_ITEMS.map((item) => (
               <Pressable
                 key={item.key}
                 style={[styles.moreMenuRow, { borderBottomColor: colors.borderLight }]}
-                onPress={() => { setActiveSection('more'); setMoreSubSection(item.key as 'people' | 'activity' | 'settings'); setShowMoreMenu(false); }}
+                onPress={() => { setActiveSection('more'); setMoreSubSection(item.key as MoreSubSection); setShowMoreMenu(false); }}
               >
                 <Icon name={item.icon} size={18} color={colors.textSecondary} />
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>
@@ -2194,7 +2454,7 @@ export default function ProjectDetailScreen() {
       </Modal>
 
       {/* Task Detail Modal */}
-      <Modal visible={!!selectedTask} animationType="slide" transparent onRequestClose={() => setSelectedTask(null)}>
+      <BottomSheetModal visible={!!selectedTask} onRequestClose={() => setSelectedTask(null)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2226,6 +2486,19 @@ export default function ProjectDetailScreen() {
                   placeholderTextColor={colors.textTertiary}
                   multiline
                 />
+
+                <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.md }]}>Photos and videos</Text>
+                {(() => {
+                  const items: TaskMediaItem[] = (db.taskAttachments[selectedTask.id] ?? []).map(a => ({ key: a.id, uri: a.fileUrl, mediaType: a.mediaType }));
+                  return (
+                    <TaskMediaStrip
+                      items={items}
+                      onOpen={(index) => setTaskMediaViewer({ items, index })}
+                      onAdd={() => handleAddTaskMedia(selectedTask)}
+                      onRemove={(key) => handleRemoveTaskMedia(selectedTask.id, key)}
+                    />
+                  );
+                })()}
 
                 <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Status</Text>
                 <View style={styles.taskStatusPickerRow}>
@@ -2284,6 +2557,19 @@ export default function ProjectDetailScreen() {
                   </View>
                 )}
 
+                {(() => {
+                  const live = tasks.find(t => t.id === selectedTask.id) ?? selectedTask;
+                  if (live.status !== 'completed' || (!live.completer && !live.completedAt)) return null;
+                  return (
+                    <View style={[styles.taskPhotoNote, { backgroundColor: colors.backgroundTertiary }]}>
+                      <Icon name="check-circle" size={14} color={semantic.success} />
+                      <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, flex: 1 }]}>
+                        {completedLabel(live)}
+                      </Text>
+                    </View>
+                  );
+                })()}
+
                 {settings?.completionPhotoRequired && (
                   <View style={[styles.taskPhotoNote, { backgroundColor: colors.backgroundTertiary }]}>
                     <Icon name="camera" size={14} color={colors.textSecondary} />
@@ -2312,12 +2598,18 @@ export default function ProjectDetailScreen() {
                 })()}
               </ScrollView>
             )}
+            <TaskMediaViewer
+              items={taskMediaViewer?.items ?? []}
+              index={taskMediaViewer?.index ?? null}
+              onIndexChange={(index) => setTaskMediaViewer(v => (v ? { ...v, index } : v))}
+              onClose={() => setTaskMediaViewer(null)}
+            />
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Add Task Modal */}
-      <Modal visible={showAddTask} animationType="slide" transparent onRequestClose={() => setShowAddTask(false)}>
+      <BottomSheetModal visible={showAddTask} onRequestClose={() => setShowAddTask(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2345,6 +2637,17 @@ export default function ProjectDetailScreen() {
                 placeholder="Add details for whoever picks this up..."
                 placeholderTextColor={colors.textTertiary}
                 multiline
+              />
+
+              <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.md }]}>Photos or videos (optional)</Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+                Show the crew what to do. Videos can be up to a minute long.
+              </Text>
+              <TaskMediaStrip
+                items={newTaskMedia}
+                onOpen={(index) => setTaskMediaViewer({ items: newTaskMedia, index })}
+                onAdd={handleAddNewTaskMedia}
+                onRemove={(key) => setNewTaskMedia(prev => prev.filter(m => m.key !== key))}
               />
 
               <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Assign To (optional)</Text>
@@ -2376,12 +2679,18 @@ export default function ProjectDetailScreen() {
                 <Button title="Cancel" onPress={() => setShowAddTask(false)} variant="ghost" fullWidth />
               </View>
             </ScrollView>
+            <TaskMediaViewer
+              items={taskMediaViewer?.items ?? []}
+              index={taskMediaViewer?.index ?? null}
+              onIndexChange={(index) => setTaskMediaViewer(v => (v ? { ...v, index } : v))}
+              onClose={() => setTaskMediaViewer(null)}
+            />
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Add Photo Modal */}
-      <Modal visible={showAddPhoto} animationType="slide" transparent onRequestClose={() => setShowAddPhoto(false)}>
+      <BottomSheetModal visible={showAddPhoto} onRequestClose={() => setShowAddPhoto(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2462,10 +2771,10 @@ export default function ProjectDetailScreen() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Photo Details Modal */}
-      <Modal visible={!!reviewPhoto} animationType="slide" transparent onRequestClose={() => setReviewPhoto(null)}>
+      <BottomSheetModal visible={!!reviewPhoto} onRequestClose={() => setReviewPhoto(null)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={styles.dragHandleWrap}>
@@ -2648,7 +2957,7 @@ export default function ProjectDetailScreen() {
             )}
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Photo Details full-screen viewer */}
       <Modal visible={showPhotoViewer && !!reviewPhoto} transparent animationType="fade" onRequestClose={() => setShowPhotoViewer(false)}>
@@ -2664,7 +2973,7 @@ export default function ProjectDetailScreen() {
       </Modal>
 
       {/* Manage Access Modal */}
-      <Modal visible={showManageAccess} animationType="slide" transparent onRequestClose={() => setShowManageAccess(false)}>
+      <BottomSheetModal visible={showManageAccess} onRequestClose={() => setShowManageAccess(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2741,10 +3050,10 @@ export default function ProjectDetailScreen() {
             })()}
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* Preview Customer View Modal */}
-      <Modal visible={showCustomerPreview} animationType="slide" transparent onRequestClose={() => setShowCustomerPreview(false)}>
+      <BottomSheetModal visible={showCustomerPreview} onRequestClose={() => setShowCustomerPreview(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background, maxHeight: '92%' }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
@@ -2820,7 +3129,7 @@ export default function ProjectDetailScreen() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 }
@@ -2890,6 +3199,17 @@ const styles = StyleSheet.create({
   coverImage: {
     width: '100%',
     height: '100%',
+  },
+  coverChangeButton: {
+    position: 'absolute',
+    right: spacing.lg,
+    bottom: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    gap: spacing.xs,
   },
   coverStatusPill: {
     position: 'absolute',
@@ -3070,7 +3390,7 @@ const styles = StyleSheet.create({
   taskFilterRow: {
     flexDirection: 'row',
     backgroundColor: '#0000000A',
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: 3,
     marginBottom: spacing.lg,
   },
@@ -3078,7 +3398,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
   },
   taskSection: {
     borderRadius: radius.md,
@@ -3119,7 +3439,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   taskPhotoNote: {
     flexDirection: 'row',
@@ -3146,11 +3466,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
   },
   selectedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   pickerList: {
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     marginTop: spacing.xs,
     maxHeight: 240,
     overflow: 'hidden',
@@ -3184,7 +3504,7 @@ const styles = StyleSheet.create({
   // Requests
   responseBox: {
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     marginTop: spacing.md,
   },
 
@@ -3247,7 +3567,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
     marginTop: spacing.md,
   },
@@ -3256,14 +3576,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
   },
   dangerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
     marginTop: spacing.md,
   },
   outlineBtn: {
@@ -3271,7 +3591,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.full,
     marginTop: spacing.md,
   },
 
@@ -3398,8 +3718,8 @@ const styles = StyleSheet.create({
   descInput: {
     marginTop: spacing.sm,
     padding: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
     minHeight: 80,
     textAlignVertical: 'top',
     fontSize: typeScale.bodySmall.fontSize,
@@ -3482,7 +3802,7 @@ const styles = StyleSheet.create({
   descBox: {
     marginTop: spacing.sm,
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     borderWidth: 1,
   },
   descEditActions: {
@@ -3524,8 +3844,8 @@ const styles = StyleSheet.create({
   // Update composer
   composerInput: {
     padding: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
     fontSize: typeScale.bodySmall.fontSize,
     marginBottom: spacing.sm,
   },
@@ -3566,7 +3886,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.full,
   },
   accessCard: {
     borderRadius: radius.md,
@@ -3581,7 +3901,7 @@ const styles = StyleSheet.create({
   accessDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.sm,
     marginTop: spacing.md,
   },
@@ -3650,7 +3970,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   previewUpdateCard: {
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: spacing.sm,
     marginBottom: spacing.sm,

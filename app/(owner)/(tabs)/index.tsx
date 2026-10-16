@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -9,20 +9,21 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useOwnerDashboard, type AttentionItem, type CrewMember, type ProjectHomeSummary } from '@/hooks/useOwnerDashboard';
-import { Avatar, OptimizedImage, ProgressBar } from '@/components/ui';
+import { Avatar, ProgressBar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
+import { getProjectImageUri, getCompanyImageUri } from '@/lib/projectImages';
+import { BrandCover } from '@/components/branding/BrandCover';
+import { DASHBOARD_HERO_HEIGHT } from '@/components/media/HeaderPhotoField';
+import { useCompanySetup } from '@/hooks/useCompanySetup';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
-const HERO_IMAGE_URI = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80';
-const PROJECT_IMAGES = [
-  'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=600&q=80',
-  'https://images.unsplash.com/photo-1558904541-efa843a96f01?w=600&q=80',
-  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=600&q=80',
-  'https://images.unsplash.com/photo-1571939228382-b2f2b585ce15?w=600&q=80',
-];
+/** The setup walkthrough opens by itself once per app launch until it's been gone through. */
+let setupOpenedThisLaunch = false;
+
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -58,6 +59,14 @@ export default function OwnerDashboard() {
     todayStats, attentionItems, attentionTotalCount,
     crewToday, crewTodayTotal, activeProjects, activeProjectsTotal,
   } = useOwnerDashboard();
+  const setup = useCompanySetup();
+
+  useEffect(() => {
+    if (setup.needsWalkthrough && !setupOpenedThisLaunch) {
+      setupOpenedThisLaunch = true;
+      router.push('/(owner)/setup' as any);
+    }
+  }, [setup.needsWalkthrough, router]);
 
   function renderHeroStat(icon: React.ReactNode, value: number, label: string) {
     return (
@@ -154,10 +163,7 @@ export default function OwnerDashboard() {
         style={[styles.projectCard, { backgroundColor: colors.surface }, shadow.sm]}
         onPress={() => router.push(`/(owner)/projects/${project.id}` as any)}
       >
-        <OptimizedImage
-          source={PROJECT_IMAGES[index % PROJECT_IMAGES.length]}
-          style={styles.projectImage}
-        />
+        <BrandCover uri={getProjectImageUri(project)} style={styles.projectImage} variant="tile" />
         <View style={styles.projectInfo}>
           <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
             {project.name}
@@ -249,9 +255,9 @@ export default function OwnerDashboard() {
               <Icon name="plus" size={20} color={colors.primary} />
             </Pressable>
             <Pressable
-              onPress={() => router.push('/(owner)/more' as any)}
+              onPress={() => router.push('/(owner)/edit-profile' as any)}
               accessibilityRole="button"
-              accessibilityLabel="Profile and more"
+              accessibilityLabel="Edit your profile and photo"
             >
               <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={44} uri={user?.avatarUrl} />
             </Pressable>
@@ -261,7 +267,7 @@ export default function OwnerDashboard() {
         <View style={styles.content}>
           {/* Today hero */}
           <View style={[styles.heroCard, shadow.md]}>
-            <OptimizedImage source={HERO_IMAGE_URI} style={StyleSheet.absoluteFill} />
+            <BrandCover uri={getCompanyImageUri()} style={StyleSheet.absoluteFill} />
             <LinearGradient
               colors={['rgba(10,20,15,0.25)', 'rgba(8,16,12,0.85)']}
               style={StyleSheet.absoluteFill}
@@ -286,6 +292,32 @@ export default function OwnerDashboard() {
               </Pressable>
             </View>
           </View>
+
+          {/* Recommended setup checklist, until every step is done */}
+          {setup.showChecklist && (
+            <View style={[styles.setupCard, { backgroundColor: colors.surface, borderColor: colors.primaryLight }, shadow.sm]}>
+              <View style={styles.sectionTitleRow}>
+                <Icon name="check-square" size={18} color={colors.primary} />
+                <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Finish your setup</Text>
+                <Text style={[typeScale.labelSmall, { color: colors.primary }]}>{setup.doneCount} of {setup.total}</Text>
+              </View>
+              <ProgressBar progress={Math.round((setup.doneCount / setup.total) * 100)} height={6} style={{ marginVertical: spacing.sm }} />
+              {setup.steps.map((s) => (
+                <Pressable
+                  key={s.key}
+                  style={styles.setupRow}
+                  onPress={() => router.push({ pathname: '/(owner)/setup', params: { step: s.key } } as any)}
+                  disabled={s.done}
+                >
+                  <Icon name={s.done ? 'check-circle' : 'circle'} size={18} color={s.done ? semantic.success : colors.textTertiary} />
+                  <Text style={[typeScale.bodySmall, { flex: 1, color: s.done ? colors.textTertiary : colors.textPrimary, textDecorationLine: s.done ? 'line-through' : 'none' }]}>
+                    {s.title}
+                  </Text>
+                  {!s.done && <Icon name="chevron-right" size={16} color={colors.textTertiary} />}
+                </Pressable>
+              ))}
+            </View>
+          )}
 
           {/* Needs Attention */}
           <View style={styles.section}>
@@ -369,7 +401,7 @@ export default function OwnerDashboard() {
       </ScrollView>
 
       {/* Quick Actions sheet */}
-      <Modal visible={quickActionsOpen} transparent animationType="slide" onRequestClose={() => setQuickActionsOpen(false)}>
+      <BottomSheetModal visible={quickActionsOpen} onRequestClose={() => setQuickActionsOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setQuickActionsOpen(false)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
@@ -400,12 +432,24 @@ export default function OwnerDashboard() {
             </Pressable>
           </Pressable>
         </Pressable>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  setupCard: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  setupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
   screen: { flex: 1 },
   scrollContent: { paddingBottom: spacing['5xl'] },
   header: {
@@ -448,7 +492,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg },
 
   heroCard: {
-    height: 280,
+    height: DASHBOARD_HERO_HEIGHT,
     borderRadius: radius.lg,
     overflow: 'hidden',
     marginBottom: spacing.xl,

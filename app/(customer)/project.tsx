@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Alert, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -8,6 +10,8 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { SectionTabs, ProgressBar, Card, EmptyState, StatusBadge, Button, OptimizedImage } from '@/components/ui';
 import { useProject } from '@/hooks/useProject';
+import { db } from '@/data/store';
+import { CustomerDocuments } from '@/components/financials/CustomerDocuments';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic, brand } from '@/theme/colors';
@@ -21,6 +25,7 @@ const SECTIONS = [
 ];
 
 const statusConfig: Record<ProjectStatus, { label: string; type: 'success' | 'warning' | 'info' | 'neutral' }> = {
+  prospect: { label: 'Quote', type: 'neutral' },
   active: { label: 'In Progress', type: 'success' },
   on_hold: { label: 'On Hold', type: 'warning' },
   completed: { label: 'Completed', type: 'info' },
@@ -65,7 +70,7 @@ export default function CustomerProjectScreen() {
   const [reqDescription, setReqDescription] = useState('');
   const [reqCategory, setReqCategory] = useState<RequestCategory>('question');
 
-  const { project, photos, customerTimeline, updates, requests, settings, taskStats } = useProject(id);
+  const { project, photos, customerTimeline, updates, requests, submitRequest, settings, taskStats } = useProject(id);
 
   const sharedPhotos = useMemo(
     () => photos.filter(p => p.isCustomerVisible),
@@ -78,8 +83,8 @@ export default function CustomerProjectScreen() {
   );
 
   const customerRequests = useMemo(
-    () => requests.filter(r => r.requestedBy === 'customer1'),
-    [requests],
+    () => requests.filter(r => r.requestedBy === user?.id),
+    [requests, user?.id],
   );
 
   const isCompleted = project?.status === 'completed';
@@ -87,7 +92,11 @@ export default function CustomerProjectScreen() {
 
   function handleSubmitRequest() {
     if (!reqTitle.trim()) return;
-    Alert.alert('Request Submitted', `Your ${categoryOptions.find(c => c.key === reqCategory)?.label ?? reqCategory} has been sent to Brighton Lawn + Landscape. They'll review it shortly.`);
+    submitRequest({ title: reqTitle.trim(), description: reqDescription.trim() || undefined, category: reqCategory });
+    const companyName = db.company?.name ?? 'Brighton Lawn + Landscape';
+    const sentMsg = `Your ${categoryOptions.find(c => c.key === reqCategory)?.label ?? reqCategory} has been sent to ${companyName}. They'll review it shortly.`;
+    if (Platform.OS === 'web') alert(sentMsg);
+    else Alert.alert('Request Submitted', sentMsg);
     setReqTitle('');
     setReqDescription('');
     setReqCategory('question');
@@ -102,7 +111,9 @@ export default function CustomerProjectScreen() {
     );
   }
 
-  const config = statusConfig[project.status];
+  // Narrowed copy: nested render functions below lose the `if (!project)` narrowing.
+  const p = project;
+  const config = statusConfig[p.status];
 
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -126,47 +137,48 @@ export default function CustomerProjectScreen() {
             </View>
           </View>
         )}
+        <CustomerDocuments projectId={p.id} />
         <Card>
           <View style={styles.progressSection}>
-            <Text style={[typeScale.displayLarge, { color: colors.primary }]}>{project.progress}%</Text>
+            <Text style={[typeScale.displayLarge, { color: colors.primary }]}>{p.progress}%</Text>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>complete</Text>
           </View>
-          <ProgressBar progress={project.progress} height={10} style={{ marginTop: spacing.sm }} />
+          <ProgressBar progress={p.progress} height={10} style={{ marginTop: spacing.sm }} />
           <View style={{ marginTop: spacing.md }}>
             <StatusBadge label={config.label} status={config.type} />
           </View>
         </Card>
 
         <Card title="Project Details" style={{ marginTop: spacing.lg }}>
-          {project.address && (
+          {p.address && (
             <View style={styles.detailRow}>
               <Icon name="map-pin" size={16} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                {project.address}{project.city ? `, ${project.city}` : ''}{project.state ? ` ${project.state}` : ''} {project.zip ?? ''}
+                {p.address}{p.city ? `, ${p.city}` : ''}{p.state ? ` ${p.state}` : ''} {p.zip ?? ''}
               </Text>
             </View>
           )}
-          {project.startDate && (
+          {p.startDate && (
             <View style={styles.detailRow}>
               <Icon name="calendar" size={16} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                Started {formatDate(project.startDate)}
+                Started {formatDate(p.startDate)}
               </Text>
             </View>
           )}
-          {project.estimatedEndDate && (
+          {p.estimatedEndDate && (
             <View style={styles.detailRow}>
               <Icon name="clock" size={16} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                Est. completion: {formatDate(project.estimatedEndDate)}
+                Est. completion: {formatDate(p.estimatedEndDate)}
               </Text>
             </View>
           )}
-          {project.completedAt && (
+          {p.completedAt && (
             <View style={styles.detailRow}>
               <Icon name="check-circle" size={16} color={semantic.success} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                Completed {formatDate(project.completedAt)}
+                Completed {formatDate(p.completedAt)}
               </Text>
             </View>
           )}
@@ -431,7 +443,7 @@ export default function CustomerProjectScreen() {
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} numberOfLines={1}>
-              {project.name}
+              {p.name}
             </Text>
           </View>
         </View>
@@ -439,9 +451,9 @@ export default function CustomerProjectScreen() {
 
       <SectionTabs tabs={activeSections} activeTab={activeSection} onTabChange={setActiveSection} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {sectionRenderers[activeSection]?.()}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -541,7 +553,7 @@ const styles = StyleSheet.create({
   // Requests
   responseBox: {
     padding: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     marginTop: spacing.md,
   },
   categoryGrid: {
@@ -559,8 +571,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   formInput: {
-    borderWidth: 1,
-    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typeScale.bodySmall.fontSize,

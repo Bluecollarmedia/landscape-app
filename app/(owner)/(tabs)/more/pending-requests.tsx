@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { Card, Button, StatusBadge, Avatar, OptimizedImage } from '@/components/ui';
+import { StatusBadge, Avatar, OptimizedImage, ScreenHeader, SegmentedTabs, PressableScale, FadeInItem, IconTile } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius, shadow } from '@/theme/spacing';
+import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { useJoinRequests, useMemberships } from '@/hooks/useOnboarding';
+import { useJoinRequests } from '@/hooks/useOnboarding';
 import type { JoinRequest } from '@/types/onboarding';
+import type { WorkerType } from '@/types/maintenance';
 import { haptics } from '@/lib/haptics';
 
 function formatTimeAgo(isoStr: string): string {
@@ -43,25 +41,18 @@ type Tab = 'pending' | 'history';
 
 export default function PendingRequestsScreen() {
   const { colors } = useTheme();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { pendingRequests, allRequests, approveRequest, declineRequest } = useJoinRequests();
-  const { createMembership } = useMemberships();
   const [activeTab, setActiveTab] = useState<Tab>('pending');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // The owner's pick per request; starts as what they applied as.
+  const [typeChoice, setTypeChoice] = useState<Record<string, WorkerType>>({});
+  const typeFor = (r: JoinRequest): WorkerType => typeChoice[r.id] ?? r.requestedWorkerType ?? 'landscaping';
 
   function handleApprove(request: JoinRequest) {
     haptics.success();
-    approveRequest(request.id, 'worker');
-    if (request.person) {
-      createMembership({
-        personId: request.personId,
-        role: 'worker',
-        joinMethod: request.joinMethod,
-        joinRequestId: request.id,
-        person: request.person,
-      });
-    }
+    // Also makes them an active worker of the chosen type (see approve_join_request
+    // in supabase/updates/019). A maintenance code never skips this step.
+    approveRequest(request.id, 'worker', typeFor(request));
   }
 
   function handleDecline(request: JoinRequest) {
@@ -78,137 +69,164 @@ export default function PendingRequestsScreen() {
 
   const displayRequests = activeTab === 'pending' ? pendingRequests : historyRequests;
 
-  function renderRequestCard(request: JoinRequest) {
+  function renderRequestCard(request: JoinRequest, index: number) {
     const isExpanded = expandedId === request.id;
     const person = request.person;
     if (!person) return null;
 
     return (
-      <Pressable
-        key={request.id}
-        style={[styles.requestCard, { backgroundColor: colors.surface }, shadow.sm]}
-        onPress={() => setExpandedId(isExpanded ? null : request.id)}
-      >
-        <View style={styles.requestHeader}>
-          {person.profilePhotoUrl ? (
-            <OptimizedImage source={person.profilePhotoUrl} style={styles.photo} />
-          ) : (
-            <Avatar firstName={person.firstName} lastName={person.lastName} size={52} />
-          )}
-          <View style={styles.requestInfo}>
-            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
-              {person.firstName} {person.lastName}
-            </Text>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{person.email}</Text>
-            {person.phone && (
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{person.phone}</Text>
+      <FadeInItem key={`${activeTab}-${request.id}`} index={index}>
+        <PressableScale
+          style={[styles.requestCard, { backgroundColor: colors.surface }]}
+          scaleTo={0.98}
+          onPress={() => setExpandedId(isExpanded ? null : request.id)}
+        >
+          <View style={styles.requestHeader}>
+            {person.profilePhotoUrl ? (
+              <OptimizedImage source={person.profilePhotoUrl} style={styles.photo} />
+            ) : (
+              <Avatar firstName={person.firstName} lastName={person.lastName} size={52} />
             )}
+            <View style={styles.requestInfo}>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
+                {person.firstName} {person.lastName}
+              </Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{person.email}</Text>
+              {person.phone && (
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{person.phone}</Text>
+              )}
+            </View>
+            {request.status === 'pending' && <StatusBadge label="Pending" status="warning" />}
+            {request.status === 'approved' && <StatusBadge label="Approved" status="success" />}
+            {request.status === 'declined' && <StatusBadge label="Declined" status="error" />}
+            {request.status === 'cancelled' && <StatusBadge label="Cancelled" status="neutral" />}
           </View>
-          {request.status === 'pending' && <StatusBadge label="Pending" status="warning" />}
-          {request.status === 'approved' && <StatusBadge label="Approved" status="success" />}
-          {request.status === 'declined' && <StatusBadge label="Declined" status="error" />}
-          {request.status === 'cancelled' && <StatusBadge label="Cancelled" status="neutral" />}
-        </View>
 
-        <View style={[styles.metaRow, { borderTopColor: colors.borderLight }]}>
-          <View style={styles.metaItem}>
-            <Text style={[typeScale.overline, { color: colors.textTertiary }]}>JOINED VIA</Text>
-            <View style={styles.metaValue}>
-              <Icon
-                name={request.joinMethod === 'team_code' ? 'hash' : 'mail'}
-                size={12}
-                color={colors.textSecondary}
-              />
-              <Text style={[typeScale.caption, { color: colors.textPrimary, marginLeft: 4 }]}>
-                {joinMethodLabel(request.joinMethod)}
+          <View style={[styles.metaRow, { borderTopColor: colors.borderLight }]}>
+            <View style={styles.metaItem}>
+              <Text style={[typeScale.overline, { color: colors.textTertiary }]}>JOINED VIA</Text>
+              <View style={styles.metaValue}>
+                <Icon
+                  name={request.joinMethod === 'team_code' ? 'hash' : 'mail'}
+                  size={12}
+                  color={colors.textSecondary}
+                />
+                <Text style={[typeScale.caption, { color: colors.textPrimary, marginLeft: 4 }]}>
+                  {joinMethodLabel(request.joinMethod)}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.metaItem}>
+              <Text style={[typeScale.overline, { color: colors.textTertiary }]}>APPLIED AS</Text>
+              <View style={styles.metaValue}>
+                <Icon name={request.requestedWorkerType === 'maintenance' ? 'repeat' : 'tool'} size={12} color={colors.textSecondary} />
+                <Text style={[typeScale.caption, { color: colors.textPrimary, marginLeft: 4 }]}>
+                  {request.requestedWorkerType === 'maintenance' ? 'Maintenance' : 'Worker'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.metaItem}>
+              <Text style={[typeScale.overline, { color: colors.textTertiary }]}>REQUESTED</Text>
+              <Text style={[typeScale.caption, { color: colors.textPrimary }]}>
+                {formatDate(request.createdAt)}
               </Text>
             </View>
           </View>
-          <View style={styles.metaItem}>
-            <Text style={[typeScale.overline, { color: colors.textTertiary }]}>REQUESTED</Text>
-            <Text style={[typeScale.caption, { color: colors.textPrimary }]}>
-              {formatDate(request.createdAt)}
-            </Text>
-          </View>
-        </View>
 
-        {request.status === 'pending' && (
-          <View style={styles.actions}>
-            <Pressable
-              style={[styles.approveBtn, { backgroundColor: semantic.success }]}
-              onPress={() => handleApprove(request)}
-            >
-              <Icon name="check" size={16} color="#FFFFFF" />
-              <Text style={[typeScale.labelSmall, { color: '#FFFFFF', marginLeft: 4 }]}>Approve</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.declineBtn, { borderColor: semantic.error }]}
-              onPress={() => handleDecline(request)}
-            >
-              <Icon name="x" size={16} color={semantic.error} />
-              <Text style={[typeScale.labelSmall, { color: semantic.error, marginLeft: 4 }]}>Decline</Text>
-            </Pressable>
-          </View>
-        )}
+          {request.status === 'pending' && (
+            <View style={styles.typePicker}>
+              <Text style={[typeScale.overline, { color: colors.textTertiary }]}>APPROVE AS</Text>
+              <View style={styles.typeOptions} accessibilityRole="radiogroup">
+                {([['landscaping', 'Worker'], ['maintenance', 'Maintenance']] as const).map(([value, label]) => {
+                  const selected = typeFor(request) === value;
+                  return (
+                    <PressableScale
+                      key={value}
+                      style={[styles.typeOption, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primarySurface : colors.surface }]}
+                      scaleTo={0.96}
+                      onPress={() => setTypeChoice((prev) => ({ ...prev, [request.id]: value }))}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: selected }}
+                    >
+                      <Icon name={selected ? 'check-circle' : 'circle'} size={14} color={selected ? colors.primary : colors.textTertiary} />
+                      <Text style={[typeScale.labelSmall, { color: selected ? colors.primary : colors.textSecondary, marginLeft: 6 }]} numberOfLines={1}>{label}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+              {request.requestedWorkerType === 'maintenance' && typeFor(request) === 'landscaping' && (
+                <Text style={[typeScale.caption, { color: semantic.warning, marginTop: spacing.xs }]}>
+                  They used your maintenance code. Approving as a landscaping worker keeps them off maintenance routes.
+                </Text>
+              )}
+            </View>
+          )}
 
-        {request.status === 'approved' && request.reviewedAt && (
-          <View style={[styles.reviewInfo, { backgroundColor: semantic.successLight }]}>
-            <Icon name="check-circle" size={14} color={semantic.success} />
-            <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-              Approved {formatTimeAgo(request.reviewedAt)} — Role: {request.assignedRole ?? 'Worker'}
-            </Text>
-          </View>
-        )}
+          {request.status === 'pending' && (
+            <View style={styles.actions}>
+              <PressableScale
+                style={[styles.approveBtn, { backgroundColor: semantic.success }]}
+                scaleTo={0.94}
+                haptic={false}
+                onPress={() => handleApprove(request)}
+                accessibilityRole="button"
+              >
+                <Icon name="check" size={16} color="#FFFFFF" />
+                <Text style={[typeScale.labelSmall, { color: '#FFFFFF', marginLeft: 4 }]}>Approve</Text>
+              </PressableScale>
+              <PressableScale
+                style={[styles.declineBtn, { borderColor: semantic.error, backgroundColor: colors.surface }]}
+                scaleTo={0.94}
+                haptic={false}
+                onPress={() => handleDecline(request)}
+                accessibilityRole="button"
+              >
+                <Icon name="x" size={16} color={semantic.error} />
+                <Text style={[typeScale.labelSmall, { color: semantic.error, marginLeft: 4 }]}>Decline</Text>
+              </PressableScale>
+            </View>
+          )}
 
-        {request.status === 'declined' && (
-          <View style={[styles.reviewInfo, { backgroundColor: semantic.errorLight }]}>
-            <Icon name="x-circle" size={14} color={semantic.error} />
-            <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-              Declined {request.reviewedAt ? formatTimeAgo(request.reviewedAt) : ''}
-              {request.declineReason ? ` — ${request.declineReason}` : ''}
-            </Text>
-          </View>
-        )}
-      </Pressable>
+          {request.status === 'approved' && request.reviewedAt && (
+            <View style={[styles.reviewInfo, { backgroundColor: semantic.successLight }]}>
+              <Icon name="check-circle" size={14} color={semantic.success} />
+              <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
+                Approved {formatTimeAgo(request.reviewedAt)} as {request.assignedWorkerType === 'maintenance' ? 'a maintenance worker' : (request.assignedRole === 'admin' ? 'an admin' : request.assignedRole === 'customer' ? 'a customer' : 'a worker')}
+              </Text>
+            </View>
+          )}
+
+          {request.status === 'declined' && (
+            <View style={[styles.reviewInfo, { backgroundColor: semantic.errorLight }]}>
+              <Icon name="x-circle" size={14} color={semantic.error} />
+              <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
+                Declined {request.reviewedAt ? formatTimeAgo(request.reviewedAt) : ''}
+                {request.declineReason ? ` — ${request.declineReason}` : ''}
+              </Text>
+            </View>
+          )}
+        </PressableScale>
+      </FadeInItem>
     );
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
-          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
-          Join Requests
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+      <ScreenHeader title="Join Requests" subtitle="People asking to join your team" />
 
-      {/* Tabs */}
-      <View style={[styles.tabs, { borderBottomColor: colors.borderLight }]}>
-        <Pressable
-          style={[styles.tab, activeTab === 'pending' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-          onPress={() => setActiveTab('pending')}
-        >
-          <Text style={[typeScale.labelSmall, { color: activeTab === 'pending' ? colors.primary : colors.textSecondary }]}>
-            Pending ({pendingRequests.length})
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === 'history' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-          onPress={() => setActiveTab('history')}
-        >
-          <Text style={[typeScale.labelSmall, { color: activeTab === 'history' ? colors.primary : colors.textSecondary }]}>
-            History
-          </Text>
-        </Pressable>
-      </View>
+      <SegmentedTabs
+        options={[
+          { value: 'pending' as Tab, label: `Pending (${pendingRequests.length})` },
+          { value: 'history' as Tab, label: 'History' },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {displayRequests.length === 0 && (
           <View style={styles.empty}>
-            <Icon name="inbox" size={48} color={colors.textTertiary} />
+            <IconTile name="inbox" size={56} muted />
             <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.md }]}>
               {activeTab === 'pending' ? 'No pending requests' : 'No request history'}
             </Text>
@@ -223,23 +241,6 @@ export default function PendingRequestsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
-  },
-  tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    marginBottom: spacing.md,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
   content: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing['5xl'],
@@ -249,9 +250,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing['4xl'],
   },
   requestCard: {
-    borderRadius: radius.sm,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
+    ...Platform.select({
+      android: { elevation: 2 },
+      default: {
+        shadowColor: '#1B3A2D',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+    }),
   },
   requestHeader: {
     flexDirection: 'row',
@@ -279,6 +289,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
   },
+  typePicker: {
+    marginTop: spacing.md,
+  },
+  typeOptions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  typeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+  },
   actions: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -289,23 +317,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radius.full,
+    ...Platform.select({
+      android: { elevation: 3 },
+      default: {
+        shadowColor: '#2E7D32',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+    }),
   },
   declineBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radius.full,
     borderWidth: 1,
   },
   reviewInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.sm,
     marginTop: spacing.md,
   },
 });

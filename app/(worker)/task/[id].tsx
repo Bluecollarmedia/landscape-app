@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Image, Platform, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,8 @@ import { StatusBadge } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { haptics } from '@/lib/haptics';
+import { db } from '@/data/store';
+import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,17 +21,23 @@ export default function TaskDetailScreen() {
   const insets = useSafeAreaInsets();
   const {
     currentJob, projectTasks, projectSettings,
-    startTask, completeTask, taskPhotoCaptured, taskPhotoUris, captureTaskPhoto,
+    startTask, completeTask, taskPhotoCaptured, taskPhotoUris, captureTaskPhoto, isTaskLead,
   } = useWorkerContext();
 
   const [busy, setBusy] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const tasks = currentJob ? projectTasks(currentJob.projectId) : [];
   const task = tasks.find(t => t.id === id);
+  const attachments = task ? db.taskAttachments[task.id] ?? [] : [];
+  const mediaItems: TaskMediaItem[] = attachments.map(a => ({ key: a.id, uri: a.fileUrl, mediaType: a.mediaType }));
   const settings = currentJob ? projectSettings(currentJob.projectId) : undefined;
   const photoRequired = settings?.completionPhotoRequired ?? false;
   const hasPhoto = task ? !!taskPhotoCaptured[task.id] : false;
   const photoUri = task ? taskPhotoUris[task.id] : undefined;
+  const isLead = currentJob ? isTaskLead(currentJob.projectId) : false;
+  const leadId = currentJob ? db.projects.find(p => p.id === currentJob.projectId)?.taskLeadId : undefined;
+  const lead = leadId ? db.people[leadId] : undefined;
 
   if (!task) {
     return (
@@ -54,13 +62,35 @@ export default function TaskDetailScreen() {
     startTask(task!.id);
   }
 
-  async function handleTakePhoto() {
+  function handleTakePhoto() {
+    if (Platform.OS === 'web') {
+      pickPhoto('library');
+      return;
+    }
+    Alert.alert('Add Photo', undefined, [
+      { text: 'Take Photo', onPress: () => pickPhoto('camera') },
+      { text: 'Choose from Library', onPress: () => pickPhoto('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  async function pickPhoto(source: 'camera' | 'library') {
     setBusy(true);
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.7,
-      });
+      const permission = source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          source === 'camera' ? 'Camera access needed' : 'Photo access needed',
+          'Turn it on for Brighton Lawn in the Settings app to add task photos.',
+        );
+        return;
+      }
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
       if (!result.canceled && result.assets[0]) {
         haptics.success();
         captureTaskPhoto(task!.id, result.assets[0].uri);
@@ -85,8 +115,8 @@ export default function TaskDetailScreen() {
   }
 
   function handleMarkComplete() {
+    if (!completeTask(task!.id)) return;
     haptics.success();
-    completeTask(task!.id);
     router.back();
   }
 
@@ -102,7 +132,33 @@ export default function TaskDetailScreen() {
           <StatusBadge label={badge.label} status={badge.status} />
         </View>
 
-        {photoRequired && task.status !== 'completed' && (
+        {task.status === 'completed' && (task.completer || task.completedAt) && (
+          <View style={[styles.card, styles.notice, { backgroundColor: colors.successLight, marginTop: spacing.lg }]}>
+            <Feather name="check-circle" size={18} color={colors.success} />
+            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
+              Completed{task.completer ? ` by ${task.completer.firstName} ${task.completer.lastName}`.trimEnd() : ''}
+              {task.completedAt && (
+                <Text style={{ color: colors.textSecondary }}>{'\n'}{formatCompletedAt(task.completedAt)}</Text>
+              )}
+            </Text>
+          </View>
+        )}
+
+        {!isLead && task.status !== 'completed' && (
+          <View style={[styles.card, styles.notice, { backgroundColor: colors.backgroundTertiary, marginTop: spacing.lg }]}>
+            <Feather name="lock" size={18} color={colors.textSecondary} />
+            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
+              Only the Task Lead can check off tasks{'\n'}
+              <Text style={{ color: colors.textSecondary }}>
+                {lead
+                  ? `${lead.firstName} ${lead.lastName}`.trim() + ' is the Task Lead for this job.'
+                  : 'No Task Lead yet. The owner needs to pick one before tasks can be checked off.'}
+              </Text>
+            </Text>
+          </View>
+        )}
+
+        {isLead && photoRequired && task.status !== 'completed' && (
           <View style={[styles.card, styles.notice, { backgroundColor: colors.infoLight, marginTop: spacing.lg }]}>
             <Feather name="camera" size={18} color={colors.info} />
             <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
@@ -121,7 +177,19 @@ export default function TaskDetailScreen() {
           </View>
         )}
 
-        {(photoRequired || photoUri) && (
+        {attachments.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.lg }, shadow.md]}>
+            <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>
+              {attachments.some(a => a.mediaType === 'video') ? 'PHOTOS AND VIDEOS' : 'PHOTOS'}
+            </Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>
+              Tap to see what needs to be done.
+            </Text>
+            <TaskMediaStrip items={mediaItems} onOpen={setViewerIndex} />
+          </View>
+        )}
+
+        {((isLead && photoRequired) || photoUri) && (
           <View style={[styles.photoArea, { backgroundColor: colors.groupedBackground, marginTop: spacing.lg }]}>
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photoImage} resizeMode="cover" />
@@ -137,7 +205,7 @@ export default function TaskDetailScreen() {
         )}
 
         <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
-          {task.status === 'pending' && (
+          {isLead && task.status === 'pending' && (
             <Pressable onPress={handleStart}>
               <LinearGradient
                 colors={[colors.primary, colors.primaryDark]}
@@ -151,7 +219,7 @@ export default function TaskDetailScreen() {
             </Pressable>
           )}
 
-          {task.status === 'in_progress' && (
+          {isLead && task.status === 'in_progress' && (
             <>
               {photoRequired && (
                 <Pressable
@@ -187,8 +255,20 @@ export default function TaskDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      <TaskMediaViewer
+        items={mediaItems}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+        onClose={() => setViewerIndex(null)}
+      />
     </View>
   );
+}
+
+function formatCompletedAt(iso: string) {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 function Header({ onBack, colors, insets }: { onBack: () => void; colors: any; insets: any }) {

@@ -20,7 +20,13 @@ import type {
   StorageInfo,
   UploadPurpose,
 } from '@/types/storage';
-import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_DEFAULT, MAX_AVATAR_SIZE } from '@/types/storage';
+import {
+  ALLOWED_MIME_TYPES,
+  MAX_FILE_SIZE_DEFAULT,
+  MAX_AVATAR_SIZE,
+  DEFAULT_STORAGE_LIMIT_GB,
+  storageLimitBytes,
+} from '@/types/storage';
 
 export const R2_PUBLIC_URL = process.env.EXPO_PUBLIC_R2_PUBLIC_URL ?? '';
 
@@ -182,15 +188,48 @@ export async function getStorageInfo(): Promise<StorageInfo> {
     return mockStorageInfo();
   }
 
-  const response = await supabase.functions.invoke('storage-usage', {
-    method: 'GET',
+  // Adds up the files in this company's folders of the Supabase Storage
+  // "media" bucket (see src/lib/media.ts for the folder layout).
+  const { db } = require('@/data/store') as typeof import('@/data/store');
+  const bucket = supabase.storage.from('media');
+  const folders = [
+    ...db.projects.map((p) => `${db.companyId}/projects/${p.id}`),
+    `${db.companyId}/trucks`,
+    'avatars',
+  ];
+  let totalBytes = 0;
+  let photoCount = 0;
+  let avatarCount = 0;
+  const results = await Promise.all(folders.map((f) => bucket.list(f, { limit: 1000 })));
+  results.forEach(({ data }, i) => {
+    for (const obj of data ?? []) {
+      if (!obj.id) continue; // sub-folder
+      const size = Number((obj.metadata as { size?: number } | null)?.size ?? 0);
+      if (folders[i] === 'avatars') {
+        avatarCount++;
+      } else {
+        photoCount++;
+      }
+      totalBytes += size;
+    }
   });
-
-  if (response.error) {
-    throw new UploadError('Failed to load storage info.', 'server');
-  }
-
-  return response.data as StorageInfo;
+  const maxStorageBytes = companyStorageLimitBytes();
+  return {
+    usage: {
+      totalBytes,
+      fileCount: photoCount + avatarCount,
+      photoCount,
+      avatarCount,
+      documentCount: 0,
+      percentUsed: percentOf(totalBytes, maxStorageBytes),
+    },
+    settings: {
+      maxStorageBytes,
+      maxFileSizeBytes: 10_485_760,
+      rateLimitPerMinute: 10,
+      rateLimitPerHour: 100,
+    },
+  };
 }
 
 export async function updateStorageSettings(
@@ -266,18 +305,30 @@ function mockPresignedUrl(request: UploadRequest): PresignedUploadResponse {
   };
 }
 
+/** The limit the owner picked in Settings → Storage (0 = no limit). */
+function companyStorageLimitBytes(): number {
+  const { db } = require('@/data/store') as typeof import('@/data/store');
+  return storageLimitBytes(db.company?.storageLimitGb ?? DEFAULT_STORAGE_LIMIT_GB);
+}
+
+function percentOf(used: number, max: number): number {
+  return max > 0 ? Math.round((used / max) * 100) : 0;
+}
+
 function mockStorageInfo(): StorageInfo {
+  const totalBytes = 157_286_400;
+  const maxStorageBytes = companyStorageLimitBytes();
   return {
     usage: {
-      totalBytes: 157_286_400,
+      totalBytes,
       fileCount: 42,
       photoCount: 38,
       avatarCount: 3,
       documentCount: 1,
-      percentUsed: 3,
+      percentUsed: percentOf(totalBytes, maxStorageBytes),
     },
     settings: {
-      maxStorageBytes: 5_368_709_120,
+      maxStorageBytes,
       maxFileSizeBytes: 10_485_760,
       rateLimitPerMinute: 10,
       rateLimitPerHour: 100,

@@ -23,10 +23,16 @@ const EVENT_ICONS: Record<NotificationEventType, { icon: string; color: string }
   worker_completed_job: { icon: 'check-circle', color: semantic.success },
   photo_waiting_review: { icon: 'camera', color: semantic.info },
   customer_request_submitted: { icon: 'message-square', color: semantic.info },
+  customer_message: { icon: 'message-circle', color: semantic.info },
   schedule_changed: { icon: 'calendar', color: brand.primary },
   schedule_conflict: { icon: 'alert-triangle', color: semantic.error },
   announcement_posted: { icon: 'volume-2', color: brand.primary },
+  quote_approved: { icon: 'check-circle', color: semantic.success },
+  quote_declined: { icon: 'x-circle', color: semantic.error },
+  quote_sent: { icon: 'file-text', color: semantic.info },
+  invoice_issued: { icon: 'dollar-sign', color: semantic.info },
 };
+const FALLBACK_ICON = { icon: 'bell', color: brand.primary };
 
 function formatTimeAgo(isoStr: string): string {
   const now = Date.now();
@@ -78,7 +84,7 @@ export default function NotificationCenterScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {sorted.map((n) => {
-          const eventConfig = EVENT_ICONS[n.eventType];
+          const eventConfig = EVENT_ICONS[n.eventType] ?? FALLBACK_ICON;
           const isUnread = n.status === 'unread';
           return (
             <Pressable
@@ -90,6 +96,11 @@ export default function NotificationCenterScreen() {
               ]}
               onPress={() => {
                 if (isUnread) markRead(n.id);
+                if ((n.linkedEntityType === 'quote' || n.linkedEntityType === 'change_order' || n.linkedEntityType === 'invoice') && n.linkedEntityId) {
+                  // This screen is a modal: close it first so the document opens on the main stack.
+                  router.back();
+                  router.push({ pathname: '/(owner)/document', params: { kind: n.linkedEntityType, id: n.linkedEntityId } } as any);
+                }
               }}
             >
               <View

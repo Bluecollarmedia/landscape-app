@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -16,7 +18,9 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.45, 200);
 export default function DeclinedScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { signOut, pendingCompanyName } = useAuth();
+  const router = useRouter();
+  const { signOut, pendingCompanyName, pendingKind } = useAuth();
+  const isSnow = pendingKind === 'snow';
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -39,13 +43,21 @@ export default function DeclinedScreen() {
           </Text>
 
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm, lineHeight: 20 }]}>
-            Your request to join {pendingCompanyName ?? 'the company'} was not approved. If you believe this is a mistake, please contact the company directly.
+            Your request to join {isSnow ? 'the snow team at ' : ''}{pendingCompanyName ?? 'the company'} was not approved. If you believe this is a mistake, please contact the company directly.
           </Text>
         </View>
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <Button
+          title={isSnow ? 'Enter a New Snow Code' : 'Enter a New Team Code'}
+          onPress={() => router.push((isSnow ? '/(auth)/join-team?kind=snow' : '/(auth)/join-team') as any)}
+          variant="secondary"
+          icon="hash"
+          fullWidth
+        />
         <Button title="Sign Out" onPress={signOut} variant="ghost" icon="log-out" fullWidth />
+        <DeleteAccountRow />
       </View>
     </View>
   );

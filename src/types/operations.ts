@@ -53,6 +53,19 @@ export interface WorkerHourlyRate {
 
 // ── Overtime ───────────────────────────────────────────────────
 
+/** A worker's own overtime terms. Workers with no row use the company rule. */
+export interface WorkerPaySettings {
+  personId: string;
+  companyId: string;
+  overtimeEnabled: boolean;
+  /** Hours worked in a week before overtime starts. */
+  overtimeAfterHours: number;
+  overtimeMultiplier: number;
+  /** Target-Pay Mode: what the worker should earn per hour worked, overtime included. */
+  targetHourlyRate?: number;
+  updatedAt?: string;
+}
+
 export type OvertimeRuleType = 'weekly_40' | 'daily_8' | 'custom' | 'none';
 
 export interface OvertimeRule {
@@ -80,9 +93,15 @@ export type NotificationEventType =
   | 'worker_completed_job'
   | 'photo_waiting_review'
   | 'customer_request_submitted'
+  | 'customer_message'
   | 'schedule_changed'
   | 'schedule_conflict'
-  | 'announcement_posted';
+  | 'announcement_posted'
+  | 'quote_approved'
+  | 'quote_declined'
+  // To the customer
+  | 'quote_sent'
+  | 'invoice_issued';
 
 export interface NotificationPreference {
   id: string;
@@ -104,7 +123,7 @@ export interface AppNotification {
   title: string;
   body: string;
   status: NotificationStatus;
-  linkedEntityType?: 'worker' | 'project' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement';
+  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement' | 'quote' | 'change_order' | 'invoice';
   linkedEntityId?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;

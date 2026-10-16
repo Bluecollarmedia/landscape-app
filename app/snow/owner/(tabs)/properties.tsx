@@ -1,11 +1,3 @@
-import { SnowPlaceholder } from '@/components/snow/SnowPlaceholder';
+import { SnowPropertiesScreen } from '@/components/snow/properties/SnowPropertiesScreen';
 
-export default function Screen() {
-  return (
-    <SnowPlaceholder
-      title="Snow Properties"
-      icon="map-pin"
-      purpose="Each snow property's services, contacts, instructions, reference photos and notification preferences."
-    />
-  );
-}
+export default SnowPropertiesScreen;

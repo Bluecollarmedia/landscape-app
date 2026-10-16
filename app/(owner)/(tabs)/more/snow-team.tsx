@@ -13,6 +13,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform, Alert, Pressable, Share, RefreshControl } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '@/providers/ThemeProvider';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { ScreenHeader, ListSection, Avatar, Button, InlineNotice, StatusBadge, LoadingSpinner, Icon } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -183,7 +184,9 @@ function MemberCard({ member, onSave, onRevoke }: {
   );
 }
 
-export default function SnowTeamScreen() {
+/** Also the Snow Mode Team tab (`asTab`: no back button, clears the tab bar). */
+export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
+  const tabBarClearance = useTabBarClearance();
   const { colors } = useTheme();
   const admin = useSnowOnboardingAdmin();
   const [showHistory, setShowHistory] = useState(false);
@@ -269,9 +272,9 @@ export default function SnowTeamScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Snow Team" subtitle="Snow code, requests and access" />
+      <ScreenHeader title="Snow Team" subtitle="Snow code, requests and access" hideBack={asTab} />
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, asTab && { paddingBottom: tabBarClearance + spacing.lg }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await admin.reload(); setRefreshing(false); }} />}
       >
         {admin.loading ? (
@@ -396,3 +399,7 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   historyToggle: { paddingVertical: spacing.md, marginLeft: spacing.md },
 });
+
+export default function SnowTeamRoute() {
+  return <SnowTeamScreen />;
+}

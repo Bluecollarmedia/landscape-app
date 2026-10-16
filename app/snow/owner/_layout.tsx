@@ -8,6 +8,7 @@ export default function SnowOwnerLayout() {
       <Stack.Screen name="storm-new" options={{ presentation: 'modal' }} />
       <Stack.Screen name="storm/[id]" />
       <Stack.Screen name="route/[id]" />
+      <Stack.Screen name="property" />
       <Stack.Screen name="activity" />
       <Stack.Screen name="hours" />
       <Stack.Screen name="review" />

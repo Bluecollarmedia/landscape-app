@@ -102,9 +102,11 @@ interface ScreenHeaderProps {
   right?: React.ReactNode;
   /** Override the back action (defaults to router.back()). */
   onBack?: () => void;
+  /** Hide the back button (e.g. when the screen is a tab's root). */
+  hideBack?: boolean;
 }
 
-export function ScreenHeader({ title, subtitle, right, onBack }: ScreenHeaderProps) {
+export function ScreenHeader({ title, subtitle, right, onBack, hideBack }: ScreenHeaderProps) {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -112,11 +114,13 @@ export function ScreenHeader({ title, subtitle, right, onBack }: ScreenHeaderPro
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.buttonRow}>
-        <GlassIconButton
-          icon="chevron-left"
-          onPress={onBack ?? (() => router.back())}
-          accessibilityLabel="Go back"
-        />
+        {hideBack ? null : (
+          <GlassIconButton
+            icon="chevron-left"
+            onPress={onBack ?? (() => router.back())}
+            accessibilityLabel="Go back"
+          />
+        )}
         <View style={styles.right}>{right}</View>
       </View>
       <Animated.View entering={FadeIn.duration(260)}>

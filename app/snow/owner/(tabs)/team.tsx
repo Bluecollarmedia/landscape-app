@@ -1,11 +1,6 @@
-import { SnowPlaceholder } from '@/components/snow/SnowPlaceholder';
+import React from 'react';
+import { SnowTeamScreen } from '../../../(owner)/(tabs)/more/snow-team';
 
-export default function Screen() {
-  return (
-    <SnowPlaceholder
-      title="Snow Team"
-      icon="users"
-      purpose="Snow employees, their service access, signup requests and time records."
-    />
-  );
+export default function SnowOwnerTeamTab() {
+  return <SnowTeamScreen asTab />;
 }

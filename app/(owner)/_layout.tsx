@@ -41,6 +41,8 @@ export default function OwnerLayout() {
         <Stack.Screen name="document-edit" options={{ presentation: 'modal', gestureEnabled: false }} />
         {/* Maintenance property + contract form: opened from Maintenance and from a route. */}
         <Stack.Screen name="maintenance-property-edit" options={{ presentation: 'modal' }} />
+        {/* Snow Mode activity log: opened from the snow dashboard and settings. */}
+        <Stack.Screen name="snow-activity" />
         <Stack.Screen name="setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
       </Stack>
     </ScheduleProvider>

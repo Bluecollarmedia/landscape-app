@@ -65,3 +65,19 @@ psql -d t -f supabase/updates/020_snow_access.sql
 psql -d t -f supabase/updates/020b_snow_foundation.sql
 psql -d t -f supabase/tests/020b_snow_foundation_test.sql
 ```
+
+`028_snow_shifts_test.sql` checks the snow time clock (run 020 and 020b
+first): a snow-only employee who leads no route clocks in and out without
+seeing any route, visit or property; a retry or double tap never makes a
+second shift; there are no location columns; pending applicants and customers
+can't clock in or see shifts; employees can't write or correct their own time;
+owner corrections need a reason, keep the tapped times and an append-only
+correction history, can close a forgotten shift, and refuse overlaps; a voided
+shift counts zero and can't change; shifts and corrections can't be deleted;
+a revoked employee can still clock out but not back in; every action is in the
+activity log; landscaping work_sessions are untouched.
+
+```sh
+psql -d t -f supabase/updates/028_snow_shifts.sql
+psql -d t -f supabase/tests/028_snow_shifts_test.sql
+```

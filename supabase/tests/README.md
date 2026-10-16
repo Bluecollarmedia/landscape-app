@@ -136,3 +136,13 @@ the other updates so the landscaping sweep covers every table.
 for f in supabase/updates/0*.sql; do grep -v supabase_vault "$f" | psql -d t; done
 psql -d t -f supabase/tests/020_snow_access_test.sql
 ```
+
+`021_snow_mode_switch_test.sql` checks the Landscaping/Snow switch: companies
+start in Landscaping, a worker can't switch, the owner can (who and when are
+stamped and can't be forged), unknown modes are refused, and switching touches
+no other data.
+
+```sh
+psql -d t -f supabase/updates/021_snow_mode_switch.sql
+psql -d t -f supabase/tests/021_snow_mode_switch_test.sql
+```

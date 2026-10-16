@@ -62,7 +62,7 @@ export default function JoinTeamScreen() {
       setCodeValid(true);
       setCodeError('');
       setCompanyName(result.companyName ?? '');
-      setJoiningAsMaintenance(result.workerType === 'maintenance');
+      setJoiningAsMaintenance('workerType' in result && result.workerType === 'maintenance');
     } else {
       setCodeValid(false);
       setCodeError(`Invalid ${codeLabel.toLowerCase()}. Please check and try again.`);

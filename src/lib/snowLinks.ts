@@ -15,7 +15,7 @@ export function snowDashboardHref(target: SnowTarget): string | undefined {
     case 'storm':
     case 'route':
     case 'visit':
-      // TODO(snow): storm detail / route review / visit screens.
+      // TODO(snow): storm detail / route review / visit screens, under /snow/owner/... (e.g. /snow/owner/storm/<id>).
       return undefined;
   }
 }

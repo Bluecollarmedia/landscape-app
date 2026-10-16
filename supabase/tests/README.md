@@ -65,3 +65,17 @@ psql -d t -f supabase/updates/020_snow_access.sql
 psql -d t -f supabase/updates/020b_snow_foundation.sql
 psql -d t -f supabase/tests/020b_snow_foundation_test.sql
 ```
+
+`024_snow_storm_lifecycle_test.sql` checks the storm lifecycle (run 020, 020b,
+022 and 024 first): creating a draft per service (a repeated create makes one
+storm), only properties with the storm's service are offered, status and
+stamps can't be set directly, dispatch needs a route with stops and a lead,
+two storms can be active at once, workers and customers can't run any of it,
+ending keeps unfinished stops unfinished and blocks new work, reopening keeps
+completed work and creates no notifications or media, extra passes are new
+visits, repeated taps change nothing, and no storm goes back to draft.
+
+```sh
+psql -d t -f supabase/updates/024_snow_storm_lifecycle.sql
+psql -d t -f supabase/tests/024_snow_storm_lifecycle_test.sql
+```

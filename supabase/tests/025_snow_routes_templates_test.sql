@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP 0
 \pset tuples_only on
 \pset format unaligned
--- Run after 020, 020b, 022 and 025. Lines starting EXPECT ERROR are followed
+-- Run after 020, 020b, 022, 024 and 025. Lines starting EXPECT ERROR are followed
 -- by the error the user would get.
 alter table auth.users disable trigger all;
 alter table public.company_members disable trigger all;
@@ -71,7 +71,7 @@ select 'routes led by plower', count(*) from snow_routes where lead_person_id='1
 select snow_assign_lead('40000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-00000000000d', true);
 
 -- Dispatch, then work the first stop.
-update snow_storms set status='dispatched', dispatched_at=now() where id='30000000-0000-0000-0000-000000000001';
+select snow_dispatch_storm('30000000-0000-0000-0000-000000000001') \g /dev/null
 update snow_visits set status='arrived', arrived_at=now(), arrived_by='10000000-0000-0000-0000-00000000000b'
  where route_id='40000000-0000-0000-0000-000000000001' and position=1;
 -- Add a stop right after the one being worked (ahead of the lead's next stop).
@@ -114,7 +114,7 @@ select snow_apply_template((select id from snow_route_templates), '30000000-0000
 delete from snow_route_template_stops;
 
 -- Ended storms take no route edits until reopened.
-update snow_storms set status='ended', ended_at=now() where id='30000000-0000-0000-0000-000000000001';
+select snow_end_storm('30000000-0000-0000-0000-000000000001') \g /dev/null
 \echo EXPECT ERROR add to ended storm:
 select snow_add_visit('40000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001');
 

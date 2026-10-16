@@ -67,7 +67,7 @@ psql -d t -f supabase/tests/020b_snow_foundation_test.sql
 ```
 
 `025_snow_routes_templates_test.sql` checks owner route management (run 020,
-020b, 022 and 025 first): stops added at any position including a repeat pass
+020b, 022, 024 and 025 first): stops added at any position including a repeat pass
 at the same property, a retried add makes one visit, drag-and-drop reorder and
 a stale order refused, one person leading two routes is a warning the owner
 confirms (never a block), a lead must hold the service, stops added after
@@ -80,6 +80,7 @@ templates.
 
 ```sh
 psql -d t -f supabase/updates/022_snow_property_details.sql
+psql -d t -f supabase/updates/024_snow_storm_lifecycle.sql
 psql -d t -f supabase/updates/025_snow_routes_templates.sql
 psql -d t -f supabase/tests/025_snow_routes_templates_test.sql
 ```

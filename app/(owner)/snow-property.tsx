@@ -14,6 +14,7 @@ import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { Button, Icon, Input, LoadingSpinner } from '@/components/ui';
 import { TaskMediaStrip, TaskMediaViewer } from '@/components/tasks/TaskMedia';
 import { snowMediaItems } from '@/components/snow/SnowReference';
+import { OwnerPropertyNotifications } from '@/components/snow/notifications/SnowNotifySettings';
 import { notify, pickSnowMedia } from '@/components/snow/pickSnowMedia';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
@@ -112,6 +113,7 @@ export default function SnowPropertyScreen() {
                 onChanged={reload}
               />
             ))}
+            <OwnerPropertyNotifications propertyId={id} />
           </>
         )}
       </KeyboardAwareScrollView>

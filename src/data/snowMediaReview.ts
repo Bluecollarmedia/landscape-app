@@ -63,7 +63,7 @@ export async function reviewMedia(mediaId: string, status: 'approved' | 'hidden'
   return error ? fail(message(error, 'Couldn\'t save the review.')) : ok(undefined);
 }
 
-/** Shares the stop's approved media and notifies linked customers once. Returns how many were notified. */
+/** Shares the stop's approved media with linked customers (update 031 sends the "done" message). Returns how many were shared. */
 export async function sendCustomerUpdate(visitId: string): Promise<Result<number>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { data, error } = await supabase.rpc('snow_send_customer_update', { p_visit_id: visitId });

@@ -65,9 +65,9 @@ export function SnowMediaReviewScreen() {
     const res = await sendCustomerUpdate(s.visitId);
     setBusy(null);
     if (!res.ok) return showMessage('Couldn\'t send', res.error);
-    showMessage('Update sent', res.data
-      ? `${res.data} ${res.data === 1 ? 'customer was' : 'customers were'} notified.`
-      : 'Approved photos are shared. No customer account is linked to this property, so nobody was notified.');
+    showMessage('Sent to the customer', res.data
+      ? `${res.data} ${res.data === 1 ? 'photo is' : 'photos are'} now in their Snow updates.`
+      : 'The stop is now in their Snow updates.');
     reload();
   }
 

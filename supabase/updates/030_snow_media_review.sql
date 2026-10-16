@@ -3,11 +3,11 @@
 -- (safe to run again).
 --  • The owner/admin reviews each completion photo/video (approve or hide)
 --    before anything reaches a customer. New media starts as "to review".
---  • "Send update" on a completed stop shares its approved media with the
---    property's linked customer contacts and puts one in-app notification in
---    each one's bell (which also pushes to their phone, update 008). Sending
---    again for the same stop shares newly approved media but doesn't notify
---    twice.
+--  • "Send to customer" on a completed stop shares its approved media with
+--    the property's linked customer contacts, so it shows in their Snow
+--    updates. Sending again shares newly approved media. The "work is done"
+--    message itself comes from update 031 (customer notification settings),
+--    so nothing here notifies anyone and customers are never told twice.
 --  • Customers read their updates through snow_customer_updates(): completed
 --    stops at properties where they're a linked contact, with only the media
 --    that was shared. They never see hidden or unreviewed media, routes,
@@ -63,16 +63,13 @@ end;
 $$;
 
 -- ── Owner/admin: send the update to the customer ────────────────────────────
--- Returns how many customers were notified this time.
+-- Returns how many photos/videos were shared this time.
 
 create or replace function public.snow_send_customer_update(p_visit_id uuid)
 returns int language plpgsql security definer set search_path = public as $$
 declare
   v public.snow_visits;
   shared int;
-  notified int := 0;
-  c record;
-  svc text;
 begin
   select * into v from public.snow_visits where id = p_visit_id;
   if v.id is null or not public.is_staff(v.company_id) then raise exception 'Stop not found.'; end if;
@@ -86,25 +83,15 @@ begin
    where visit_id = v.id and review_status = 'approved' and shared_at is null;
   get diagnostics shared = row_count;
 
+  -- Marks the stop as released to the customer's Snow updates.
   if v.customer_notified_at is null then
-    svc := case v.service when 'plowing' then 'Plowing' when 'shoveling' then 'Shoveling' else 'Salting' end;
-    for c in
-      select distinct person_id from public.snow_property_contacts
-       where property_id = v.property_id and person_id is not null and removed_at is null
-    loop
-      insert into public.app_notifications (company_id, recipient_id, event_type, title, body, linked_entity_type, linked_entity_id)
-      values (v.company_id, c.person_id, 'snow_visit_completed',
-              svc || ' done at ' || coalesce(v.property_name, 'your property'),
-              'Tap to see the photos.', 'snow_visit', v.id::text);
-      notified := notified + 1;
-    end loop;
     update public.snow_visits set customer_notified_at = now() where id = v.id;
   end if;
 
   perform public.snow_log_event(v.company_id, 'visit.customer_update_sent', 'snow_visit', v.id, v.storm_id, v.route_id,
                                 v.id, v.property_id, p_service => v.service,
-                                p_after => jsonb_build_object('media_shared', shared, 'customers_notified', notified));
-  return notified;
+                                p_after => jsonb_build_object('media_shared', shared));
+  return shared;
 end;
 $$;
 

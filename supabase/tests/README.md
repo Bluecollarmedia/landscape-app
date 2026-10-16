@@ -187,7 +187,7 @@ psql -d t -f supabase/tests/028_snow_shifts_test.sql
 `030_snow_media_review_test.sql` checks media review and customer updates (run
 020 through 030 first; it runs the 025/026 test for its fixture): new media
 waits for review, a stop can't be sent until every photo is approved or
-hidden, sending notifies linked customers once, sent photos can't be hidden,
+hidden, sharing happens once per photo, sent photos can't be hidden,
 leads can't review, and customers see only their own completed stops with
 shared media.
 

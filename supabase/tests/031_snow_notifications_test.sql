@@ -71,7 +71,10 @@ insert into snow_visits(id,route_id,property_id) values
  ('50000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001'),
  ('50000000-0000-0000-0000-000000000002','40000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000002'),
  ('50000000-0000-0000-0000-000000000003','40000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001');
-update snow_storms set status='dispatched', dispatched_at=now() where id='30000000-0000-0000-0000-000000000001';
+select current_setting('request.jwt.claim.sub') as prev_sub \gset
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a',false) \g /dev/null
+select snow_dispatch_storm('30000000-0000-0000-0000-000000000001') \g /dev/null
+select set_config('request.jwt.claim.sub', :'prev_sub', false) \g /dev/null
 
 -- Arrival at Oak (pass 1): arrival is on, so both Oak contacts are told. No owner alert for arrivals.
 update snow_visits set status='arrived' where id='50000000-0000-0000-0000-000000000001';
@@ -107,10 +110,16 @@ select 'PASS 2 with alerts off: owner alerts', count(*) from snow_notifications 
 select 'PASS 2 with alerts off: customer notices still', count(*) from snow_notifications where visit_id='50000000-0000-0000-0000-000000000003' and category='customer';
 select 'PASS 2 still completed and logged', v.status, exists(select 1 from snow_activity_events e where e.visit_id=v.id and e.action='visit.completed') from snow_visits v where v.id='50000000-0000-0000-0000-000000000003';
 
--- End and reopen: nothing is re-sent; a new pass is a new visit and notifies once.
+-- End and reopen (through update 024's lifecycle functions): nothing is re-sent; a new pass is a new visit and notifies once.
 select count(*) as before_reopen from snow_notifications \gset
-update snow_storms set status='ended', ended_at=now() where id='30000000-0000-0000-0000-000000000001';
-update snow_storms set status='dispatched' where id='30000000-0000-0000-0000-000000000001';
+select current_setting('request.jwt.claim.sub') as prev_sub \gset
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a',false) \g /dev/null
+select snow_end_storm('30000000-0000-0000-0000-000000000001') \g /dev/null
+select set_config('request.jwt.claim.sub', :'prev_sub', false) \g /dev/null
+select current_setting('request.jwt.claim.sub') as prev_sub \gset
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000000a',false) \g /dev/null
+select snow_reopen_storm('30000000-0000-0000-0000-000000000001') \g /dev/null
+select set_config('request.jwt.claim.sub', :'prev_sub', false) \g /dev/null
 select 'REOPEN re-sent nothing', count(*) = :before_reopen from snow_notifications;
 insert into snow_visits(id,route_id,property_id) values ('50000000-0000-0000-0000-000000000004','40000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001');
 update snow_visits set status='arrived' where id='50000000-0000-0000-0000-000000000004';

@@ -1,11 +1,3 @@
-import { SnowPlaceholder } from '@/components/snow/SnowPlaceholder';
+import { StormsListScreen } from '@/components/snow/storms/StormsListScreen';
 
-export default function Screen() {
-  return (
-    <SnowPlaceholder
-      title="Storms"
-      icon="cloud-snow"
-      purpose="Create, prepare, dispatch, end and reopen storms, and manage each storm's routes."
-    />
-  );
-}
+export default StormsListScreen;

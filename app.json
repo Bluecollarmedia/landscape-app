@@ -38,10 +38,12 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Brighton Lawn to access your photos for profile pictures.",
-          "cameraPermission": "Allow Brighton Lawn to use the camera for profile pictures."
+          "photosPermission": "Allow Brighton Lawn to access your photos for profile pictures, job photos and task instructions.",
+          "cameraPermission": "Allow Brighton Lawn to use the camera for profile pictures, job photos and task instructions.",
+          "microphonePermission": "Allow Brighton Lawn to record sound when you film a video for a task."
         }
       ],
+      "expo-video",
       [
         "expo-splash-screen",
         {

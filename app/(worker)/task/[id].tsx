@@ -11,6 +11,8 @@ import { StatusBadge } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { haptics } from '@/lib/haptics';
+import { db } from '@/data/store';
+import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,9 +25,12 @@ export default function TaskDetailScreen() {
   } = useWorkerContext();
 
   const [busy, setBusy] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const tasks = currentJob ? projectTasks(currentJob.projectId) : [];
   const task = tasks.find(t => t.id === id);
+  const attachments = task ? db.taskAttachments[task.id] ?? [] : [];
+  const mediaItems: TaskMediaItem[] = attachments.map(a => ({ key: a.id, uri: a.fileUrl, mediaType: a.mediaType }));
   const settings = currentJob ? projectSettings(currentJob.projectId) : undefined;
   const photoRequired = settings?.completionPhotoRequired ?? false;
   const hasPhoto = task ? !!taskPhotoCaptured[task.id] : false;
@@ -143,6 +148,18 @@ export default function TaskDetailScreen() {
           </View>
         )}
 
+        {attachments.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.lg }, shadow.md]}>
+            <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>
+              {attachments.some(a => a.mediaType === 'video') ? 'PHOTOS AND VIDEOS' : 'PHOTOS'}
+            </Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>
+              Tap to see what needs to be done.
+            </Text>
+            <TaskMediaStrip items={mediaItems} onOpen={setViewerIndex} />
+          </View>
+        )}
+
         {(photoRequired || photoUri) && (
           <View style={[styles.photoArea, { backgroundColor: colors.groupedBackground, marginTop: spacing.lg }]}>
             {photoUri ? (
@@ -209,6 +226,13 @@ export default function TaskDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      <TaskMediaViewer
+        items={mediaItems}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+        onClose={() => setViewerIndex(null)}
+      />
     </View>
   );
 }

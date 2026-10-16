@@ -49,6 +49,18 @@ psql -d t -f supabase/updates/018_maintenance.sql
 psql -d t -f supabase/tests/018_maintenance_test.sql
 ```
 
+`020_snow_access_test.sql` checks Snow Mode access: snow-only employees (and
+pending or revoked ones) see zero rows in every landscaping table, a
+dual-mode worker keeps landscaping, plowing / shoveling / salting are
+separate, only the owner can grant or revoke, switching the company to Snow
+Mode grants nothing, and grants and revokes are logged once. Run it after all
+the other updates so the landscaping sweep covers every table.
+
+```sh
+for f in supabase/updates/0*.sql; do grep -v supabase_vault "$f" | psql -d t; done
+psql -d t -f supabase/tests/020_snow_access_test.sql
+```
+
 `020b_snow_foundation_test.sql` checks the Snow Mode base tables (run 020
 first): the same property twice on one route and on another route as separate
 visits, a lead must hold the route's service and can lead several routes, lead
@@ -64,4 +76,18 @@ workers/customers see nothing from these tables.
 psql -d t -f supabase/updates/020_snow_access.sql
 psql -d t -f supabase/updates/020b_snow_foundation.sql
 psql -d t -f supabase/tests/020b_snow_foundation_test.sql
+```
+
+`020c_snow_lead_access_test.sql` checks route lead access (run 020 and 020b
+first): a lead sees only the routes they lead (several in one storm is fine),
+their stops, properties, media and skip requests, and nothing from other
+routes or services; non-leads, landscaping workers and customers see nothing;
+draft storms stay hidden until dispatch and ended storms leave the lead's
+view; leads can't reorder, complete, skip, add, delete or reassign by writing
+to tables; and reassigning, cancelling, removing the service or revoking snow
+access takes access away at once.
+
+```sh
+psql -d t -f supabase/updates/020c_snow_lead_access.sql
+psql -d t -f supabase/tests/020c_snow_lead_access_test.sql
 ```

@@ -28,6 +28,8 @@ export interface Project {
   companyId: string;
   customerId?: string;
   name: string;
+  /** The one worker who can start/complete this job's tasks (update 016). */
+  taskLeadId?: string;
   address?: string;
   city?: string;
   state?: string;
@@ -81,6 +83,8 @@ export interface ProjectTask {
   sortOrder: number;
   assignedTo?: string;
   completedAt?: string;
+  /** Stamped by the database when the task is completed (update 016). */
+  completedBy?: string;
   createdAt: string;
   updatedAt: string;
   assignee?: PersonSummary;

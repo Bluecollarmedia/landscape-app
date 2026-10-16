@@ -112,8 +112,8 @@ export default function TaskDetailScreen() {
   }
 
   function handleMarkComplete() {
+    if (!completeTask(task!.id)) return;
     haptics.success();
-    completeTask(task!.id);
     router.back();
   }
 

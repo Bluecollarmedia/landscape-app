@@ -1376,6 +1376,40 @@ export default function ProjectDetailScreen() {
           />
         </View>
 
+        {/* Task Lead (update 016): only this worker can start/complete tasks on the job. */}
+        <View style={[styles.taskStatsHeader, { gap: spacing.sm }]}>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>Task Lead</Text>
+          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+            {p.taskLeadId
+              ? 'Only the Task Lead can start and complete tasks. The rest of the crew can see them.'
+              : 'Pick one worker to run the task list. Until then, workers can\'t change tasks.'}
+          </Text>
+          {team.length ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {team.map(tm => {
+                const on = tm.personId === p.taskLeadId;
+                const label = tm.person ? `${tm.person.firstName} ${tm.person.lastName}`.trim() : 'Worker';
+                return (
+                  <Pressable
+                    key={tm.personId}
+                    onPress={() => updateProject({ taskLeadId: tm.personId })}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    style={{
+                      paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.full,
+                      backgroundColor: on ? colors.primary : colors.primarySurface,
+                    }}
+                  >
+                    <Text style={[typeScale.labelLarge, { color: on ? '#fff' : colors.primary }]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Add workers to the project team first.</Text>
+          )}
+        </View>
+
         <View style={styles.taskFilterRow}>
           {filterOptions.map(opt => (
             <Pressable

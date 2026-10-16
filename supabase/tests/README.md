@@ -195,3 +195,13 @@ shared media.
 psql -d t -f supabase/updates/030_snow_media_review.sql
 (cd supabase/tests && psql -d t -f 030_snow_media_review_test.sql)
 ```
+
+`016_task_leads_test.sql` checks Task Lead (run update 016 first): with no
+lead picked no worker can change tasks, only an active worker can be the lead,
+another worker can't change tasks, the lead can change status but not edit
+tasks, and the database stamps who completed a task and when.
+
+```sh
+psql -d t -f supabase/updates/016_task_leads.sql
+psql -d t -f supabase/tests/016_task_leads_test.sql
+```

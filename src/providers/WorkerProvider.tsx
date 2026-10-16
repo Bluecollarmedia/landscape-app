@@ -32,6 +32,11 @@ const MAX_ACCURACY_ALLOWANCE_M = 75;
 
 type JobState = 'not_started' | 'confirmed' | 'en_route' | 'checked_in' | 'working' | 'completed';
 
+function showTaskLeadNotice(message: string) {
+  if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(message);
+  else Alert.alert('Task Lead only', message);
+}
+
 interface WorkerContextValue {
   todayAssignments: Assignment[];
   upcomingAssignments: Assignment[];
@@ -56,8 +61,11 @@ interface WorkerContextValue {
   checkOuts: CheckOut[];
 
   projectTasks: (projectId: string) => ProjectTask[];
-  startTask: (taskId: string) => void;
-  completeTask: (taskId: string) => void;
+  /** Whether this worker is the job's Task Lead (only the lead can change its tasks, update 016). */
+  isTaskLead: (projectId: string) => boolean;
+  /** Both refuse (with a message) when this worker isn't the job's Task Lead. */
+  startTask: (taskId: string) => boolean;
+  completeTask: (taskId: string) => boolean;
   projectSettings: (projectId: string) => ProjectSettings | undefined;
   taskPhotoCaptured: Record<string, boolean>;
   taskPhotoUris: Record<string, string>;
@@ -314,18 +322,36 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
   const projectTasksFn = useCallback((projectId: string): ProjectTask[] =>
     db.tasks[projectId] ?? [], [v]);
 
+  const isTaskLead = useCallback((projectId: string) =>
+    db.projects.find(p => p.id === projectId)?.taskLeadId === workerId, [v, workerId]);
+
+  // The database refuses task changes from anyone but the Task Lead, so stop
+  // here with the reason instead of showing a change that won't save.
+  const leadOrExplain = useCallback((projectId?: string) => {
+    const lead = db.projects.find(p => p.id === projectId)?.taskLeadId;
+    if (lead === workerId) return true;
+    const name = lead ? db.people[lead] : undefined;
+    showTaskLeadNotice(lead
+      ? `Only the Task Lead${name ? `, ${name.firstName},` : ''} can change tasks on this job.`
+      : 'This job has no Task Lead yet. Ask the owner to pick one.');
+    return false;
+  }, [v, workerId]);
+
   const startTask = useCallback((taskId: string) => {
     const task = findRow('project_tasks', taskId);
+    if (!leadOrExplain(task?.projectId)) return false;
     updateRow('project_tasks', taskId, { status: 'in_progress' });
     if (currentJob?.status === 'checked_in') updateRow('assignments', currentJob.id, { status: 'working' });
     logActivity({
       assignmentId: currentJob?.id, projectId: task?.projectId,
       activityType: 'task_started', description: `Started: ${task?.title ?? 'task'}`,
     });
-  }, [currentJob, logActivity]);
+    return true;
+  }, [currentJob, logActivity, leadOrExplain]);
 
   const completeTask = useCallback((taskId: string) => {
     const task = findRow('project_tasks', taskId);
+    if (!leadOrExplain(task?.projectId)) return false;
     updateRow('project_tasks', taskId, { status: 'completed', completedAt: new Date().toISOString() });
     logActivity({
       assignmentId: currentJob?.id, projectId: task?.projectId,
@@ -336,7 +362,8 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
       const projectName = db.projects.find(p => p.id === task.projectId)?.name ?? 'a project';
       notifyStaff('worker_completed_task', 'Task completed', `${workerName} completed "${task.title}" at ${projectName}.`, { type: 'project', id: task.projectId }, undefined, workerId);
     }
-  }, [currentJob, logActivity, workerName]);
+    return true;
+  }, [currentJob, logActivity, workerName, leadOrExplain]);
 
   const projectSettingsFn = useCallback((projectId: string) =>
     db.settings[projectId], [v]);
@@ -407,6 +434,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     checkIns: checkInList,
     checkOuts: checkOutList,
     projectTasks: projectTasksFn,
+    isTaskLead,
     startTask,
     completeTask,
     projectSettings: projectSettingsFn,
@@ -426,7 +454,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     currentJob, nextJob, jobState, scheduleConfirmed, hasScheduleChanges,
     confirmSchedule, acknowledgeChanges,
     checkIn, checkOut, locateForCheckIn, locateForCheckOut, checkInList, checkOutList,
-    projectTasksFn, startTask, completeTask, projectSettingsFn,
+    projectTasksFn, isTaskLead, startTask, completeTask, projectSettingsFn,
     taskPhotos, taskPhotoUris, captureTaskPhoto, activityList, workerSettings,
     updateNavApp, updateNotificationsEnabled, offlineQueue, isOnline, openMapsNavigation, moveToNextJob,
   ]);

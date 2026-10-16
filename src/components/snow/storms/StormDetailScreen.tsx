@@ -3,12 +3,12 @@
  * actions: Dispatch (draft), End Storm (active, always confirmed), Reopen
  * (ended). The database decides what's allowed; this screen shows its answer.
  *
- * Route building and editing are the routes screens' job (update 025);
- * routes are listed here read-only. Working layout in the existing app
- * style; no approved mockup yet.
+ * Routes are added here (blank or from a saved template) and edited on the
+ * route screen (update 025). Working layout in the existing app style; no
+ * approved mockup yet.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, Icon, InlineNotice, LoadingSpinner, ProgressBar, ScreenHeader, StatusBadge } from '@/components/ui';
@@ -24,6 +24,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { SnowStorm } from '@/types/snow';
 import { STATUS_TONE } from './StormsListScreen';
+import { addRouteFromTemplate, createRoute, loadRouteTemplates, type RouteTemplate } from '@/data/snowRoutes';
 
 const fmt = (iso?: string) =>
   iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
@@ -37,6 +38,7 @@ export function StormDetailScreen() {
   const [summary, setSummary] = useState<StormSummary | null>(null);
   const [routes, setRoutes] = useState<StormRouteRow[]>([]);
   const [eligible, setEligible] = useState<number | null>(null);
+  const [templates, setTemplates] = useState<RouteTemplate[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -54,6 +56,10 @@ export function StormDetailScreen() {
     setStorm(s.data.storm);
     setSummary(s.data.summary);
     if (r.ok) setRoutes(r.data);
+    if (s.data.storm.status !== 'ended') {
+      const t = await loadRouteTemplates(s.data.storm.service);
+      if (ticket === latest.current && t.ok) setTemplates(t.data);
+    }
     if (s.data.storm.status === 'draft') {
       const e = await loadEligibleProperties(id);
       if (ticket === latest.current && e.ok) setEligible(e.data.length);
@@ -129,6 +135,26 @@ export function StormDetailScreen() {
     }, true);
   }
 
+  const openRoute = (routeId: string) => router.push({ pathname: '/snow/owner/route/[id]', params: { id: routeId } });
+
+  async function onAddRoute() {
+    if (!storm) return;
+    setBusy(true);
+    const res = await createRoute(storm.id, { name: `Route ${routes.length + 1}`, mediaRequired: true, minMedia: 1 });
+    setBusy(false);
+    if (!res.ok) return showMessage('Couldn\'t add the route', res.error);
+    openRoute(res.data);
+  }
+
+  async function onUseTemplate(t: RouteTemplate) {
+    if (!storm) return;
+    setBusy(true);
+    const res = await addRouteFromTemplate(storm.id, t.id);
+    setBusy(false);
+    if (!res.ok) return showMessage('Couldn\'t add the route', res.error);
+    openRoute(res.data);
+  }
+
   if (loading) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -183,7 +209,12 @@ export function StormDetailScreen() {
         {routes.length ? (
           <View style={[styles.group, { backgroundColor: colors.surface }]}>
             {routes.map((r, i) => (
-              <View key={r.id} style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
+              <Pressable
+                key={r.id}
+                onPress={() => openRoute(r.id)}
+                accessibilityRole="button"
+                style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}
+              >
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={[typeScale.bodyLarge, { color: r.cancelled ? colors.textTertiary : colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
                     {r.name}{r.cancelled ? ' (cancelled)' : ''}
@@ -195,7 +226,8 @@ export function StormDetailScreen() {
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
                   {r.stops ? `${r.completed} of ${r.stops} done` : 'No stops'}
                 </Text>
-              </View>
+                <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+              </Pressable>
             ))}
           </View>
         ) : (
@@ -206,6 +238,22 @@ export function StormDetailScreen() {
             </Text>
           </View>
         )}
+        {storm.status !== 'ended' ? (
+          <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+            <Button title="Add route" icon="plus" variant="secondary" onPress={onAddRoute} disabled={busy} fullWidth />
+            {templates.map((t) => (
+              <Button
+                key={t.id}
+                title={`Add "${t.name}" (${t.stops} ${t.stops === 1 ? 'stop' : 'stops'})`}
+                icon="copy"
+                variant="ghost"
+                onPress={() => onUseTemplate(t)}
+                disabled={busy}
+                fullWidth
+              />
+            ))}
+          </View>
+        ) : null}
         {storm.status === 'draft' && eligible !== null ? (
           <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary }]}>
             {eligible === 0

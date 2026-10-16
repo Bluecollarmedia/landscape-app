@@ -15,6 +15,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   clockIn, clockOut, correctShift, formatClock, formatHours, loadShifts, shiftHours, startOfWeekIso, type SnowShift,
 } from '@/data/snowShifts';
+import { ShiftCorrectionSheet } from './ShiftCorrectionSheet';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -123,6 +124,7 @@ export function SnowHoursScreen() {
   const insets = useSafeAreaInsets();
   const { shifts, error, loading, reload } = useShifts();
   const [names, setNames] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<SnowShift | null>(null);
 
   useEffect(() => {
     const ids = [...new Set(shifts.map((s) => s.personId))].filter((id) => !names[id]);
@@ -178,9 +180,12 @@ export function SnowHoursScreen() {
                       s={s}
                       first={i === 0}
                       name={names[s.personId]}
-                      action={!s.originalOut ? (
-                        <Button title="Clock out now" size="sm" variant="secondary" onPress={() => clockOutNow(s)} style={{ alignSelf: 'flex-start', marginTop: spacing.xs }} />
-                      ) : null}
+                      action={(
+                        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+                          <Button title="Correct times" size="sm" variant="secondary" onPress={() => setEditing(s)} />
+                          {!s.originalOut ? <Button title="Clock out now" size="sm" variant="secondary" onPress={() => clockOutNow(s)} /> : null}
+                        </View>
+                      )}
                     />
                   ))}
                 </View>
@@ -189,6 +194,12 @@ export function SnowHoursScreen() {
           </>
         )}
       </ScrollView>
+      <ShiftCorrectionSheet
+        shift={editing}
+        who={editing ? names[editing.personId] : undefined}
+        onClose={() => setEditing(null)}
+        onSaved={reload}
+      />
     </View>
   );
 }

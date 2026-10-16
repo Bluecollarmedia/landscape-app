@@ -9,6 +9,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useAuth } from '@/providers/AuthProvider';
 import { useJoinRequests } from '@/hooks/useOnboarding';
+import { useSnowOnboardingAdmin } from '@/hooks/useSnowOnboarding';
 import { Avatar, IconTile, MenuGroup, MenuRow, PressableScale, FadeInItem } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -28,6 +29,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { pendingRequests } = useJoinRequests();
+  const { pending: pendingSnow } = useSnowOnboardingAdmin();
 
   const go = (route: string) => router.push(route as any);
 
@@ -125,6 +127,7 @@ export default function MoreScreen() {
             {memberRole !== 'admin' && (
               <MenuRow icon="users" label="Accounts" subtitle="Everyone who has signed up" onPress={() => go('/(owner)/more/accounts')} />
             )}
+            <MenuRow icon="cloud-snow" label="Snow Team" subtitle="Snow code, snow requests and access" count={pendingSnow.length} onPress={() => go('/(owner)/more/snow-team')} />
             <MenuRow icon="sliders" label="Join Settings" subtitle="Team code and invitations" onPress={() => go('/(owner)/more/join-settings')} />
             <MenuRow icon="user-check" label="Attendance" subtitle="Check-ins and status" onPress={() => go('/(owner)/more/attendance')} />
           </MenuGroup>

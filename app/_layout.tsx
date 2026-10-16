@@ -52,12 +52,13 @@ function RootNavigator() {
       return;
     }
 
+    // The setup hub links to the create-company / join-team / project-code
+    // screens, which also work for an already-signed-in user.
+    const setupScreens = ['create-company', 'join-team', 'customer-access'];
+    const onSetupScreen = inAuthGroup && setupScreens.includes((segments as string[])[1] ?? '');
+
     if (appState === 'onboarding') {
-      // Signed in but not part of a company yet. The setup hub links to the
-      // create-company / join-team / project-code screens, which also work
-      // for an already-signed-in user, so those are allowed here too.
-      const setupScreens = ['create-company', 'join-team', 'customer-access'];
-      const onSetupScreen = inAuthGroup && setupScreens.includes((segments as string[])[1] ?? '');
+      // Signed in but not part of a company yet.
       if (!inOnboardingGroup && !onSetupScreen) {
         router.replace('/(onboarding)/setup');
       }
@@ -72,7 +73,8 @@ function RootNavigator() {
     }
 
     if (appState === 'declined') {
-      if (!inOnboardingGroup) {
+      // A declined person may try again with a new code.
+      if (!inOnboardingGroup && !onSetupScreen) {
         router.replace('/(onboarding)/declined');
       }
       return;

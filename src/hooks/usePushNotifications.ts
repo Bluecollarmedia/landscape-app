@@ -24,6 +24,7 @@ function targetFor(role: UserRole, d: PushData): string | { pathname: string; pa
   }
   if (role === 'customer') {
     if (DOC_TYPES.has(type) && id) return { pathname: '/(customer)/document', params: { kind: type, id } };
+    if (type === 'snow_visit') return '/(customer)/snow-updates';
     return '/(customer)';
   }
   return '/(worker)/notifications';

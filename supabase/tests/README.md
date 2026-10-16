@@ -183,3 +183,15 @@ reason, can't be edited, and the clock in/out/correction are logged.
 psql -d t -f supabase/updates/028_snow_shifts.sql
 psql -d t -f supabase/tests/028_snow_shifts_test.sql
 ```
+
+`030_snow_media_review_test.sql` checks media review and customer updates (run
+020 through 030 first; it runs the 025/026 test for its fixture): new media
+waits for review, a stop can't be sent until every photo is approved or
+hidden, sending notifies linked customers once, sent photos can't be hidden,
+leads can't review, and customers see only their own completed stops with
+shared media.
+
+```sh
+psql -d t -f supabase/updates/030_snow_media_review.sql
+(cd supabase/tests && psql -d t -f 030_snow_media_review_test.sql)
+```

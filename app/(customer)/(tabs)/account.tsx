@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useAuth } from '@/providers/AuthProvider';
@@ -13,6 +14,7 @@ import { db, useDb } from '@/data/store';
 import { formatAddress } from '@/lib/address';
 
 export default function CustomerAccountScreen() {
+  const router = useRouter();
   const { colors } = useTheme();
   const { user, signOut, switchDevRole } = useAuth();
   useDb();
@@ -36,6 +38,17 @@ export default function CustomerAccountScreen() {
             </Text>
           </View>
         </View>
+      </ListSection>
+
+      <ListSection title="Snow">
+        <ListRow
+          icon="cloud-snow"
+          iconColor={colors.primary}
+          title="Snow updates"
+          subtitle="Plowing, shoveling and salting at your property, with photos"
+          showChevron
+          onPress={() => router.push('/(customer)/snow-updates')}
+        />
       </ListSection>
 
       <ListSection title="Your Project Team">

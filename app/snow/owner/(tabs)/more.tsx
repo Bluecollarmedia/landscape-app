@@ -27,6 +27,12 @@ export default function SnowOwnerMoreScreen() {
           subtitle="Who clocked in this week, and fix a missed clock-out"
           onPress={() => router.push('/snow/owner/hours')}
         />
+        <SettingsRow
+          icon="camera"
+          title="Photo review"
+          subtitle="Approve photos and send updates to customers"
+          onPress={() => router.push('/snow/owner/review')}
+        />
       </SettingsGroup>
       <SettingsGroup title="Mode">
         <ModeSwitchRow />

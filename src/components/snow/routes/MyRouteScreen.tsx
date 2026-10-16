@@ -20,6 +20,7 @@ import {
   type MyRoute, type RouteDetail,
 } from '@/data/snowRoutes';
 import { STOP_TONE } from './RouteEditScreen';
+import { LeadSkipPanel } from './SkipRequests';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -154,6 +155,7 @@ export function MyRouteScreen() {
                     />
                   </>
                 )}
+                <LeadSkipPanel visitId={current.id} disabled={busy} onChanged={reload} />
               </View>
             ) : null}
             {working && !current && route.stops.length ? (

@@ -159,3 +159,17 @@ psql -d t -f supabase/tests/snow_roles_standin.sql   # or 020_snow_access.sql
 psql -d t -f supabase/updates/023_snow_onboarding.sql
 psql -d t -f supabase/tests/snow_onboarding_test.sql
 ```
+
+`025_026_snow_routes_lead_test.sql` checks route building and lead work (run
+020 through 026 first): reorder needs every stop listed once, a saved template
+keeps stop order and lead, using it leaves out properties that no longer offer
+the service, a lead sees nothing before dispatch and only their own routes
+after, stops are worked in order one at a time, a double tap changes nothing,
+the photo minimum blocks Finish Stop, media keys must belong to the stop, a lead
+can't update visits directly, and other plowers and customers see nothing.
+
+```sh
+psql -d t -f supabase/updates/025_snow_routes_templates.sql
+psql -d t -f supabase/updates/026_snow_lead_execution.sql
+psql -d t -f supabase/tests/025_026_snow_routes_lead_test.sql
+```

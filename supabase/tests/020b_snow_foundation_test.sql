@@ -1,4 +1,6 @@
 \set ON_ERROR_STOP 0
+-- Run on 020 + 020b only (before 020c): the "worker sees" lines expect no lead
+-- access yet. With 020c the fixture worker leads routes and sees them, by design.
 \pset tuples_only on
 \pset format unaligned
 -- Fixture: company, owner, a landscaping worker, a customer.

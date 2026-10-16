@@ -57,9 +57,9 @@ const TABLES = {
   companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'storageLimitGb', 'targetPayEnabled', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
   people: { scope: 'all', cols: ['id', 'userId', 'email', 'firstName', 'lastName', 'avatarUrl', 'phone', 'createdAt', 'updatedAt'] },
   company_members: { scope: 'company', cols: ['id', 'companyId', 'personId', 'role', 'status', 'joinMethod', 'joinRequestId', 'approvedBy', 'approvedAt', 'deactivatedAt', 'deactivatedBy', 'createdAt', 'updatedAt'] },
-  projects: { scope: 'company', cols: ['id', 'companyId', 'customerId', 'name', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'status', 'progress', 'startDate', 'estimatedEndDate', 'completedAt', 'notes', 'coverPhotoUrl', 'customerProjectCode', 'customerClaimedBy', 'customerClaimedAt', 'createdAt', 'updatedAt'] },
+  projects: { scope: 'company', cols: ['id', 'companyId', 'customerId', 'name', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'status', 'progress', 'startDate', 'estimatedEndDate', 'completedAt', 'notes', 'coverPhotoUrl', 'customerProjectCode', 'customerClaimedBy', 'customerClaimedAt', 'taskLeadId', 'createdAt', 'updatedAt'] },
   project_team: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'addedAt', 'removedAt'] },
-  project_tasks: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'title', 'description', 'status', 'sortOrder', 'assignedTo', 'completedAt', 'createdAt', 'updatedAt'] },
+  project_tasks: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'title', 'description', 'status', 'sortOrder', 'assignedTo', 'completedAt', 'completedBy', 'createdAt', 'updatedAt'] },
   project_settings: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'customerInteractionEnabled', 'completionPhotoRequired', 'checkinRadiusMeters', 'customerCanRequest', 'customerCanViewPhotos', 'customerCanComment', 'createdAt', 'updatedAt'] },
   project_photos: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'taskId', 'assignmentId', 'uploadedBy', 'fileKey', 'fileUrl', 'caption', 'customerDescription', 'isCustomerVisible', 'sharedBy', 'sharedAt', 'photoType', 'takenAt', 'createdAt'] },
   project_updates: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'createdBy', 'title', 'body', 'isCustomerVisible', 'photoIds', 'createdAt', 'updatedAt'] },
@@ -357,7 +357,7 @@ function derive() {
   }) as CompanyMembership);
 
   // Project children
-  const tasks = groupBy(raw.project_tasks.map((t): Row => ({ ...t, assignee: person(t.assignedTo) })), 'projectId');
+  const tasks = groupBy(raw.project_tasks.map((t): Row => ({ ...t, assignee: person(t.assignedTo), completer: person(t.completedBy) })), 'projectId');
   for (const k of Object.keys(tasks)) tasks[k].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || byCreated(a, b));
   const team = groupBy(
     raw.project_team.filter((t) => !t.removedAt).map((t) => ({ ...t, person: person(t.personId) })),
@@ -402,6 +402,7 @@ function derive() {
         ...p,
         progress: p.progress ?? 0,
         customer: person(p.customerId),
+        taskLead: person(p.taskLeadId),
         teamCount: (team[p.id] ?? []).length,
         taskCount: pt.length,
         openTaskCount: pt.filter((t) => t.status !== 'completed').length,

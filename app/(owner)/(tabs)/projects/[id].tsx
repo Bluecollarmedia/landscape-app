@@ -156,6 +156,7 @@ const historyIcons: Record<string, keyof typeof Feather.glyphMap> = {
   progress_updated: 'trending-up',
   team_member_added: 'user-plus',
   team_member_removed: 'user-minus',
+  task_lead_changed: 'award',
   task_created: 'plus-square',
   task_completed: 'check-circle',
   photo_added: 'camera',
@@ -172,6 +173,7 @@ const historyIconColors: Record<string, { bg: string; fg: string }> = {
   progress_updated: { bg: '#DDF0DF', fg: '#2E9E45' },
   team_member_added: { bg: '#DCE9FB', fg: '#2E6BD6' },
   team_member_removed: { bg: '#DCE9FB', fg: '#2E6BD6' },
+  task_lead_changed: { bg: '#DDF0DF', fg: '#2E9E45' },
   task_created: { bg: '#D9F2EF', fg: '#1F9E8E' },
   task_completed: { bg: '#D9F2EF', fg: '#1F9E8E' },
   photo_added: { bg: '#EDE3FB', fg: '#7C4FD1' },
@@ -181,6 +183,15 @@ const historyIconColors: Record<string, { bg: string; fg: string }> = {
   settings_changed: { bg: '#E9E9EC', fg: '#5B5B63' },
   note_added: { bg: '#E9E9EC', fg: '#5B5B63' },
 };
+
+/** "Completed by Rosa Lopez · Oct 15 at 2:30 PM" */
+function completedLabel(task: ProjectTask): string {
+  const who = task.completer ? ` by ${task.completer.firstName} ${task.completer.lastName}`.trimEnd() : '';
+  if (!task.completedAt) return `Completed${who}`;
+  const d = new Date(task.completedAt);
+  const when = `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+  return `Completed${who} · ${when}`;
+}
 
 export default function ProjectDetailScreen() {
   const { id, section } = useLocalSearchParams<{ id: string; section?: string }>();
@@ -213,12 +224,13 @@ export default function ProjectDetailScreen() {
     }
   }, [section]);
 
-  const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, editRequestResponse, reopenRequest, deleteRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
+  const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, setTaskLead, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, editRequestResponse, reopenRequest, deleteRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
   const { user } = useAuth();
   const schedule = useSchedule();
   const customerAccess = useCustomerAccess();
   const { workers: companyWorkers } = useWorkers();
   const [showAddTeamMember, setShowAddTeamMember] = useState(false);
+  const [showTaskLeadPicker, setShowTaskLeadPicker] = useState(false);
   const [reviewPhoto, setReviewPhoto] = useState<ProjectPhoto | null>(null);
   const [customerDesc, setCustomerDesc] = useState('');
   const [editingCustomerDesc, setEditingCustomerDesc] = useState(false);
@@ -613,7 +625,8 @@ export default function ProjectDetailScreen() {
   }
 
   function handleRemoveTeamMember(personId: string, name: string) {
-    const msg = `Remove ${name} from this project's team? They will no longer be assignable to this project's tasks or schedule.`;
+    const msg = `Remove ${name} from this project's team? They will no longer be assignable to this project's tasks or schedule.`
+      + (personId === p.taskLeadId ? ' They will also stop being the Task Lead.' : '');
     if (Platform.OS === 'web') {
       if (!confirm(msg)) return;
       removeTeamMember(personId);
@@ -623,6 +636,102 @@ export default function ProjectDetailScreen() {
         { text: 'Remove', style: 'destructive', onPress: () => removeTeamMember(personId) },
       ]);
     }
+  }
+
+  function handlePickTaskLead(personId: string | null) {
+    haptics.select();
+    setTaskLead(personId);
+    setShowTaskLeadPicker(false);
+  }
+
+  function renderTaskLeadCard() {
+    const lead = p.taskLead;
+    return (
+      <Pressable
+        style={[styles.taskLeadCard, { backgroundColor: lead ? colors.surface : colors.warningLight }, shadow.sm]}
+        onPress={() => setShowTaskLeadPicker(true)}
+        accessibilityRole="button"
+        accessibilityLabel={lead ? 'Change Task Lead' : 'Pick a Task Lead'}
+      >
+        {lead ? (
+          <Avatar firstName={lead.firstName} lastName={lead.lastName} size={40} uri={lead.avatarUrl} />
+        ) : (
+          <View style={[styles.taskLeadIcon, { backgroundColor: colors.surface }]}>
+            <Icon name="award" size={20} color={semantic.warning} />
+          </View>
+        )}
+        <View style={{ flex: 1, marginLeft: spacing.sm }}>
+          <Text style={[typeScale.caption, { color: colors.textTertiary, fontWeight: '600' }]}>TASK LEAD</Text>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
+            {lead ? `${lead.firstName} ${lead.lastName}`.trim() : 'No Task Lead yet'}
+          </Text>
+          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+            {lead ? 'The only worker who can check off tasks on this job.' : 'Workers can\'t check off tasks until you pick one.'}
+          </Text>
+        </View>
+        <Text style={[typeScale.labelSmall, { color: colors.primary, fontWeight: '700' }]}>{lead ? 'Change' : 'Pick'}</Text>
+      </Pressable>
+    );
+  }
+
+  function renderTaskLeadPicker() {
+    // Anyone on the job: its team plus anyone scheduled on it.
+    const onJob = new Set([
+      ...team.map(tm => tm.personId),
+      ...db.assignments
+        .filter(a => a.projectId === p.id && a.status !== 'cancelled' && a.status !== 'reassigned')
+        .map(a => a.personId),
+    ]);
+    const candidates = companyWorkers.filter(w => onJob.has(w.person.id));
+    return (
+      <BottomSheetModal visible={showTaskLeadPicker} onRequestClose={() => setShowTaskLeadPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.borderLight }]}>
+              <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>Task Lead</Text>
+              <Pressable onPress={() => setShowTaskLeadPicker(false)} style={styles.modalClose} accessibilityRole="button" accessibilityLabel="Close">
+                <Icon name="x" size={24} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.sm }]}>
+                Only the Task Lead can start and check off this job's tasks. The rest of the crew can see the tasks and progress. You can change this any time.
+              </Text>
+              {candidates.length === 0 ? (
+                <Text style={[typeScale.bodySmall, { color: colors.textTertiary, marginTop: spacing.md }]}>
+                  Add workers to this project's team or schedule them here first.
+                </Text>
+              ) : (
+                candidates.map((w, i) => {
+                  const selected = p.taskLeadId === w.person.id;
+                  return (
+                    <View key={w.person.id}>
+                      {i > 0 && <Divider style={{ marginVertical: spacing.sm }} />}
+                      <Pressable style={styles.teamRow} onPress={() => handlePickTaskLead(w.person.id)}>
+                        <Avatar firstName={w.person.firstName} lastName={w.person.lastName} size={40} uri={w.person.avatarUrl} />
+                        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', flex: 1, marginLeft: spacing.sm }]}>
+                          {w.person.firstName} {w.person.lastName}
+                        </Text>
+                        <Icon name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.textTertiary} />
+                      </Pressable>
+                    </View>
+                  );
+                })
+              )}
+              {p.taskLeadId && (
+                <Pressable
+                  style={[styles.scheduleWorkerBtn, { borderColor: colors.border, marginTop: spacing.lg }]}
+                  onPress={() => handlePickTaskLead(null)}
+                >
+                  <Icon name="user-x" size={16} color={colors.textSecondary} />
+                  <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>Remove Task Lead</Text>
+                </Pressable>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </BottomSheetModal>
+    );
   }
 
   function renderPeople() {
@@ -646,6 +755,8 @@ export default function ProjectDetailScreen() {
             )}
           </View>
         </View>
+
+        {renderTaskLeadCard()}
 
         <View style={styles.teamHeaderRow}>
           <View style={{ flex: 1, marginRight: spacing.sm }}>
@@ -688,7 +799,9 @@ export default function ProjectDetailScreen() {
                     <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
                       {member.person?.firstName} {member.person?.lastName}
                     </Text>
-                    <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>Worker</Text>
+                    <Text style={[typeScale.bodySmall, { color: member.personId === p.taskLeadId ? colors.primary : colors.textTertiary }]}>
+                      {member.personId === p.taskLeadId ? 'Worker · Task Lead' : 'Worker'}
+                    </Text>
                   </View>
                   <Pressable
                     hitSlop={10}
@@ -1252,6 +1365,11 @@ export default function ProjectDetailScreen() {
               <Text style={[typeScale.caption, { color: semantic.warning }]}>Photo required</Text>
             </View>
           )}
+          {task.status === 'completed' && (task.completer || task.completedAt) && (
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+              {completedLabel(task)}
+            </Text>
+          )}
           {task.status === 'completed' && taskPhoto && (
             <View style={styles.taskPhotoRequiredRow}>
               <Icon name="camera" size={11} color={colors.textTertiary} />
@@ -1335,6 +1453,8 @@ export default function ProjectDetailScreen() {
             style={{ marginTop: spacing.sm }}
           />
         </View>
+
+        {renderTaskLeadCard()}
 
         <View style={styles.taskFilterRow}>
           {filterOptions.map(opt => (
@@ -2458,6 +2578,19 @@ export default function ProjectDetailScreen() {
                   </View>
                 )}
 
+                {(() => {
+                  const live = tasks.find(t => t.id === selectedTask.id) ?? selectedTask;
+                  if (live.status !== 'completed' || (!live.completer && !live.completedAt)) return null;
+                  return (
+                    <View style={[styles.taskPhotoNote, { backgroundColor: colors.backgroundTertiary }]}>
+                      <Icon name="check-circle" size={14} color={semantic.success} />
+                      <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, flex: 1 }]}>
+                        {completedLabel(live)}
+                      </Text>
+                    </View>
+                  );
+                })()}
+
                 {settings?.completionPhotoRequired && (
                   <View style={[styles.taskPhotoNote, { backgroundColor: colors.backgroundTertiary }]}>
                     <Icon name="camera" size={14} color={colors.textSecondary} />
@@ -2495,6 +2628,8 @@ export default function ProjectDetailScreen() {
           </View>
         </View>
       </BottomSheetModal>
+
+      {renderTaskLeadPicker()}
 
       {/* Add Task Modal */}
       <BottomSheetModal visible={showAddTask} onRequestClose={() => setShowAddTask(false)}>
@@ -3870,6 +4005,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: spacing.md,
+  },
+  taskLeadCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  taskLeadIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addTeamMemberBtn: {
     flexDirection: 'row',

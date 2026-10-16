@@ -22,6 +22,7 @@ export default function TaskDetailScreen() {
   const {
     currentJob, projectTasks, projectSettings,
     startTask, completeTask, taskPhotoCaptured, taskPhotoUris, captureTaskPhoto,
+    taskLead, canChangeTasks,
   } = useWorkerContext();
 
   const [busy, setBusy] = useState(false);
@@ -35,6 +36,8 @@ export default function TaskDetailScreen() {
   const photoRequired = settings?.completionPhotoRequired ?? false;
   const hasPhoto = task ? !!taskPhotoCaptured[task.id] : false;
   const photoUri = task ? taskPhotoUris[task.id] : undefined;
+  const isLead = currentJob ? canChangeTasks(currentJob.projectId) : false;
+  const lead = currentJob ? taskLead(currentJob.projectId) : undefined;
 
   if (!task) {
     return (
@@ -129,6 +132,32 @@ export default function TaskDetailScreen() {
           <StatusBadge label={badge.label} status={badge.status} />
         </View>
 
+        {task.status === 'completed' && (task.completer || task.completedAt) && (
+          <View style={[styles.card, styles.notice, { backgroundColor: colors.successLight, marginTop: spacing.lg }]}>
+            <Feather name="check-circle" size={18} color={colors.success} />
+            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
+              Completed{task.completer ? ` by ${task.completer.firstName} ${task.completer.lastName}`.trimEnd() : ''}
+              {task.completedAt && (
+                <Text style={{ color: colors.textSecondary }}>{'\n'}{formatCompletedAt(task.completedAt)}</Text>
+              )}
+            </Text>
+          </View>
+        )}
+
+        {!isLead && task.status !== 'completed' && (
+          <View style={[styles.card, styles.notice, { backgroundColor: colors.backgroundTertiary, marginTop: spacing.lg }]}>
+            <Feather name="lock" size={18} color={colors.textSecondary} />
+            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
+              Only the Task Lead can check off tasks{'\n'}
+              <Text style={{ color: colors.textSecondary }}>
+                {lead
+                  ? `${lead.firstName} ${lead.lastName}`.trim() + ' is the Task Lead for this job.'
+                  : 'No Task Lead yet. The owner needs to pick one before tasks can be checked off.'}
+              </Text>
+            </Text>
+          </View>
+        )}
+
         {photoRequired && task.status !== 'completed' && (
           <View style={[styles.card, styles.notice, { backgroundColor: colors.infoLight, marginTop: spacing.lg }]}>
             <Feather name="camera" size={18} color={colors.info} />
@@ -176,7 +205,7 @@ export default function TaskDetailScreen() {
         )}
 
         <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
-          {task.status === 'pending' && (
+          {isLead && task.status === 'pending' && (
             <Pressable onPress={handleStart}>
               <LinearGradient
                 colors={[colors.primary, colors.primaryDark]}
@@ -190,7 +219,7 @@ export default function TaskDetailScreen() {
             </Pressable>
           )}
 
-          {task.status === 'in_progress' && (
+          {isLead && task.status === 'in_progress' && (
             <>
               {photoRequired && (
                 <Pressable
@@ -235,6 +264,11 @@ export default function TaskDetailScreen() {
       />
     </View>
   );
+}
+
+function formatCompletedAt(iso: string) {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 function Header({ onBack, colors, insets }: { onBack: () => void; colors: any; insets: any }) {

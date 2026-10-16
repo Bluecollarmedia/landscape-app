@@ -388,6 +388,7 @@ export const mockProjects: Project[] = [
   {
     id: 'proj1',
     companyId: 'company1',
+    taskLeadId: 'worker1',
     customerId: 'customer1',
     name: 'Beachwood Residence',
     address: '142 Beachwood Dr',
@@ -412,6 +413,7 @@ export const mockProjects: Project[] = [
   {
     id: 'proj2',
     companyId: 'company1',
+    taskLeadId: 'worker3',
     customerId: 'customer2',
     name: 'Chen Property',
     address: '890 Overlook Rd',
@@ -551,9 +553,9 @@ export const mockProjects: Project[] = [
 
 export const mockTasks: Record<string, ProjectTask[]> = {
   proj1: [
-    { id: 't1', projectId: 'proj1', title: 'Demo existing patio', status: 'completed', sortOrder: 1, completedAt: '2026-07-20T16:00:00Z', createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-07-20T16:00:00Z' },
-    { id: 't2', projectId: 'proj1', title: 'Grade and compact sub-base', status: 'completed', sortOrder: 2, completedAt: '2026-07-25T14:00:00Z', createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-07-25T14:00:00Z' },
-    { id: 't3', projectId: 'proj1', title: 'Install retaining wall footings', status: 'completed', sortOrder: 3, completedAt: '2026-08-02T15:00:00Z', createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-08-02T15:00:00Z' },
+    { id: 't1', projectId: 'proj1', title: 'Demo existing patio', status: 'completed', sortOrder: 1, completedAt: '2026-07-20T16:00:00Z', completedBy: 'worker1', createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-07-20T16:00:00Z' },
+    { id: 't2', projectId: 'proj1', title: 'Grade and compact sub-base', status: 'completed', sortOrder: 2, completedAt: '2026-07-25T14:00:00Z', completedBy: 'worker1', createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-07-25T14:00:00Z' },
+    { id: 't3', projectId: 'proj1', title: 'Install retaining wall footings', status: 'completed', sortOrder: 3, completedAt: '2026-08-02T15:00:00Z', completedBy: 'worker1', createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-08-02T15:00:00Z' },
     { id: 't4', projectId: 'proj1', title: 'Build retaining wall', status: 'completed', sortOrder: 4, assignedTo: 'worker1', completedAt: '2026-08-15T17:00:00Z', assignee: mockPeople.worker1, createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-08-15T17:00:00Z' },
     { id: 't5', projectId: 'proj1', title: 'Lay paver base and sand', status: 'completed', sortOrder: 5, completedAt: '2026-08-22T14:00:00Z', createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-08-22T14:00:00Z' },
     { id: 't6', projectId: 'proj1', title: 'Install natural stone pavers', status: 'completed', sortOrder: 6, assignedTo: 'worker1', completedAt: '2026-08-30T16:00:00Z', assignee: mockPeople.worker1, createdAt: '2026-07-10T10:00:00Z', updatedAt: '2026-08-30T16:00:00Z' },

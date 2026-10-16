@@ -14,6 +14,7 @@ export type HistoryEventType =
   | 'progress_updated'
   | 'team_member_added'
   | 'team_member_removed'
+  | 'task_lead_changed'
   | 'task_created'
   | 'task_completed'
   | 'photo_added'
@@ -51,6 +52,10 @@ export interface Project {
   customerProjectCode?: string;
   customerClaimedBy?: string;
   customerClaimedAt?: string;
+  /** The one worker who can start, complete or reopen this job's tasks
+   * (supabase/updates/016). Without one, only the owner/admin can. */
+  taskLeadId?: string;
+  taskLead?: PersonSummary;
 }
 
 export interface CustomerProjectAccess {
@@ -81,9 +86,12 @@ export interface ProjectTask {
   sortOrder: number;
   assignedTo?: string;
   completedAt?: string;
+  /** Who completed it; stamped by the database. */
+  completedBy?: string;
   createdAt: string;
   updatedAt: string;
   assignee?: PersonSummary;
+  completer?: PersonSummary;
 }
 
 /** A photo or video the owner attached to a task to show what to do. */

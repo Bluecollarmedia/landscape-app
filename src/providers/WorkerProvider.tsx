@@ -9,6 +9,7 @@ import { addProjectPhoto, logProjectHistory, notifyStaff } from '@/data/actions'
 import { todayKey, localDateTime } from '@/lib/ids';
 import type { Assignment } from '@/types/schedule';
 import type { ProjectTask, ProjectSettings } from '@/types/project';
+import type { PersonSummary } from '@/types/company';
 import type {
   CheckIn,
   CheckOut,
@@ -56,6 +57,10 @@ interface WorkerContextValue {
   checkOuts: CheckOut[];
 
   projectTasks: (projectId: string) => ProjectTask[];
+  /** The job's Task Lead, if the owner picked one. */
+  taskLead: (projectId: string) => PersonSummary | undefined;
+  /** Only the job's Task Lead can start, complete or reopen its tasks. */
+  canChangeTasks: (projectId: string) => boolean;
   startTask: (taskId: string) => void;
   completeTask: (taskId: string) => void;
   projectSettings: (projectId: string) => ProjectSettings | undefined;
@@ -314,29 +319,38 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
   const projectTasksFn = useCallback((projectId: string): ProjectTask[] =>
     db.tasks[projectId] ?? [], [v]);
 
+  const taskLeadFn = useCallback((projectId: string) =>
+    db.projects.find(p => p.id === projectId)?.taskLead, [v]);
+
+  const canChangeTasksFn = useCallback((projectId: string) =>
+    !!workerId && db.projects.find(p => p.id === projectId)?.taskLeadId === workerId, [v, workerId]);
+
   const startTask = useCallback((taskId: string) => {
     const task = findRow('project_tasks', taskId);
+    if (!task || !canChangeTasksFn(task.projectId)) return;
     updateRow('project_tasks', taskId, { status: 'in_progress' });
     if (currentJob?.status === 'checked_in') updateRow('assignments', currentJob.id, { status: 'working' });
     logActivity({
       assignmentId: currentJob?.id, projectId: task?.projectId,
       activityType: 'task_started', description: `Started: ${task?.title ?? 'task'}`,
     });
-  }, [currentJob, logActivity]);
+  }, [currentJob, logActivity, canChangeTasksFn]);
 
   const completeTask = useCallback((taskId: string) => {
     const task = findRow('project_tasks', taskId);
-    updateRow('project_tasks', taskId, { status: 'completed', completedAt: new Date().toISOString() });
+    if (!task || !canChangeTasksFn(task.projectId)) return;
+    // The database stamps the real time and person (update 016).
+    updateRow('project_tasks', taskId, { status: 'completed', completedAt: new Date().toISOString(), completedBy: workerId });
     logActivity({
       assignmentId: currentJob?.id, projectId: task?.projectId,
       activityType: 'task_completed', description: `Completed: ${task?.title ?? 'task'}`,
     });
-    if (task?.projectId) {
+    if (task.projectId) {
       logProjectHistory(task.projectId, 'task_completed', `Task completed: ${task.title}`, { taskId });
       const projectName = db.projects.find(p => p.id === task.projectId)?.name ?? 'a project';
       notifyStaff('worker_completed_task', 'Task completed', `${workerName} completed "${task.title}" at ${projectName}.`, { type: 'project', id: task.projectId }, undefined, workerId);
     }
-  }, [currentJob, logActivity, workerName]);
+  }, [currentJob, logActivity, workerName, workerId, canChangeTasksFn]);
 
   const projectSettingsFn = useCallback((projectId: string) =>
     db.settings[projectId], [v]);
@@ -407,6 +421,8 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     checkIns: checkInList,
     checkOuts: checkOutList,
     projectTasks: projectTasksFn,
+    taskLead: taskLeadFn,
+    canChangeTasks: canChangeTasksFn,
     startTask,
     completeTask,
     projectSettings: projectSettingsFn,
@@ -426,7 +442,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     currentJob, nextJob, jobState, scheduleConfirmed, hasScheduleChanges,
     confirmSchedule, acknowledgeChanges,
     checkIn, checkOut, locateForCheckIn, locateForCheckOut, checkInList, checkOutList,
-    projectTasksFn, startTask, completeTask, projectSettingsFn,
+    projectTasksFn, taskLeadFn, canChangeTasksFn, startTask, completeTask, projectSettingsFn,
     taskPhotos, taskPhotoUris, captureTaskPhoto, activityList, workerSettings,
     updateNavApp, updateNotificationsEnabled, offlineQueue, isOnline, openMapsNavigation, moveToNextJob,
   ]);

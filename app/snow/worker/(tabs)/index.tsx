@@ -1,11 +1,3 @@
-import { SnowPlaceholder } from '@/components/snow/SnowPlaceholder';
+import { MyRouteScreen } from '@/components/snow/routes/MyRouteScreen';
 
-export default function Screen() {
-  return (
-    <SnowPlaceholder
-      title="My Route"
-      icon="navigation"
-      purpose="The route you lead: your next stop, directions, instructions, reference photos, arrival and completion."
-    />
-  );
-}
+export default MyRouteScreen;

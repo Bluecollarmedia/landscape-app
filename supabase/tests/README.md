@@ -96,3 +96,17 @@ cuts the lead off.
 psql -d t -f supabase/updates/022_snow_property_details.sql
 psql -d t -f supabase/tests/022_snow_property_details_test.sql
 ```
+
+`027_snow_skip_requests_test.sql` checks skipped-stop requests (run 020 and
+020b first): no request before dispatch, a reason is required, the lead can't
+skip ahead or decide their own request, a double tap makes one request, the
+stop stays pending while reviewed, other plowers/shovelers/customers see
+nothing, a denial keeps the stop open with the owner's note, an approval skips
+it without counting it completed (a later pass at the same property is
+untouched), withdraw and auto-withdraw on completion, a reassigned lead loses
+sight of the route's requests, and the history and activity log are kept.
+
+```sh
+psql -d t -f supabase/updates/027_snow_skip_requests.sql
+psql -d t -f supabase/tests/027_snow_skip_requests_test.sql
+```

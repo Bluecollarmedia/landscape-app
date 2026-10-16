@@ -19,7 +19,7 @@ function message(error: { message?: string } | null | undefined, fallback: strin
   return m && !/^(permission denied|new row violates|JWT)/i.test(m) ? m : fallback;
 }
 
-export interface ReviewMedia { id: string; kind: 'photo' | 'video'; url?: string; status: 'pending' | 'approved' | 'hidden'; shared: boolean }
+export interface ReviewMedia { id: string; kind: 'photo' | 'video'; url?: string; status: 'pending' | 'approved' | 'hidden'; shared: boolean; withdrawn: boolean }
 export interface ReviewStop {
   visitId: string;
   propertyName: string;
@@ -36,12 +36,12 @@ export async function loadReviewQueue(): Promise<Result<ReviewStop[]>> {
   const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
   const { data, error } = await supabase
     .from('snow_visits')
-    .select('id, property_name, service, completed_at, completion_note, customer_notified_at, snow_completion_media(id, kind, file_key, review_status, shared_at, created_at)')
+    .select('id, property_name, service, completed_at, completion_note, customer_notified_at, snow_completion_media(id, kind, file_key, review_status, shared_at, withdrawn_at, created_at)')
     .eq('status', 'completed')
     .gte('completed_at', since)
     .order('completed_at', { ascending: false });
   if (error) return fail(message(error, 'Couldn\'t load completed stops.'));
-  type M = { id: string; kind: 'photo' | 'video'; file_key: string; review_status: ReviewMedia['status']; shared_at: string | null; created_at: string };
+  type M = { id: string; kind: 'photo' | 'video'; file_key: string; review_status: ReviewMedia['status']; shared_at: string | null; withdrawn_at: string | null; created_at: string };
   const keys = (data ?? []).flatMap((v) => ((v.snow_completion_media ?? []) as M[]).map((m) => m.file_key));
   let urls: Record<string, string> = {};
   try { urls = await signedSnowMediaUrls(keys); } catch { /* thumbnails are optional */ }
@@ -54,7 +54,7 @@ export async function loadReviewQueue(): Promise<Result<ReviewStop[]>> {
     notified: !!v.customer_notified_at,
     media: ((v.snow_completion_media ?? []) as M[])
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      .map((m) => ({ id: m.id, kind: m.kind, url: urls[m.file_key], status: m.review_status, shared: !!m.shared_at })),
+      .map((m) => ({ id: m.id, kind: m.kind, url: urls[m.file_key], status: m.review_status, shared: !!m.shared_at, withdrawn: !!m.withdrawn_at })),
   })));
 }
 
@@ -117,4 +117,16 @@ export async function addOwnerMedia(companyId: string, visitId: string, drafts: 
     }
   }
   return ok(saved);
+}
+
+/**
+ * Owner/admin: take a photo or video back from the customer (update 033). It
+ * leaves their Snow updates and they can no longer open the file; the record,
+ * who sent it and who withdrew it stay. A customer who already saw or saved it
+ * still has it. A withdrawn item can't be sent again.
+ */
+export async function withdrawMedia(mediaId: string): Promise<Result> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { error } = await supabase.rpc('snow_withdraw_media', { p_media_id: mediaId });
+  return error ? fail(message(error, "Couldn't withdraw the photo.")) : ok(undefined);
 }

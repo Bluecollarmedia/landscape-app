@@ -1,3 +1,4 @@
+import type { WorkerType } from './maintenance';
 export interface Company {
   id: string;
   name: string;
@@ -47,6 +48,9 @@ export interface CompanyMember {
   personId: string;
   role: CompanyRole;
   status: MemberStatus;
+  /** Workers only: 'maintenance' workers can be put on maintenance routes.
+   * Missing means 'landscaping' (before supabase/updates/018). */
+  workerType?: WorkerType;
   createdAt: string;
   updatedAt: string;
   person?: PersonSummary;

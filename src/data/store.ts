@@ -24,7 +24,7 @@ import { uuid } from '@/lib/ids';
 import type { Company, CompanyMember, PersonSummary } from '@/types/company';
 import type {
   Project, ProjectTask, ProjectTeamMember, ProjectSettings, ProjectPhoto, ProjectUpdate,
-  ProjectRequest, ProjectHistoryEntry, CustomerTimelineEvent, ProjectMessage,
+  ProjectRequest, ProjectHistoryEntry, CustomerTimelineEvent, ProjectMessage, TaskAttachment,
 } from '@/types/project';
 import type { Assignment, ScheduleChange, ScheduleSeries } from '@/types/schedule';
 import type { Truck } from '@/types/truck';
@@ -109,6 +109,8 @@ const TABLES = {
   // Update 015: document defaults and materials preparation (owner/admin only).
   financial_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'defaultTaxRate', 'defaultTerms', 'defaultExclusions', 'defaultPaymentInstructions', 'updatedAt'] },
   material_vendors: { scope: 'company', cols: ['id', 'companyId', 'name', 'contactName', 'phone', 'email', 'address', 'pickupInstructions', 'notes', 'createdAt', 'updatedAt'] },
+  // Update 017: photos/videos the owner attaches to a task.
+  task_attachments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'taskId', 'mediaType', 'fileUrl', 'fileKey', 'sizeBytes', 'createdBy', 'createdAt'] },
   project_materials: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'name', 'quantity', 'unit', 'status', 'vendorId', 'notes', 'source', 'sortOrder', 'createdBy', 'createdAt', 'updatedAt'] },
   project_material_plans: { scope: 'company', pk: 'projectId', cols: ['projectId', 'companyId', 'vendorId', 'pickupLocation', 'pickupInstructions', 'handlingNotes', 'reminderAt', 'reminderJobDate', 'reminderNote', 'dismissedSources', 'updatedAt'] },
   // Maintenance (supabase/updates/018). Workers only receive what the database
@@ -200,6 +202,8 @@ export interface Db {
   team: Record<string, ProjectTeamMember[]>;
   settings: Record<string, ProjectSettings>;
   photos: Record<string, ProjectPhoto[]>;
+  /** Owner's instruction photos/videos per task, oldest first. */
+  taskAttachments: Record<string, TaskAttachment[]>;
   updates: Record<string, ProjectUpdate[]>;
   requests: Record<string, ProjectRequest[]>;
   /** Customer ↔ owner messages per project, oldest first. */
@@ -273,6 +277,7 @@ export const db: Db = {
   team: {},
   settings: {},
   photos: {},
+  taskAttachments: {},
   updates: {},
   requests: {},
   messages: {},
@@ -391,6 +396,9 @@ function derive() {
   db.team = team as Record<string, ProjectTeamMember[]>;
   db.settings = settings;
   db.photos = photos as Record<string, ProjectPhoto[]>;
+  const taskAttachments = groupBy(raw.task_attachments.map((a) => ({ ...a, sizeBytes: a.sizeBytes != null ? Number(a.sizeBytes) : undefined })), 'taskId');
+  for (const k of Object.keys(taskAttachments)) taskAttachments[k].sort((a, b) => byCreated(a, b));
+  db.taskAttachments = taskAttachments as Record<string, TaskAttachment[]>;
   db.updates = groupBy(raw.project_updates.map((u) => ({ ...u, author: person(u.createdBy) })), 'projectId') as Record<string, ProjectUpdate[]>;
   db.requests = groupBy(raw.project_requests.map((r) => ({ ...r, requester: person(r.requestedBy) })), 'projectId') as Record<string, ProjectRequest[]>;
   db.messages = groupBy(

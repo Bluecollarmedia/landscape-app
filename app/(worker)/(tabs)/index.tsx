@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { Feather } from '@expo/vector-icons';
+import { db } from '@/data/store';
+import { taskMediaLabel } from '@/components/tasks/TaskMedia';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -198,6 +200,14 @@ export default function WorkerTodayScreen() {
           >
             {task.title}
           </Text>
+          {(db.taskAttachments[task.id]?.length ?? 0) > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+              <Feather name="paperclip" size={12} color={colors.primary} />
+              <Text style={[typeScale.caption, { color: colors.primary, marginLeft: 4 }]}>
+                {taskMediaLabel(db.taskAttachments[task.id])}
+              </Text>
+            </View>
+          )}
           {task.status === 'in_progress' && (
             <View style={[styles.inProgressTag, { backgroundColor: colors.warningLight }]}>
               <Text style={[typeScale.caption, { color: colors.warning }]}>In Progress</Text>

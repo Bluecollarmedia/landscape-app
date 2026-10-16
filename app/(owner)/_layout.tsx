@@ -31,6 +31,7 @@ export default function OwnerLayout() {
         {/* Crews: opened from Workers and from a worker's profile. */}
         <Stack.Screen name="crews" />
         <Stack.Screen name="crew-edit" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="snow-property" />
         <Stack.Screen name="document" />
         <Stack.Screen name="document-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="document-edit" options={{ presentation: 'modal', gestureEnabled: false }} />

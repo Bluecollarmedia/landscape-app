@@ -78,3 +78,21 @@ psql -d t -f supabase/updates/020_snow_access.sql
 psql -d t -f supabase/updates/020b_snow_foundation.sql
 psql -d t -f supabase/tests/020b_snow_foundation_test.sql
 ```
+
+`022_snow_property_details_test.sql` checks snow property details (run 020,
+020b and 022 first; the stubs need a `storage.foldername` stand-in and storage
+grants): company ids come from the parent record, one main contact per
+property, only customer accounts can be linked, saved instructions and
+reference media can't be edited or deleted (even by the owner), a plow lead
+sees only plowing instructions/media and files and a shovel lead only
+shoveling, crew who lead nothing see none, customers see their property's
+name/address and services but no notes, instructions or media, another
+company sees nothing, a visit needs the service set up on the property, a
+completed visit still shows the instructions version and photos it was done
+with after the owner changes them, and an ended storm or revoked service
+cuts the lead off.
+
+```sh
+psql -d t -f supabase/updates/022_snow_property_details.sql
+psql -d t -f supabase/tests/022_snow_property_details_test.sql
+```

@@ -36,6 +36,7 @@ export default function OwnerLayout() {
         <Stack.Screen name="customers" />
         {/* Maintenance: New Route opens from the Maintenance tab and a property. */}
         <Stack.Screen name="route-new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="snow-property" />
         <Stack.Screen name="document" />
         <Stack.Screen name="document-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="document-edit" options={{ presentation: 'modal', gestureEnabled: false }} />

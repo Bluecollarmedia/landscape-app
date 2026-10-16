@@ -30,6 +30,9 @@ function confirmThen(title: string, msg: string, action: string, run: () => void
   }
 }
 
+/** Visits shown here; the rest are on the history screen. */
+const RECENT_VISITS = 5;
+
 const STOP_BADGE: Record<StopStatus, { label: string; status: 'success' | 'info' | 'warning' | 'neutral' }> = {
   completed: { label: 'Completed', status: 'success' },
   arrived: { label: 'In progress', status: 'info' },
@@ -207,14 +210,22 @@ export default function MaintenancePropertyScreen() {
         )}
 
         {/* History */}
-        <ListSection title={`VISITS (${visits.length})`}>
+        <ListSection title={visits.length > RECENT_VISITS ? 'RECENT VISITS' : `VISITS (${visits.length})`}>
           {visits.length === 0 ? (
             <View style={styles.blockPad}>
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
                 No visits yet. Visits appear here when this property is put on a route.
               </Text>
             </View>
-          ) : visits.map((v) => <VisitRow key={v.id} stop={v} serviceDate={m.routeById[v.routeId]?.serviceDate} />)}
+          ) : visits.slice(0, RECENT_VISITS).map((v) => <VisitRow key={v.id} stop={v} serviceDate={m.routeById[v.routeId]?.serviceDate} />)}
+          {/* Every visit and per-service counts live on the shared history screen. */}
+          <ListRow
+            icon="clock"
+            title="Full Service History"
+            subtitle={visits.length > RECENT_VISITS ? `All ${visits.length} visits, per service` : 'Every visit, per service'}
+            showChevron
+            onPress={() => router.push(`/(owner)/maintenance/history/${p.id}` as any)}
+          />
         </ListSection>
 
         <ListSection>

@@ -84,9 +84,67 @@ export interface SnowRoute {
   notes?: string;
   cancelledAt?: string;
   cancelledBy?: string;
+  /** Template the route was made from (cleared if the template is deleted). Update 025. */
+  templateId?: string;
+  /** Template version used; templateSnapshot is the template as it was then. */
+  templateVersion?: number;
+  templateSnapshot?: Record<string, unknown>;
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * A saved route: service, stop order, suggested lead and photo rule
+ * (update 025). Using it copies everything into a new route of a storm, so
+ * editing the template later never changes a past or running storm.
+ */
+export interface SnowRouteTemplate {
+  id: string;
+  companyId: string;
+  name: string;
+  service: SnowService;
+  leadPersonId?: string;
+  mediaRequired: boolean;
+  minMedia: number;
+  notes?: string;
+  /** Goes up by one on every change to the template or its stops. */
+  version: number;
+  archivedAt?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One stop of a template. A property can be listed more than once. */
+export interface SnowRouteTemplateStop {
+  id: string;
+  companyId: string;
+  templateId: string;
+  propertyId: string;
+  position: number;
+  createdAt: string;
+}
+
+/** Another open route a person already leads (a warning, never a block). */
+export interface SnowLeadConflict {
+  routeId: string;
+  routeName: string;
+  stormId: string;
+  stormName: string;
+  stormStatus: StormStatus;
+  service: SnowService;
+  /** Stops not finished yet on that route. */
+  stopsLeft: number;
+}
+
+export interface SnowApplyTemplateResult {
+  routeId: string;
+  added: number;
+  /** Template stops left out: the property is inactive or no longer gets the service. */
+  skipped: { propertyId: string; name: string; reason: 'inactive' | 'no_service' }[];
+  /** The saved lead isn't on the snow team for the service any more. */
+  leadDropped: boolean;
 }
 
 export interface SnowRouteLeadAssignment {

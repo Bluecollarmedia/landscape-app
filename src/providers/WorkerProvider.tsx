@@ -352,7 +352,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
   const completeTask = useCallback((taskId: string) => {
     const task = findRow('project_tasks', taskId);
     if (!leadOrExplain(task?.projectId)) return false;
-    updateRow('project_tasks', taskId, { status: 'completed', completedAt: new Date().toISOString() });
+    updateRow('project_tasks', taskId, { status: 'completed', completedAt: new Date().toISOString(), completedBy: workerId });
     logActivity({
       assignmentId: currentJob?.id, projectId: task?.projectId,
       activityType: 'task_completed', description: `Completed: ${task?.title ?? 'task'}`,
@@ -363,7 +363,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
       notifyStaff('worker_completed_task', 'Task completed', `${workerName} completed "${task.title}" at ${projectName}.`, { type: 'project', id: task.projectId }, undefined, workerId);
     }
     return true;
-  }, [currentJob, logActivity, workerName, leadOrExplain]);
+  }, [currentJob, logActivity, workerName, workerId, leadOrExplain]);
 
   const projectSettingsFn = useCallback((projectId: string) =>
     db.settings[projectId], [v]);

@@ -79,7 +79,7 @@ export default function WorkerTodayScreen() {
   const {
     todayAssignments, currentJob, jobState, checkIns, checkOuts, moveToNextJob,
     scheduleConfirmed, confirmSchedule, checkIn, checkOut, locateForCheckIn, locateForCheckOut, openMapsNavigation,
-    projectTasks, projectSettings, taskPhotoCaptured,
+    projectTasks, projectSettings, taskPhotoCaptured, isTaskLead,
   } = useWorkerContext();
 
   // The job on screen: the one in progress, else the next unfinished one, else the last one
@@ -119,6 +119,9 @@ export default function WorkerTodayScreen() {
     : undefined;
 
   const tasks = primaryAssignment ? projectTasks(primaryAssignment.projectId) : [];
+  const isLead = primaryAssignment ? isTaskLead(primaryAssignment.projectId) : false;
+  const leadId = primaryAssignment ? db.projects.find(p => p.id === primaryAssignment.projectId)?.taskLeadId : undefined;
+  const lead = leadId ? db.people[leadId] : undefined;
   const completedTasks = tasks.filter(t => t.status === 'completed');
   // Completed tasks fold away under a toggle so the list shows only what's left to do.
   const openTasks = tasks.filter(t => t.status !== 'completed');
@@ -207,6 +210,11 @@ export default function WorkerTodayScreen() {
                 {taskMediaLabel(db.taskAttachments[task.id])}
               </Text>
             </View>
+          )}
+          {task.status === 'completed' && task.completer && (
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+              Done by {task.completer.firstName} {task.completer.lastName}
+            </Text>
           )}
           {task.status === 'in_progress' && (
             <View style={[styles.inProgressTag, { backgroundColor: colors.warningLight }]}>
@@ -590,6 +598,16 @@ export default function WorkerTodayScreen() {
                         ]}
                       />
                     </View>
+                    <View style={[styles.leadRow, { marginTop: spacing.sm }]}>
+                      <Feather name={isLead ? 'award' : 'lock'} size={13} color={isLead ? colors.primary : colors.textTertiary} />
+                      <Text style={[typeScale.caption, { color: isLead ? colors.primary : colors.textSecondary, marginLeft: 6, flex: 1 }]}>
+                        {isLead
+                          ? "You're the Task Lead. You check off tasks for this job."
+                          : lead
+                          ? `Task Lead: ${lead.firstName} ${lead.lastName}`.trimEnd() + '. Only they can check off tasks.'
+                          : 'No Task Lead yet. The owner needs to pick one before tasks can be checked off.'}
+                      </Text>
+                    </View>
                   </View>
                   {openTasks.map((task, i) => renderTaskRow(task, i === 0))}
                   {openTasks.length === 0 && (
@@ -866,6 +884,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderRadius: radius.full,
   },
+  leadRow: { flexDirection: 'row', alignItems: 'center' },
   tasksHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

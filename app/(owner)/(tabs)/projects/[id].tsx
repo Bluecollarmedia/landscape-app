@@ -182,6 +182,15 @@ const historyIconColors: Record<string, { bg: string; fg: string }> = {
   note_added: { bg: '#E9E9EC', fg: '#5B5B63' },
 };
 
+/** "Completed by Rosa Lopez · Oct 15 at 2:30 PM" */
+function completedLabel(task: ProjectTask): string {
+  const who = task.completer ? ` by ${task.completer.firstName} ${task.completer.lastName}`.trimEnd() : '';
+  if (!task.completedAt) return `Completed${who}`;
+  const d = new Date(task.completedAt);
+  const when = `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+  return `Completed${who} · ${when}`;
+}
+
 export default function ProjectDetailScreen() {
   const { id, section } = useLocalSearchParams<{ id: string; section?: string }>();
   const { colors } = useTheme();
@@ -1291,6 +1300,11 @@ export default function ProjectDetailScreen() {
               <Icon name="camera" size={11} color={semantic.warning} />
               <Text style={[typeScale.caption, { color: semantic.warning }]}>Photo required</Text>
             </View>
+          )}
+          {task.status === 'completed' && (task.completer || task.completedAt) && (
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+              {completedLabel(task)}
+            </Text>
           )}
           {task.status === 'completed' && taskPhoto && (
             <View style={styles.taskPhotoRequiredRow}>
@@ -2542,6 +2556,19 @@ export default function ProjectDetailScreen() {
                     ))}
                   </View>
                 )}
+
+                {(() => {
+                  const live = tasks.find(t => t.id === selectedTask.id) ?? selectedTask;
+                  if (live.status !== 'completed' || (!live.completer && !live.completedAt)) return null;
+                  return (
+                    <View style={[styles.taskPhotoNote, { backgroundColor: colors.backgroundTertiary }]}>
+                      <Icon name="check-circle" size={14} color={semantic.success} />
+                      <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, flex: 1 }]}>
+                        {completedLabel(live)}
+                      </Text>
+                    </View>
+                  );
+                })()}
 
                 {settings?.completionPhotoRequired && (
                   <View style={[styles.taskPhotoNote, { backgroundColor: colors.backgroundTertiary }]}>

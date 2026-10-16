@@ -375,7 +375,7 @@ function derive() {
   }) as CompanyMembership);
 
   // Project children
-  const tasks = groupBy(raw.project_tasks.map((t): Row => ({ ...t, assignee: person(t.assignedTo) })), 'projectId');
+  const tasks = groupBy(raw.project_tasks.map((t): Row => ({ ...t, assignee: person(t.assignedTo), completer: person(t.completedBy) })), 'projectId');
   for (const k of Object.keys(tasks)) tasks[k].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || byCreated(a, b));
   const team = groupBy(
     raw.project_team.filter((t) => !t.removedAt).map((t) => ({ ...t, person: person(t.personId) })),

@@ -88,6 +88,8 @@ export interface ProjectTask {
   createdAt: string;
   updatedAt: string;
   assignee?: PersonSummary;
+  /** Who completed it (stamped by the database, update 016). */
+  completer?: PersonSummary;
 }
 
 /** A photo or video the owner attached to a task to show what to do. */

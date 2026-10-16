@@ -84,10 +84,17 @@ export function useProject(projectId: string) {
     const before = findRow('project_tasks', taskId);
     const changes: Partial<ProjectTask> = { ...patch };
     delete changes.assignee;
-    if (patch.status === 'completed' && before?.status !== 'completed' && !patch.completedAt) {
+    delete changes.completer;
+    // The database stamps the real time and person (update 016); these keep
+    // the screen right until the saved row comes back.
+    if (patch.status === 'completed' && before?.status !== 'completed') {
       changes.completedAt = new Date().toISOString();
+      changes.completedBy = db.personId || undefined;
     }
-    if (patch.status && patch.status !== 'completed' && before?.status === 'completed') changes.completedAt = undefined;
+    if (patch.status && patch.status !== 'completed') {
+      changes.completedAt = undefined;
+      changes.completedBy = undefined;
+    }
     updateRow('project_tasks', taskId, changes);
     if (patch.status === 'completed' && before?.status !== 'completed') {
       logProjectHistory(projectId, 'task_completed', `Task completed: ${before?.title ?? ''}`.trim(), { taskId });

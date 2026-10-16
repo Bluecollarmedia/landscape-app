@@ -1,3 +1,5 @@
+import type { WorkerType } from './maintenance';
+
 // ── Join Request ────────────────────────────────────────────────
 
 export type JoinMethod = 'team_code' | 'email_invitation' | 'invitation_link';
@@ -12,6 +14,10 @@ export interface JoinRequest {
   status: JoinRequestStatus;
   requestedRole?: 'worker' | 'customer';
   assignedRole?: 'worker' | 'customer' | 'admin';
+  /** Which kind of team code they used. Only a label: the owner still approves. */
+  requestedWorkerType?: WorkerType;
+  /** The type the owner approved them as. */
+  assignedWorkerType?: WorkerType;
   reviewedBy?: string;
   reviewedAt?: string;
   declineReason?: string;
@@ -57,6 +63,8 @@ export interface TeamCode {
   id: string;
   companyId: string;
   code: string;
+  /** A maintenance code marks the join request as maintenance. Missing means 'landscaping'. */
+  workerType?: WorkerType;
   isActive: boolean;
   createdBy: string;
   createdAt: string;
@@ -91,6 +99,7 @@ export type MembershipAuditEventType =
   | 'worker_deactivated'
   | 'customer_approved'
   | 'role_changed'
+  | 'worker_type_changed'
   | 'ownership_transferred';
 
 export interface MembershipAuditEvent {

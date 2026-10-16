@@ -53,21 +53,62 @@ export function eligibleMaintenanceCrew(): PersonSummary[] {
   return crew ? workers.filter((w) => crew.memberIds.includes(w.id)) : workers;
 }
 
-/** Owner/admin: mark which crew is the maintenance crew (`null` = none). */
-export function setMaintenanceCrew(crewId: string | null) {
+/** Owner/admin: mark which crew is the maintenance crew (`null` = none).
+ * Fails when the crew has landscaping workers in it (the database refuses
+ * that too, supabase/updates/019). `memberIds` overrides the crew's saved
+ * members, for when they were changed in the same save. */
+export function setMaintenanceCrew(crewId: string | null, memberIds?: string[]): Result {
+  if (crewId) {
+    const crew = db.crews.find((c) => c.id === crewId);
+    const maint = new Set(maintenanceWorkers().map((p) => p.id));
+    const others = (memberIds ?? crew?.memberIds ?? []).filter((pid) => !maint.has(pid));
+    if (others.length) {
+      const names = others.map((pid) => db.people[pid]?.firstName ?? 'A worker').join(', ');
+      return fail(`${names} ${others.length === 1 ? 'is not a maintenance worker' : 'are not maintenance workers'}. Only maintenance workers can be in the Maintenance Crew.`);
+    }
+  }
   for (const c of db.crews) {
     if (c.isMaintenance && c.id !== crewId) updateRow('crews', c.id, { isMaintenance: false });
   }
-  if (crewId && !db.crews.find((c) => c.id === crewId)?.isMaintenance) updateRow('crews', crewId, { isMaintenance: true });
+  if (crewId && !db.crews.find((c) => c.id === crewId && c.isMaintenance)) updateRow('crews', crewId, { isMaintenance: true });
+  return ok(undefined);
 }
 
-/** Owner/admin only. Explicit reclassification of a worker. */
-export function setWorkerType(personId: string, workerType: WorkerType): Result {
+/** Local mirror of what the database does on approval / reclassification
+ * (supabase/updates/019): maintenance workers join the Maintenance Crew if
+ * one is set up, and a worker who is no longer maintenance leaves it. */
+export function placeInMaintenanceCrew(personId: string, workerType: WorkerType) {
+  const crew = maintenanceCrew();
+  if (!crew) return;
+  const current = (rowsOf('crew_members') as { id: string; crewId: string; personId: string }[]).find((r) => r.personId === personId);
+  if (workerType === 'maintenance') {
+    if (current?.crewId === crew.id) return;
+    if (current) deleteRow('crew_members', current.id);
+    insertRow('crew_members', { crewId: crew.id, personId });
+  } else if (current?.crewId === crew.id) {
+    deleteRow('crew_members', current.id);
+  }
+}
+
+/** Owner/admin only. Explicit reclassification of a worker. A plain row update
+ * can't change the type; the set_worker_type RPC (supabase/updates/019) does,
+ * and writes it to the membership audit log. */
+export async function setWorkerType(personId: string, workerType: WorkerType): Promise<Result> {
   const m = db.members.find((x) => x.personId === personId && x.role === 'worker');
   if (!m) return fail('Only workers can be classified.');
-  if (m.workerType === workerType) return ok(undefined);
-  updateRow('company_members', m.id, { workerType });
-  return ok(undefined);
+  const from: WorkerType = m.workerType ?? 'landscaping';
+  if (from === workerType) return ok(undefined);
+  if (isDemo()) {
+    updateRow('company_members', m.id, { workerType });
+    placeInMaintenanceCrew(personId, workerType);
+    insertRow('membership_audit_log', {
+      eventType: 'worker_type_changed', actorId: db.personId, targetId: personId, metadata: { from, to: workerType },
+    });
+    return ok(undefined);
+  }
+  const { error } = await rpc('set_worker_type', { p_person_id: personId, p_type: workerType });
+  await refresh('company_members', 'crew_members');
+  return error ? fail(error.message) : ok(undefined);
 }
 
 // ── Properties, contracts, rules ────────────────────────────────────────────

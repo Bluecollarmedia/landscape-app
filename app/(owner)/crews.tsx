@@ -59,7 +59,15 @@ export default function CrewsScreen() {
             >
               <View style={[styles.colorBar, { backgroundColor: c.color }]} />
               <View style={{ flex: 1, gap: spacing.xs }}>
-                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{c.name}</Text>
+                <View style={styles.nameRow}>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700', flexShrink: 1 }]} numberOfLines={1}>{c.name}</Text>
+                  {c.isMaintenance && (
+                    <View style={[styles.maintTag, { backgroundColor: colors.primarySurface }]}>
+                      <Icon name="repeat" size={11} color={colors.primary} />
+                      <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '700' }]}>Maintenance</Text>
+                    </View>
+                  )}
+                </View>
                 {people.length > 0 ? (
                   <View style={styles.avatarRow}>
                     {people.slice(0, 5).map((p, i) => (
@@ -85,6 +93,8 @@ export default function CrewsScreen() {
 }
 
 const styles = StyleSheet.create({
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  maintTag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.full },
   screen: { flex: 1 },
   header: {
     flexDirection: 'row',

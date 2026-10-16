@@ -7,8 +7,10 @@ import type {
   CompanyMembership,
   JoinRequestPerson,
 } from '@/types/onboarding';
+import type { WorkerType } from '@/types/maintenance';
 import { db, useDb, insertRow, updateRow, upsertRow, rpc, refresh, isDemo } from '@/data/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { placeInMaintenanceCrew } from '@/data/maintenance';
 
 function randomSuffix(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -24,44 +26,56 @@ function codePrefix(): string {
 
 // ── Team Code Hook ─────────────────────────────────────────────
 
-export function useTeamCode(companyId?: string) {
+const typeOf = (c: TeamCode): WorkerType => c.workerType ?? 'landscaping';
+
+/** The team code for one kind of worker. Regular and maintenance codes are
+ * separate; either one only files a request that the owner must approve. */
+export function useTeamCode(companyId?: string, workerType: WorkerType = 'landscaping') {
   const v = useDb();
 
   const activeCode = useMemo<TeamCode | undefined>(
-    () => db.teamCodes.filter((c) => c.companyId === (companyId ?? db.companyId) && c.isActive).pop(),
-    [v, companyId],
+    () => db.teamCodes.filter((c) => c.companyId === (companyId ?? db.companyId) && c.isActive && typeOf(c) === workerType).pop(),
+    [v, companyId, workerType],
   );
 
   /** Checks a team code before joining. Works before sign-in. */
   const validateCode = useCallback(
-    async (code: string): Promise<{ valid: boolean; companyId?: string; companyName?: string }> => {
+    async (code: string): Promise<{ valid: boolean; companyId?: string; companyName?: string; workerType?: WorkerType }> => {
       if (!isSupabaseConfigured) {
         const found = db.teamCodes.find((c) => c.code.toUpperCase() === code.toUpperCase() && c.isActive);
-        return found ? { valid: true, companyId: found.companyId, companyName: db.company?.name ?? 'Brighton Lawn + Landscape' } : { valid: false };
+        return found ? { valid: true, companyId: found.companyId, companyName: db.company?.name ?? 'Brighton Lawn + Landscape', workerType: typeOf(found) } : { valid: false };
       }
       const { data, error } = await supabase.rpc('lookup_team_code', { p_code: code });
       if (error || !data) return { valid: false };
-      const r = data as { valid: boolean; company_id?: string; company_name?: string };
-      return { valid: !!r.valid, companyId: r.company_id, companyName: r.company_name };
+      const r = data as { valid: boolean; company_id?: string; company_name?: string; worker_type?: WorkerType };
+      return { valid: !!r.valid, companyId: r.company_id, companyName: r.company_name, workerType: r.worker_type ?? 'landscaping' };
     },
     [],
   );
 
+  /** Replaces this kind's code (the other kind keeps working). Also creates
+   * the maintenance code the first time. */
   const regenerateCode = useCallback(() => {
     const now = new Date().toISOString();
-    for (const c of db.teamCodes.filter((t) => t.isActive)) {
+    for (const c of db.teamCodes.filter((t) => t.isActive && typeOf(t) === workerType)) {
       updateRow('team_codes', c.id, { isActive: false, deactivatedAt: now });
     }
-    const newCode = `${codePrefix()}-${randomSuffix()}`;
+    const newCode = workerType === 'maintenance'
+      ? `${codePrefix()}-MAINT-${randomSuffix()}`
+      : `${codePrefix()}-${randomSuffix()}`;
     const row = insertRow('team_codes', {
       code: newCode,
+      // Only sent for maintenance, so regular codes save even before update 019.
+      ...(workerType === 'maintenance' ? { workerType } : {}),
       isActive: true,
       createdBy: db.personId,
     });
-    upsertRow('company_join_settings', { ...db.joinSettings, companyId: db.companyId, currentTeamCodeId: row.id });
-    insertRow('membership_audit_log', { eventType: 'team_code_generated', actorId: db.personId });
+    if (workerType === 'landscaping') {
+      upsertRow('company_join_settings', { ...db.joinSettings, companyId: db.companyId, currentTeamCodeId: row.id });
+    }
+    insertRow('membership_audit_log', { eventType: 'team_code_generated', actorId: db.personId, metadata: { workerType } });
     return newCode;
-  }, []);
+  }, [workerType]);
 
   return { activeCode, validateCode, regenerateCode };
 }
@@ -99,25 +113,29 @@ export function useJoinRequests(companyId?: string) {
     [cid],
   );
 
-  /** Approves a request and makes the person an active member with this role. */
+  /** Approves a request and makes the person an active member with this role.
+   * `workerType` is the owner's choice; it defaults to what they applied as. */
   const approveRequest = useCallback(
-    async (requestId: string, assignedRole: 'worker' | 'customer' | 'admin') => {
+    async (requestId: string, assignedRole: 'worker' | 'customer' | 'admin', workerType?: WorkerType) => {
       const request = db.joinRequests.find((r) => r.id === requestId);
       if (!request) return;
+      const wtype: WorkerType = assignedRole === 'worker' ? (workerType ?? request.requestedWorkerType ?? 'landscaping') : 'landscaping';
       if (isDemo()) {
         updateRow('join_requests', requestId, {
-          status: 'approved', assignedRole, reviewedBy: db.personId, reviewedAt: new Date().toISOString(),
+          status: 'approved', assignedRole, assignedWorkerType: wtype, reviewedBy: db.personId, reviewedAt: new Date().toISOString(),
         });
         const existing = db.members.find((m) => m.personId === request.personId);
-        if (existing) updateRow('company_members', existing.id, { role: assignedRole, status: 'active' });
-        else insertRow('company_members', { personId: request.personId, role: assignedRole, status: 'active', joinMethod: request.joinMethod, joinRequestId: requestId });
+        if (existing) updateRow('company_members', existing.id, { role: assignedRole, status: 'active', workerType: wtype });
+        else insertRow('company_members', { personId: request.personId, role: assignedRole, status: 'active', workerType: wtype, joinMethod: request.joinMethod, joinRequestId: requestId });
+        placeInMaintenanceCrew(request.personId, wtype);
         return;
       }
       // Optimistic: hide it from the pending list right away.
-      updateRow('join_requests', requestId, { status: 'approved', assignedRole });
-      const { error } = await rpc('approve_join_request', { p_request_id: requestId, p_role: assignedRole });
+      updateRow('join_requests', requestId, { status: 'approved', assignedRole, assignedWorkerType: wtype });
+      // The database also puts maintenance workers in the Maintenance Crew (update 019).
+      const { error } = await rpc('approve_join_request', { p_request_id: requestId, p_role: assignedRole, p_worker_type: wtype });
       if (error) console.warn('[join] approve failed', error.message);
-      await refresh('join_requests', 'company_members', 'people');
+      await refresh('join_requests', 'company_members', 'people', 'crew_members');
     },
     [],
   );

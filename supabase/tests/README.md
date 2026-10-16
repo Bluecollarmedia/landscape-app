@@ -44,6 +44,6 @@ the small stand-in here:
 
 ```sh
 psql -d t -f supabase/tests/snow_roles_standin.sql   # or 020_snow_access.sql
-psql -d t -f supabase/updates/snow_onboarding.sql
+psql -d t -f supabase/updates/023_snow_onboarding.sql
 psql -d t -f supabase/tests/snow_onboarding_test.sql
 ```

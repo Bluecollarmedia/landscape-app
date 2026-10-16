@@ -6,7 +6,7 @@
  * Mode design will restyle it later.
  *
  * Everything here goes through the database functions in
- * supabase/updates/*_snow_onboarding.sql (owner/admin only).
+ * supabase/updates/023_snow_onboarding.sql (owner/admin only).
  */
 
 import React, { useState } from 'react';

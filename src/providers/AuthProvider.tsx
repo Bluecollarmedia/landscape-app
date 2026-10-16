@@ -160,7 +160,7 @@ export interface SignUpIntent {
     zip?: string;
   };
   teamCode?: string;
-  /** Snow signup code: files a Snow access request (supabase/updates/*_snow_onboarding.sql). */
+  /** Snow signup code: files a Snow access request (supabase/updates/023_snow_onboarding.sql). */
   snowCode?: string;
   projectCode?: string;
 }

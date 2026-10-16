@@ -1,5 +1,6 @@
 -- ============================================================================
--- Snow onboarding — run once in Supabase → SQL Editor (safe to run again).
+-- Update 23 — Snow onboarding. Run once in Supabase → SQL Editor, after update 20
+-- (Snow access). Safe to run again.
 --  • The owner has a separate Snow signup code (SNOW-XXXXXX), apart from the
 --    regular team code. Regenerating or turning it off stops new requests
 --    with the old code; requests already waiting stay for review.

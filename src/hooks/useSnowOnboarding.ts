@@ -4,7 +4,7 @@
  *
  * Kept apart from the landscaping team code / join requests
  * (useOnboarding.ts). Every read and write goes through database functions in
- * supabase/updates/*_snow_onboarding.sql, which check that the caller is the
+ * supabase/updates/023_snow_onboarding.sql, which check that the caller is the
  * owner/admin (or, for the applicant functions, that they act on themselves).
  * In demo mode (no Supabase) it works on a small in-memory sample.
  */

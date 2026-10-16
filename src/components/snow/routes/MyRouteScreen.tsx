@@ -20,6 +20,8 @@ import {
   type MyRoute, type RouteDetail,
 } from '@/data/snowRoutes';
 import { STOP_TONE } from './RouteEditScreen';
+import { LeadSkipPanel } from './SkipRequests';
+import { SnowServiceReferenceCard } from '@/components/snow/SnowReference';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -154,7 +156,16 @@ export function MyRouteScreen() {
                     />
                   </>
                 )}
+                <LeadSkipPanel visitId={current.id} disabled={busy} onChanged={reload} />
               </View>
+            ) : null}
+            {working && current ? (
+              <>
+                <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>
+                  {SERVICE_LABEL[route.service]} instructions
+                </Text>
+                <SnowServiceReferenceCard propertyId={current.propertyId} service={route.service} />
+              </>
             ) : null}
             {working && !current && route.stops.length ? (
               <InlineNotice icon="check-circle" tone="success" text="Every stop on this route is done." style={{ marginTop: spacing.md }} />

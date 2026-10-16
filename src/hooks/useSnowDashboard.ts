@@ -61,7 +61,7 @@ async function load(companyId: string): Promise<{ ok: true; data: Loaded } | { o
       .eq('company_id', companyId).eq('status', 'pending'),
     supabase.from('snow_shifts')
       .select('id, person_id, clock_in_at')
-      .eq('company_id', companyId).eq('status', 'open'),
+      .eq('company_id', companyId).is('clock_out_at', null),
     supabase.from('snow_completion_media')
       .select('created_at', { count: 'exact' })
       .eq('company_id', companyId).eq('review_status', 'pending')

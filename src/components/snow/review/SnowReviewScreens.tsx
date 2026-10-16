@@ -10,13 +10,16 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'r
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, Icon, InlineNotice, LoadingSpinner, ScreenHeader, StatusBadge } from '@/components/ui';
-import { showMessage } from '@/components/financials/ActionSheet';
+import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
+import { pickSnowMedia } from '@/components/snow/pickSnowMedia';
+import { db, useDb } from '@/data/store';
 import { useTheme } from '@/providers/ThemeProvider';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
-  loadCustomerSnowUpdates, loadReviewQueue, reviewMedia, sendCustomerUpdate,
+  addOwnerMedia, loadCustomerSnowUpdates, loadReviewQueue, reviewMedia, sendCustomerUpdate, withdrawMedia,
   type CustomerSnowUpdate, type ReviewMedia, type ReviewStop,
 } from '@/data/snowMediaReview';
+import { CustomerNotifyPrefs } from '@/components/snow/notifications/SnowNotifySettings';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -36,6 +39,7 @@ function Thumb({ m, children }: { m: { kind: string; url?: string }; children?: 
 
 /** Owner: Snow More → Photo review. */
 export function SnowMediaReviewScreen() {
+  useDb();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [stops, setStops] = useState<ReviewStop[]>([]);
@@ -60,6 +64,22 @@ export function SnowMediaReviewScreen() {
     reload();
   }
 
+  function withdraw(m: ReviewMedia) {
+    confirmAction(
+      'Withdraw this photo?',
+      "It disappears from the customer's Snow updates and they can no longer open it. If they already saw or saved it, that can't be undone. It can't be sent again.",
+      'Withdraw',
+      async () => {
+        setBusy(m.id);
+        const res = await withdrawMedia(m.id);
+        setBusy(null);
+        if (!res.ok) showMessage("Couldn't withdraw", res.error);
+        reload();
+      },
+      true,
+    );
+  }
+
   async function send(s: ReviewStop) {
     setBusy(s.visitId);
     const res = await sendCustomerUpdate(s.visitId);
@@ -68,6 +88,17 @@ export function SnowMediaReviewScreen() {
     showMessage('Sent to the customer', res.data
       ? `${res.data} ${res.data === 1 ? 'photo is' : 'photos are'} now in their Snow updates.`
       : 'The stop is now in their Snow updates.');
+    reload();
+  }
+
+  async function addPhotos(s: ReviewStop) {
+    if (!db.companyId) return;
+    const drafts = await pickSnowMedia();
+    if (!drafts.length) return;
+    setBusy(s.visitId);
+    const res = await addOwnerMedia(db.companyId, s.visitId, drafts);
+    setBusy(null);
+    if (!res.ok) showMessage("Couldn't add the photo", res.error);
     reload();
   }
 
@@ -90,10 +121,17 @@ export function SnowMediaReviewScreen() {
         {s.media.length ? (
           <View style={styles.thumbs}>
             {s.media.map((m) => (
-              <View key={m.id} style={{ gap: 4, opacity: m.status === 'hidden' ? 0.4 : 1 }}>
+              <View key={m.id} style={{ gap: 4, opacity: m.status === 'hidden' || m.withdrawn ? 0.4 : 1 }}>
                 <Thumb m={m} />
-                {m.shared ? (
-                  <Text style={[typeScale.caption, { color: colors.success, textAlign: 'center' }]}>Sent</Text>
+                {m.withdrawn ? (
+                  <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>Withdrawn</Text>
+                ) : m.shared ? (
+                  <View style={{ alignItems: 'center', gap: 2 }}>
+                    <Text style={[typeScale.caption, { color: colors.success }]}>Sent</Text>
+                    <Pressable disabled={busy === m.id} onPress={() => withdraw(m)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Withdraw from the customer">
+                      <Text style={[typeScale.caption, { color: colors.error, fontWeight: '600' }]}>Withdraw</Text>
+                    </Pressable>
+                  </View>
                 ) : (
                   <View style={{ flexDirection: 'row', justifyContent: 'center', gap: spacing.sm }}>
                     <Pressable disabled={busy === m.id} onPress={() => review(m, 'approved')} hitSlop={6} accessibilityLabel="Approve">
@@ -110,6 +148,14 @@ export function SnowMediaReviewScreen() {
         ) : (
           <Text style={[typeScale.caption, { color: colors.textTertiary }]}>No photos for this stop.</Text>
         )}
+        <Button
+          title="Add a photo or video"
+          icon="camera"
+          size="sm"
+          variant="secondary"
+          disabled={busy === s.visitId}
+          onPress={() => addPhotos(s)}
+        />
         {!s.notified || newlyApproved ? (
           <Button
             title={s.notified ? 'Share newly approved photos' : 'Send to customer'}
@@ -182,6 +228,7 @@ export function CustomerSnowUpdatesScreen() {
             {u.media.length ? <View style={styles.thumbs}>{u.media.map((m) => <Thumb key={m.id} m={m} />)}</View> : null}
           </View>
         ))}
+        <CustomerNotifyPrefs />
       </ScrollView>
     </View>
   );

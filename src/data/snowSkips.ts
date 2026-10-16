@@ -104,3 +104,14 @@ export async function listPendingSkips(stormId?: string): Promise<Result<SnowSki
   const { data, error } = await q;
   return error ? fail(error.message) : ok((data ?? []).map(toRequest));
 }
+
+/** Every request on one route, newest first (owner, or the route's lead). */
+export async function listRouteSkips(routeId: string): Promise<Result<SnowSkipRequest[]>> {
+  if (isDemo()) return ok([]);
+  const { data, error } = await supabase
+    .from('snow_skip_requests')
+    .select('*')
+    .eq('route_id', routeId)
+    .order('created_at', { ascending: false });
+  return error ? fail(error.message) : ok((data ?? []).map(toRequest));
+}

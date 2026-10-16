@@ -16,6 +16,7 @@ import {
   addStops, cancelRoute, loadRoute, loadSnowLeads, removeStop, reorderStops, saveRouteAsTemplate, updateRoute,
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
+import { OwnerSkipRequests } from './SkipRequests';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -144,6 +145,12 @@ export function RouteEditScreen() {
       >
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
         {route.cancelled ? <InlineNotice icon="slash" tone="warning" text="This route was cancelled." style={{ marginBottom: spacing.md }} /> : null}
+
+        {route.stormStatus === 'dispatched' ? (
+          <View style={{ marginBottom: spacing.md }}>
+            <OwnerSkipRequests routeId={route.id} stops={route.stops} leadName={leadName} onDecided={reload} />
+          </View>
+        ) : null}
 
         <View style={[styles.card, { backgroundColor: colors.surface, gap: spacing.md }]}>
           <Input

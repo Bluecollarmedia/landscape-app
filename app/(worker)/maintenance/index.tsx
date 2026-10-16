@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -14,7 +13,7 @@ import { useDb, db } from '@/data/store';
 import { locationLabel } from '@/data/maintenance';
 import { missingRequirements, finishStopAndAdvance, useFinishingStop } from '@/data/maintenanceFinish';
 import { haptics } from '@/lib/haptics';
-import { Avatar, EmptyState } from '@/components/ui';
+import { EmptyState } from '@/components/ui';
 import { BrandCover } from '@/components/branding/BrandCover';
 import { JobMap } from '@/components/maps/JobMap';
 import { YardStartCard } from '@/components/maintenance/YardStartCard';
@@ -24,10 +23,12 @@ import { displayStatus } from '@/components/maintenance/types';
 import { formatClock, servicesLabel, stopAddress } from '@/components/maintenance/format';
 import { getWorkerHeaderImageUri } from '@/lib/projectImages';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius, shadow } from '@/theme/spacing';
+import { spacing, radius } from '@/theme/spacing';
 import type { MaintenanceStopDetail } from '@/types/maintenance';
 
-const HERO_HEIGHT = 260;
+const HERO_HEIGHT = 210;
+/** The white sheet's rounded top edge overlaps the photo by this much. */
+const SHEET_RADIUS = 28;
 /** Room the fixed action button takes at the bottom of the scroll. */
 const ACTION_AREA = 96;
 
@@ -50,7 +51,6 @@ export default function MaintenanceTodayScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
   const { openMapsNavigation } = useWorkerContext();
   const checkIn = useMaintenanceCheckIn();
@@ -138,13 +138,10 @@ export default function MaintenanceTodayScreen() {
         <View style={styles.hero}>
           <BrandCover uri={getWorkerHeaderImageUri()} style={styles.heroImage} />
           <LinearGradient
-            colors={['rgba(0,0,0,0.25)', 'transparent', 'transparent', colors.groupedBackground]}
-            locations={[0, 0.35, 0.75, 1]}
+            colors={['rgba(0,0,0,0.35)', 'transparent', 'rgba(0,0,0,0.18)']}
+            locations={[0, 0.45, 1]}
             style={StyleSheet.absoluteFill}
           />
-          <View style={[styles.avatarWrap, { top: insets.top + spacing.sm }]}>
-            <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={44} uri={user?.avatarUrl} />
-          </View>
           <View style={styles.heroText}>
             <Text style={[typeScale.bodySmall, styles.heroShadow, { color: '#FFFFFF' }]}>{dateStr}</Text>
             <Text style={[typeScale.displayLarge, styles.heroShadow, { color: '#FFFFFF', marginTop: 2 }]}>{greeting}</Text>
@@ -154,7 +151,7 @@ export default function MaintenanceTodayScreen() {
           </View>
         </View>
 
-        <View style={styles.content}>
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
           <YardStartCard
             dayStart={dayStart}
             yard={yard}
@@ -163,20 +160,16 @@ export default function MaintenanceTodayScreen() {
           />
 
           {!route ? (
-            <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
-              <EmptyState
-                icon="map"
-                title="No route today"
-                description="When the owner puts you on a maintenance route, its stops show up here."
-              />
-            </View>
+            <EmptyState
+              icon="map"
+              title="No route today"
+              description="When the owner puts you on a maintenance route, its stops show up here."
+            />
           ) : (
-            <View style={[styles.card, styles.routeCard, { backgroundColor: colors.surface }, shadow.md]}>
+            <View>
               <View style={styles.routeHeader}>
-                <View style={[styles.headerIcon, { backgroundColor: colors.primarySurface }]}>
-                  <Feather name="map" size={18} color={colors.primaryDark} />
-                </View>
-                <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
+                <Feather name="map-pin" size={26} color={colors.primary} />
+                <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
                   Today's Route
                 </Text>
               </View>
@@ -232,7 +225,7 @@ export default function MaintenanceTodayScreen() {
               <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginBottom: spacing.sm }]}>
                 Upcoming Stops
               </Text>
-              <View style={[styles.listCard, { backgroundColor: colors.surface }, shadow.sm]}>
+              <View style={[styles.listCard, { borderColor: colors.border }]}>
                 {upcoming.map((s, i) => (
                   <StopRow
                     key={s.id}
@@ -256,7 +249,7 @@ export default function MaintenanceTodayScreen() {
         >
           <LinearGradient
             pointerEvents="none"
-            colors={['transparent', colors.groupedBackground, colors.groupedBackground]}
+            colors={['transparent', colors.surface, colors.surface]}
             locations={[0, 0.35, 1]}
             style={styles.actionFade}
           />
@@ -267,12 +260,7 @@ export default function MaintenanceTodayScreen() {
             accessibilityLabel={`${action.title}. ${action.subtitle}`}
             style={({ pressed }) => [pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] }]}
           >
-            <LinearGradient
-              colors={action.muted ? [colors.primaryLight, colors.primary] : [colors.primary, colors.primaryDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.actionButton, shadow.md]}
-            >
+            <View style={[styles.actionButton, { backgroundColor: action.muted ? colors.primary : colors.primaryDark }]}>
               <View style={styles.actionRow}>
                 <Feather name={action.icon} size={20} color="#FFFFFF" />
                 <Text style={[typeScale.headingSmall, styles.actionTitle]}>{action.title}</Text>
@@ -280,7 +268,7 @@ export default function MaintenanceTodayScreen() {
               <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.9)', marginTop: 2 }]} numberOfLines={1}>
                 {action.subtitle}
               </Text>
-            </LinearGradient>
+            </View>
           </Pressable>
           {action.title === 'START DAY' && next && (
             <Pressable
@@ -331,7 +319,7 @@ function NextStopCard({ stop, onOpen, onDirections }: { stop: MaintenanceStopDet
               </Text>
             </View>
             <View style={[styles.meta, { marginTop: spacing.sm }]}>
-              <StopStatusPill status={status} />
+              <StopStatusPill status={status} icon />
             </View>
           </View>
           {stop.property && <JobMap place={stop.property} height={92} style={styles.map} />}
@@ -399,12 +387,15 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   hero: { height: HERO_HEIGHT, width: '100%' },
   heroImage: { width: '100%', height: '100%' },
-  avatarWrap: { position: 'absolute', right: spacing.lg },
-  heroText: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing['3xl'] },
+  heroText: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing['3xl'] + spacing.sm },
   heroShadow: { textShadowColor: 'rgba(0, 0, 0, 0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
-  content: { paddingHorizontal: spacing.lg, gap: spacing.lg, marginTop: -spacing.md },
-  card: { borderRadius: radius.xl, padding: spacing.lg },
-  routeCard: { paddingBottom: spacing.lg },
+  sheet: {
+    marginHorizontal: spacing.md,
+    marginTop: -SHEET_RADIUS,
+    padding: spacing.lg,
+    gap: spacing.lg,
+    borderRadius: SHEET_RADIUS,
+  },
   routeHeader: { flexDirection: 'row', alignItems: 'center' },
   leadRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   headerIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -424,7 +415,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderTopWidth: StyleSheet.hairlineWidth,
   },
   doneBox: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg },
-  listCard: { borderRadius: radius.xl, overflow: 'hidden' },
+  listCard: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
   actionArea: { position: 'absolute', left: spacing.lg, right: spacing.lg, alignItems: 'stretch' },
   actionFade: { position: 'absolute', left: -spacing.lg, right: -spacing.lg, top: -spacing.xl, bottom: -spacing['3xl'] },
   actionButton: { height: 68, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },

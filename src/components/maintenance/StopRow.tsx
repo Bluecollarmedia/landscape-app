@@ -16,7 +16,7 @@ const STATUS_LABEL: Record<StopDisplayStatus, string> = {
   skipped: 'Skipped',
 };
 
-export function StopStatusPill({ status }: { status: StopDisplayStatus }) {
+export function StopStatusPill({ status, icon }: { status: StopDisplayStatus; icon?: boolean }) {
   const { colors } = useTheme();
   const tone =
     status === 'next' || status === 'arrived'
@@ -25,7 +25,8 @@ export function StopStatusPill({ status }: { status: StopDisplayStatus }) {
         ? { bg: colors.successLight, fg: colors.success }
         : { bg: colors.backgroundTertiary, fg: colors.textSecondary };
   return (
-    <View style={[styles.pill, { backgroundColor: tone.bg }]}>
+    <View style={[styles.pill, { backgroundColor: tone.bg }, icon && styles.pillWithIcon]}>
+      {icon && (status === 'next' || status === 'arrived') ? <Feather name="clock" size={14} color={tone.fg} /> : null}
       <Text style={[typeScale.labelSmall, { color: tone.fg }]}>{STATUS_LABEL[status]}</Text>
     </View>
   );
@@ -129,5 +130,6 @@ const styles = StyleSheet.create({
   metaText: { marginLeft: spacing.xs, flexShrink: 1 },
   note: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.sm },
   pill: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.full },
+  pillWithIcon: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: 6 },
   chevron: { marginLeft: spacing.xs, marginTop: 8 },
 });

@@ -20,14 +20,14 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import {
-  useSnowActivity, type SnowActivityEvent, type SnowActivityFilters, type SnowFilterKind, type SnowFilterOption,
+  useSnowActivity, type SnowActivityEntry, type SnowActivityFilters, type SnowFilterKind, type SnowFilterOption,
 } from '@/hooks/useSnowActivity';
 import { actionIcon, actionLabel, entityLabel, fieldChanges } from '@/lib/snowActivity';
 
 const FILTERS: { kind: SnowFilterKind; label: string; field: keyof SnowActivityFilters }[] = [
   { kind: 'storm', label: 'Storm', field: 'stormId' },
   { kind: 'route', label: 'Route', field: 'routeId' },
-  { kind: 'worker', label: 'Worker', field: 'workerPersonId' },
+  { kind: 'worker', label: 'Worker', field: 'personId' },
   { kind: 'property', label: 'Property', field: 'propertyId' },
   { kind: 'action', label: 'Action', field: 'action' },
 ];
@@ -82,17 +82,17 @@ export default function SnowActivityScreen() {
     setExpandedId(null);
   }
 
-  function renderEvent({ item: e }: { item: SnowActivityEvent }) {
+  function renderEvent({ item: e }: { item: SnowActivityEntry }) {
     const isExpanded = expandedId === e.id;
-    const who = e.actorName ?? (e.actorPersonId ? 'Someone' : 'System');
+    const who = e.actorName ?? (e.actorId ? 'Someone' : 'System');
     const context = [
       labelOf('storm', e.stormId),
       labelOf('route', e.routeId),
       labelOf('property', e.propertyId),
       e.service ? SERVICE_LABEL[e.service] ?? e.service : undefined,
     ].filter(Boolean).join(' · ');
-    const about = e.workerName && e.workerPersonId !== e.actorPersonId ? e.workerName : undefined;
-    const changes = isExpanded ? fieldChanges(e.before, e.after) : [];
+    const about = e.personName && e.personId !== e.actorId ? e.personName : undefined;
+    const changes = isExpanded ? fieldChanges(e.before ?? null, e.after ?? null) : [];
 
     return (
       <Pressable
@@ -141,7 +141,7 @@ export default function SnowActivityScreen() {
                 ))
               )}
               <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
-                {entityLabel(e.entity)} record · {new Date(e.occurredAt).toLocaleString('en-US')}
+                {entityLabel(e.entityType)} record · {new Date(e.occurredAt).toLocaleString('en-US')}
               </Text>
             </View>
           )}

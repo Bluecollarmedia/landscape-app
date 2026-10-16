@@ -1,5 +1,5 @@
 /**
- * Words for the Snow Mode activity log (supabase/snow/029).
+ * Words for the Snow Mode activity log (supabase/updates/029).
  *
  * The database records actions as '<entity>.<verb>' (storm.dispatched,
  * visit.completed, route.lead_changed …). Snow tables are logged
@@ -11,6 +11,7 @@ import type { Feather } from '@expo/vector-icons';
 
 type IconName = keyof typeof Feather.glyphMap;
 
+/** First word of an action, or an entity type, as the Owner reads it. */
 const ENTITY_LABEL: Record<string, string> = {
   storm: 'Storm',
   route: 'Route',
@@ -18,23 +19,19 @@ const ENTITY_LABEL: Record<string, string> = {
   property: 'Property',
   property_service: 'Property service',
   property_contact: 'Property contact',
-  property_media: 'Reference media',
+  service_instruction: 'Service instructions',
   reference_media: 'Reference media',
+  media: 'Completion media',
   completion_media: 'Completion media',
-  visit_media: 'Completion media',
-  media: 'Media',
+  skip: 'Skip request',
   skip_request: 'Skip request',
-  time_entry: 'Time entry',
   shift: 'Shift',
-  time_correction: 'Time correction',
-  notification: 'Notification',
-  customer_notification: 'Customer notification',
-  route_template: 'Route template',
-  setting: 'Snow setting',
+  settings: 'Snow settings',
   signup_code: 'Snow signup code',
-  signup_request: 'Snow access request',
+  access_request: 'Snow access request',
   staff: 'Snow team member',
   staff_service: 'Snow service access',
+  notification: 'Notification',
 };
 
 /** Exact sentences for the actions the Owner will see most. */
@@ -43,40 +40,46 @@ const ACTION_LABEL: Record<string, string> = {
   'storm.dispatched': 'Storm dispatched',
   'storm.ended': 'Storm ended',
   'storm.reopened': 'Storm reopened',
+  'storm.deleted': 'Storm deleted',
   'route.created': 'Route created',
-  'route.lead_changed': 'Route lead changed',
-  'route.deleted': 'Route removed',
-  'visit.created': 'Stop added',
-  'visit.reordered': 'Stop moved',
+  'route.cancelled': 'Route cancelled',
+  'route.media_rule_changed': 'Photo/video requirement changed',
+  'route.lead_assigned': 'Route lead assigned',
+  'route.lead_ended': 'Route lead removed',
+  'visit.added': 'Stop added',
+  'visit.moved': 'Stop moved',
   'visit.arrived': 'Arrived at stop',
   'visit.completed': 'Stop completed',
   'visit.skipped': 'Stop skipped',
-  'visit.deleted': 'Stop removed',
-  'skip_request.created': 'Skip requested',
-  'skip_request.approved': 'Skip approved',
-  'skip_request.denied': 'Skip denied',
-  'completion_media.created': 'Media uploaded',
-  'completion_media.approved': 'Media approved for customer',
-  'completion_media.removed': 'Media removed from customer selection',
-  'completion_media.shared': 'Media shared with customer',
-  'time_entry.created': 'Clocked in',
-  'shift.created': 'Clocked in',
-  'time_entry.clocked_out': 'Clocked out',
+  'visit.removed': 'Stop removed',
+  'media.uploaded': 'Photo or video uploaded',
+  'media.reviewed': 'Media reviewed',
+  'media.removed': 'Media removed from customer selection',
+  'media.shared': 'Media shared with customer',
+  'skip.requested': 'Skip requested',
+  'skip.approved': 'Skip approved',
+  'skip.denied': 'Skip denied',
+  'skip.withdrawn': 'Skip request withdrawn',
+  'shift.clocked_in': 'Clocked in',
   'shift.clocked_out': 'Clocked out',
-  'time_correction.created': 'Time corrected',
-  'customer_notification.created': 'Customer notification queued',
-  'customer_notification.delivered': 'Customer notification delivered',
-  'customer_notification.failed': 'Customer notification failed',
+  'shift.corrected': 'Time corrected',
+  'shift.voided': 'Shift voided',
+  'settings.changed': 'Snow settings changed',
   'staff.created': 'Added to snow team',
   'staff.active': 'Snow access restored',
   'staff.revoked': 'Snow access revoked',
   'staff_service.created': 'Snow service granted',
   'staff_service.deleted': 'Snow service removed',
-  'customer_notification.unavailable': 'Customer notification not sent (no delivery set up)',
+  'notification.queued': 'Customer notification stored (not sent yet)',
+  'notification.delivered': 'Customer notification delivered',
+  'notification.failed': 'Customer notification failed',
 };
 
 const VERB_LABEL: Record<string, string> = {
   created: 'added',
+  added: 'added',
+  removed: 'removed',
+  moved: 'moved',
   updated: 'changed',
   deleted: 'removed',
   reordered: 'moved',
@@ -106,14 +109,14 @@ export function actionIcon(action: string): IconName {
   if (verb === 'arrived') return 'map-pin';
   if (verb === 'completed' || verb === 'approved' || verb === 'delivered') return 'check-circle';
   if (verb === 'denied' || verb === 'failed') return 'x-circle';
-  if (verb === 'reordered') return 'list';
-  if (verb === 'lead_changed' || verb === 'reassigned') return 'user-check';
+  if (verb === 'moved') return 'list';
+  if (verb === 'lead_changed' || verb === 'lead_assigned' || verb === 'reassigned') return 'user-check';
   if (verb === 'shared') return 'share';
   if (entity === 'storm') return 'cloud-snow';
   if (entity === 'route') return 'navigation';
   if (entity.includes('media')) return 'image';
-  if (entity === 'skip_request') return 'skip-forward';
-  if (entity === 'time_entry' || entity === 'shift' || entity === 'time_correction') return 'clock';
+  if (entity === 'skip' || entity === 'skip_request') return 'skip-forward';
+  if (entity === 'shift') return 'clock';
   if (entity.includes('notification')) return 'bell';
   if (entity === 'property' || entity.startsWith('property_')) return 'home';
   return 'activity';

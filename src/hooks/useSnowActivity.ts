@@ -1,41 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { db, rpc, isDemo } from '@/data/store';
+import type { SnowActivityAction, SnowActivityEvent, SnowService } from '@/types/snow';
 
 /**
- * The Owner's Snow Mode activity log (supabase/snow/029). Events are
+ * The Owner's Snow Mode activity log (supabase/updates/029). Events are
  * written by the database whenever a snow record changes; this only reads
  * them, newest first, through snow_activity_feed (owner/admin only).
  */
 
-export interface SnowActivityEvent {
-  id: string;
-  occurredAt: string;
-  action: string;
-  entity: string;
-  recordTable?: string;
-  recordId?: string;
-  stormId?: string;
-  routeId?: string;
-  visitId?: string;
-  propertyId?: string;
-  workerPersonId?: string;
-  service?: string;
-  before: Record<string, unknown> | null;
-  after: Record<string, unknown> | null;
-  changedFields: string[];
-  note?: string;
-  metadata: Record<string, unknown>;
-  actorPersonId?: string;
+/** A log entry (update 20b's shape) with the names the feed adds. */
+export interface SnowActivityEntry extends SnowActivityEvent {
   actorName?: string;
-  workerName?: string;
+  /** Name of the worker the event is about. */
+  personName?: string;
 }
 
 export interface SnowActivityFilters {
   stormId?: string;
   routeId?: string;
-  workerPersonId?: string;
+  /** Events about this worker or done by them. */
+  personId?: string;
   propertyId?: string;
-  /** A whole action ('visit.completed') or every action on an entity ('visit'). */
+  /** A whole action ('visit.completed') or its first word ('visit'). */
   action?: string;
 }
 
@@ -54,24 +40,21 @@ export interface SnowFilterOption {
 interface EventRow {
   id: string;
   occurred_at: string;
+  actor_id: string | null;
+  actor_name: string | null;
   action: string;
-  entity: string;
-  record_table: string | null;
-  record_id: string | null;
+  entity_type: string;
+  entity_id: string | null;
   storm_id: string | null;
   route_id: string | null;
   visit_id: string | null;
   property_id: string | null;
-  worker_person_id: string | null;
+  person_id: string | null;
+  person_name: string | null;
   service: string | null;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
-  changed_fields: string[] | null;
   note: string | null;
-  metadata: Record<string, unknown> | null;
-  actor_person_id: string | null;
-  actor_name: string | null;
-  worker_name: string | null;
 }
 
 interface OptionRow {
@@ -85,37 +68,35 @@ interface OptionRow {
 
 const PAGE = 50;
 
-function fromRow(r: EventRow): SnowActivityEvent {
+function fromRow(r: EventRow): SnowActivityEntry {
   return {
     id: r.id,
+    companyId: db.companyId,
     occurredAt: r.occurred_at,
-    action: r.action,
-    entity: r.entity,
-    recordTable: r.record_table ?? undefined,
-    recordId: r.record_id ?? undefined,
+    actorId: r.actor_id ?? undefined,
+    actorName: r.actor_name ?? undefined,
+    action: r.action as SnowActivityAction,
+    entityType: r.entity_type,
+    entityId: r.entity_id ?? undefined,
     stormId: r.storm_id ?? undefined,
     routeId: r.route_id ?? undefined,
     visitId: r.visit_id ?? undefined,
     propertyId: r.property_id ?? undefined,
-    workerPersonId: r.worker_person_id ?? undefined,
-    service: r.service ?? undefined,
-    before: r.before,
-    after: r.after,
-    changedFields: r.changed_fields ?? [],
+    personId: r.person_id ?? undefined,
+    personName: r.person_name ?? undefined,
+    service: (r.service ?? undefined) as SnowService | undefined,
+    before: r.before ?? undefined,
+    after: r.after ?? undefined,
     note: r.note ?? undefined,
-    metadata: r.metadata ?? {},
-    actorPersonId: r.actor_person_id ?? undefined,
-    actorName: r.actor_name ?? undefined,
-    workerName: r.worker_name ?? undefined,
   };
 }
 
-function feedArgs(f: SnowActivityFilters, before?: SnowActivityEvent) {
+function feedArgs(f: SnowActivityFilters, before?: SnowActivityEntry) {
   return {
     p_company_id: db.companyId,
     p_storm_id: f.stormId ?? null,
     p_route_id: f.routeId ?? null,
-    p_worker_person_id: f.workerPersonId ?? null,
+    p_person_id: f.personId ?? null,
     p_property_id: f.propertyId ?? null,
     p_action: f.action ?? null,
     p_before_at: before?.occurredAt ?? null,
@@ -125,7 +106,7 @@ function feedArgs(f: SnowActivityFilters, before?: SnowActivityEvent) {
 }
 
 export function useSnowActivity(filters: SnowActivityFilters) {
-  const [events, setEvents] = useState<SnowActivityEvent[]>([]);
+  const [events, setEvents] = useState<SnowActivityEntry[]>([]);
   const [options, setOptions] = useState<SnowFilterOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);

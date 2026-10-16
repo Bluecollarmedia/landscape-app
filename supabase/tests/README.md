@@ -173,3 +173,13 @@ psql -d t -f supabase/updates/025_snow_routes_templates.sql
 psql -d t -f supabase/updates/026_snow_lead_execution.sql
 psql -d t -f supabase/tests/025_026_snow_routes_lead_test.sql
 ```
+
+`028_snow_shifts_test.sql` checks the snow time clock (run 020 through 028
+first): clock in/out are double-tap safe, workers can't write or correct
+shifts and see only their own, customers can't clock in, corrections need a
+reason, can't be edited, and the clock in/out/correction are logged.
+
+```sh
+psql -d t -f supabase/updates/028_snow_shifts.sql
+psql -d t -f supabase/tests/028_snow_shifts_test.sql
+```

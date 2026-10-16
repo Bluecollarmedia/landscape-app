@@ -21,6 +21,12 @@ export default function SnowOwnerMoreScreen() {
           subtitle="Everything that happened, by storm, route and person"
           onPress={() => router.push('/snow/owner/activity')}
         />
+        <SettingsRow
+          icon="clock"
+          title="Snow hours"
+          subtitle="Who clocked in this week, and fix a missed clock-out"
+          onPress={() => router.push('/snow/owner/hours')}
+        />
       </SettingsGroup>
       <SettingsGroup title="Mode">
         <ModeSwitchRow />

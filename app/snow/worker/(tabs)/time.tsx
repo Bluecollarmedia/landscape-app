@@ -1,11 +1,3 @@
-import { SnowPlaceholder } from '@/components/snow/SnowPlaceholder';
+import { SnowTimeClockScreen } from '@/components/snow/time/SnowTimeScreens';
 
-export default function Screen() {
-  return (
-    <SnowPlaceholder
-      title="Time Clock"
-      icon="clock"
-      purpose="Clock in at the start of your shift and clock out at the end. No location is used."
-    />
-  );
-}
+export default SnowTimeClockScreen;

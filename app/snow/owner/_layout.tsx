@@ -9,6 +9,7 @@ export default function SnowOwnerLayout() {
       <Stack.Screen name="storm/[id]" />
       <Stack.Screen name="route/[id]" />
       <Stack.Screen name="activity" />
+      <Stack.Screen name="hours" />
     </Stack>
   );
 }

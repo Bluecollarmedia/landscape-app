@@ -11,10 +11,12 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, Icon, InlineNotice, LoadingSpinner, ScreenHeader, StatusBadge } from '@/components/ui';
 import { showMessage } from '@/components/financials/ActionSheet';
+import { pickSnowMedia } from '@/components/snow/pickSnowMedia';
+import { db, useDb } from '@/data/store';
 import { useTheme } from '@/providers/ThemeProvider';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
-  loadCustomerSnowUpdates, loadReviewQueue, reviewMedia, sendCustomerUpdate,
+  addOwnerMedia, loadCustomerSnowUpdates, loadReviewQueue, reviewMedia, sendCustomerUpdate,
   type CustomerSnowUpdate, type ReviewMedia, type ReviewStop,
 } from '@/data/snowMediaReview';
 import { typeScale } from '@/theme/typography';
@@ -36,6 +38,7 @@ function Thumb({ m, children }: { m: { kind: string; url?: string }; children?: 
 
 /** Owner: Snow More → Photo review. */
 export function SnowMediaReviewScreen() {
+  useDb();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [stops, setStops] = useState<ReviewStop[]>([]);
@@ -68,6 +71,17 @@ export function SnowMediaReviewScreen() {
     showMessage('Sent to the customer', res.data
       ? `${res.data} ${res.data === 1 ? 'photo is' : 'photos are'} now in their Snow updates.`
       : 'The stop is now in their Snow updates.');
+    reload();
+  }
+
+  async function addPhotos(s: ReviewStop) {
+    if (!db.companyId) return;
+    const drafts = await pickSnowMedia();
+    if (!drafts.length) return;
+    setBusy(s.visitId);
+    const res = await addOwnerMedia(db.companyId, s.visitId, drafts);
+    setBusy(null);
+    if (!res.ok) showMessage("Couldn't add the photo", res.error);
     reload();
   }
 
@@ -110,6 +124,14 @@ export function SnowMediaReviewScreen() {
         ) : (
           <Text style={[typeScale.caption, { color: colors.textTertiary }]}>No photos for this stop.</Text>
         )}
+        <Button
+          title="Add a photo or video"
+          icon="camera"
+          size="sm"
+          variant="secondary"
+          disabled={busy === s.visitId}
+          onPress={() => addPhotos(s)}
+        />
         {!s.notified || newlyApproved ? (
           <Button
             title={s.notified ? 'Share newly approved photos' : 'Send to customer'}

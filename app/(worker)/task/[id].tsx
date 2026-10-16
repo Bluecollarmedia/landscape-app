@@ -158,7 +158,7 @@ export default function TaskDetailScreen() {
           </View>
         )}
 
-        {photoRequired && task.status !== 'completed' && (
+        {isLead && photoRequired && task.status !== 'completed' && (
           <View style={[styles.card, styles.notice, { backgroundColor: colors.infoLight, marginTop: spacing.lg }]}>
             <Feather name="camera" size={18} color={colors.info} />
             <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
@@ -189,7 +189,7 @@ export default function TaskDetailScreen() {
           </View>
         )}
 
-        {(photoRequired || photoUri) && (
+        {((isLead && photoRequired) || photoUri) && (
           <View style={[styles.photoArea, { backgroundColor: colors.groupedBackground, marginTop: spacing.lg }]}>
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photoImage} resizeMode="cover" />

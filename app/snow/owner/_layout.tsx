@@ -5,6 +5,9 @@ export default function SnowOwnerLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      {/* Storms (route files come with the Storm lifecycle work). */}
+      <Stack.Screen name="storm-new" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="storm/[id]" />
     </Stack>
   );
 }

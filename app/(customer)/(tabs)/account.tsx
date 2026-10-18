@@ -40,6 +40,17 @@ export default function CustomerAccountScreen() {
         </View>
       </ListSection>
 
+      <ListSection title="Maintenance">
+        <ListRow
+          icon="repeat"
+          iconColor={colors.primary}
+          title="Maintenance updates"
+          subtitle="Recent visits to your property, with photos we've shared"
+          showChevron
+          onPress={() => router.push('/(customer)/maintenance-updates')}
+        />
+      </ListSection>
+
       <ListSection title="Snow">
         <ListRow
           icon="cloud-snow"

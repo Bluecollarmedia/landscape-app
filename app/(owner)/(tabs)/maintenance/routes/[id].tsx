@@ -9,7 +9,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenance, useMaintenanceRoute } from '@/hooks/useMaintenance';
 import { db, useDb } from '@/data/store';
-import { correctAttendance, locationLabel } from '@/data/maintenance';
+import { correctAttendance, locationLabel, setStopPhotoShared } from '@/data/maintenance';
 import {
   buildRouteReview, correctStopTime, describeEvent, formatTime,
   type AttendanceReview, type RecordedTime, type StopReview, type StopTimeKind,
@@ -397,7 +397,21 @@ function StopCard({ review, canFix, onFix, onOpenProperty }: {
           {stop.photos.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
               {stop.photos.map((ph) => (
-                <OptimizedImage key={ph.id} source={ph.fileUrl} style={styles.thumb} accessibilityLabel={ph.caption ?? 'Stop photo'} />
+                <View key={ph.id} style={{ alignItems: 'center', gap: 4 }}>
+                  <OptimizedImage source={ph.fileUrl} style={styles.thumb} accessibilityLabel={ph.caption ?? 'Stop photo'} />
+                  <Pressable
+                    onPress={() => setStopPhotoShared(ph.id, !ph.isCustomerVisible)}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel={ph.isCustomerVisible ? 'Shared with the customer. Tap to make it internal.' : 'Internal. Tap to share with the customer.'}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                  >
+                    <Icon name={ph.isCustomerVisible ? 'eye' : 'lock'} size={11} color={ph.isCustomerVisible ? colors.primary : colors.textTertiary} />
+                    <Text style={[typeScale.caption, { color: ph.isCustomerVisible ? colors.primary : colors.textTertiary, fontWeight: '600' }]}>
+                      {ph.isCustomerVisible ? 'Shared' : 'Internal'}
+                    </Text>
+                  </Pressable>
+                </View>
               ))}
             </ScrollView>
           )}

@@ -1,5 +1,5 @@
 /**
- * SegmentedTabs — the Liquid Glass segmented control (same look as the
+ * SegmentedTabs — the segmented control (flat: neutral track, white selected segment) (same look as the
  * Schedule tab's Day/Week switch), for screens that flip between two or
  * three views such as Pending / History.
  */
@@ -31,11 +31,11 @@ export function SegmentedTabs<T extends string>({ options, value, onChange }: Se
             onChange(next.value);
           }
         }}
-        tintColor={colors.primary}
+        tintColor={colors.surface}
         appearance="light"
-        backgroundColor={colors.groupedBackground}
+        backgroundColor={colors.backgroundTertiary}
         fontStyle={{ color: colors.textSecondary }}
-        activeFontStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+        activeFontStyle={{ color: colors.textPrimary, fontWeight: '600' }}
         style={styles.control}
       />
     </View>

@@ -6,6 +6,7 @@
  * (src/data/snowDashboard.ts). Working layout in the existing app style; no
  * approved mockup yet.
  */
+import { servicesLabel, stormServices } from '@/lib/snowServices';
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -145,7 +146,7 @@ function StormCard({ storm, onOpenStorm, onOpenRoute }: { storm: StormOverview; 
         <View style={{ flex: 1 }}>
           <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{storm.name}</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-            {SERVICE_LABEL[storm.service]}
+            {servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x])}
             {storm.reopenedCount > 0 ? ` · Reopened${storm.reopenedCount > 1 ? ` ${storm.reopenedCount}×` : ''}` : ''}
           </Text>
         </View>

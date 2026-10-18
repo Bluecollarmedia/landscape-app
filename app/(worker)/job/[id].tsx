@@ -1,3 +1,4 @@
+import { ReportProblemButton } from '@/components/issues/ReportProblemButton';
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -283,6 +284,9 @@ export default function JobDetailScreen() {
               </LinearGradient>
             </Pressable>
           )}
+        </View>
+        <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.lg }}>
+          <ReportProblemButton where={{ projectId: assignment.projectId }} />
         </View>
       </ScrollView>
 

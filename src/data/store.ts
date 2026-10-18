@@ -126,6 +126,7 @@ const TABLES = {
   maintenance_stop_tasks: { scope: 'company', cols: ['id', 'companyId', 'routeId', 'stopId', 'title', 'isRequired', 'sortOrder', 'completedAt', 'completedBy', 'createdAt', 'updatedAt'] },
   maintenance_photos: { scope: 'company', cols: ['id', 'companyId', 'routeId', 'stopId', 'propertyId', 'uploadedBy', 'fileUrl', 'fileKey', 'sizeBytes', 'caption', 'isCustomerVisible', 'sharedBy', 'sharedAt', 'takenAt', 'createdAt'] },
   maintenance_day_attendance: { scope: 'company', cols: ['id', 'companyId', 'personId', 'serviceDate', 'routeId', 'startedAt', 'source', 'latitude', 'longitude', 'accuracyM', 'distanceM', 'locationStatus', 'originalStartedAt', 'correctedAt', 'correctedBy', 'correctionNote', 'createdAt', 'updatedAt'] },
+  property_issues: { scope: 'company', cols: ['id', 'companyId', 'reportedBy', 'issueType', 'notes', 'photos', 'maintenancePropertyId', 'projectId', 'placeName', 'status', 'resolvedBy', 'resolvedAt', 'resolutionNote', 'createdAt', 'updatedAt'] },
   maintenance_events: { scope: 'company', cols: ['id', 'companyId', 'routeId', 'stopId', 'personId', 'eventType', 'occurredAt', 'latitude', 'longitude', 'accuracyM', 'distanceM', 'locationStatus', 'note', 'metadata', 'createdAt'] },
 } satisfies Record<string, TableDef>;
 

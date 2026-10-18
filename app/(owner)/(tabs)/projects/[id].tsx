@@ -2116,20 +2116,42 @@ export default function ProjectDetailScreen() {
     setTimeout(() => setCodeCopied(false), 2000);
   }
 
-  async function handleRevokeAccess() {
+  /** Asks first on every platform (these actions cut a customer off or invalidate a shared code). */
+  function confirmThen(title: string, message: string, action: string, run: () => void) {
     if (Platform.OS === 'web') {
-      if (!confirm('Revoke customer access? The customer will no longer be able to view this project. A new code will be generated.')) return;
+      if (confirm(`${title}
+
+${message}`)) run();
+      return;
     }
-    await customerAccess.revokeAccess(p.id);
-    setAccessVersion((v) => v + 1);
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: action, style: 'destructive', onPress: run },
+    ]);
   }
 
-  async function handleRegenerateCode() {
-    if (Platform.OS === 'web') {
-      if (!confirm('Generate a new code? The old code will stop working and any existing claim will be removed.')) return;
-    }
-    await customerAccess.regenerateCode(p.id);
-    setAccessVersion((v) => v + 1);
+  function handleRevokeAccess() {
+    confirmThen(
+      'Remove customer access?',
+      'The customer will no longer be able to view this project. A new code will be made.',
+      'Remove Access',
+      async () => {
+        await customerAccess.revokeAccess(p.id);
+        setAccessVersion((v) => v + 1);
+      },
+    );
+  }
+
+  function handleRegenerateCode() {
+    confirmThen(
+      'Make a new code?',
+      'The old code will stop working and any existing claim will be removed.',
+      'New Code',
+      async () => {
+        await customerAccess.regenerateCode(p.id);
+        setAccessVersion((v) => v + 1);
+      },
+    );
   }
 
   function handleSetRadius(meters: number) {

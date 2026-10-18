@@ -49,7 +49,7 @@ export function RouteEditScreen() {
     setRoute(r.data);
     setName(r.data.name);
     const [l, e, load] = await Promise.all([
-      loadSnowLeads(r.data.service), loadEligibleProperties(r.data.stormId), loadLeadLoad(r.data.id),
+      loadSnowLeads(r.data.service), loadEligibleProperties(r.data.stormId, r.data.service), loadLeadLoad(r.data.id),
     ]);
     if (l.ok) setLeads(l.data);
     if (e.ok) setEligible(e.data);

@@ -1,10 +1,11 @@
 /**
- * Create Storm (Owner). Pick the service, name the storm, save it as a
+ * Create Storm (Owner). Pick the service or services, name the storm, save it as a
  * draft. Nothing is dispatched or sent; the owner plans routes next and
  * dispatches from the storm screen.
  *
  * Working layout in the existing app style; no approved mockup yet.
  */
+import { toggleService } from '@/lib/snowServices';
 import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -28,7 +29,7 @@ export function StormNewScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [service, setService] = useState<SnowService | null>(null);
+  const [services, setServices] = useState<SnowService[]>([]);
   const [name, setName] = useState('');
   const [nameEdited, setNameEdited] = useState(false);
   const [notes, setNotes] = useState('');
@@ -38,16 +39,17 @@ export function StormNewScreen() {
   const requestId = useRef(uuid()).current;
 
   function pick(s: SnowService) {
-    setService(s);
-    if (!nameEdited) setName(defaultStormName(s));
+    const next = toggleService(services, s);
+    setServices(next);
+    if (!nameEdited && next.length) setName(defaultStormName(next));
   }
 
   async function save() {
-    if (!service) return setError('Choose a service.');
+    if (services.length === 0) return setError('Choose at least one service.');
     if (!name.trim()) return setError('Give the storm a name.');
     setSaving(true);
     setError(null);
-    const res = await createStorm({ name, service, notes, requestId });
+    const res = await createStorm({ name, services, notes, requestId });
     setSaving(false);
     if (!res.ok) return setError(res.error);
     router.replace({ pathname: '/snow/owner/storm/[id]', params: { id: res.data.storm.id } });
@@ -57,10 +59,10 @@ export function StormNewScreen() {
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.groupedBackground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader title="New storm" subtitle="Saved as a draft. You dispatch it when the plan is ready." />
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }} keyboardShouldPersistTaps="handled">
-        <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>Service</Text>
+        <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>Services</Text>
         <View style={[styles.group, { backgroundColor: colors.surface }]}>
           {SNOW_SERVICES.map((s, i) => {
-            const selected = service === s;
+            const selected = services.includes(s);
             return (
               <Pressable
                 key={s}
@@ -70,7 +72,7 @@ export function StormNewScreen() {
                   i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight },
                   pressed && { opacity: 0.6 },
                 ]}
-                accessibilityRole="radio"
+                accessibilityRole="checkbox"
                 accessibilityState={{ selected }}
                 accessibilityLabel={SERVICE_LABEL[s]}
               >
@@ -81,13 +83,13 @@ export function StormNewScreen() {
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{SERVICE_LABEL[s]}</Text>
                   <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{SERVICE_HINT[s]}</Text>
                 </View>
-                <Icon name={selected ? 'check-circle' : 'circle'} size={22} color={selected ? colors.primary : colors.textTertiary} />
+                <Icon name={selected ? 'check-square' : 'square'} size={22} color={selected ? colors.primary : colors.textTertiary} />
               </Pressable>
             );
           })}
         </View>
         <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary }]}>
-          A storm covers one service. Create another storm for a second service; they can run at the same time.
+          Pick every service this storm covers. Each route you add later does one of them, so one storm can have plowing routes and shoveling routes.
         </Text>
 
         <Input
@@ -108,7 +110,7 @@ export function StormNewScreen() {
         />
 
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.lg }} /> : null}
-        <Button title="Create draft storm" onPress={save} loading={saving} disabled={!service} fullWidth style={{ marginTop: spacing.xl }} />
+        <Button title="Create draft storm" onPress={save} loading={saving} disabled={services.length === 0} fullWidth style={{ marginTop: spacing.xl }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

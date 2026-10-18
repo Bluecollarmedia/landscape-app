@@ -17,12 +17,13 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   deleteDraftStorm, dispatchStorm, endStorm, endStormConfirmation, loadEligibleProperties, loadStormRoutes,
-  previewEndStorm, reopenStorm, SERVICE_LABEL, STORM_STATUS_LABEL,
+  previewEndStorm, reopenStorm, setStormServices, SERVICE_LABEL, STORM_STATUS_LABEL,
   type StormRouteRow, type StormSummary,
 } from '@/data/snowStorms';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import type { SnowStorm } from '@/types/snow';
+import { SNOW_SERVICES, type SnowService, type SnowStorm } from '@/types/snow';
+import { removableServices, routeServiceChoice, routesPerService, servicesLabel, stormServices, toggleService } from '@/lib/snowServices';
 import { STATUS_TONE } from './StormsListScreen';
 import { addRouteFromTemplate, createRoute, loadRouteTemplates, type RouteTemplate } from '@/data/snowRoutes';
 
@@ -39,6 +40,8 @@ export function StormDetailScreen() {
   const [routes, setRoutes] = useState<StormRouteRow[]>([]);
   const [eligible, setEligible] = useState<number | null>(null);
   const [templates, setTemplates] = useState<RouteTemplate[]>([]);
+  const [choosingService, setChoosingService] = useState(false);
+  const [editingServices, setEditingServices] = useState<SnowService[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -57,7 +60,7 @@ export function StormDetailScreen() {
     setSummary(s.data.summary);
     if (r.ok) setRoutes(r.data);
     if (s.data.storm.status !== 'ended') {
-      const t = await loadRouteTemplates(s.data.storm.service);
+      const t = await loadRouteTemplates(stormServices(s.data.storm));
       if (ticket === latest.current && t.ok) setTemplates(t.data);
     }
     if (s.data.storm.status === 'draft') {
@@ -137,13 +140,32 @@ export function StormDetailScreen() {
 
   const openRoute = (routeId: string) => router.push({ pathname: '/snow/owner/route/[id]', params: { id: routeId } });
 
-  async function onAddRoute() {
+  /** Adds a route. With several services the owner says which one this route does. */
+  async function onAddRoute(picked?: SnowService) {
     if (!storm) return;
+    const choice = routeServiceChoice(stormServices(storm), picked);
+    if (choice.error) return showMessage('Couldn\'t add the route', choice.error);
+    if (choice.needsPick) return setChoosingService(true);
+    setChoosingService(false);
+    const service = choice.service!;
+    const several = stormServices(storm).length > 1;
+    const sameService = routes.filter((r) => r.service === service).length;
+    const name = several ? `${SERVICE_LABEL[service]} route ${sameService + 1}` : `Route ${routes.length + 1}`;
     setBusy(true);
-    const res = await createRoute(storm.id, { name: `Route ${routes.length + 1}`, mediaRequired: true, minMedia: 1 });
+    const res = await createRoute(storm.id, { name, service, mediaRequired: true, minMedia: 1 });
     setBusy(false);
     if (!res.ok) return showMessage('Couldn\'t add the route', res.error);
     openRoute(res.data);
+  }
+
+  async function onSaveServices() {
+    if (!storm || !editingServices) return;
+    setBusy(true);
+    const res = await setStormServices(storm.id, editingServices);
+    setBusy(false);
+    if (!res.ok) return showMessage('Couldn\'t change the services', res.error);
+    setEditingServices(null);
+    reload();
   }
 
   async function onUseTemplate(t: RouteTemplate) {
@@ -178,7 +200,7 @@ export function StormDetailScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title={storm.name} subtitle={SERVICE_LABEL[storm.service]} right={<StatusBadge label={STORM_STATUS_LABEL[storm.status]} status={STATUS_TONE[storm.status]} />} />
+      <ScreenHeader title={storm.name} subtitle={servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x])} right={<StatusBadge label={STORM_STATUS_LABEL[storm.status]} status={STATUS_TONE[storm.status]} />} />
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -220,7 +242,7 @@ export function StormDetailScreen() {
                     {r.name}{r.cancelled ? ' (cancelled)' : ''}
                   </Text>
                   <Text style={[typeScale.caption, { color: r.leadName ? colors.textSecondary : colors.warning }]} numberOfLines={1}>
-                    {r.leadName ? `Lead: ${r.leadName}` : 'No lead yet'}
+                    {SERVICE_LABEL[r.service]} · {r.leadName ? `Lead: ${r.leadName}` : 'No lead yet'}
                   </Text>
                 </View>
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
@@ -240,11 +262,22 @@ export function StormDetailScreen() {
         )}
         {storm.status !== 'ended' ? (
           <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
-            <Button title="Add route" icon="plus" variant="secondary" onPress={onAddRoute} disabled={busy} fullWidth />
+            {choosingService ? (
+              <View style={[styles.card, { backgroundColor: colors.surface, gap: spacing.sm }]}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>What does this route do?</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>A route does one service. Its stops, lead and photos all follow it.</Text>
+                {stormServices(storm).map((sv) => (
+                  <Button key={sv} title={SERVICE_LABEL[sv]} variant="secondary" onPress={() => onAddRoute(sv)} disabled={busy} fullWidth />
+                ))}
+                <Button title="Cancel" variant="ghost" onPress={() => setChoosingService(false)} fullWidth />
+              </View>
+            ) : (
+              <Button title="Add route" icon="plus" variant="secondary" onPress={() => onAddRoute()} disabled={busy} fullWidth />
+            )}
             {templates.map((t) => (
               <Button
                 key={t.id}
-                title={`Add "${t.name}" (${t.stops} ${t.stops === 1 ? 'stop' : 'stops'})`}
+                title={`Add "${t.name}"${stormServices(storm).length > 1 ? ` · ${SERVICE_LABEL[t.service]}` : ''} (${t.stops} ${t.stops === 1 ? 'stop' : 'stops'})`}
                 icon="copy"
                 variant="ghost"
                 onPress={() => onUseTemplate(t)}
@@ -257,9 +290,55 @@ export function StormDetailScreen() {
         {storm.status === 'draft' && eligible !== null ? (
           <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary }]}>
             {eligible === 0
-              ? `No active properties offer ${SERVICE_LABEL[storm.service].toLowerCase()} yet. Turn the service on for a property first.`
-              : `${eligible} ${eligible === 1 ? 'property offers' : 'properties offer'} ${SERVICE_LABEL[storm.service].toLowerCase()}.`}
+              ? `No active properties offer ${servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x].toLowerCase())} yet. Turn the service on for a property first.`
+              : `${eligible} ${eligible === 1 ? 'property offers' : 'properties offer'} ${servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x].toLowerCase())}.`}
           </Text>
+        ) : null}
+
+        {storm.status !== 'ended' ? (
+          <>
+            <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>Services</Text>
+            <View style={[styles.card, { backgroundColor: colors.surface, gap: spacing.sm }]}>
+              {editingServices ? (
+                <>
+                  {SNOW_SERVICES.map((sv) => {
+                    const on = editingServices.includes(sv);
+                    const locked = on && !removableServices(stormServices(storm), [...new Set(routes.map((r) => r.service))]).includes(sv) && stormServices(storm).includes(sv);
+                    return (
+                      <Pressable
+                        key={sv}
+                        onPress={() => !locked && setEditingServices(toggleService(editingServices, sv))}
+                        style={styles.serviceRow}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: on, disabled: locked }}
+                      >
+                        <Icon name={on ? 'check-square' : 'square'} size={20} color={on ? colors.primary : colors.textTertiary} />
+                        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{SERVICE_LABEL[sv]}</Text>
+                        {locked ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Has routes</Text> : null}
+                      </Pressable>
+                    );
+                  })}
+                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                    <Button title="Save services" size="sm" icon="check" onPress={onSaveServices} loading={busy} disabled={editingServices.length === 0} />
+                    <Button title="Cancel" size="sm" variant="ghost" onPress={() => setEditingServices(null)} />
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
+                    {servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x])}
+                  </Text>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                    {(() => {
+                      const per = routesPerService(stormServices(storm), routes.filter((r) => !r.cancelled));
+                      return stormServices(storm).map((sv) => `${SERVICE_LABEL[sv]}: ${per[sv]} ${per[sv] === 1 ? 'route' : 'routes'}`).join(' · ');
+                    })()}
+                  </Text>
+                  <Button title="Change services" size="sm" variant="secondary" icon="sliders" onPress={() => setEditingServices(stormServices(storm))} />
+                </>
+              )}
+            </View>
+          </>
         ) : null}
 
         <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>History</Text>
@@ -316,4 +395,5 @@ const styles = StyleSheet.create({
   help: { marginTop: spacing.sm, marginHorizontal: spacing.sm },
   group: { borderRadius: radius.lg, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 56 },
+  serviceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 40 },
 });

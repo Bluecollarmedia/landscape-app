@@ -54,7 +54,7 @@ export interface RouteDetail {
 }
 
 export interface SnowLead { personId: string; name: string }
-export interface RouteTemplate { id: string; name: string; stops: number }
+export interface RouteTemplate { id: string; name: string; stops: number; service: SnowService }
 
 // ── Reading ─────────────────────────────────────────────────────────────────
 
@@ -127,17 +127,17 @@ export async function loadSnowLeads(service: SnowService): Promise<Result<SnowLe
     .sort((a, b) => a.name.localeCompare(b.name)));
 }
 
-export async function loadRouteTemplates(service: SnowService): Promise<Result<RouteTemplate[]>> {
+export async function loadRouteTemplates(service: SnowService | SnowService[]): Promise<Result<RouteTemplate[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { data, error } = await supabase
     .from('snow_route_templates')
-    .select('id, name, snow_route_template_stops(count)')
-    .eq('service', service)
+    .select('id, name, service, snow_route_template_stops(count)')
+    .in('service', Array.isArray(service) ? service : [service])
     .order('name');
   if (error) return fail(message(error, 'Couldn\'t load templates.'));
   return ok((data ?? []).map((t) => {
     const c = t.snow_route_template_stops as unknown as { count: number }[] | undefined;
-    return { id: t.id, name: t.name, stops: c?.[0]?.count ?? 0 };
+    return { id: t.id, name: t.name, stops: c?.[0]?.count ?? 0, service: t.service as SnowService };
   }));
 }
 
@@ -163,12 +163,13 @@ export async function loadMyRoutes(): Promise<Result<MyRoute[]>> {
 
 // ── Owner: building routes ──────────────────────────────────────────────────
 
-export async function createRoute(stormId: string, input: { name: string; leadPersonId?: string; mediaRequired: boolean; minMedia: number }): Promise<Result<string>> {
+export async function createRoute(stormId: string, input: { name: string; service?: SnowService; leadPersonId?: string; mediaRequired: boolean; minMedia: number }): Promise<Result<string>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { data: last } = await supabase.from('snow_routes').select('position').eq('storm_id', stormId)
     .order('position', { ascending: false }).limit(1).maybeSingle();
   const { data, error } = await supabase.from('snow_routes').insert({
     storm_id: stormId,
+    ...(input.service ? { service: input.service } : {}),
     name: input.name.trim(),
     lead_person_id: input.leadPersonId ?? null,
     media_required: input.mediaRequired,

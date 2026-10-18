@@ -196,14 +196,56 @@ export async function cancelRoute(routeId: string): Promise<Result> {
   return error ? fail(message(error, 'Couldn\'t cancel the route.')) : ok(undefined);
 }
 
-export async function addStops(routeId: string, propertyIds: string[]): Promise<Result> {
+/**
+ * Adds one visit per entry, in the order given; the database numbers each new
+ * stop last. The same property can be listed again (or already be on the
+ * route): every visit is its own record. Returns the new visit ids.
+ */
+export async function addStops(routeId: string, propertyIds: string[]): Promise<Result<string[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  // One at a time, in the order picked: the database numbers each new stop last.
+  const ids: string[] = [];
   for (const propertyId of propertyIds) {
-    const { error } = await supabase.from('snow_visits').insert({ route_id: routeId, property_id: propertyId });
-    if (error) return fail(message(error, 'Couldn\'t add the stop.'));
+    const { data, error } = await supabase.from('snow_visits')
+      .insert({ route_id: routeId, property_id: propertyId }).select('id').single();
+    if (error || !data) return fail(message(error, 'Couldn\'t add the stop.'));
+    ids.push(data.id as string);
   }
-  return ok(undefined);
+  return ok(ids);
+}
+
+/**
+ * The order that puts new visits right after the stops already worked or in
+ * progress, ahead of everything not yet started ("do these next"). Worked
+ * stops keep their places.
+ */
+export function orderWithNext(stops: { id: string; status: string }[], newIds: string[]): string[] {
+  let lastWorked = -1;
+  stops.forEach((s, i) => { if (s.status !== 'pending') lastWorked = i; });
+  const ids = stops.map((s) => s.id);
+  return [...ids.slice(0, lastWorked + 1), ...newIds, ...ids.slice(lastWorked + 1)];
+}
+
+/**
+ * Other live routes each person leads, on storms that haven't ended, so the
+ * owner can see a possible scheduling clash. Information only: the owner can
+ * still give one person several routes.
+ */
+export async function loadLeadLoad(excludeRouteId: string): Promise<Result<Record<string, string[]>>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data, error } = await supabase
+    .from('snow_routes')
+    .select('id, name, lead_person_id, snow_storms!inner(name, status)')
+    .is('cancelled_at', null)
+    .not('lead_person_id', 'is', null)
+    .neq('snow_storms.status', 'ended')
+    .neq('id', excludeRouteId);
+  if (error) return fail(message(error, 'Couldn\'t check the other routes.'));
+  const out: Record<string, string[]> = {};
+  for (const r of data ?? []) {
+    const s = (Array.isArray(r.snow_storms) ? r.snow_storms[0] : r.snow_storms) as { name: string } | null;
+    (out[r.lead_person_id as string] ??= []).push(s?.name ? `${r.name} (${s.name})` : r.name);
+  }
+  return ok(out);
 }
 
 /** Removes a stop nobody has started. Worked stops are kept by the database. */

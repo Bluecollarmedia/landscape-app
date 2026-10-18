@@ -17,6 +17,8 @@ export interface SnowTab {
   title: string;
   feather: keyof typeof Feather.glyphMap;
   sf: string | { default: string; selected: string };
+  /** Keep the route but leave it out of the tab bar (e.g. a lead-only tab for a non-lead). */
+  hidden?: boolean;
 }
 
 /**
@@ -31,7 +33,7 @@ export function SnowTabs({ tabs }: { tabs: SnowTab[] }) {
     return (
       <NativeTabs tintColor={colors.primary} minimizeBehavior="automatic">
         {tabs.map((t) => (
-          <NativeTabs.Trigger key={t.name} name={t.name}>
+          <NativeTabs.Trigger key={t.name} name={t.name} hidden={!!t.hidden}>
             <NativeTabs.Trigger.Icon
               sf={t.sf}
               src={<NativeTabs.Trigger.VectorIcon family={Feather} name={t.feather} />}
@@ -65,6 +67,7 @@ export function SnowTabs({ tabs }: { tabs: SnowTab[] }) {
           name={t.name}
           options={{
             title: t.title,
+            ...(t.hidden ? { href: null } : {}),
             tabBarIcon: ({ color, size }) => <Feather name={t.feather} size={size} color={color} />,
           }}
         />

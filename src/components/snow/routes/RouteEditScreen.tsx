@@ -13,7 +13,7 @@ import { confirmAction, showMessage } from '@/components/financials/ActionSheet'
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
 import {
-  addStops, cancelRoute, loadRoute, loadSnowLeads, removeStop, reorderStops, saveRouteAsTemplate, updateRoute,
+  addStops, cancelRoute, loadLeadLoad, loadRoute, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, updateRoute,
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
 import { OwnerSkipRequests } from './SkipRequests';
@@ -37,6 +37,8 @@ export function RouteEditScreen() {
   const [pickLead, setPickLead] = useState(false);
   const [pickStops, setPickStops] = useState(false);
   const [chosen, setChosen] = useState<string[]>([]);
+  const [doNext, setDoNext] = useState(false);
+  const [leadLoad, setLeadLoad] = useState<Record<string, string[]>>({});
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -46,9 +48,12 @@ export function RouteEditScreen() {
     setError(null);
     setRoute(r.data);
     setName(r.data.name);
-    const [l, e] = await Promise.all([loadSnowLeads(r.data.service), loadEligibleProperties(r.data.stormId)]);
+    const [l, e, load] = await Promise.all([
+      loadSnowLeads(r.data.service), loadEligibleProperties(r.data.stormId), loadLeadLoad(r.data.id),
+    ]);
     if (l.ok) setLeads(l.data);
     if (e.ok) setEligible(e.data);
+    if (load.ok) setLeadLoad(load.data);
   }, [id]);
 
   useEffect(() => { reload(); }, [reload]);
@@ -75,6 +80,20 @@ export function RouteEditScreen() {
     reload();
   }
 
+  /** Puts a stop that hasn't started right after the stops already worked or in progress. */
+  async function moveToNext(index: number) {
+    if (!route) return;
+    const ids = route.stops.map((s) => s.id);
+    let lastWorked = -1;
+    route.stops.forEach((s, i) => { if (s.status !== 'pending') lastWorked = i; });
+    const [id] = ids.splice(index, 1);
+    ids.splice(lastWorked + 1, 0, id);
+    setRoute({ ...route, stops: ids.map((sid) => route.stops.find((s) => s.id === sid)!) });
+    const res = await reorderStops(route.id, ids);
+    if (!res.ok) showMessage('Couldn\'t reorder', res.error);
+    reload();
+  }
+
   function onRemove(stopId: string, label: string) {
     confirmAction(`Remove ${label}?`, 'This stop hasn\'t been started, so nothing is lost.', 'Remove', async () => {
       const res = await removeStop(stopId);
@@ -87,9 +106,14 @@ export function RouteEditScreen() {
     if (!route || !chosen.length) return;
     setBusy(true);
     const res = await addStops(route.id, chosen);
+    if (res.ok && doNext) {
+      const re = await reorderStops(route.id, orderWithNext(route.stops, res.data));
+      if (!re.ok) showMessage('Added, but couldn\'t put them next', re.error);
+    }
     setBusy(false);
     if (!res.ok) showMessage('Couldn\'t add every stop', res.error);
     setChosen([]);
+    setDoNext(false);
     setPickStops(false);
     reload();
   }
@@ -131,8 +155,12 @@ export function RouteEditScreen() {
 
   const editable = !route.cancelled && route.stormStatus !== 'ended';
   const leadName = leads.find((l) => l.personId === route.leadPersonId)?.name;
-  const onRoute = new Set(route.stops.map((s) => s.propertyId));
-  const addable = eligible.filter((p) => !onRoute.has(p.propertyId));
+  // A property can be on a route more than once (repeat passes), so every
+  // eligible property stays pickable; we just show how many visits it has.
+  const visitsOn = new Map<string, number>();
+  route.stops.forEach((s) => visitsOn.set(s.propertyId, (visitsOn.get(s.propertyId) ?? 0) + 1));
+  const addable = eligible;
+  const firstPending = route.stops.findIndex((s) => s.status === 'pending');
   const sep = { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight };
 
   return (
@@ -164,6 +192,11 @@ export function RouteEditScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Lead</Text>
               <Text style={[typeScale.bodyLarge, { color: leadName ? colors.textPrimary : colors.warning }]}>{leadName ?? 'Pick a lead'}</Text>
+              {route.leadPersonId && leadLoad[route.leadPersonId] ? (
+                <Text style={[typeScale.caption, { color: colors.warning }]}>
+                  Also leads {leadLoad[route.leadPersonId].join(', ')}. That's allowed; check the timing.
+                </Text>
+              ) : null}
             </View>
             {editable ? <Icon name={pickLead ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} /> : null}
           </Pressable>
@@ -176,7 +209,12 @@ export function RouteEditScreen() {
                     style={[styles.row, i > 0 && sep]}
                     onPress={() => { setPickLead(false); save({ leadPersonId: l.personId }); }}
                   >
-                    <Text style={[typeScale.bodyLarge, { flex: 1, color: colors.textPrimary }]}>{l.name}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{l.name}</Text>
+                      {leadLoad[l.personId] ? (
+                        <Text style={[typeScale.caption, { color: colors.warning }]}>Already leads {leadLoad[l.personId].join(', ')}</Text>
+                      ) : null}
+                    </View>
                     {l.personId === route.leadPersonId ? <Icon name="check" size={18} color={colors.primary} /> : null}
                   </Pressable>
                 ))}
@@ -220,6 +258,7 @@ export function RouteEditScreen() {
                   </View>
                   {movable ? (
                     <View style={styles.inline}>
+                      <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} />
                       <IconTap icon="arrow-up" label="Move up" disabled={i === 0} onPress={() => move(i, -1)} color={colors.textSecondary} />
                       <IconTap icon="arrow-down" label="Move down" disabled={i === route.stops.length - 1} onPress={() => move(i, 1)} color={colors.textSecondary} />
                       <IconTap icon="x" label="Remove stop" onPress={() => onRemove(s.id, s.propertyName)} color={colors.error} />
@@ -250,14 +289,30 @@ export function RouteEditScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{p.name}</Text>
                       <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{p.address}</Text>
+                      {visitsOn.get(p.propertyId) ? (
+                        <Text style={[typeScale.caption, { color: colors.primary }]}>
+                          Already on this route ×{visitsOn.get(p.propertyId)}. Adding it again makes another visit.
+                        </Text>
+                      ) : null}
                     </View>
                   </Pressable>
                 );
               }) : (
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                  Every property that offers {SERVICE_LABEL[route.service].toLowerCase()} is already on this route.
+                  No property offers {SERVICE_LABEL[route.service].toLowerCase()} yet.
                 </Text>
               )}
+              {route.stormStatus === 'dispatched' && route.stops.length > 0 ? (
+                <View style={[styles.inline, { marginTop: spacing.md }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Do these next</Text>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                      Puts them right after the stop the lead is on, ahead of stops not yet started.
+                    </Text>
+                  </View>
+                  <Switch value={doNext} onValueChange={setDoNext} accessibilityLabel="Do these next" />
+                </View>
+              ) : null}
               <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
                 <Button title="Cancel" variant="ghost" onPress={() => { setPickStops(false); setChosen([]); }} />
                 <Button title={chosen.length ? `Add ${chosen.length}` : 'Add'} disabled={!chosen.length} loading={busy} onPress={onAddStops} />

@@ -1,3 +1,4 @@
+import { copyText } from '@/lib/invite';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking } from 'react-native';
 import { Switch } from '@/components/ui/Switch';
@@ -2102,9 +2103,12 @@ export default function ProjectDetailScreen() {
     );
   }
 
-  function handleCopyCode(code: string) {
-    if (Platform.OS === 'web') {
-      navigator.clipboard?.writeText(code)?.catch(() => {});
+  async function handleCopyCode(code: string) {
+    if (!code) return;
+    try {
+      await copyText(code);
+    } catch {
+      return;
     }
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 2000);

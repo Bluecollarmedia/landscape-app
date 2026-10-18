@@ -1,10 +1,10 @@
 /**
- * Photo uploads (Supabase Storage).
+ * Photo and video uploads.
  *
- * Photos taken in the app are uploaded to the public "media" bucket so every
- * phone sees the same picture. The bucket and its access rules are created by
- * supabase/schema.sql. (Cloudflare R2 via src/lib/storage.ts is the longer-term
- * plan for large volumes; this keeps photos working with no extra account.)
+ * Files go to Cloudflare R2 (through the `media` Edge Function, which hands out
+ * a short upload link) once EXPO_PUBLIC_R2_PUBLIC_URL is set in the build.
+ * Until then they fall back to the public Supabase "media" bucket so the app
+ * keeps working during the move. Old Supabase files keep their links.
  *
  * In demo mode (no Supabase configured) the local file URI is returned as-is.
  */
@@ -14,6 +14,9 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { uuid } from './ids';
 
 export const MEDIA_BUCKET = 'media';
+
+/** True once the build knows the R2 public address. */
+export const r2Enabled = !!process.env.EXPO_PUBLIC_R2_PUBLIC_URL;
 
 function guessContentType(uri: string, mimeType?: string): { contentType: string; ext: string } {
   const lower = uri.split('?')[0].toLowerCase();
@@ -37,6 +40,8 @@ export async function uploadImage(localUri: string, folder: string, mimeType?: s
   }
 
   const { contentType, ext } = guessContentType(localUri, mimeType);
+  if (r2Enabled) return uploadToR2(localUri, folder, contentType);
+
   const key = `${folder}/${uuid()}.${ext}`;
 
   let body: Blob | FormData;
@@ -57,4 +62,30 @@ export async function uploadImage(localUri: string, folder: string, mimeType?: s
 
   const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(key);
   return { url: data.publicUrl, key };
+}
+
+async function uploadToR2(localUri: string, folder: string, contentType: string): Promise<{ url: string; key: string }> {
+  const blob = await (await fetch(localUri)).blob();
+  const { data, error } = await supabase.functions.invoke('media', {
+    body: { action: 'put', folder, contentType, size: blob.size },
+  });
+  if (error || !data?.uploadUrl) throw new Error(`Upload failed: ${error?.message ?? data?.error ?? 'no upload link'}`);
+
+  const res = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
+  if (!res.ok) throw new Error('Upload failed. Please check your connection and try again.');
+  return { url: data.publicUrl as string, key: data.key as string };
+}
+
+/**
+ * Removes an uploaded file by its key. Files can be in R2 (new) or the old
+ * Supabase bucket, so both are asked; one of them simply has nothing to delete.
+ */
+export async function removeMedia(key: string): Promise<void> {
+  if (!isSupabaseConfigured || /^https?:\/\//i.test(key)) return;
+  if (r2Enabled) {
+    const { error } = await supabase.functions.invoke('media', { body: { action: 'delete', key } });
+    if (error) console.warn('[media] R2 delete failed', error.message);
+  }
+  const { error } = await supabase.storage.from(MEDIA_BUCKET).remove([key]);
+  if (error) console.warn('[media] cleanup failed', error.message);
 }

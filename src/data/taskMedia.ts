@@ -10,7 +10,7 @@
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { db, insertRow, saveDeferredRow, discardLocalRow, deleteRow } from './store';
-import { uploadImage, MEDIA_BUCKET } from '@/lib/media';
+import { uploadImage, removeMedia } from '@/lib/media';
 import { getStorageInfo } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { formatBytes } from '@/types/storage';
@@ -178,8 +178,6 @@ export function saveTaskMedia(projectId: string, taskId: string, drafts: TaskMed
 export function removeTaskMedia(att: TaskAttachment) {
   deleteRow('task_attachments', att.id);
   if (!db.demo && att.fileKey) {
-    supabase.storage.from(MEDIA_BUCKET).remove([att.fileKey]).then(({ error }) => {
-      if (error) console.warn('[task media] storage delete failed', error.message);
-    });
+    removeMedia(att.fileKey).catch((err) => console.warn('[task media] storage delete failed', err));
   }
 }

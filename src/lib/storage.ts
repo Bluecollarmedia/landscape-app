@@ -213,6 +213,15 @@ export async function getStorageInfo(): Promise<StorageInfo> {
       totalBytes += size;
     }
   });
+  // New files live in R2; add them to the old Supabase ones.
+  if (process.env.EXPO_PUBLIC_R2_PUBLIC_URL) {
+    const { data } = await supabase.functions.invoke('media', { body: { action: 'usage' } });
+    if (data && typeof data.bytes === 'number') {
+      totalBytes += data.bytes;
+      photoCount += data.photos ?? 0;
+      avatarCount += data.avatars ?? 0;
+    }
+  }
   const maxStorageBytes = companyStorageLimitBytes();
   return {
     usage: {

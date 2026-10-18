@@ -55,7 +55,7 @@ export function StormNewScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.groupedBackground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title="New storm" subtitle="Saved as a draft. You dispatch it when the plan is ready." />
+      <ScreenHeader title="Storm plan" subtitle="Saved as a draft. You dispatch it when the plan is ready." />
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }} keyboardShouldPersistTaps="handled">
         <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>Service</Text>
         <View style={[styles.group, { backgroundColor: colors.surface }]}>

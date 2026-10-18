@@ -5,6 +5,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { formatClock, servicesLabel, stopAddress } from './format';
+import { ServiceIcon } from './ServiceIcon';
 import { displayStatus, type StopDisplayStatus } from './types';
 import type { MaintenanceStopDetail } from '@/types/maintenance';
 
@@ -95,7 +96,7 @@ export function StopRow({ stop, nextStopId, nameOf, first, showInstructions, onP
           </Text>
         </View>
         <View style={styles.meta}>
-          <Feather name="scissors" size={13} color={colors.primary} />
+          <ServiceIcon label={servicesLabel(stop)} size={15} color={colors.primary} />
           <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]} numberOfLines={2}>
             {servicesLabel(stop)}
           </Text>

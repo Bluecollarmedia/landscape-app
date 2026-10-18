@@ -18,6 +18,8 @@ import { useTeamCode } from '@/hooks/useOnboarding';
 import { lookupSnowCode, requestSnowAccess } from '@/hooks/useSnowOnboarding';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/media';
+import { saveBirthdayForCurrentUser } from '@/data/birthday';
+import { parseBirthday, birthdayProblem } from '@/lib/birthday';
 
 type Step = 'code' | 'account' | 'profile';
 
@@ -51,6 +53,7 @@ export default function JoinTeamScreen() {
   const [firstName, setFirstName] = useState(user?.firstName ?? '');
   const [lastName, setLastName] = useState(user?.lastName ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
+  const [birthday, setBirthday] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   const [error, setError] = useState('');
@@ -132,6 +135,11 @@ export default function JoinTeamScreen() {
       setError('Please enter your phone number.');
       return;
     }
+    const birthdayErr = birthdayProblem(birthday);
+    if (birthdayErr) {
+      setError(`Birthday: ${birthdayErr}`);
+      return;
+    }
     setError('');
     setLoading(true);
 
@@ -176,6 +184,10 @@ export default function JoinTeamScreen() {
           return;
         }
       }
+
+      // Birthday is optional. Saved now when we are signed in; when an email confirmation comes first it can be added later in Edit Profile.
+      const birthdayIso = parseBirthday(birthday);
+      if (birthdayIso) await saveBirthdayForCurrentUser(birthdayIso);
 
       // Profile photo is optional; upload it if one was picked.
       if (photoUri) {
@@ -362,6 +374,7 @@ export default function JoinTeamScreen() {
               <Input label="Last Name *" placeholder="Smith" value={lastName} onChangeText={setLastName} containerStyle={{ flex: 1 }} />
             </View>
             <Input label="Phone *" placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
+            <Input label="Birthday (optional)" placeholder="MM/DD/YYYY" value={birthday} onChangeText={setBirthday} keyboardType="numbers-and-punctuation" icon="gift" />
 
             <View style={[styles.infoBox, { backgroundColor: semantic.warningLight, borderColor: semantic.warning }]}>
               <Icon name="info" size={14} color={semantic.warning} />

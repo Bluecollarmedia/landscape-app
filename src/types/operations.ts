@@ -83,6 +83,7 @@ export interface OvertimeRule {
 // ── Notifications ──────────────────────────────────────────────
 
 export type NotificationEventType =
+  | 'issue_reported'
   | 'worker_checked_in'
   | 'worker_checked_out'
   | 'worker_checked_in_late'
@@ -123,7 +124,7 @@ export interface AppNotification {
   title: string;
   body: string;
   status: NotificationStatus;
-  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement' | 'quote' | 'change_order' | 'invoice';
+  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement' | 'quote' | 'change_order' | 'invoice' | 'issue';
   linkedEntityId?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;

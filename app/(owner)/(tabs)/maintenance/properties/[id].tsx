@@ -4,6 +4,7 @@
  * visit so far. Deactivating the contract or the property keeps all history.
  */
 
+import { IssuesSection } from '@/components/issues/IssuesSection';
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -236,6 +237,8 @@ export default function MaintenancePropertyScreen() {
             onPress={toggleProperty}
           />
         </ListSection>
+
+        <IssuesSection where={{ maintenancePropertyId: p.id }} />
       </ScrollView>
     </View>
   );

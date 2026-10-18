@@ -5,6 +5,7 @@
  * photos and finish show up for everyone.
  */
 
+import { ReportProblemButton } from '@/components/issues/ReportProblemButton';
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -192,6 +193,10 @@ export default function MaintenanceStopScreen() {
             />
           </Section>
         )}
+
+        <View style={{ marginTop: spacing.xl }}>
+          <ReportProblemButton where={{ maintenancePropertyId: stop.propertyId }} />
+        </View>
       </ScrollView>
 
       {/* Fixed bottom action */}

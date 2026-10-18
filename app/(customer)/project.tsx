@@ -12,6 +12,7 @@ import { SectionTabs, ProgressBar, Card, EmptyState, StatusBadge, Button, Optimi
 import { useProject } from '@/hooks/useProject';
 import { db } from '@/data/store';
 import { CustomerDocuments } from '@/components/financials/CustomerDocuments';
+import { ReportSheet, type ReportTarget } from '@/components/reports/ReportSheet';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic, brand } from '@/theme/colors';
@@ -71,6 +72,7 @@ export default function CustomerProjectScreen() {
   const [reqCategory, setReqCategory] = useState<RequestCategory>('question');
 
   const { project, photos, customerTimeline, updates, requests, submitRequest, settings, taskStats } = useProject(id);
+  const [reporting, setReporting] = useState<ReportTarget | null>(null);
 
   const sharedPhotos = useMemo(
     () => photos.filter(p => p.isCustomerVisible),
@@ -293,11 +295,21 @@ export default function CustomerProjectScreen() {
                   <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
                     {formatDateTime(photo.sharedAt ?? photo.createdAt)}
                   </Text>
+                  <Pressable
+                    onPress={() => setReporting({ projectId: id, type: 'photo', contentId: photo.id, where: project?.name })}
+                    hitSlop={8}
+                    style={{ alignSelf: 'flex-start', marginTop: spacing.xs }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Report this photo"
+                  >
+                    <Text style={[typeScale.caption, { color: colors.textSecondary, textDecorationLine: 'underline' }]}>Report</Text>
+                  </Pressable>
                 </View>
               </Card>
             ))}
           </View>
         )}
+        <ReportSheet target={reporting} onClose={() => setReporting(null)} />
       </View>
     );
   }

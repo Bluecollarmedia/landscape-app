@@ -6,6 +6,7 @@
  * update 026). Working layout in the existing app style; no approved mockup.
  */
 import { pickActiveRoute, splitMyRoutes } from '@/lib/snowMyRoute';
+import { canWorkRoute } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,6 +78,8 @@ export function MyRouteScreen() {
   const done = route?.stops.filter((s) => s.status === 'completed' || s.status === 'skipped').length ?? 0;
   const working = route?.stormStatus === 'dispatched' && !route.cancelled;
   const { active: activeRoutes, history: pastRoutes } = splitMyRoutes(routes);
+  // Update 41: crew can see the route, its stops and instructions; only the lead can act on it.
+  const isLead = canWorkRoute(routes.find((r) => r.id === route?.id)?.role);
   const needMedia = route && current && route.mediaRequired ? Math.max(0, route.minMedia - current.mediaCount) : 0;
 
   return (
@@ -140,7 +143,9 @@ export function MyRouteScreen() {
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{current.propertyAddress}</Text>
                 </View>
                 <Button title="Directions" icon="navigation" variant="secondary" onPress={() => openDirections({ address: current.propertyAddress })} fullWidth />
-                {current.status === 'pending' ? (
+                {!isLead ? (
+                  <InlineNotice icon="eye" tone="info" text="You're on this route's crew. The route lead marks arrivals, finishes stops and adds photos." />
+                ) : current.status === 'pending' ? (
                   <Button title="I'm Here" icon="map-pin" loading={busy} onPress={() => act(() => arriveAtStop(current.id), 'Can\'t start this stop')} fullWidth />
                 ) : (
                   <>
@@ -171,7 +176,7 @@ export function MyRouteScreen() {
                     />
                   </>
                 )}
-                <LeadSkipPanel visitId={current.id} disabled={busy} onChanged={reload} />
+                {isLead ? <LeadSkipPanel visitId={current.id} disabled={busy} onChanged={reload} /> : null}
               </View>
             ) : null}
             {working && current ? (

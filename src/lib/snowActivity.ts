@@ -15,6 +15,7 @@ type IconName = keyof typeof Feather.glyphMap;
 const ENTITY_LABEL: Record<string, string> = {
   storm: 'Storm',
   route: 'Route',
+  route_crew: 'Route crew',
   visit: 'Stop',
   property: 'Property',
   property_service: 'Property service',
@@ -42,6 +43,8 @@ const ACTION_LABEL: Record<string, string> = {
   'storm.reopened': 'Storm reopened',
   'storm.deleted': 'Storm deleted',
   'route.created': 'Route created',
+  'route_crew.created': 'Crew member added',
+  'route_crew.deleted': 'Crew member removed',
   'route.cancelled': 'Route cancelled',
   'route.media_rule_changed': 'Photo/video requirement changed',
   'route.lead_assigned': 'Route lead assigned',

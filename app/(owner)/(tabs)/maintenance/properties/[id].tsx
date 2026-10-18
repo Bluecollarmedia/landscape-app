@@ -10,6 +10,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader, GlassIconButton, EmptyState, StatusBadge, ListSection, ListRow } from '@/components/ui';
 import { ServiceDueLine } from '@/components/maintenance/ServiceDueLine';
+import { CustomerAccessSection } from '@/components/maintenance/CustomerAccessSection';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenance, useMaintenanceProperty } from '@/hooks/useMaintenance';
@@ -136,6 +137,8 @@ export default function MaintenancePropertyScreen() {
             <ListRow icon="crosshair" title="No map location" subtitle="Arrivals here can't be GPS-verified. Edit the address and check it on the map." />
           )}
         </ListSection>
+
+        <CustomerAccessSection propertyId={p.id} propertyName={p.name} linked={!!p.customer} />
 
         {(!!p.accessNotes || !!p.notes) && (
           <ListSection title="NOTES">

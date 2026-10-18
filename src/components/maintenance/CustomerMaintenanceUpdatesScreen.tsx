@@ -7,7 +7,10 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, InlineNotice, LoadingSpinner, OptimizedImage, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
-import { loadCustomerMaintenanceUpdates, type CustomerMaintenanceUpdate } from '@/data/maintenanceCustomer';
+import {
+  loadCustomerMaintenanceUpdates, loadMyMaintenanceProperties,
+  type CustomerMaintenanceUpdate, type MyMaintenanceProperty,
+} from '@/data/maintenanceCustomer';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -18,12 +21,14 @@ export function CustomerMaintenanceUpdatesScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [updates, setUpdates] = useState<CustomerMaintenanceUpdate[]>([]);
+  const [properties, setProperties] = useState<MyMaintenanceProperty[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    const res = await loadCustomerMaintenanceUpdates();
+    const [res, props] = await Promise.all([loadCustomerMaintenanceUpdates(), loadMyMaintenanceProperties()]);
     setLoading(false);
+    if (props.ok) setProperties(props.data);
     if (!res.ok) return setError(res.error);
     setError(null);
     setUpdates(res.data);
@@ -38,6 +43,19 @@ export function CustomerMaintenanceUpdatesScreen() {
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
       >
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
+        {properties.length ? (
+          <View style={{ marginBottom: spacing.lg, gap: spacing.xs }}>
+            <Text style={[typeScale.overline, { color: colors.textSecondary, marginLeft: spacing.sm }]}>YOUR PROPERTIES</Text>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, gap: spacing.sm }]}>
+              {properties.map((p) => (
+                <View key={p.id}>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{p.name}</Text>
+                  {p.address ? <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{p.address}</Text> : null}
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
         {loading ? <LoadingSpinner /> : !updates.length ? (
           <EmptyState icon="repeat" title="No maintenance visits yet" description="After each visit to your property you'll see it here, with photos when we've shared them." />
         ) : updates.map((u) => (

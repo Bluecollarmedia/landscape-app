@@ -18,6 +18,7 @@ import {
 } from '@/data/snowRoutes';
 import { OwnerSkipRequests } from './SkipRequests';
 import { typeScale } from '@/theme/typography';
+import { ReorderableList } from '@/components/ui/ReorderableList';
 import { spacing, radius } from '@/theme/spacing';
 
 export const STOP_TONE = { pending: 'neutral', arrived: 'info', completed: 'success', skipped: 'warning' } as const;
@@ -38,6 +39,7 @@ export function RouteEditScreen() {
   const [pickStops, setPickStops] = useState(false);
   const [chosen, setChosen] = useState<string[]>([]);
   const [doNext, setDoNext] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [leadLoad, setLeadLoad] = useState<Record<string, string[]>>({});
 
   const reload = useCallback(async () => {
@@ -64,6 +66,15 @@ export function RouteEditScreen() {
     const res = await updateRoute(route.id, patch);
     setBusy(false);
     if (!res.ok) return showMessage('Couldn\'t save', res.error);
+    reload();
+  }
+
+  /** Saves a new stop order (from a drag): shows it right away, then lets the database have the final word. */
+  async function applyOrder(ids: string[]) {
+    if (!route) return;
+    setRoute({ ...route, stops: ids.map((sid) => route.stops.find((s) => s.id === sid)!) });
+    const res = await reorderStops(route.id, ids);
+    if (!res.ok) showMessage("Couldn't reorder", res.error);
     reload();
   }
 
@@ -167,6 +178,7 @@ export function RouteEditScreen() {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader title={route.name} subtitle={`${route.stormName} · ${SERVICE_LABEL[route.service]}`} />
       <ScrollView
+        scrollEnabled={!dragging}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
         keyboardShouldPersistTaps="handled"
@@ -247,28 +259,37 @@ export function RouteEditScreen() {
         <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>Stops</Text>
         {route.stops.length ? (
           <View style={[styles.group, { backgroundColor: colors.surface, borderColor: 'transparent' }]}>
-            {route.stops.map((s, i) => {
-              const movable = editable && s.status === 'pending';
-              return (
-                <View key={s.id} style={[styles.row, i > 0 && sep]}>
-                  <Text style={[typeScale.labelLarge, { color: colors.textTertiary, width: 22 }]}>{i + 1}</Text>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{s.propertyName}</Text>
-                    <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
-                  </View>
-                  {movable ? (
-                    <View style={styles.inline}>
-                      <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} />
-                      <IconTap icon="arrow-up" label="Move up" disabled={i === 0} onPress={() => move(i, -1)} color={colors.textSecondary} />
-                      <IconTap icon="arrow-down" label="Move down" disabled={i === route.stops.length - 1} onPress={() => move(i, 1)} color={colors.textSecondary} />
-                      <IconTap icon="x" label="Remove stop" onPress={() => onRemove(s.id, s.propertyName)} color={colors.error} />
+            <ReorderableList
+              items={route.stops}
+              keyOf={(s) => s.id}
+              rowHeight={STOP_ROW_HEIGHT}
+              canDrag={(s) => editable && s.status === 'pending'}
+              onReorder={applyOrder}
+              onDragActive={setDragging}
+              renderRow={(s, i, handle) => {
+                const movable = editable && s.status === 'pending';
+                return (
+                  <View style={[styles.row, { flex: 1 }, i > 0 && sep]}>
+                    {handle ?? <View style={{ width: 32 }} />}
+                    <Text style={[typeScale.labelLarge, { color: colors.textTertiary, width: 18 }]}>{i + 1}</Text>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{s.propertyName}</Text>
+                      <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
                     </View>
-                  ) : (
-                    <StatusBadge label={STOP_STATUS_LABEL[s.status]} status={STOP_TONE[s.status]} />
-                  )}
-                </View>
-              );
-            })}
+                    {movable ? (
+                      <View style={styles.inline}>
+                        <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} />
+                        <IconTap icon="arrow-up" label="Move up" disabled={i === 0} onPress={() => move(i, -1)} color={colors.textSecondary} />
+                        <IconTap icon="arrow-down" label="Move down" disabled={i === route.stops.length - 1} onPress={() => move(i, 1)} color={colors.textSecondary} />
+                        <IconTap icon="x" label="Remove stop" onPress={() => onRemove(s.id, s.propertyName)} color={colors.error} />
+                      </View>
+                    ) : (
+                      <StatusBadge label={STOP_STATUS_LABEL[s.status]} status={STOP_TONE[s.status]} />
+                    )}
+                  </View>
+                );
+              }}
+            />
           </View>
         ) : (
           <Text style={[typeScale.bodySmall, styles.help, { color: colors.textSecondary }]}>No stops yet.</Text>
@@ -341,6 +362,9 @@ function IconTap({ icon, label, onPress, disabled, color }: { icon: React.Compon
     </Pressable>
   );
 }
+
+/** Every stop row is this tall so a dragged row can slide between its neighbours. */
+const STOP_ROW_HEIGHT = 72;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },

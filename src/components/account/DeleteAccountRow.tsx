@@ -25,11 +25,10 @@ export function DeleteAccountRow() {
   const [error, setError] = useState('');
 
   const me = db.members.find((m) => m.personId === db.personId);
-  const otherOwners = db.members.filter(
-    (m) => m.role === 'owner' && m.status === 'active' && m.personId !== db.personId,
-  );
-  const lastOwner = me?.role === 'owner' && otherOwners.length === 0;
-  const ready = typed.trim().toUpperCase() === CONFIRM_WORD;
+  // An owner can't erase their login while owning the company (the database
+  // refuses too): they delete the company first, so nothing is left unmanaged.
+  const isOwner = me?.role === 'owner';
+  const ready = typed.trim().toUpperCase() === CONFIRM_WORD && !isOwner;
 
   function close() {
     if (busy) return;
@@ -78,10 +77,10 @@ export function DeleteAccountRow() {
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
               Your login and contact details are erased and you're removed from the team. Your name stays on past records like hours and project history. This can't be undone.
             </Text>
-            {lastOwner && (
+            {isOwner && (
               <View style={[styles.warnBox, { backgroundColor: semantic.warningLight }]}>
                 <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>
-                  You're the only owner of {db.company?.name ?? 'this company'}. Nobody will be able to manage it after this, and someone else could create a new company in the app.
+                  You own {db.company?.name ?? 'this company'}. Delete the company first (More → Settings → Delete Company), then you can delete your account.
                 </Text>
               </View>
             )}

@@ -18,7 +18,7 @@ import {
 import { loadStorms } from '@/data/snowStorms';
 import type { SnowStorm } from '@/types/snow';
 import {
-  SHORT_SHIFT_MINUTES, addDays, dayKeyOf, filterShifts, groupByWorkerDay, isShortShift, shiftMs, weekStartDay,
+  SHORT_SHIFT_MINUTES, addDays, countUntaggedDuring, dayKeyOf, filterShifts, groupByWorkerDay, isShortShift, shiftMs, weekStartDay,
 } from '@/lib/snowHours';
 import { ShiftCorrectionSheet } from './ShiftCorrectionSheet';
 import { typeScale } from '@/theme/typography';
@@ -158,6 +158,7 @@ export function SnowHoursScreen() {
   const [stormId, setStormId] = useState<string | null>(null);
   const [personId, setPersonId] = useState<string | null>(null);
   const [onlyReview, setOnlyReview] = useState(false);
+  const [includeUntagged, setIncludeUntagged] = useState(false);
   const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
 
   const storm = storms.find((s) => s.id === stormId);
@@ -168,7 +169,8 @@ export function SnowHoursScreen() {
     const since = storm?.dispatchedAt
       ? new Date(new Date(storm.dispatchedAt).getTime() - 24 * 3_600_000).toISOString()
       : new Date(`${days.fromDay}T00:00:00`).toISOString();
-    const until = storm ? storm.endedAt : new Date(`${addDays(days.toDay, 1)}T00:00:00`).toISOString();
+    // A storm that is running (or was reopened) has no end yet; only a storm that is ended has one.
+    const until = storm ? (storm.status === 'ended' ? storm.endedAt : undefined) : new Date(`${addDays(days.toDay, 1)}T00:00:00`).toISOString();
     const res = await loadShifts(since, until);
     setLoading(false);
     if (!res.ok) return setError(res.error);
@@ -194,10 +196,13 @@ export function SnowHoursScreen() {
   }, [shifts, names]);
 
   const nameOf = (id: string) => names[id] ?? '…';
+  const stormWindow = storm?.dispatchedAt ? { start: storm.dispatchedAt, end: storm.status === 'ended' ? storm.endedAt : undefined } : undefined;
   const filtered = filterShifts(shifts, {
     personId: personId ?? undefined,
-    ...(storm?.dispatchedAt ? { window: { start: storm.dispatchedAt, end: storm.endedAt } } : { fromDay: days.fromDay, toDay: days.toDay }),
+    ...(storm?.dispatchedAt ? { stormId: storm.id, includeUntagged, window: stormWindow } : { fromDay: days.fromDay, toDay: days.toDay }),
   });
+  const untaggedCount = stormWindow ? countUntaggedDuring(shifts, stormWindow, personId ?? undefined) : 0;
+  const taggedCount = storm ? filtered.filter((s) => s.stormId === storm.id).length : 0;
   const reviewCount = filtered.filter((s) => isShortShift(s)).length;
   const shown = onlyReview ? filtered.filter((s) => isShortShift(s)) : filtered;
   const groups = groupByWorkerDay(shown, nameOf);
@@ -220,7 +225,7 @@ export function SnowHoursScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Snow hours" subtitle={storm ? `${storm.name} · while it was active` : `${dayLabel(days.fromDay)} – ${dayLabel(days.toDay)}`} />
+      <ScreenHeader title="Snow hours" subtitle={storm ? `${storm.name} · shifts tagged to this storm` : `${dayLabel(days.fromDay)} – ${dayLabel(days.toDay)}`} />
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
@@ -234,9 +239,19 @@ export function SnowHoursScreen() {
         <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textSecondary }]}>WORKER</Text>
         <FilterChips options={workerOptions} selected={personId ?? 'all'} onSelect={(k) => setPersonId(k === 'all' ? null : k)} />
         {storm ? (
-          <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm, marginHorizontal: spacing.sm }]}>
-            Clock-ins are not tied to a storm, so this shows shifts that overlapped the time the storm was dispatched.
-          </Text>
+          <View style={{ marginTop: spacing.sm, marginHorizontal: spacing.sm, gap: spacing.xs }}>
+            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+              A clock-in is tagged with a storm automatically when the worker has exactly one active route. These are the shifts tagged to this storm.
+            </Text>
+            {untaggedCount > 0 ? (
+              <Pressable onPress={() => setIncludeUntagged(!includeUntagged)} accessibilityRole="button" accessibilityState={{ checked: includeUntagged }}>
+                <Text style={[typeScale.caption, { color: colors.primary }]}>
+                  {taggedCount === 0 && !includeUntagged ? 'No shifts are tagged to this storm yet. ' : ''}
+                  {untaggedCount} untagged {untaggedCount === 1 ? 'shift' : 'shifts'} overlapped this storm's time (no route, or more than one, when they clocked in). {includeUntagged ? 'Hide them' : 'Include them'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
 
         {loading ? <LoadingSpinner /> : (

@@ -26,6 +26,8 @@ export interface SnowShift {
   /** The times as tapped. */
   originalIn: string;
   originalOut?: string;
+  /** The storm this shift was tagged with at clock-in (update 42). Missing when untagged or before update 42. */
+  stormId?: string;
   corrected: boolean;
   correctionReason?: string;
 }
@@ -33,14 +35,19 @@ export interface SnowShift {
 /** Shifts the caller can see (own for workers, everyone's for owner/admin), newest first. */
 export async function loadShifts(sinceIso: string, untilIso?: string): Promise<Result<SnowShift[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  let q = supabase
-    .from('snow_shifts')
-    .select('id, person_id, clock_in_at, clock_out_at, snow_shift_corrections(clock_in_at, clock_out_at, reason, created_at)')
-    .gte('clock_in_at', sinceIso);
-  if (untilIso) q = q.lt('clock_in_at', untilIso);
-  const { data, error } = await q.order('clock_in_at', { ascending: false });
+  const run = (columns: string) => {
+    let q = supabase.from('snow_shifts').select(columns).gte('clock_in_at', sinceIso);
+    if (untilIso) q = q.lt('clock_in_at', untilIso);
+    return q.order('clock_in_at', { ascending: false });
+  };
+  const corrections = 'snow_shift_corrections(clock_in_at, clock_out_at, reason, created_at)';
+  let { data, error } = await run(`id, person_id, storm_id, clock_in_at, clock_out_at, ${corrections}`);
+  // Before update 42 there is no storm_id column: load the shifts without it (every shift is untagged).
+  if (error && /storm_id/i.test(error.message)) {
+    ({ data, error } = await run(`id, person_id, clock_in_at, clock_out_at, ${corrections}`));
+  }
   if (error) return fail(message(error, 'Couldn\'t load shifts.'));
-  return ok((data ?? []).map((s) => {
+  return ok(((data ?? []) as any[]).map((s) => {
     const fixes = ((s.snow_shift_corrections ?? []) as { clock_in_at: string; clock_out_at: string | null; reason: string; created_at: string }[])
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
     const last = fixes[fixes.length - 1];
@@ -51,6 +58,7 @@ export async function loadShifts(sinceIso: string, untilIso?: string): Promise<R
       clockOutAt: (last ? last.clock_out_at : s.clock_out_at) ?? undefined,
       originalIn: s.clock_in_at,
       originalOut: s.clock_out_at ?? undefined,
+      stormId: s.storm_id ?? undefined,
       corrected: !!last,
       correctionReason: last?.reason,
     };

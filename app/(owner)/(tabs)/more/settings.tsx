@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Avatar, GlassIconButton } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
+import { DeleteCompanyRow } from '@/components/account/DeleteCompanyRow';
 import { ModeSwitchRow } from '@/components/snow/ModeSwitchRow';
 import { SettingsGroup, SettingsRow, PressScale, UsageBar, tileColors } from '@/components/settings/SettingsList';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -218,6 +219,7 @@ export default function SettingsScreen() {
           <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
         </SettingsGroup>
         <ListSection>
+          <DeleteCompanyRow />
           <DeleteAccountRow />
         </ListSection>
       </ScrollView>

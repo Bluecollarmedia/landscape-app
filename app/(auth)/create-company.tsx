@@ -128,6 +128,13 @@ export default function CreateCompanyScreen() {
     setError('');
     setLoading(true);
     try {
+      // The database allows only one company. Ask first, so the sign-up path
+      // can't quietly make an account with no company when one already exists.
+      const { data: slotOpen, error: slotError } = await supabase.rpc('company_slot_open');
+      if (!slotError && slotOpen === false) {
+        throw new Error('A company already exists. Ask the owner for a team code to join it.');
+      }
+
       if (signedIn) {
         const { error: rpcError } = await supabase.rpc('create_company', {
           data: {

@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, ScreenHeader, StatusBadge, Switch } from '@/components/ui';
+import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, PressableScale, ScreenHeader, StatusBadge, Switch } from '@/components/ui';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
@@ -127,6 +127,17 @@ export function RouteEditScreen() {
       res.ok ? `"${route.name}" can be added to the next ${SERVICE_LABEL[route.service].toLowerCase()} storm.` : res.error);
   }
 
+  /** Everything on this screen saves as it changes; Done also saves a name still being typed, then closes. */
+  async function done() {
+    if (route && name.trim() && name.trim() !== route.name) {
+      setBusy(true);
+      const res = await updateRoute(route.id, { name });
+      setBusy(false);
+      if (!res.ok) return showMessage("Couldn't save", res.error);
+    }
+    router.back();
+  }
+
   function onCancelRoute() {
     if (!route) return;
     confirmAction(`Cancel ${route.name}?`, 'Its lead stops seeing it. Work already done stays recorded.', 'Cancel route', async () => {
@@ -165,13 +176,34 @@ export function RouteEditScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title={route.name} subtitle={`${route.stormName} · ${SERVICE_LABEL[route.service]}`} />
+      <ScreenHeader
+        title={route.name}
+        subtitle={`${route.stormName} · ${SERVICE_LABEL[route.service]}`}
+        right={
+          <PressableScale
+            onPress={done}
+            disabled={busy}
+            scaleTo={0.92}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Done"
+            style={[styles.done, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}
+          >
+            <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Done</Text>
+          </PressableScale>
+        }
+      />
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
         keyboardShouldPersistTaps="handled"
       >
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
+        {!route.cancelled ? (
+          <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
+            Changes save as you make them. Tap Done when you are finished.
+          </Text>
+        ) : null}
         {route.cancelled ? <InlineNotice icon="slash" tone="warning" text="This route was cancelled." style={{ marginBottom: spacing.md }} /> : null}
 
         {route.stormStatus === 'dispatched' ? (
@@ -343,6 +375,7 @@ function IconTap({ icon, label, onPress, disabled, color }: { icon: React.Compon
 }
 
 const styles = StyleSheet.create({
+  done: { height: 44, paddingHorizontal: spacing.lg, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   screen: { flex: 1 },
   card: { borderRadius: radius.lg, padding: spacing.lg },
   label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },

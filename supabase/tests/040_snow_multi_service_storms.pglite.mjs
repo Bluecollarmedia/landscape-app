@@ -72,6 +72,12 @@ await db.exec(routesTable);
 await db.exec(oldRouteFill);
 await db.exec(visitsAndRouteFill);
 await db.exec(f024); // the real storm lifecycle (guard, create, dispatch, end, reopen, helpers, old eligible fn)
+// The REAL activity log pieces as they are BEFORE update 40: the events table (foreign keys left out),
+// the helper that writes an entry (020b) and the row logger that watches storms (029).
+await db.exec(grabTable(f020b, 'create table if not exists public.snow_activity_events').replace(/references public\.[a-z_]+\([a-z_]+\)( on delete [a-z ]+)?/g, ''));
+await db.exec(grabFn(f020b, 'create or replace function public.snow_log_event'));
+await db.exec(grabFn(read('supabase/updates/029_snow_activity_log.sql'), 'create or replace function public.snow_audit_row'));
+await db.exec("create trigger snow_audit after insert or update or delete on public.snow_storms for each row execute function public.snow_audit_row('storm')");
 await db.exec(templateTables);
 await db.exec(applyFn);
 
@@ -247,6 +253,47 @@ const still = (await q(db, `select status, services from public.snow_storms wher
 check('44 the old ended storm is still intact after everything above', still.status === 'ended' && still.services.join() === 'plowing');
 await db.query(`insert into public.snow_routes (storm_id, name, lead_person_id) values ($1, 'Reopened Old Route', $2)`, [oneCall.id, plowGuy]).catch(() => {});
 check('45 a plain two-column route insert (how older app builds add routes) still works on a single-service storm', (await q(db, `select count(*)::int n from public.snow_routes where storm_id = $1`, [oneCall.id]))[0].n >= 1);
+
+// ── Activity entries (update 40, section 8) ─────────────────────────────────
+const events = (stormId, extra = '') => q(db, `select action, entity_type, service, note, before, after from public.snow_activity_events where storm_id = $1 ${extra} order by occurred_at, id`, [stormId]);
+const stormEv = async (stormId) => (await events(stormId, "and entity_type = 'storm'"));
+
+const legacyEv = await stormEv(legacy);
+check('46 entries written BEFORE update 40 are not rewritten (the old storm still says plowing)',
+  legacyEv.length >= 3 && legacyEv.every((e) => e.service === 'plowing' && e.note === null), JSON.stringify(legacyEv.map((e) => [e.action, e.service, e.note])));
+
+const bigEv = await stormEv(storm);
+check('47 a multi-service storm\'s "created" entry has no service and lists them all',
+  bigEv[0].action === 'storm.created' && bigEv[0].service === null && bigEv[0].note === 'Services: plowing, shoveling', JSON.stringify(bigEv[0]));
+const lifecycle = bigEv.filter((e) => ['storm.dispatched', 'storm.ended', 'storm.reopened'].includes(e.action));
+check('48 its dispatched, ended and reopened entries are labelled the same way (none says one service)',
+  lifecycle.map((e) => e.action).join() === 'storm.dispatched,storm.ended,storm.reopened' && lifecycle.every((e) => e.service === null && /^Services: /.test(e.note)), JSON.stringify(lifecycle.map((e) => [e.action, e.service, e.note])));
+
+const edits = bigEv.filter((e) => e.action === 'storm.updated' && e.after && e.after.services);
+const addSalting = edits.find((e) => (e.after.services || []).includes('salting'));
+check('49 editing the services records the before and after lists and the note shows the current list',
+  !!addSalting && addSalting.before.services.join() === 'plowing,shoveling' && addSalting.after.services.join() === 'plowing,shoveling,salting' && addSalting.service === null && addSalting.note === 'Services: plowing, shoveling, salting',
+  JSON.stringify(addSalting));
+const removeSalting = edits.find((e) => !(e.after.services || []).includes('salting'));
+check('50 removing a service is recorded the same way, with the shorter current list', !!removeSalting && removeSalting.note === 'Services: plowing, shoveling', JSON.stringify(removeSalting));
+
+const singleEv = await stormEv(oneCall.id);
+check('51 a single-service storm is logged exactly as before (service kept, no note)', singleEv.length >= 1 && singleEv.every((e) => e.service === 'salting' && e.note === null), JSON.stringify(singleEv.map((e) => [e.action, e.service, e.note])));
+
+const direct = async (type, svc, note, id) => (await q(db, `select public.snow_log_event($1, 'x.tested', $2, $3, $4, null, null, null, null, $5, null, null, $6) as id`, [co, type, id, id, svc, note]));
+const idOf = (await direct('route', 'shoveling', 'A route note', storm))[0].id;
+const route = (await q(db, `select service, note from public.snow_activity_events where id = $1`, [idOf]))[0];
+check('52 entries about routes (or anything that is not a storm) are unchanged, even in a multi-service storm', route.service === 'shoveling' && route.note === 'A route note', JSON.stringify(route));
+const idVisit = (await direct('visit', 'plowing', null, storm))[0].id;
+check('53 visit entries keep their own service and get no note', (await q(db, `select service, note from public.snow_activity_events where id = $1`, [idVisit]))[0].service === 'plowing');
+const idCustom = (await direct('storm', 'plowing', 'Custom note', storm))[0].id;
+const custom = (await q(db, `select service, note from public.snow_activity_events where id = $1`, [idCustom]))[0];
+check('54 a note someone wrote is kept (the services note only fills an empty one)', custom.service === null && custom.note === 'Custom note', JSON.stringify(custom));
+
+const draftMulti = (await q(db, `select public.snow_create_storm('Draft to delete', array['shoveling','salting']) as r`))[0].r.storm.id;
+await db.query(`delete from public.snow_storms where id = $1`, [draftMulti]);
+const deleted = (await stormEv(draftMulti)).find((e) => e.action === 'storm.deleted');
+check('55 deleting a multi-service draft is logged with all its services too (read from the deleted row)', !!deleted && deleted.service === null && deleted.note === 'Services: shoveling, salting', JSON.stringify(deleted));
 
 const bad = results.filter((x) => !x).length;
 console.log(`\n${results.length - bad} passed, ${bad} failed (${results.length} checks)`);

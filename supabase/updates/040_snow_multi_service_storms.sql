@@ -18,6 +18,13 @@
 --  • Dispatch now checks each route's lead against THAT route's service, and
 --    refuses a route with no stops (cancel it or add stops first).
 --  • Route templates work on any storm that includes the template's service.
+--  • Activity: an entry about a storm that covers several services no longer
+--    names only its first service. Its service field is left empty and its note
+--    lists them all ("Services: plowing, shoveling, salting"). Editing the
+--    services records the before and after lists (the existing change log) and
+--    the note shows the current list. Single-service storms, and every
+--    route/visit/other entry, are logged exactly as before; entries already
+--    written are not rewritten.
 -- No data is deleted or rewritten except filling the new column.
 -- ============================================================================
 
@@ -318,6 +325,58 @@ begin
   return rid;
 end;
 $$;
+
+-- ── 8) Activity entries for a multi-service storm ──────────────────────────
+-- Every activity entry goes through snow_log_event(). The row logger (update
+-- 029) fills `service` from the row, and for a storm that is its first service,
+-- which would read as "plowing" for a plowing + shoveling + salting storm. So,
+-- for entries ABOUT a storm only: when it covers more than one service, leave
+-- the service empty and say which services in the note. The before/after
+-- change log (which already holds the old and new `services` lists when they
+-- are edited) is untouched. Same arguments and permissions as before.
+
+create or replace function public.snow_log_event(
+  p_company_id uuid,
+  p_action text,
+  p_entity_type text,
+  p_entity_id uuid,
+  p_storm_id uuid default null,
+  p_route_id uuid default null,
+  p_visit_id uuid default null,
+  p_property_id uuid default null,
+  p_person_id uuid default null,
+  p_service text default null,
+  p_before jsonb default null,
+  p_after jsonb default null,
+  p_note text default null
+) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  eid uuid;
+  svcs text[];
+begin
+  if p_entity_type = 'storm' then
+    select services into svcs from public.snow_storms where id = coalesce(p_entity_id, p_storm_id);
+    -- A deleted storm is gone from the table: its last row is in the log's "before".
+    if svcs is null and p_before is not null and jsonb_typeof(p_before -> 'services') = 'array' then
+      svcs := array(select jsonb_array_elements_text(p_before -> 'services'));
+    end if;
+    if svcs is not null and cardinality(svcs) > 1 then
+      p_service := null;
+      p_note := coalesce(nullif(trim(coalesce(p_note, '')), ''), 'Services: ' || array_to_string(svcs, ', '));
+    end if;
+  end if;
+  insert into public.snow_activity_events
+    (company_id, actor_id, action, entity_type, entity_id, storm_id, route_id, visit_id,
+     property_id, person_id, service, before, after, note)
+  values
+    (p_company_id, public.my_person_id(), p_action, p_entity_type, p_entity_id, p_storm_id, p_route_id, p_visit_id,
+     p_property_id, p_person_id, p_service, p_before, p_after, nullif(trim(p_note), ''))
+  returning id into eid;
+  return eid;
+end;
+$$;
+revoke all on function public.snow_log_event(uuid, text, text, uuid, uuid, uuid, uuid, uuid, uuid, text, jsonb, jsonb, text) from public, anon, authenticated;
 
 -- ── Who can call what ──────────────────────────────────────────────────────
 revoke execute on function public.snow_set_storm_services(uuid, text[]) from public, anon;

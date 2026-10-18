@@ -9,7 +9,7 @@
  * supabase/updates/023_snow_onboarding.sql (owner/admin only).
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform, Alert, Pressable, Share, RefreshControl } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -18,6 +18,8 @@ import { ScreenHeader, ListSection, Avatar, Button, InlineNotice, StatusBadge, L
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { haptics } from '@/lib/haptics';
+import { db, useDb } from '@/data/store';
+import { pageOf, workersToOfferSnow } from '@/lib/snowTeam';
 import {
   useSnowOnboardingAdmin,
   SNOW_SERVICES,
@@ -134,6 +136,38 @@ function RequestCard({ req, onApprove, onDecline, onRemove }: {
   );
 }
 
+/** An existing landscaping worker the owner can give Snow access without a signup request. */
+function ExistingWorkerCard({ first, last, email, phone, onGrant }: {
+  first: string; last: string; email: string; phone?: string;
+  onGrant: (s: SnowService[]) => Promise<void>;
+}) {
+  const { colors } = useTheme();
+  const [services, setServices] = useState<SnowService[]>([]);
+  const [busy, setBusy] = useState(false);
+  return (
+    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+      <PersonLine first={first} last={last} email={email} phone={phone} note="On the landscaping team" />
+      <ServicePicker value={services} onChange={setServices} />
+      <View style={styles.actionsRow}>
+        <Button
+          title="Give Snow access"
+          size="sm"
+          icon="check"
+          disabled={services.length === 0}
+          loading={busy}
+          onPress={async () => {
+            setBusy(true);
+            try { await onGrant(services); } finally { setBusy(false); }
+          }}
+        />
+      </View>
+      {services.length === 0 && (
+        <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>Pick at least one service.</Text>
+      )}
+    </View>
+  );
+}
+
 function MemberCard({ member, onSave, onRevoke }: {
   member: SnowMember;
   onSave: (s: SnowService[]) => Promise<void>;
@@ -192,10 +226,20 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
   const [showHistory, setShowHistory] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showCodeTools, setShowCodeTools] = useState(false);
+  const [showAddWorkers, setShowAddWorkers] = useState(false);
+  const [historyPages, setHistoryPages] = useState(1);
+  const dbVersion = useDb();
 
   const history = admin.requests.filter((r) => r.status === 'declined' || r.status === 'removed' || r.status === 'approved');
   const active = admin.members.filter((m) => m.status === 'active');
   const revoked = admin.members.filter((m) => m.status === 'revoked');
+  const offerWorkers = useMemo(
+    () => workersToOfferSnow(db.members, admin.members),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dbVersion, admin.members],
+  );
+  const historyPage = pageOf(history, historyPages);
 
   async function run(p: Promise<{ ok: boolean; error?: string }>, success?: () => void) {
     const res = await p;
@@ -272,7 +316,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Snow Team" subtitle="Snow code, requests and access" hideBack={asTab} />
+      <ScreenHeader title="Snow Team" subtitle="Who can work snow, and who is waiting" hideBack={asTab} />
       <ScrollView
         contentContainerStyle={[styles.content, asTab && { paddingBottom: tabBarClearance + spacing.lg }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await admin.reload(); setRefreshing(false); }} />}
@@ -286,30 +330,6 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
           </View>
         ) : (
           <>
-            {/* Code */}
-            <ListSection title="SNOW SIGNUP CODE" footer="Separate from your landscaping team code. A code only sends a request; nobody gets in until you approve them.">
-              <View style={styles.codeBlock}>
-                {admin.code ? (
-                  <>
-                    <Text selectable style={[typeScale.displaySmall, { color: colors.textPrimary, letterSpacing: 2 }]}>{admin.code}</Text>
-                    <View style={styles.actionsRow}>
-                      <Button title={copied ? 'Copied' : 'Copy'} size="sm" variant="secondary" icon={copied ? 'check' : 'copy'} onPress={handleCopy} />
-                      <Button title="Share" size="sm" variant="secondary" icon="share" onPress={handleShare} />
-                      <Button title="New Code" size="sm" variant="ghost" icon="refresh-cw" onPress={handleRegenerate} />
-                      <Button title="Turn Off" size="sm" variant="ghost" onPress={handleDisable} />
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>No Snow code is on. Nobody can send a new snow request.</Text>
-                    <View style={styles.actionsRow}>
-                      <Button title="Make a Snow Code" size="sm" icon="plus" onPress={handleRegenerate} />
-                    </View>
-                  </>
-                )}
-              </View>
-            </ListSection>
-
             {/* Requests */}
             <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>
               REQUESTS{admin.pending.length ? ` (${admin.pending.length})` : ''}
@@ -343,6 +363,65 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
               <MemberCard key={m.personId} member={m} onSave={(s) => run(admin.setServices(m, s))} onRevoke={() => handleRevoke(m)} />
             ))}
 
+            {/* Existing landscaping workers: grant Snow directly, no code or request needed */}
+            {offerWorkers.length > 0 && (
+              <>
+                <Pressable onPress={() => setShowAddWorkers((v) => !v)} style={styles.sectionToggle} accessibilityRole="button" accessibilityState={{ expanded: showAddWorkers }}>
+                  <Text style={[typeScale.overline, { color: colors.textTertiary, flex: 1 }]}>ADD FROM YOUR LANDSCAPING TEAM ({offerWorkers.length})</Text>
+                  <Icon name={showAddWorkers ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
+                </Pressable>
+                {showAddWorkers && offerWorkers.map((w) => (
+                  <ExistingWorkerCard
+                    key={w.personId}
+                    first={w.person!.firstName}
+                    last={w.person!.lastName}
+                    email={w.person!.email}
+                    phone={w.person!.phone}
+                    onGrant={(svc) => run(admin.grantAccess({ personId: w.personId, firstName: w.person!.firstName, lastName: w.person!.lastName, email: w.person!.email, phone: w.person!.phone }, svc), () => haptics.success())}
+                  />
+                ))}
+                {!showAddWorkers && (
+                  <Text style={[typeScale.caption, styles.empty, { color: colors.textSecondary }]}>
+                    They keep the same account and their landscaping access. You choose which snow services they can work.
+                  </Text>
+                )}
+              </>
+            )}
+
+            {/* New workers: the Snow code, kept small */}
+            <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>NEW WORKERS</Text>
+            <View style={[styles.card, { backgroundColor: colors.surface, paddingVertical: spacing.md }]}>
+              {admin.code ? (
+                <>
+                  <View style={styles.codeRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Snow signup code</Text>
+                      <Text selectable style={[typeScale.labelLarge, { color: colors.textPrimary, letterSpacing: 1.5 }]}>{admin.code}</Text>
+                    </View>
+                    <Button title={copied ? 'Copied' : 'Copy'} size="sm" variant="secondary" icon={copied ? 'check' : 'copy'} onPress={handleCopy} />
+                    <Button title="Share" size="sm" variant="secondary" icon="share" onPress={handleShare} />
+                  </View>
+                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
+                    For people who are not on your team yet. A code only sends a request; nobody gets in until you approve them.
+                  </Text>
+                  <Pressable onPress={() => setShowCodeTools((v) => !v)} style={{ marginTop: spacing.sm }} accessibilityRole="button">
+                    <Text style={[typeScale.labelSmall, { color: colors.primary }]}>{showCodeTools ? 'Hide code options' : 'Code options'}</Text>
+                  </Pressable>
+                  {showCodeTools && (
+                    <View style={styles.actionsRow}>
+                      <Button title="New Code" size="sm" variant="ghost" icon="refresh-cw" onPress={handleRegenerate} />
+                      <Button title="Turn Off" size="sm" variant="ghost" onPress={handleDisable} />
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.codeRow}>
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1 }]}>No Snow code is on. Nobody new can send a request.</Text>
+                  <Button title="Make a Snow Code" size="sm" icon="plus" onPress={handleRegenerate} />
+                </View>
+              )}
+            </View>
+
             {/* History */}
             {history.length > 0 && (
               <Pressable onPress={() => setShowHistory((v) => !v)} style={styles.historyToggle} accessibilityRole="button">
@@ -352,7 +431,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
               </Pressable>
             )}
             {showHistory &&
-              history.map((r) => (
+              historyPage.shown.map((r) => (
                 <View key={r.id} style={[styles.card, { backgroundColor: colors.surface }]}>
                   <View style={styles.memberTop}>
                     <View style={{ flex: 1 }}>
@@ -375,6 +454,11 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
                   </View>
                 </View>
               ))}
+            {showHistory && historyPage.more > 0 && (
+              <Pressable onPress={() => setHistoryPages((n) => n + 1)} style={styles.historyToggle} accessibilityRole="button">
+                <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Show {Math.min(historyPage.more, 10)} more ({historyPage.more} left)</Text>
+              </Pressable>
+            )}
           </>
         )}
       </ScrollView>
@@ -398,6 +482,8 @@ const styles = StyleSheet.create({
   },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   historyToggle: { paddingVertical: spacing.md, marginLeft: spacing.md },
+  sectionToggle: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.sm, marginHorizontal: spacing.md },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });
 
 export default function SnowTeamRoute() {

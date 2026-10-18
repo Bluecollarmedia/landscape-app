@@ -532,6 +532,17 @@ export function addStopPhoto(stopId: string, localUri: string, caption?: string)
   return row;
 }
 
+/**
+ * Owner/admin: share a stop photo with the property's customer, or make it
+ * internal again. Photos are internal by default and only the owner can share
+ * one; the customer sees it in Maintenance updates (supabase/updates/034).
+ */
+export function setStopPhotoShared(photoId: string, shared: boolean) {
+  updateRow('maintenance_photos', photoId, shared
+    ? { isCustomerVisible: true, sharedBy: db.personId, sharedAt: new Date().toISOString() }
+    : { isCustomerVisible: false, sharedBy: null, sharedAt: null });
+}
+
 /** Until the stop is finished, the person who took a photo (or owner/admin) can remove it. */
 export function removeStopPhoto(photoId: string) {
   deleteRow('maintenance_photos', photoId);

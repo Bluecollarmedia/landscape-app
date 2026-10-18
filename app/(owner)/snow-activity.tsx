@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
-import { EmptyState } from '@/components/ui';
+import { EmptyState, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -215,15 +215,7 @@ export default function SnowActivityScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
-          <Icon name="arrow-left" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
-          Snow Activity
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Snow Activity" subtitle="Everything that happened, newest first" />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar} style={styles.filterScroll}>
         {DATE_RANGES.map((r) => {

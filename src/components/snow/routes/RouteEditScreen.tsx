@@ -217,7 +217,7 @@ export function RouteEditScreen() {
             accessibilityLabel="Done"
             style={[styles.done, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}
           >
-            <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Done</Text>
+            <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary }]}>Done</Text>
           </PressableScale>
         }
       />

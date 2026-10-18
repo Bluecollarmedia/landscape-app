@@ -111,8 +111,8 @@ export function MyRouteScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
                 >
-                  <Text style={[typeScale.labelLarge, { color: on ? '#fff' : colors.textPrimary }]}>{r.name}</Text>
-                  <Text style={[typeScale.caption, { color: on ? '#fff' : colors.textSecondary }]}>{r.stormName}</Text>
+                  <Text style={[typeScale.labelLarge, { color: on ? colors.textOnPrimary : colors.textPrimary }]}>{r.name}</Text>
+                  <Text style={[typeScale.caption, { color: on ? colors.textOnPrimary : colors.textSecondary }]}>{r.stormName}</Text>
                 </Pressable>
               );
             })}

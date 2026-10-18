@@ -6,6 +6,7 @@
  * automatically. Anyone else lands on "Finish setting up" afterwards.
  */
 
+import { TermsAgreement, TERMS_REQUIRED_MESSAGE } from '@/components/legal/TermsAgreement';
 import React, { useState, useRef } from 'react';
 import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions, Platform, Alert, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,7 +40,13 @@ export default function SignUpScreen() {
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
+  const [agreed, setAgreed] = useState(false);
+
   async function handleSignUp() {
+    if (!agreed) {
+      setError(TERMS_REQUIRED_MESSAGE);
+      return;
+    }
     if (!firstName.trim() || !lastName.trim() || !email.trim() || !password.trim()) {
       setError('Please fill in all fields.');
       return;
@@ -157,6 +164,8 @@ export default function SignUpScreen() {
           onSubmitEditing={handleSignUp}
           icon="lock"
         />
+
+        <TermsAgreement value={agreed} onChange={(v) => { setAgreed(v); if (v) setError(''); }} />
 
         <Button
           title="Create Account"

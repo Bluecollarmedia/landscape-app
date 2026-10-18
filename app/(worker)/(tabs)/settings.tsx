@@ -1,3 +1,4 @@
+import { LegalSection } from '@/components/legal/LegalSection';
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -130,6 +131,8 @@ export default function WorkerSettingsScreen() {
           />
         </ListSection>
       )}
+
+      <LegalSection />
 
       <ListSection>
         <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={() => setSignOutConfirmOpen(true)} />

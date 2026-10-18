@@ -4,6 +4,9 @@
  * owner's to change, so they are read-only here), and Sign Out. No owner
  * controls. Services come from get_my_snow_access (update 020).
  */
+import { LegalSection } from '@/components/legal/LegalSection';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
+import { ListSection } from '@/components/ui';
 import { displayName, formatPhone, profileNudge, roleLabel } from '@/lib/snowWorkerProfile';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
@@ -127,9 +130,14 @@ export function SnowWorkerSettings() {
           </SettingsGroup>
         ) : null}
 
+        <LegalSection />
+
         <SettingsGroup>
           <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
         </SettingsGroup>
+        <ListSection>
+          <DeleteAccountRow />
+        </ListSection>
       </ScrollView>
     </View>
   );

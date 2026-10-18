@@ -1,3 +1,4 @@
+import { TermsAgreement, TERMS_REQUIRED_MESSAGE } from '@/components/legal/TermsAgreement';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensions, Alert, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -106,7 +107,13 @@ export default function CreateCompanyScreen() {
     else router.back();
   }
 
+  const [agreed, setAgreed] = useState(false);
+
   async function handleCreate() {
+    if (!signedIn && !agreed) {
+      setError(TERMS_REQUIRED_MESSAGE);
+      return;
+    }
     if (!isSupabaseConfigured) {
       // Demo mode: no backend, just show the owner screens.
       setLoading(true);
@@ -285,6 +292,8 @@ export default function CreateCompanyScreen() {
                 As the company owner, you'll have full control over your team, projects, and settings. You can invite workers and customers after setup.
               </Text>
             </View>
+
+            {!signedIn && <TermsAgreement value={agreed} onChange={(v) => { setAgreed(v); if (v) setError(''); }} />}
 
             <Button title="Create Company" onPress={handleCreate} loading={loading} fullWidth size="lg" icon="check-circle" />
           </View>

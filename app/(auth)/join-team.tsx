@@ -1,3 +1,4 @@
+import { TermsAgreement, TERMS_REQUIRED_MESSAGE } from '@/components/legal/TermsAgreement';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Alert, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -126,7 +127,13 @@ export default function JoinTeamScreen() {
     }
   }
 
+  const [agreed, setAgreed] = useState(false);
+
   async function handleSubmitRequest() {
+    if (!signedIn && !agreed) {
+      setError(TERMS_REQUIRED_MESSAGE);
+      return;
+    }
     if (!firstName.trim() || !lastName.trim()) {
       setError('Please enter your full name.');
       return;
@@ -388,6 +395,8 @@ export default function JoinTeamScreen() {
                 After submitting, the company owner will review your request. You'll be notified when approved.
               </Text>
             </View>
+
+            {!signedIn && <TermsAgreement value={agreed} onChange={(v) => { setAgreed(v); if (v) setError(''); }} />}
 
             <Button title={isSnow ? 'Submit Snow Request' : 'Submit Join Request'} onPress={handleSubmitRequest} loading={loading} fullWidth size="lg" icon="send" />
           </View>

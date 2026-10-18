@@ -1,3 +1,4 @@
+import { LegalSection } from '@/components/legal/LegalSection';
 import { useMyMaintenanceProperties } from '@/data/maintenanceCustomer';
 import React from 'react';
 import { View, Text, Linking } from 'react-native';
@@ -128,6 +129,8 @@ export default function CustomerAccountScreen() {
           />
         </ListSection>
       )}
+
+      <LegalSection />
 
       <ListSection>
         <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={signOut} />

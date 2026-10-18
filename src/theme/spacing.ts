@@ -65,14 +65,14 @@ export const shadow = {
     ios: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
+      shadowOpacity: 0.03,
       shadowRadius: 2,
     },
-    android: { elevation: 1 },
+    android: { elevation: 0 },
     default: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
+      shadowOpacity: 0.03,
       shadowRadius: 2,
     },
   })!,
@@ -82,15 +82,15 @@ export const shadow = {
     ios: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
     },
-    android: { elevation: 3 },
+    android: { elevation: 1 },
     default: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
     },
   })!,
 

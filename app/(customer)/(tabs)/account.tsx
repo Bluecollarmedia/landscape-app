@@ -12,12 +12,14 @@ import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import { db, useDb } from '@/data/store';
 import { formatAddress } from '@/lib/address';
+import { useHasSnow } from '@/hooks/useHasSnow';
 
 export default function CustomerAccountScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { user, signOut, switchDevRole } = useAuth();
   useDb();
+  const hasSnow = useHasSnow();
   const insets = useSafeAreaInsets();
 
   return (
@@ -51,16 +53,18 @@ export default function CustomerAccountScreen() {
         />
       </ListSection>
 
-      <ListSection title="Snow">
-        <ListRow
-          icon="cloud-snow"
-          iconColor={colors.primary}
-          title="Snow updates"
-          subtitle="Plowing, shoveling and salting at your property, with photos"
-          showChevron
-          onPress={() => router.push('/(customer)/snow-updates')}
-        />
-      </ListSection>
+      {hasSnow ? (
+        <ListSection title="Snow">
+          <ListRow
+            icon="cloud-snow"
+            iconColor={colors.primary}
+            title="Snow updates"
+            subtitle="Plowing, shoveling and salting at your property, with photos"
+            showChevron
+            onPress={() => router.push('/(customer)/snow-updates')}
+          />
+        </ListSection>
+      ) : null}
 
       <ListSection title="Your Project Team">
         <ListRow

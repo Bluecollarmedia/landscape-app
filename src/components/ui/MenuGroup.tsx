@@ -2,7 +2,7 @@
  * MenuGroup / MenuRow — flat, full-width list rows used on the owner's
  * More tab.
  *
- * Each row has a pale-green circle with a green line icon, a label, an
+ * Each row has a warm-neutral circle with a charcoal line icon, a label, an
  * optional subtitle and count pill, and a chevron. Rows are separated by a
  * thin hairline that starts at the row's text; each group ends with a
  * full-width hairline. No cards, gradients or shadows.
@@ -56,8 +56,8 @@ export function MenuRow({ icon, label, subtitle, count, onPress }: MenuRowProps)
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <View style={[styles.iconCircle, { backgroundColor: colors.primarySurface }]}>
-        <Icon name={icon as any} size={18} color={colors.primary} />
+      <View style={[styles.iconCircle, { backgroundColor: colors.backgroundTertiary }]}>
+        <Icon name={icon as any} size={18} color={colors.textPrimary} />
       </View>
       <View style={styles.rowText}>
         <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{label}</Text>

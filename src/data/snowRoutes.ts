@@ -7,6 +7,7 @@
  * their stops in order: I'm Here, completion photos/videos, Finish Stop. The
  * database checks every step (dispatched storm, order, photo minimum).
  */
+import { roleFor, type RouteRole } from '@/lib/snowCrew';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { discardSnowUpload, uploadSnowMedia } from '@/lib/snowMedia';
 import type { SnowService } from '@/types/snow';
@@ -54,7 +55,7 @@ export interface RouteDetail {
 }
 
 export interface SnowLead { personId: string; name: string }
-export interface RouteTemplate { id: string; name: string; stops: number }
+export interface RouteTemplate { id: string; name: string; stops: number; service: SnowService }
 
 // ── Reading ─────────────────────────────────────────────────────────────────
 
@@ -127,17 +128,17 @@ export async function loadSnowLeads(service: SnowService): Promise<Result<SnowLe
     .sort((a, b) => a.name.localeCompare(b.name)));
 }
 
-export async function loadRouteTemplates(service: SnowService): Promise<Result<RouteTemplate[]>> {
+export async function loadRouteTemplates(service: SnowService | SnowService[]): Promise<Result<RouteTemplate[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { data, error } = await supabase
     .from('snow_route_templates')
-    .select('id, name, snow_route_template_stops(count)')
-    .eq('service', service)
+    .select('id, name, service, snow_route_template_stops(count)')
+    .in('service', Array.isArray(service) ? service : [service])
     .order('name');
   if (error) return fail(message(error, 'Couldn\'t load templates.'));
   return ok((data ?? []).map((t) => {
     const c = t.snow_route_template_stops as unknown as { count: number }[] | undefined;
-    return { id: t.id, name: t.name, stops: c?.[0]?.count ?? 0 };
+    return { id: t.id, name: t.name, stops: c?.[0]?.count ?? 0, service: t.service as SnowService };
   }));
 }
 
@@ -145,30 +146,71 @@ export async function loadRouteTemplates(service: SnowService): Promise<Result<R
  * Routes the signed-in lead works, newest storm first. The database only
  * shows a lead their own live routes on dispatched or ended storms.
  */
-export interface MyRoute { id: string; name: string; stormName: string; stormStatus: RouteDetail['stormStatus']; service: SnowService }
+export interface MyRoute { id: string; name: string; stormName: string; stormStatus: RouteDetail['stormStatus']; service: SnowService; role: RouteRole }
 export async function loadMyRoutes(): Promise<Result<MyRoute[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const { data, error } = await supabase
+  // Update 41: the routes I lead AND the routes I'm on the crew of, with my role in each.
+  // Before update 41 the function isn't there and only a lead can see a route, so every route is mine as lead.
+  const mine = await supabase.rpc('snow_my_routes');
+  let roles: Map<string, RouteRole> | null = null;
+  if (!mine.error) {
+    roles = new Map(((mine.data ?? []) as { route_id: string; role: RouteRole }[]).map((r) => [r.route_id, r.role]));
+    if (roles.size === 0) return ok([]);
+  } else if (!OLD_DATABASE.test(mine.error.message)) {
+    return fail(message(mine.error, 'Couldn\'t load your routes.'));
+  }
+  let query = supabase
     .from('snow_routes')
     .select('id, name, service, created_at, snow_storms!inner(name, status)')
     .is('cancelled_at', null)
     .neq('snow_storms.status', 'draft')
     .order('created_at', { ascending: false });
+  if (roles) query = query.in('id', [...roles.keys()]);
+  const { data, error } = await query;
   if (error) return fail(message(error, 'Couldn\'t load your routes.'));
   return ok((data ?? []).map((r) => {
     const s = (Array.isArray(r.snow_storms) ? r.snow_storms[0] : r.snow_storms) as { name: string; status: RouteDetail['stormStatus'] };
-    return { id: r.id, name: r.name, service: r.service, stormName: s.name, stormStatus: s.status };
+    return { id: r.id, name: r.name, service: r.service, stormName: s.name, stormStatus: s.status, role: roleFor(roles, r.id) };
   }));
+}
+
+// ── Crew (update 41) ────────────────────────────────────────────────────────
+
+/** The database doesn't have update 41 yet (a function or table isn't there). */
+const OLD_DATABASE = /could not find the function|schema cache|does not exist/i;
+const NEEDS_UPDATE_41 = 'Crew members need database update 41, which has not been installed yet.';
+
+export interface RouteCrewMember { personId: string; name: string }
+
+/** The crew on one route. Owners/admins see everyone's; a lead sees their own crew. */
+export async function loadRouteCrew(routeId: string): Promise<Result<RouteCrewMember[]>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data, error } = await supabase.from('snow_route_crew').select('person_id, created_at').eq('route_id', routeId).order('created_at');
+  if (error) return OLD_DATABASE.test(error.message) ? ok([]) : fail(message(error, 'Couldn\'t load the crew.'));
+  const ids = (data ?? []).map((c) => c.person_id as string);
+  if (!ids.length) return ok([]);
+  const { data: people } = await supabase.from('people').select('id, first_name, last_name').in('id', ids);
+  const names = new Map((people ?? []).map((p) => [p.id as string, `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unnamed']));
+  return ok(ids.map((id) => ({ personId: id, name: names.get(id) ?? 'Unnamed' })));
+}
+
+/** Makes this exactly the route's crew (owner/admin). Repeating it changes nothing. */
+export async function setRouteCrew(routeId: string, personIds: string[]): Promise<Result<string[]>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data, error } = await supabase.rpc('snow_set_route_crew', { p_route_id: routeId, p_person_ids: personIds });
+  if (error) return fail(OLD_DATABASE.test(error.message) ? NEEDS_UPDATE_41 : message(error, 'Couldn\'t change the crew.'));
+  return ok(((data as { crew?: string[] } | null)?.crew ?? []) as string[]);
 }
 
 // ── Owner: building routes ──────────────────────────────────────────────────
 
-export async function createRoute(stormId: string, input: { name: string; leadPersonId?: string; mediaRequired: boolean; minMedia: number }): Promise<Result<string>> {
+export async function createRoute(stormId: string, input: { name: string; service?: SnowService; leadPersonId?: string; mediaRequired: boolean; minMedia: number }): Promise<Result<string>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { data: last } = await supabase.from('snow_routes').select('position').eq('storm_id', stormId)
     .order('position', { ascending: false }).limit(1).maybeSingle();
   const { data, error } = await supabase.from('snow_routes').insert({
     storm_id: stormId,
+    ...(input.service ? { service: input.service } : {}),
     name: input.name.trim(),
     lead_person_id: input.leadPersonId ?? null,
     media_required: input.mediaRequired,

@@ -11,6 +11,7 @@
 import { Platform } from 'react-native';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { uuid } from './ids';
+import { r2Enabled } from './media';
 
 export const SNOW_MEDIA_BUCKET = 'snow-media';
 
@@ -38,6 +39,26 @@ export async function uploadSnowMedia(localUri: string, folder: string, mimeType
   const { contentType, ext } = contentTypeOf(localUri, mimeType);
   const key = `${folder}/${uuid()}.${ext}`;
 
+  if (r2Enabled) {
+    // The real file goes to R2. A 1-byte stand-in goes to the private bucket so
+    // the database's existing permission rules decide who may write and read it.
+    const { error: standInError } = await supabase.storage
+      .from(SNOW_MEDIA_BUCKET)
+      .upload(key, new Uint8Array([0]).buffer, { contentType, upsert: false });
+    if (standInError) throw new Error(`Upload failed: ${standInError.message}`);
+    try {
+      const blob = await (await fetch(localUri)).blob();
+      const { data, error } = await supabase.functions.invoke('media', { body: { action: 'snow-put', key, contentType } });
+      if (error || !data?.uploadUrl) throw new Error(error?.message ?? data?.error ?? 'no upload link');
+      const res = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
+      if (!res.ok) throw new Error('Please check your connection and try again.');
+    } catch (err) {
+      await supabase.storage.from(SNOW_MEDIA_BUCKET).remove([key]);
+      throw new Error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return key;
+  }
+
   let body: Blob | FormData;
   if (Platform.OS === 'web') {
     body = await (await fetch(localUri)).blob();
@@ -55,6 +76,10 @@ export async function uploadSnowMedia(localUri: string, folder: string, mimeType
 export async function discardSnowUpload(key: string): Promise<void> {
   const { error } = await supabase.storage.from(SNOW_MEDIA_BUCKET).remove([key]);
   if (error) console.warn('[snow media] cleanup failed', error.message);
+  if (r2Enabled) {
+    const { error: r2Error } = await supabase.functions.invoke('media', { body: { action: 'snow-delete', key } });
+    if (r2Error) console.warn('[snow media] R2 cleanup failed', r2Error.message);
+  }
 }
 
 /**
@@ -63,6 +88,11 @@ export async function discardSnowUpload(key: string): Promise<void> {
  */
 export async function signedSnowMediaUrls(keys: string[]): Promise<Record<string, string>> {
   if (!isSupabaseConfigured || keys.length === 0) return {};
+  if (r2Enabled) {
+    const { data, error } = await supabase.functions.invoke('media', { body: { action: 'snow-sign', keys } });
+    if (error) throw new Error(error.message);
+    return (data?.urls ?? {}) as Record<string, string>;
+  }
   const { data, error } = await supabase.storage.from(SNOW_MEDIA_BUCKET).createSignedUrls(keys, SIGNED_URL_SECONDS);
   if (error) throw new Error(error.message);
   const out: Record<string, string> = {};

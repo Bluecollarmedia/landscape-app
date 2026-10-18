@@ -1,13 +1,15 @@
 /**
- * Snow worker Settings: who you're signed in as, which snow services the
- * owner has given you, and Sign Out. Read-only on purpose: the services come
- * from the owner (get_my_snow_access, update 020), so there is nothing here
- * to change and no owner controls. Working layout, no approved mockup yet.
+ * Snow worker Settings: your profile (photo, name, phone: yours to edit), your
+ * account (email, role) and the snow services the owner has given you (the
+ * owner's to change, so they are read-only here), and Sign Out. No owner
+ * controls. Services come from get_my_snow_access (update 020).
  */
+import { displayName, formatPhone, profileNudge, roleLabel } from '@/lib/snowWorkerProfile';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, InlineNotice } from '@/components/ui';
+import { Avatar, Icon, InlineNotice } from '@/components/ui';
 import { SettingsGroup, SettingsRow } from '@/components/settings/SettingsList';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -59,6 +61,9 @@ export function SnowWorkerSettings() {
   const tabBarClearance = useTabBarClearance();
   const { user, signOut } = useAuth();
   const { access, error } = useMySnowAccess(db.companyId);
+  const router = useRouter();
+  const nudge = profileNudge(user);
+  const editProfile = () => router.push('/snow/worker/edit-profile' as any);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -68,18 +73,39 @@ export function SnowWorkerSettings() {
       >
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginBottom: spacing.lg }]}>Settings</Text>
 
-        <View style={[styles.profile, { backgroundColor: colors.surface }]}>
-          <Avatar firstName={user?.firstName ?? 'W'} lastName={user?.lastName ?? 'K'} size={56} uri={user?.avatarUrl} />
+        <Pressable
+          onPress={editProfile}
+          style={[styles.profile, { backgroundColor: colors.surface }]}
+          accessibilityRole="button"
+          accessibilityLabel="Edit your profile and photo"
+        >
+          <View>
+            <Avatar firstName={user?.firstName ?? 'W'} lastName={user?.lastName ?? 'K'} size={64} uri={user?.avatarUrl} />
+            <View style={[styles.cameraBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
+              <Icon name="camera" size={12} color="#FFFFFF" />
+            </View>
+          </View>
           <View style={{ flex: 1 }}>
-            <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} numberOfLines={1}>
-              {user?.firstName} {user?.lastName}
-            </Text>
+            <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} numberOfLines={1}>{displayName(user)}</Text>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]} numberOfLines={1}>{user?.email}</Text>
             {access?.companyName ? (
               <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>{access.companyName}</Text>
             ) : null}
           </View>
-        </View>
+          <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+        </Pressable>
+        {nudge ? <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: -spacing.md, marginBottom: spacing.xl, marginHorizontal: spacing.sm }]}>{nudge}</Text> : null}
+
+        <SettingsGroup title="Your profile" footer="Your name, phone and photo are yours to change. The office sees them.">
+          <SettingsRow icon="camera" title={user?.avatarUrl ? 'Change profile photo' : 'Add a profile photo'} onPress={editProfile} />
+          <SettingsRow icon="user" title="Name" value={displayName(user)} onPress={editProfile} />
+          <SettingsRow icon="phone" title="Phone" value={formatPhone(user?.phone) || 'Add'} onPress={editProfile} />
+        </SettingsGroup>
+
+        <SettingsGroup title="Your account" footer="Your email is your sign-in. Ask the office if it needs to change.">
+          <SettingsRow icon="mail" title="Email" value={user?.email ?? ''} />
+          <SettingsRow icon="shield" title="Role" value={roleLabel(user?.role, access?.services ?? [])} />
+        </SettingsGroup>
 
         {error ? (
           <InlineNotice icon="alert-circle" tone="warning" text="Couldn't load your snow team access. Pull to refresh or try again later." style={{ marginBottom: spacing.xl }} />
@@ -112,4 +138,5 @@ export function SnowWorkerSettings() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   profile: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.xl, marginBottom: spacing.xl },
+  cameraBadge: { position: 'absolute', right: -2, bottom: -2, width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });

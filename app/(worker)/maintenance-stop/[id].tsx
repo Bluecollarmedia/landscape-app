@@ -240,7 +240,7 @@ function PrimaryButton({ label, icon, onPress, busy }: { label: string; icon: st
   const { colors } = useTheme();
   return (
     <PressableScale onPress={onPress} disabled={busy} haptic={false} accessibilityRole="button" accessibilityLabel={label}>
-      <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primary}>
+      <LinearGradient colors={[colors.primary, colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primary}>
         {busy ? <ActivityIndicator color="#FFFFFF" /> : <Icon name={icon as any} size={20} color="#FFFFFF" />}
         <Text numberOfLines={1} style={[typeScale.labelLarge, { color: '#FFFFFF', fontWeight: '800', letterSpacing: 0.6, flexShrink: 1 }]}>{label}</Text>
       </LinearGradient>

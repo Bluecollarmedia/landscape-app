@@ -5,9 +5,9 @@
  * Working layout in the existing app style; no approved mockup yet.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
+import { Button, FilterChips, Icon, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -15,6 +15,11 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   clockIn, clockOut, correctShift, formatClock, formatHours, loadShifts, shiftHours, startOfWeekIso, type SnowShift,
 } from '@/data/snowShifts';
+import { loadStorms } from '@/data/snowStorms';
+import type { SnowStorm } from '@/types/snow';
+import {
+  SHORT_SHIFT_MINUTES, addDays, dayKeyOf, filterShifts, groupByWorkerDay, isShortShift, shiftMs, weekStartDay,
+} from '@/lib/snowHours';
 import { ShiftCorrectionSheet } from './ShiftCorrectionSheet';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -34,7 +39,7 @@ function useShifts() {
   return { shifts, error, loading, reload, setShifts };
 }
 
-function ShiftRow({ s, first, name, action }: { s: SnowShift; first: boolean; name?: string; action?: React.ReactNode }) {
+function ShiftRow({ s, first, name, action, flag }: { s: SnowShift; first: boolean; name?: string; action?: React.ReactNode; flag?: string }) {
   const { colors } = useTheme();
   return (
     <View style={[styles.row, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
@@ -46,6 +51,7 @@ function ShiftRow({ s, first, name, action }: { s: SnowShift; first: boolean; na
         {s.corrected ? (
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Corrected: {s.correctionReason}</Text>
         ) : null}
+        {flag ? <Text style={[typeScale.caption, { color: colors.warning }]}>{flag}</Text> : null}
         {action}
       </View>
       <Text style={[typeScale.labelLarge, { color: s.clockOutAt ? colors.textSecondary : colors.primary }]}>{formatHours(shiftHours(s))}</Text>
@@ -118,79 +124,190 @@ export function SnowTimeClockScreen() {
   );
 }
 
-/** Owner "Snow hours": everyone's shifts this week. */
+type RangeKey = 'this_week' | 'last_week' | 'last_30';
+const RANGES: { key: RangeKey; label: string }[] = [
+  { key: 'this_week', label: 'This week' },
+  { key: 'last_week', label: 'Last week' },
+  { key: 'last_30', label: 'Last 30 days' },
+];
+
+function rangeDays(key: RangeKey): { fromDay: string; toDay: string } {
+  const today = dayKeyOf(new Date().toISOString());
+  if (key === 'this_week') return { fromDay: weekStartDay(), toDay: today };
+  if (key === 'last_week') return { fromDay: weekStartDay(new Date(), 1), toDay: addDays(weekStartDay(), -1) };
+  return { fromDay: addDays(today, -29), toDay: today };
+}
+
+const dayLabel = (day: string) => {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+};
+const msToHours = (ms: number) => ms / 3_600_000;
+
+/** Owner "Snow hours": filter by worker, storm and dates; grouped by worker and day with totals. */
 export function SnowHoursScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { shifts, error, loading, reload } = useShifts();
+  const [shifts, setShifts] = useState<SnowShift[]>([]);
+  const [storms, setStorms] = useState<SnowStorm[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [names, setNames] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<SnowShift | null>(null);
+  const [range, setRange] = useState<RangeKey>('this_week');
+  const [stormId, setStormId] = useState<string | null>(null);
+  const [personId, setPersonId] = useState<string | null>(null);
+  const [onlyReview, setOnlyReview] = useState(false);
+  const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
+
+  const storm = storms.find((s) => s.id === stormId);
+  const days = rangeDays(range);
+
+  const reload = useCallback(async () => {
+    // A storm shows the shifts that overlap its dispatch-to-end time; otherwise the chosen dates.
+    const since = storm?.dispatchedAt
+      ? new Date(new Date(storm.dispatchedAt).getTime() - 24 * 3_600_000).toISOString()
+      : new Date(`${days.fromDay}T00:00:00`).toISOString();
+    const until = storm ? storm.endedAt : new Date(`${addDays(days.toDay, 1)}T00:00:00`).toISOString();
+    const res = await loadShifts(since, until);
+    setLoading(false);
+    if (!res.ok) return setError(res.error);
+    setError(null);
+    setShifts(res.data);
+  }, [storm?.id, storm?.dispatchedAt, storm?.endedAt, days.fromDay, days.toDay]);
+
+  useEffect(() => { setLoading(true); reload(); }, [reload]);
+  useEffect(() => {
+    loadStorms().then((r) => { if (r.ok) setStorms(r.data.filter((s) => s.status !== 'draft' && s.dispatchedAt)); });
+  }, []);
 
   useEffect(() => {
     const ids = [...new Set(shifts.map((s) => s.personId))].filter((id) => !names[id]);
     if (!ids.length || !isSupabaseConfigured) return;
     supabase.from('people').select('id, first_name, last_name').in('id', ids).then(({ data }) => {
-      const next = { ...names };
-      for (const p of data ?? []) next[p.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unnamed';
-      setNames(next);
+      setNames((cur) => {
+        const next = { ...cur };
+        for (const p of data ?? []) next[p.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unnamed';
+        return next;
+      });
     });
   }, [shifts, names]);
 
-  const totals = new Map<string, number>();
-  for (const s of shifts) totals.set(s.personId, (totals.get(s.personId) ?? 0) + shiftHours(s));
+  const nameOf = (id: string) => names[id] ?? '…';
+  const filtered = filterShifts(shifts, {
+    personId: personId ?? undefined,
+    ...(storm?.dispatchedAt ? { window: { start: storm.dispatchedAt, end: storm.endedAt } } : { fromDay: days.fromDay, toDay: days.toDay }),
+  });
+  const reviewCount = filtered.filter((s) => isShortShift(s)).length;
+  const shown = onlyReview ? filtered.filter((s) => isShortShift(s)) : filtered;
+  const groups = groupByWorkerDay(shown, nameOf);
+  const totalMs = shown.reduce((t, s) => t + shiftMs(s), 0);
 
   function clockOutNow(s: SnowShift) {
     const who = names[s.personId] ?? 'this person';
     confirmAction(`Clock out ${who} now?`, 'Their original clock-in stays on record; this adds a correction.', 'Clock out', async () => {
       const res = await correctShift(s.id, s.clockInAt, new Date().toISOString(), 'Clocked out by the owner');
-      if (!res.ok) showMessage('Couldn\'t clock them out', res.error);
+      if (!res.ok) showMessage("Couldn't clock them out", res.error);
       reload();
     });
   }
 
+  const workerOptions = [
+    { key: 'all', label: 'All workers' },
+    ...Object.entries(names).sort((a, b) => a[1].localeCompare(b[1])).map(([id, n]) => ({ key: id, label: n })),
+  ];
+  const stormOptions = [{ key: 'none', label: 'Any time' }, ...storms.map((s) => ({ key: s.id, label: s.name }))];
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Snow hours" subtitle="This week" />
+      <ScreenHeader title="Snow hours" subtitle={storm ? `${storm.name} · while it was active` : `${dayLabel(days.fromDay)} – ${dayLabel(days.toDay)}`} />
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
       >
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
+
+        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textSecondary }]}>DATES</Text>
+        <FilterChips options={RANGES} selected={range} onSelect={(k) => { setRange(k); setStormId(null); }} />
+        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textSecondary }]}>STORM</Text>
+        <FilterChips options={stormOptions} selected={stormId ?? 'none'} onSelect={(k) => setStormId(k === 'none' ? null : k)} />
+        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textSecondary }]}>WORKER</Text>
+        <FilterChips options={workerOptions} selected={personId ?? 'all'} onSelect={(k) => setPersonId(k === 'all' ? null : k)} />
+        {storm ? (
+          <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm, marginHorizontal: spacing.sm }]}>
+            Clock-ins are not tied to a storm, so this shows shifts that overlapped the time the storm was dispatched.
+          </Text>
+        ) : null}
+
         {loading ? <LoadingSpinner /> : (
           <>
-            {totals.size ? (
-              <View style={[styles.group, { backgroundColor: colors.surface }]}>
-                {[...totals.entries()].sort((a, b) => b[1] - a[1]).map(([pid, h], i) => (
-                  <View key={pid} style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
-                    <Text style={[typeScale.bodyLarge, { flex: 1, color: colors.textPrimary }]}>{names[pid] ?? '…'}</Text>
-                    <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{formatHours(h)}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginHorizontal: spacing.sm }]}>Nobody has clocked in this week.</Text>
-            )}
-            {shifts.length ? (
-              <>
-                <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>Shifts</Text>
-                <View style={[styles.group, { backgroundColor: colors.surface }]}>
-                  {shifts.map((s, i) => (
-                    <ShiftRow
-                      key={s.id}
-                      s={s}
-                      first={i === 0}
-                      name={names[s.personId]}
-                      action={(
-                        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
-                          <Button title="Correct times" size="sm" variant="secondary" onPress={() => setEditing(s)} />
-                          {!s.originalOut ? <Button title="Clock out now" size="sm" variant="secondary" onPress={() => clockOutNow(s)} /> : null}
-                        </View>
-                      )}
-                    />
-                  ))}
+            <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.lg }]}>
+              <Text style={[typeScale.overline, { color: colors.textSecondary }]}>TOTAL</Text>
+              <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{formatHours(msToHours(totalMs))}</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                {shown.length} {shown.length === 1 ? 'shift' : 'shifts'} · {groups.length} {groups.length === 1 ? 'worker' : 'workers'}
+              </Text>
+              {reviewCount > 0 ? (
+                <Pressable onPress={() => setOnlyReview(!onlyReview)} style={styles.reviewRow} accessibilityRole="button">
+                  <Icon name="alert-triangle" size={16} color={colors.warning} />
+                  <Text style={[typeScale.labelLarge, { color: colors.warning, flex: 1 }]}>
+                    {reviewCount} short {reviewCount === 1 ? 'shift' : 'shifts'} to review (under {SHORT_SHIFT_MINUTES} min)
+                  </Text>
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{onlyReview ? 'Show all' : 'Show only these'}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {groups.length === 0 ? (
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, margin: spacing.lg }]}>No shifts match these filters.</Text>
+            ) : groups.map((w) => (
+              <View key={w.personId} style={{ marginTop: spacing.xl }}>
+                <View style={styles.workerHeader}>
+                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>{w.name}</Text>
+                  {w.needsReview > 0 ? <Icon name="alert-triangle" size={16} color={colors.warning} /> : null}
+                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{formatHours(msToHours(w.ms))}</Text>
                 </View>
-              </>
-            ) : null}
+                <View style={[styles.group, { backgroundColor: colors.surface }]}>
+                  {w.days.map((d, i) => {
+                    const key = `${w.personId}:${d.dayKey}`;
+                    const open = openDays[key] ?? d.needsReview > 0;
+                    return (
+                      <View key={key} style={i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight } : undefined}>
+                        <Pressable
+                          onPress={() => setOpenDays((cur) => ({ ...cur, [key]: !open }))}
+                          style={styles.row}
+                          accessibilityRole="button"
+                          accessibilityState={{ expanded: open }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{dayLabel(d.dayKey)}</Text>
+                            <Text style={[typeScale.caption, { color: d.needsReview ? colors.warning : colors.textSecondary }]}>
+                              {d.shifts.length} {d.shifts.length === 1 ? 'shift' : 'shifts'}{d.needsReview ? ` · ${d.needsReview} to review` : ''}
+                            </Text>
+                          </View>
+                          <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{formatHours(msToHours(d.ms))}</Text>
+                          <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} />
+                        </Pressable>
+                        {open ? d.shifts.map((s) => (
+                          <ShiftRow
+                            key={s.id}
+                            s={s}
+                            first={false}
+                            flag={isShortShift(s) ? `Under ${SHORT_SHIFT_MINUTES} min. Check whether this was a mistake.` : undefined}
+                            action={(
+                              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+                                <Button title="Correct times" size="sm" variant="secondary" onPress={() => setEditing(s)} />
+                                {!s.originalOut ? <Button title="Clock out now" size="sm" variant="secondary" onPress={() => clockOutNow(s)} /> : null}
+                              </View>
+                            )}
+                          />
+                        )) : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
           </>
         )}
       </ScrollView>
@@ -208,6 +325,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   card: { borderRadius: radius.lg, padding: spacing.lg },
   label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },
+  filterLabel: { marginLeft: spacing.sm, marginTop: spacing.md, marginBottom: spacing.xs },
+  workerHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginLeft: spacing.sm, marginRight: spacing.sm, marginBottom: spacing.sm },
+  reviewRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   group: { borderRadius: radius.lg, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 52 },
 });

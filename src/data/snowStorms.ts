@@ -141,6 +141,8 @@ export interface StormRouteRow {
   leadName?: string;
   /** The one service this route performs. */
   service: SnowService;
+  /** Crew members besides the lead (update 41; 0 before it). */
+  crew: number;
   cancelled: boolean;
   stops: number;
   completed: number;
@@ -150,10 +152,12 @@ export interface StormRouteRow {
 /** Routes with their lead and stop counts. Route editing lives with the routes screens (update 025). */
 export async function loadStormRoutes(stormId: string): Promise<Result<StormRouteRow[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const [routes, visits] = await Promise.all([
+  const [routes, visits, crew] = await Promise.all([
     supabase.from('snow_routes').select('id, name, position, service, lead_person_id, cancelled_at').eq('storm_id', stormId)
       .order('position').order('created_at'),
     supabase.from('snow_visits').select('route_id, status').eq('storm_id', stormId),
+    // Update 41. If it isn't installed this just fails and every route shows no crew.
+    supabase.from('snow_route_crew').select('route_id').eq('storm_id', stormId),
   ]);
   if (routes.error) return fail(message(routes.error, 'Couldn\'t load routes.'));
   if (visits.error) return fail(message(visits.error, 'Couldn\'t load stops.'));
@@ -172,6 +176,7 @@ export async function loadStormRoutes(stormId: string): Promise<Result<StormRout
       leadPersonId: r.lead_person_id ?? undefined,
       leadName: r.lead_person_id ? names.get(r.lead_person_id) : undefined,
       service: r.service as SnowService,
+      crew: crew.error ? 0 : (crew.data ?? []).filter((c) => c.route_id === r.id).length,
       cancelled: !!r.cancelled_at,
       stops: mine.length,
       completed: mine.filter((v) => v.status === 'completed').length,

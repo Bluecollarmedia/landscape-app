@@ -7,6 +7,7 @@
  * route screen (update 025). Working layout in the existing app style; no
  * approved mockup yet.
  */
+import { crewTag } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -242,7 +243,7 @@ export function StormDetailScreen() {
                     {r.name}{r.cancelled ? ' (cancelled)' : ''}
                   </Text>
                   <Text style={[typeScale.caption, { color: r.leadName ? colors.textSecondary : colors.warning }]} numberOfLines={1}>
-                    {SERVICE_LABEL[r.service]} · {r.leadName ? `Lead: ${r.leadName}` : 'No lead yet'}
+                    {SERVICE_LABEL[r.service]} · {r.leadName ? `Lead: ${r.leadName}` : 'No lead yet'}{r.crew > 0 ? ` · ${crewTag(r.crew)}` : ''}
                   </Text>
                 </View>
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]}>

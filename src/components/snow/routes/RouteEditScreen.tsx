@@ -4,6 +4,7 @@
  * the order is saved in one database call (update 025). Working layout in
  * the existing app style; no approved mockup yet.
  */
+import { crewChoices, crewCountLabel, nextCrew } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,7 +14,8 @@ import { confirmAction, showMessage } from '@/components/financials/ActionSheet'
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
 import {
-  addStops, cancelRoute, loadLeadLoad, loadRoute, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, updateRoute,
+  addStops, cancelRoute, loadLeadLoad, loadRoute, loadRouteCrew, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, updateRoute,
+  type RouteCrewMember,
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
 import { OwnerSkipRequests } from './SkipRequests';
@@ -41,6 +43,8 @@ export function RouteEditScreen() {
   const [doNext, setDoNext] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [leadLoad, setLeadLoad] = useState<Record<string, string[]>>({});
+  const [crew, setCrew] = useState<RouteCrewMember[]>([]);
+  const [pickCrew, setPickCrew] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -53,6 +57,8 @@ export function RouteEditScreen() {
     const [l, e, load] = await Promise.all([
       loadSnowLeads(r.data.service), loadEligibleProperties(r.data.stormId, r.data.service), loadLeadLoad(r.data.id),
     ]);
+    const c = await loadRouteCrew(r.data.id);
+    if (c.ok) setCrew(c.data);
     if (l.ok) setLeads(l.data);
     if (e.ok) setEligible(e.data);
     if (load.ok) setLeadLoad(load.data);
@@ -75,6 +81,17 @@ export function RouteEditScreen() {
     setRoute({ ...route, stops: ids.map((sid) => route.stops.find((s) => s.id === sid)!) });
     const res = await reorderStops(route.id, ids);
     if (!res.ok) showMessage("Couldn't reorder", res.error);
+    reload();
+  }
+
+  /** Adds or removes one crew member. The database gets the whole new list, so a double tap changes nothing. */
+  async function changeCrew(personId: string, add: boolean) {
+    if (!route) return;
+    setBusy(true);
+    const res = await setRouteCrew(route.id, nextCrew(crew.map((c) => c.personId), personId, add));
+    setBusy(false);
+    if (!res.ok) return showMessage("Couldn't change the crew", res.error);
+    setPickCrew(false);
     reload();
   }
 
@@ -237,6 +254,40 @@ export function RouteEditScreen() {
               </Text>
             )
           ) : null}
+          <View>
+            <View style={styles.inline}>
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew (optional)</Text>
+                <Text style={[typeScale.bodyLarge, { color: crew.length ? colors.textPrimary : colors.textTertiary }]}>{crewCountLabel(crew.length)}</Text>
+              </View>
+              {editable ? <Button title={pickCrew ? 'Close' : 'Add crew'} size="sm" variant="secondary" icon={pickCrew ? 'x' : 'plus'} disabled={busy} onPress={() => setPickCrew(!pickCrew)} /> : null}
+            </View>
+            {crew.map((c) => (
+              <View key={c.personId} style={[styles.inline, { paddingVertical: spacing.xs }]}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{c.name}</Text>
+                {editable ? <Button title="Remove" size="sm" variant="ghost" disabled={busy} onPress={() => changeCrew(c.personId, false)} /> : null}
+              </View>
+            ))}
+            {pickCrew ? (
+              crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).length ? (
+                <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.sm }]}>
+                  {crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).map((l, i) => (
+                    <Pressable key={l.personId} style={[styles.row, i > 0 && sep]} onPress={() => changeCrew(l.personId, true)} accessibilityRole="button">
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{l.name}</Text>
+                      <Icon name="plus" size={18} color={colors.primary} />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+                  No one else on the snow team does {SERVICE_LABEL[route.service].toLowerCase()}.
+                </Text>
+              )
+            ) : null}
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
+              Crew can see this route, its stops and instructions. Only the lead can mark arrival, finish stops and add photos.
+            </Text>
+          </View>
           <View style={styles.inline}>
             <View style={{ flex: 1 }}>
               <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Photos required</Text>

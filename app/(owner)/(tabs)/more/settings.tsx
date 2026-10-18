@@ -81,7 +81,7 @@ export default function SettingsScreen() {
         <Text style={[typeScale.displaySmall, styles.title, { color: colors.textPrimary }]}>Settings</Text>
 
         <LinearGradient
-          colors={[brand.primary, brand.primaryDark]}
+          colors={[brand.primary, brand.primary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.hero, shadow.md]}

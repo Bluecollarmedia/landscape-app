@@ -26,7 +26,7 @@ export function BrandCover({ uri, style, variant = 'hero' }: BrandCoverProps) {
   return (
     <View style={[style as StyleProp<ViewStyle>, styles.clip]} pointerEvents="none">
       <LinearGradient
-        colors={['#7CB342', brand.primary, brand.primaryDark, brand.accent]}
+        colors={[brand.primaryLight, brand.primary, brand.primaryDark, brand.accent]}
         locations={[0, 0.3, 0.62, 1]}
         start={{ x: 1, y: 0 }}
         end={{ x: 0, y: 1 }}

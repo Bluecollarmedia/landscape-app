@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Platform, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -115,7 +115,7 @@ export default function MaintenanceHomeScreen() {
           </View>
 
           {home.activePropertyCount === 0 ? (
-            <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <EmptyState
                 icon="home"
                 title="No maintenance properties yet"
@@ -125,14 +125,14 @@ export default function MaintenanceHomeScreen() {
               />
             </View>
           ) : home.dueItems.length === 0 ? (
-            <View style={[styles.card, styles.allClear, { backgroundColor: colors.surface }]}>
+            <View style={[styles.card, styles.allClear, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Icon name="check-circle" size={20} color={semantic.success} />
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1 }]}>
                 Every active contract is up to date.
               </Text>
             </View>
           ) : (
-            <View style={[styles.card, styles.listCard, { backgroundColor: colors.surface }]}>
+            <View style={[styles.card, styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {home.dueItems.slice(0, DUE_PREVIEW).map((item, i) => (
                 <DueRow
                   key={item.key}
@@ -157,7 +157,7 @@ export default function MaintenanceHomeScreen() {
       >
         <Animated.View entering={FadeIn.duration(260)} style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Maintenance</Text>
+            <Text style={[typeScale.displaySmall, { color: colors.textPrimary, fontWeight: '800' }]}>Maintenance</Text>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{todayLabel}</Text>
           </View>
           <RaisedAddButton onPress={() => go(ROUTES.newRoute)} accessibilityLabel="Create a new route" />
@@ -175,10 +175,10 @@ function TodaySection({
 
   if (routes.length === 0) {
     return (
-      <View style={[styles.card, styles.todayEmpty, { backgroundColor: colors.surface }]}>
-        <IconTile name="map" size={44} />
+      <View style={[styles.card, styles.todayEmpty, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <IconTile name="map" size={56} />
         <View style={{ flex: 1 }}>
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>No route for today</Text>
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>No route for today</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 2 }]}>
             Pick from what's due and assign the crew.
           </Text>
@@ -201,7 +201,7 @@ function TodaySection({
             scaleTo={0.98}
             accessibilityRole="button"
             accessibilityLabel={`${r.name || 'Maintenance route'}, ${r.completedCount} of ${r.stopCount} stops done`}
-            style={[styles.card, styles.routeCard, { backgroundColor: colors.surface }]}
+            style={[styles.card, styles.routeCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           >
             <View style={styles.routeTop}>
               <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
@@ -239,11 +239,16 @@ function EntryTile({ icon, title, subtitle, onPress }: { icon: string; title: st
       scaleTo={0.95}
       accessibilityRole="button"
       accessibilityLabel={title}
-      style={[styles.card, styles.entryTile, { backgroundColor: colors.surface }]}
+      style={[styles.card, styles.entryTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
-      <IconTile name={icon} size={40} />
-      <Text style={[typeScale.labelLarge, { color: colors.textPrimary, marginTop: spacing.sm }]} numberOfLines={1}>{title}</Text>
-      <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{subtitle}</Text>
+      <IconTile name={icon} size={48} />
+      <View style={styles.entryText}>
+        <View style={{ flex: 1 }}>
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{title}</Text>
+          <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 2 }]} numberOfLines={1}>{subtitle}</Text>
+        </View>
+        <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+      </View>
     </PressableScale>
   );
 }
@@ -274,16 +279,6 @@ function DueRow({ item, first, onPress }: { item: MaintenanceDueItem; first: boo
   );
 }
 
-const cardShadow = Platform.select({
-  android: { elevation: 2 },
-  default: {
-    shadowColor: '#1B3A2D',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 12,
-  },
-})!;
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: {
@@ -296,8 +291,8 @@ const styles = StyleSheet.create({
   overline: { paddingHorizontal: spacing.lg + spacing.lg, marginBottom: spacing.sm },
   card: {
     marginHorizontal: spacing.lg,
-    borderRadius: radius.lg + 2,
-    ...cardShadow,
+    borderRadius: radius.lg,
+    borderWidth: 1,
   },
   todayEmpty: {
     flexDirection: 'row',
@@ -317,6 +312,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   entryTile: { flex: 1, marginHorizontal: 0, padding: spacing.md },
+  entryText: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md, gap: spacing.xs },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'flex-end',

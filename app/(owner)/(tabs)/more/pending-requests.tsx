@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     ...Platform.select({
       android: { elevation: 3 },
       default: {
-        shadowColor: '#2E7D32',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,

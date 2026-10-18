@@ -12,14 +12,14 @@
 
 // ── Brand Palette (extracted from Brighton logos) ────────────────
 export const brand = {
-  /** Primary — true grass green (updated per approved reference) */
-  primary: '#4CAF50',
-  /** Lighter tint for hover / selected backgrounds */
-  primaryLight: '#81C784',
-  /** Darker for pressed states / gradients */
-  primaryDark: '#2E7D32',
-  /** Very light tint for subtle backgrounds */
-  primarySurface: '#E8F5E9',
+  /** Primary — deep forest green. Only for important actions and selected states. */
+  primary: '#2D5A43',
+  /** Lighter forest tone for hover / disabled primary */
+  primaryLight: '#4E7B64',
+  /** Darker for pressed states */
+  primaryDark: '#1E4430',
+  /** Quiet warm-neutral fill for tiles, chips and selected backgrounds (not green) */
+  primarySurface: '#EDECE6',
   /** Deep forest green from the main wordmark — for headings & strong text */
   accent: '#1B3A2D',
   /** Medium green from the main logo lettering */
@@ -56,29 +56,29 @@ export const semantic = {
 
 // ── Light Theme ──────────────────────────────────────────────────
 export const lightTheme = {
-  // Backgrounds
-  background: neutral.white,
-  backgroundSecondary: neutral.gray50,
-  backgroundTertiary: neutral.gray100,
+  // Backgrounds: warm off-white page, white cards
+  background: '#F6F5F1',
+  backgroundSecondary: '#FAF9F6',
+  backgroundTertiary: '#EFEEE9',
   surface: neutral.white,
   surfaceElevated: neutral.white,
-  surfacePressed: neutral.gray100,
+  surfacePressed: '#EFEEE9',
 
-  // Text
-  textPrimary: neutral.gray900,
-  textSecondary: neutral.gray600,
-  textTertiary: neutral.gray500,
+  // Text: charcoal
+  textPrimary: '#1F2328',
+  textSecondary: '#6A6E75',
+  textTertiary: '#8D9096',
   textInverse: neutral.white,
   textOnPrimary: neutral.white,
 
   // Borders
-  border: neutral.gray200,
-  borderLight: neutral.gray100,
+  border: '#E3E1DA',
+  borderLight: '#ECEAE4',
   borderFocus: brand.primary,
-  /** Hairline row/list separators — iOS system separator */
-  separator: 'rgba(60, 60, 67, 0.29)',
-  /** Screen background behind grouped list sections — iOS systemGroupedBackground */
-  groupedBackground: '#F2F2F7',
+  /** Hairline row/list separators */
+  separator: 'rgba(60, 55, 45, 0.2)',
+  /** Screen background behind grouped list sections (same warm off-white) */
+  groupedBackground: '#F6F5F1',
 
   // Interactive
   primary: brand.primary,

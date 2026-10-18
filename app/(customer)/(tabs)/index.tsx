@@ -1,3 +1,5 @@
+import { useMySnowProperties } from '@/hooks/useHasSnow';
+import { emptyPortalText, portalSections, snowCardSubtitle } from '@/lib/customerPortal';
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +30,7 @@ export default function CustomerHomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const myMaintenance = useMyMaintenanceProperties();
+  const mySnow = useMySnowProperties();
 
   useDb();
   const customerProjects = db.projects.filter(p => p.customerId === user?.id || p.customerClaimedBy === user?.id);
@@ -73,12 +76,36 @@ export default function CustomerHomeScreen() {
         </View>
       )}
 
+      {mySnow.length > 0 && (
+        <View style={{ marginBottom: spacing.xl }}>
+          <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
+            Snow
+          </Text>
+          {mySnow.map((p) => (
+            <Pressable
+              key={p.id}
+              onPress={() => router.push('/(customer)/snow-updates' as any)}
+              accessibilityRole="button"
+              accessibilityLabel={`${p.name}, snow updates`}
+              style={[styles.maintRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            >
+              <Icon name="cloud-snow" size={22} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{p.name}</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{snowCardSubtitle(p.address)}</Text>
+              </View>
+              <Icon name="chevron-right" size={20} color={colors.textSecondary} />
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       {customerProjects.length === 0 ? (
-        myMaintenance.length === 0 ? (
+        portalSections({ projects: 0, maintenance: myMaintenance.length, snow: mySnow.length }).showEmpty ? (
           <EmptyState
             icon="layers"
-            title="No projects yet"
-            description="Your landscaping project progress and updates will appear here."
+            title={emptyPortalText().title}
+            description={emptyPortalText().description}
           />
         ) : null
       ) : (

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Alert, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +15,8 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { haptics } from '@/lib/haptics';
 import { todayKey, localDateKey } from '@/lib/ids';
+import { loadBirthdays } from '@/data/birthday';
+import { formatBirthday, birthdaySoon } from '@/lib/birthday';
 
 const today = todayKey();
 
@@ -58,6 +60,15 @@ export default function WorkerDetailScreen() {
   const { crews, crewOf, setWorkerCrew } = useCrews();
 
   const worker = getWorker(id);
+
+  const [birthday, setBirthday] = useState<string | null>(null);
+  const personId = worker?.person.id;
+  useEffect(() => {
+    if (!personId) return;
+    let live = true;
+    loadBirthdays([personId]).then((m) => { if (live) setBirthday(m[personId] ?? null); });
+    return () => { live = false; };
+  }, [personId]);
 
   if (!worker) {
     return (
@@ -188,6 +199,11 @@ export default function WorkerDetailScreen() {
                 </View>
               </Pressable>
             </View>
+            {birthday ? (
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+                Birthday: {formatBirthday(birthday)}{birthdaySoon(birthday) ? ` · ${birthdaySoon(birthday)}` : ''}
+              </Text>
+            ) : null}
           </View>
 
           {/* Worker type */}

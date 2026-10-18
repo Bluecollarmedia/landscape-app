@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { usePrefetchKeyImages } from '@/lib/imageCache';
 import { View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import * as ExpoSplashScreen from 'expo-splash-screen';
@@ -31,6 +32,7 @@ function RootNavigator() {
   const { shell } = useModeAccess(user?.role);
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
+  usePrefetchKeyImages();
 
   useEffect(() => {
     if (!isLoading) {

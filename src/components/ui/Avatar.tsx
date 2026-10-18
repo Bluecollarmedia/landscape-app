@@ -41,6 +41,7 @@ export function Avatar({ firstName, lastName, size = 40, style, uri }: AvatarPro
         ]}
         contentFit="cover"
         transition={200}
+        cachePolicy="memory-disk"
       />
     );
   }

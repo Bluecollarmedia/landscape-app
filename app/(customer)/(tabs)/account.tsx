@@ -1,3 +1,4 @@
+import { useMyMaintenanceProperties } from '@/data/maintenanceCustomer';
 import React from 'react';
 import { View, Text, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ export default function CustomerAccountScreen() {
   const { user, signOut, switchDevRole } = useAuth();
   useDb();
   const hasSnow = useHasSnow();
+  const myMaintenance = useMyMaintenanceProperties();
   const insets = useSafeAreaInsets();
 
   return (
@@ -42,16 +44,18 @@ export default function CustomerAccountScreen() {
         </View>
       </ListSection>
 
-      <ListSection title="Maintenance">
-        <ListRow
-          icon="repeat"
-          iconColor={colors.primary}
-          title="Maintenance updates"
-          subtitle="Recent visits to your property, with photos we've shared"
-          showChevron
-          onPress={() => router.push('/(customer)/maintenance-updates')}
-        />
-      </ListSection>
+      {myMaintenance.length > 0 ? (
+        <ListSection title="Maintenance">
+          <ListRow
+            icon="repeat"
+            iconColor={colors.primary}
+            title="Maintenance updates"
+            subtitle="Recent visits to your property, with photos we've shared"
+            showChevron
+            onPress={() => router.push('/(customer)/maintenance-updates')}
+          />
+        </ListSection>
+      ) : null}
 
       {hasSnow ? (
         <ListSection title="Snow">

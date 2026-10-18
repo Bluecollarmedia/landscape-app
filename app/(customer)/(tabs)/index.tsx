@@ -11,6 +11,7 @@ import { Card, ProgressBar, StatusBadge, EmptyState } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { db, useDb } from '@/data/store';
+import { useMyMaintenanceProperties } from '@/data/maintenanceCustomer';
 import type { ProjectStatus } from '@/types/project';
 
 const statusConfig: Record<ProjectStatus, { label: string; type: 'success' | 'warning' | 'info' | 'neutral' }> = {
@@ -26,6 +27,7 @@ export default function CustomerHomeScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const myMaintenance = useMyMaintenanceProperties();
 
   useDb();
   const customerProjects = db.projects.filter(p => p.customerId === user?.id || p.customerClaimedBy === user?.id);
@@ -45,12 +47,40 @@ export default function CustomerHomeScreen() {
         </Text>
       </View>
 
+      {myMaintenance.length > 0 && (
+        <View style={{ marginBottom: spacing.xl }}>
+          <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
+            Maintenance
+          </Text>
+          {myMaintenance.map((m) => (
+            <Pressable
+              key={m.id}
+              onPress={() => router.push('/(customer)/maintenance-updates' as any)}
+              accessibilityRole="button"
+              accessibilityLabel={`${m.name}, maintenance updates`}
+              style={[styles.maintRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            >
+              <Icon name="repeat" size={22} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{m.name}</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {m.address ? `${m.address} · ` : ''}Visits and photos
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={20} color={colors.textSecondary} />
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       {customerProjects.length === 0 ? (
-        <EmptyState
-          icon="layers"
-          title="No projects yet"
-          description="Your landscaping project progress and updates will appear here."
-        />
+        myMaintenance.length === 0 ? (
+          <EmptyState
+            icon="layers"
+            title="No projects yet"
+            description="Your landscaping project progress and updates will appear here."
+          />
+        ) : null
       ) : (
         <>
           {activeProjects.length > 0 && (
@@ -150,6 +180,15 @@ export default function CustomerHomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  maintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+  },
   projectCard: {
     marginBottom: spacing.md,
   },

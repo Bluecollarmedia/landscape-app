@@ -314,8 +314,11 @@ export default function MaintenancePropertyEditScreen() {
 
     haptics.success();
     if (failures.length) notify('Some Services Weren’t Saved', failures.join('\n'));
-    if (existing) router.back();
-    else router.replace(`/(owner)/maintenance/properties/${propertyId}` as any);
+    // Close this pop-up the same way the other create screens do, then open the
+    // property. (A replace straight from this pop-up into the Maintenance tab
+    // could leave the editor on screen while the screen underneath changed.)
+    if (router.canGoBack()) router.back();
+    if (!existing) router.push(`/(owner)/maintenance/properties/${propertyId}` as any);
   }
 
   return (

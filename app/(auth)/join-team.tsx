@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Alert, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { Image } from 'expo-image';
@@ -133,6 +133,7 @@ export default function JoinTeamScreen() {
       return;
     }
     setError('');
+    Keyboard.dismiss();
     setLoading(true);
 
     if (!isSupabaseConfigured) {

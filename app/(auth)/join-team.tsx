@@ -201,6 +201,11 @@ export default function JoinTeamScreen() {
           }
         } catch (photoErr) {
           console.warn('[join-team] profile photo upload failed', photoErr);
+          // Sign-up itself worked; say why the photo didn't, and where to add it again.
+          const why = photoErr instanceof Error ? photoErr.message : 'Unknown error';
+          const note = `Your request was sent, but your profile photo wasn't saved. ${why} You can add it later in Settings → Edit Profile.`;
+          if (Platform.OS === 'web') alert(note);
+          else Alert.alert('Photo not saved', note);
         }
       }
 

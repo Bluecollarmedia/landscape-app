@@ -12,6 +12,7 @@
 import { Platform } from 'react-native';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { uuid } from './ids';
+import { explainUploadError, SIGNED_OUT_UPLOAD_MESSAGE } from './uploadErrors';
 
 export const MEDIA_BUCKET = 'media';
 
@@ -40,28 +41,39 @@ export async function uploadImage(localUri: string, folder: string, mimeType?: s
   }
 
   const { contentType, ext } = guessContentType(localUri, mimeType);
-  if (r2Enabled) return uploadToR2(localUri, folder, contentType);
+  await requireSession();
+  try {
+    if (r2Enabled) return await uploadToR2(localUri, folder, contentType);
 
-  const key = `${folder}/${uuid()}.${ext}`;
+    const key = `${folder}/${uuid()}.${ext}`;
 
-  let body: Blob | FormData;
-  if (Platform.OS === 'web') {
-    body = await (await fetch(localUri)).blob();
-  } else {
-    // React Native uploads local files most reliably as multipart form data.
-    const form = new FormData();
-    form.append('file', { uri: localUri, name: key.split('/').pop(), type: contentType } as unknown as Blob);
-    body = form;
+    let body: Blob | FormData;
+    if (Platform.OS === 'web') {
+      body = await (await fetch(localUri)).blob();
+    } else {
+      // React Native uploads local files most reliably as multipart form data.
+      const form = new FormData();
+      form.append('file', { uri: localUri, name: key.split('/').pop(), type: contentType } as unknown as Blob);
+      body = form;
+    }
+
+    const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(key, body, {
+      contentType,
+      upsert: false,
+    });
+    if (error) throw error;
+
+    const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(key);
+    return { url: data.publicUrl, key };
+  } catch (err) {
+    throw new Error(`Upload failed: ${explainUploadError(err).replace(/^Upload failed:?\s*/i, '')}`);
   }
+}
 
-  const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(key, body, {
-    contentType,
-    upsert: false,
-  });
-  if (error) throw new Error(`Upload failed: ${error.message}`);
-
-  const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(key);
-  return { url: data.publicUrl, key };
+/** Uploads need a signed-in session; without one the server refuses with a confusing permission error. */
+export async function requireSession(): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  if (!data?.session) throw new Error(SIGNED_OUT_UPLOAD_MESSAGE);
 }
 
 async function uploadToR2(localUri: string, folder: string, contentType: string): Promise<{ url: string; key: string }> {
@@ -69,10 +81,10 @@ async function uploadToR2(localUri: string, folder: string, contentType: string)
   const { data, error } = await supabase.functions.invoke('media', {
     body: { action: 'put', folder, contentType, size: blob.size },
   });
-  if (error || !data?.uploadUrl) throw new Error(`Upload failed: ${error?.message ?? data?.error ?? 'no upload link'}`);
+  if (error || !data?.uploadUrl) throw new Error(error?.message ?? data?.error ?? 'no upload link');
 
   const res = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
-  if (!res.ok) throw new Error('Upload failed. Please check your connection and try again.');
+  if (!res.ok) throw new Error(`The storage server answered ${res.status}`);
   return { url: data.publicUrl as string, key: data.key as string };
 }
 

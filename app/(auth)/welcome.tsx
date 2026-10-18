@@ -87,6 +87,13 @@ export default function WelcomeScreen() {
         <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
           Brighton Lawn + Landscape
         </Text>
+        <View style={styles.legalRow}>
+          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => router.push('/legal/privacy' as any)}>Privacy Policy</Text>
+          <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{'  ·  '}</Text>
+          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => router.push('/legal/terms' as any)}>Terms of Use</Text>
+          <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{'  ·  '}</Text>
+          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => router.push('/legal/support' as any)}>Support</Text>
+        </View>
       </View>
     </View>
   );
@@ -184,4 +191,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.md,
   },
+  legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: spacing.xs },
 });

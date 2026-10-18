@@ -1,3 +1,6 @@
+import { LegalSection } from '@/components/legal/LegalSection';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
+import { ListSection } from '@/components/ui';
 import React from 'react';
 import { SnowPlaceholder } from '@/components/snow/SnowPlaceholder';
 import { SettingsGroup, SettingsRow } from '@/components/settings/SettingsList';
@@ -53,9 +56,13 @@ export default function SnowOwnerMoreScreen() {
       <SettingsGroup title="Mode">
         <ModeSwitchRow />
       </SettingsGroup>
+      <LegalSection />
       <SettingsGroup>
         <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
       </SettingsGroup>
+      <ListSection>
+        <DeleteAccountRow />
+      </ListSection>
     </SnowPlaceholder>
   );
 }

@@ -1,3 +1,6 @@
+import { LegalSection } from '@/components/legal/LegalSection';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
+import { ListSection } from '@/components/ui';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,9 +39,13 @@ export default function SnowModeNoticeScreen() {
         </Text>
       </View>
       <View style={{ paddingHorizontal: spacing.lg }}>
+        <LegalSection />
         <SettingsGroup>
           <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
         </SettingsGroup>
+        <ListSection>
+          <DeleteAccountRow />
+        </ListSection>
       </View>
     </View>
   );

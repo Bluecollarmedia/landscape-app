@@ -1,3 +1,4 @@
+import { TermsAgreement, TERMS_REQUIRED_MESSAGE } from '@/components/legal/TermsAgreement';
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, Platform, Alert, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,6 +36,7 @@ export default function CustomerAccessScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
   const passwordRef = useRef<TextInput>(null);
@@ -115,6 +117,10 @@ export default function CustomerAccessScreen() {
       }
 
       if (mode === 'signup') {
+        if (!agreed) {
+          setError(TERMS_REQUIRED_MESSAGE);
+          return;
+        }
         if (!firstName.trim() || !lastName.trim()) {
           setError('Please enter your first and last name.');
           return;
@@ -313,6 +319,8 @@ export default function CustomerAccessScreen() {
             onSubmitEditing={handleAuthenticate}
             icon="lock"
           />
+
+          {mode === 'signup' && <TermsAgreement value={agreed} onChange={(v) => { setAgreed(v); if (v) setError(''); }} />}
 
           <Button
             title={mode === 'signup' ? 'Create Account & View Project' : 'Sign In & Claim Project'}

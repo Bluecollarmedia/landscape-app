@@ -1,3 +1,4 @@
+import { LegalSection } from '@/components/legal/LegalSection';
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -214,6 +215,8 @@ export default function SettingsScreen() {
             })}
           </SettingsGroup>
         )}
+
+        <LegalSection />
 
         <SettingsGroup>
           <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />

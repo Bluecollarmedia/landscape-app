@@ -8,6 +8,9 @@
  *  - Your profile and Mode.
  * No decorative toggles: anything that is not wired to behavior is not listed.
  */
+import { LegalSection } from '@/components/legal/LegalSection';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
+import { ListSection } from '@/components/ui';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -118,9 +121,14 @@ export function SnowSettingsScreen() {
           <ModeSwitchRow />
         </SettingsGroup>
 
+        <LegalSection />
+
         <SettingsGroup>
           <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
         </SettingsGroup>
+        <ListSection>
+          <DeleteAccountRow />
+        </ListSection>
       </ScrollView>
     </View>
   );

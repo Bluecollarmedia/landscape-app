@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
@@ -43,6 +43,9 @@ export default function LoginScreen() {
 
     setError('');
     setLoading(true);
+    // Close the keyboard now so it doesn't hang around (or pop back up) during the welcome animation.
+    Keyboard.dismiss();
+    passwordRef.current?.blur();
 
     startWelcome();
     try {

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Platform, Alert, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
@@ -45,6 +45,7 @@ export default function CustomerAccessScreen() {
       return;
     }
 
+    Keyboard.dismiss();
     setError('');
     const result = await validateCode(code);
 
@@ -89,6 +90,7 @@ export default function CustomerAccessScreen() {
       return;
     }
 
+    Keyboard.dismiss();
     setError('');
     setAuthLoading(true);
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensions, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensions, Alert, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
@@ -125,6 +125,7 @@ export default function CreateCompanyScreen() {
       zip: companyZip.trim() || undefined,
     };
 
+    Keyboard.dismiss();
     setError('');
     setLoading(true);
     try {

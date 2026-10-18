@@ -39,7 +39,8 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://ahvzdvzxpadfitouyxng.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_xSURIebG8cawmPmRhN5mPA_Fk9ZU6pv",
-        "EXPO_PUBLIC_WEB_URL": "https://brighton-app.netlify.app"
+        "EXPO_PUBLIC_WEB_URL": "https://brighton-app.netlify.app",
+        "EXPO_PUBLIC_R2_PUBLIC_URL": "https://pub-31ea333aa25942858270d64b5b257873.r2.dev"
       }
     }
   },

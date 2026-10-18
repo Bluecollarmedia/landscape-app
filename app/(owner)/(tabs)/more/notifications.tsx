@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { Switch } from '@/components/ui/Switch';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { Avatar, ScreenHeader, GlassIconButton, SegmentedTabs, PressableScale, FadeInItem, IconTile } from '@/components/ui';
+import { Avatar, ScreenHeader, GlassIconButton, SegmentedTabs } from '@/components/ui';
+import { IconTile } from '@/components/settings/SettingsList';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { useNotifications } from '@/hooks/useOperations';
@@ -53,17 +54,17 @@ export default function NotificationPreferencesScreen() {
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
               These are the default notification settings for all workers. You can override these per-worker in the Overrides tab.
             </Text>
-            <FadeInItem style={[styles.group, { backgroundColor: colors.surface }]}>
+            <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {ALL_EVENTS.map((eventType, i) => {
               const pref = getCompanyDefault(eventType);
               const info = EVENT_LABELS[eventType];
               const enabled = pref?.enabled ?? true;
               return (
                 <View key={eventType} style={[styles.prefRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
-                  <IconTile name={info.icon} size={32} muted={!enabled} />
+                  <IconTile name={info.icon as any} color={enabled ? colors.primary : colors.textTertiary} />
                   <View style={styles.prefInfo}>
-                    <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>{info.label}</Text>
-                    <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{info.description}</Text>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{info.label}</Text>
+                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 1 }]}>{info.description}</Text>
                   </View>
                   <Switch
                     value={enabled}
@@ -74,7 +75,7 @@ export default function NotificationPreferencesScreen() {
                 </View>
               );
             })}
-            </FadeInItem>
+            </View>
           </>
         )}
 
@@ -83,14 +84,13 @@ export default function NotificationPreferencesScreen() {
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
               Select a worker to set notification overrides that differ from company defaults.
             </Text>
-            <FadeInItem style={[styles.group, { backgroundColor: colors.surface }]}>
+            <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {workers.map((m, i) => {
               const overrideCount = preferences.filter((p) => p.personId === m.personId).length;
               return (
-                <PressableScale
+                <Pressable
                   key={m.personId}
                   style={[styles.workerRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}
-                  scaleTo={0.98}
                   onPress={() => setSelectedWorker(m.personId)}
                   accessibilityRole="button"
                 >
@@ -106,23 +106,23 @@ export default function NotificationPreferencesScreen() {
                     )}
                   </View>
                   <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-                </PressableScale>
+                </Pressable>
               );
             })}
-            </FadeInItem>
+            </View>
           </>
         )}
 
         {tab === 'overrides' && selectedWorker && (
           <>
-            <PressableScale
+            <Pressable
               style={styles.backLink}
               onPress={() => setSelectedWorker(null)}
               accessibilityRole="button"
             >
               <Icon name="arrow-left" size={16} color={colors.primary} />
               <Text style={[typeScale.labelSmall, { color: colors.primary }]}>All Workers</Text>
-            </PressableScale>
+            </Pressable>
             {(() => {
               const w = workers.find((m) => m.personId === selectedWorker);
               return (
@@ -134,7 +134,7 @@ export default function NotificationPreferencesScreen() {
                 </View>
               );
             })()}
-            <FadeInItem style={[styles.group, { backgroundColor: colors.surface }]}>
+            <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {ALL_EVENTS.map((eventType, i) => {
               const companyDefault = getCompanyDefault(eventType);
               const override = getWorkerOverride(selectedWorker, eventType);
@@ -144,9 +144,9 @@ export default function NotificationPreferencesScreen() {
               const hasOverride = override !== undefined;
               return (
                 <View key={eventType} style={[styles.prefRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
-                  <IconTile name={info.icon} size={32} muted={!currentEnabled} />
+                  <IconTile name={info.icon as any} color={currentEnabled ? colors.primary : colors.textTertiary} />
                   <View style={styles.prefInfo}>
-                    <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>{info.label}</Text>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{info.label}</Text>
                     {hasOverride && (
                       <Text style={[typeScale.caption, { color: colors.warning }]}>
                         Override (default: {defaultEnabled ? 'ON' : 'OFF'})
@@ -165,7 +165,7 @@ export default function NotificationPreferencesScreen() {
                 </View>
               );
             })}
-            </FadeInItem>
+            </View>
           </>
         )}
       </ScrollView>
@@ -178,16 +178,9 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing['5xl'] },
   group: {
     borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: spacing.md,
-    ...Platform.select({
-      android: { elevation: 2 },
-      default: {
-        shadowColor: '#1B3A2D',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-      },
-    }),
+    overflow: 'hidden',
   },
   prefRow: {
     flexDirection: 'row',

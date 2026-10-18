@@ -185,7 +185,7 @@ check('23 an old single-service storm offers the same properties as before', el.
 
 // ── Editing the services ────────────────────────────────────────────────────
 f = await fails(db, `select public.snow_set_storm_services($1, array['plowing'])`, [storm], "Can't remove shoveling");
-check('24 a service that has a route cannot be removed', f.raised && f.match, f.msg);
+check('24 a service that has a route cannot be removed, and the message explains that cancelled routes count too', f.raised && f.match && f.msg.includes('cancelled routes stay on the storm as history'), f.msg);
 let r = (await q(db, `select public.snow_set_storm_services($1, array['plowing','shoveling','salting']) as r`, [storm]))[0].r;
 check('25 a service can be added to a storm', r.changed === true && r.storm.services.join() === 'plowing,shoveling,salting');
 r = (await q(db, `select public.snow_set_storm_services($1, array['plowing','shoveling','salting']) as r`, [storm]))[0].r;
@@ -221,6 +221,8 @@ check('35 a storm with no stops at all still cannot be dispatched', f.raised && 
 await db.query(`update public.snow_routes set cancelled_at = now() where name = 'Shovel A'`);
 r = (await q(db, `select public._snow_storm_summary($1) as s`, [storm]))[0].s;
 check('36 a cancelled route stops counting as remaining work, the other service\'s route still counts', r.routes === 1 && r.visits === 3 && r.pending === 3, JSON.stringify(r));
+f = await fails(db, `select public.snow_set_storm_services($1, array['plowing'])`, [storm], "Can't remove shoveling");
+check('36b a CANCELLED route still blocks removing its service (Shovel A was cancelled above)', f.raised && f.match && f.msg.includes('cancelled'), f.msg);
 r = (await q(db, `select public.snow_end_storm($1) as r`, [storm]))[0].r;
 check('37 a multi-service storm ends like any other', r.storm.status === 'ended');
 f = await fails(db, `insert into public.snow_routes (storm_id, service, name) values ($1, 'plowing', 'Late')`, [storm], 'has ended');

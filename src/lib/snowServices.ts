@@ -60,3 +60,19 @@ export function defaultStormNameFor(services: SnowService[], label: (s: SnowServ
   if (services.length === 1) return `${day} ${services[0] === 'shoveling' ? 'Sidewalks' : label(services[0])}`;
   return `${day} Storm`;
 }
+
+/** How many routes a storm has for one service, and how many of those are cancelled (cancelled routes stay as history and still count). */
+export function serviceRouteCount(service: SnowService, routes: { service: SnowService; cancelled?: boolean }[]): { total: number; cancelled: number } {
+  const mine = routes.filter((r) => r.service === service);
+  return { total: mine.length, cancelled: mine.filter((r) => r.cancelled).length };
+}
+
+/** "2 routes", "1 route, 1 cancelled": shown next to a service that can't be removed. */
+export function lockedServiceNote(count: { total: number; cancelled: number }): string {
+  const base = `${count.total} ${count.total === 1 ? 'route' : 'routes'}`;
+  return count.cancelled ? `${base}, ${count.cancelled} cancelled` : base;
+}
+
+/** Why a service with routes can't be removed. Shown under the service list. */
+export const LOCKED_SERVICE_HELP =
+  "A service that already has a route can't be removed, even if that route was cancelled, because cancelled routes stay on the storm as history. A service with no routes can be removed.";

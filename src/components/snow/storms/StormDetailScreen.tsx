@@ -23,7 +23,7 @@ import {
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { SNOW_SERVICES, type SnowService, type SnowStorm } from '@/types/snow';
-import { removableServices, routeServiceChoice, routesPerService, servicesLabel, stormServices, toggleService } from '@/lib/snowServices';
+import { LOCKED_SERVICE_HELP, lockedServiceNote, removableServices, routeServiceChoice, routesPerService, serviceRouteCount, servicesLabel, stormServices, toggleService } from '@/lib/snowServices';
 import { STATUS_TONE } from './StormsListScreen';
 import { addRouteFromTemplate, createRoute, loadRouteTemplates, type RouteTemplate } from '@/data/snowRoutes';
 
@@ -314,10 +314,13 @@ export function StormDetailScreen() {
                       >
                         <Icon name={on ? 'check-square' : 'square'} size={20} color={on ? colors.primary : colors.textTertiary} />
                         <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{SERVICE_LABEL[sv]}</Text>
-                        {locked ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Has routes</Text> : null}
+                        {locked ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{lockedServiceNote(serviceRouteCount(sv, routes))}</Text> : null}
                       </Pressable>
                     );
                   })}
+                  {SNOW_SERVICES.some((sv) => editingServices.includes(sv) && routes.some((r) => r.service === sv)) ? (
+                    <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{LOCKED_SERVICE_HELP}</Text>
+                  ) : null}
                   <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                     <Button title="Save services" size="sm" icon="check" onPress={onSaveServices} loading={busy} disabled={editingServices.length === 0} />
                     <Button title="Cancel" size="sm" variant="ghost" onPress={() => setEditingServices(null)} />

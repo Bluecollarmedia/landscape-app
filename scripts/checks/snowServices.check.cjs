@@ -6,7 +6,7 @@ const path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '../../src/lib/snowServices.ts'), 'utf8');
 const m = { exports: {} };
 new Function('module', 'exports', ts.transpileModule(src, { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports);
-const { stormServices, servicesLabel, toggleService, routeServiceChoice, removableServices, routesPerService, defaultStormNameFor } = m.exports;
+const { stormServices, servicesLabel, toggleService, routeServiceChoice, removableServices, routesPerService, defaultStormNameFor, serviceRouteCount, lockedServiceNote, LOCKED_SERVICE_HELP } = m.exports;
 
 let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  — ' + detail}`); };
@@ -37,5 +37,10 @@ check('15 routes are counted per service', counts.plowing === 2 && counts.shovel
 const day = new Date('2026-01-12T12:00:00');
 check('16 default name for one service matches the old style', defaultStormNameFor(['plowing'], label, day) === 'Jan 12 Plowing' && defaultStormNameFor(['shoveling'], label, day) === 'Jan 12 Sidewalks');
 check('17 default name for several services', defaultStormNameFor(['plowing', 'shoveling'], label, day) === 'Jan 12 Storm');
+
+const rt = [{ service: 'shoveling', cancelled: true }, { service: 'shoveling' }, { service: 'plowing' }];
+check('18 route counts per service include cancelled ones', JSON.stringify(serviceRouteCount('shoveling', rt)) === '{"total":2,"cancelled":1}' && serviceRouteCount('salting', rt).total === 0);
+check('19 the note beside a locked service reads plainly', lockedServiceNote({ total: 1, cancelled: 0 }) === '1 route' && lockedServiceNote({ total: 3, cancelled: 2 }) === '3 routes, 2 cancelled' && lockedServiceNote({ total: 1, cancelled: 1 }) === '1 route, 1 cancelled');
+check('20 the help text says cancelled routes count and why', /even if that route was cancelled/.test(LOCKED_SERVICE_HELP) && /history/.test(LOCKED_SERVICE_HELP));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

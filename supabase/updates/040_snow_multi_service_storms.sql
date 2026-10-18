@@ -116,7 +116,8 @@ $$;
 
 -- ── 3) Editing a storm's services ──────────────────────────────────────────
 -- Owner/admin. Draft or running (not ended). A service that has a route on
--- this storm can't be removed (cancelled routes count: they are history).
+-- this storm can't be removed (cancelled routes count: they are history; the
+-- error message says so).
 
 create or replace function public.snow_set_storm_services(p_storm_id uuid, p_services text[])
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -137,7 +138,7 @@ begin
   from public.snow_routes r
   where r.storm_id = s.id and not (r.service = any (svcs));
   if blocked is not null then
-    raise exception 'Can''t remove % while this storm has routes for it. Cancel or delete those routes first.', blocked;
+    raise exception 'Can''t remove % while this storm has routes for it. Even cancelled routes stay on the storm as history, so the service has to stay.', blocked;
   end if;
 
   if svcs = s.services then return public._snow_storm_result(s, false); end if;

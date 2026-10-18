@@ -50,6 +50,7 @@ declare
   pid uuid := public.my_person_id();
   cid uuid;
   cname text;
+  t text;
 begin
   if pid is null then raise exception 'not signed in'; end if;
 
@@ -66,10 +67,38 @@ begin
 
   -- Same lock the creation check takes, so a delete and a create can't interleave.
   perform pg_advisory_xact_lock(hashtext('public.one_company'));
-  -- Allowed for this one transaction only; it is switched off straight after.
+
+  -- Deleting a company deletes its rows in many tables, and some tables' own
+  -- triggers (Snow Mode's activity log, for one) try to write a log row that
+  -- points at the company while it is being removed, which the database
+  -- refuses. So the "user" triggers on the company's tables are switched off
+  -- for this one transaction (the built-in cascade deletes stay on) and are
+  -- switched back on before it ends. If anything fails, the whole transaction
+  -- rolls back, including this switch.
+  for t in
+    select c.relname from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+     where c.relkind = 'r'
+       and exists (select 1 from pg_attribute a
+                    where a.attrelid = c.oid and a.attname = 'company_id' and not a.attisdropped)
+  loop
+    execute format('alter table public.%I disable trigger user', t);
+  end loop;
+
+  -- The company delete lock allows this for this one transaction only.
   perform set_config('app.allow_company_delete', 'on', true);
   delete from public.companies where id = cid;
   perform set_config('app.allow_company_delete', 'off', true);
+
+  for t in
+    select c.relname from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+     where c.relkind = 'r'
+       and exists (select 1 from pg_attribute a
+                    where a.attrelid = c.oid and a.attname = 'company_id' and not a.attisdropped)
+  loop
+    execute format('alter table public.%I enable trigger user', t);
+  end loop;
 
   -- Anything left over means the delete didn't really happen: undo everything.
   if exists (select 1 from public.companies where id = cid) then

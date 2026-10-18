@@ -30,6 +30,13 @@ create table public.notification_preferences (person_id uuid);
 create table public.app_notifications (recipient_id uuid);
 -- Something that blocks a delete, to simulate a failed deletion.
 create table public.keep_blocker (id uuid primary key default gen_random_uuid(), company_id uuid references public.companies(id) on delete restrict);
+-- Like Snow's activity log: a table whose own delete trigger writes a log row
+-- that points at the company. Deleting the company cascades into it.
+create table public.activity_events (id uuid primary key default gen_random_uuid(), company_id uuid not null references public.companies(id) on delete cascade, note text);
+create table public.settings_like (company_id uuid primary key references public.companies(id) on delete cascade);
+create function public.log_settings_delete() returns trigger language plpgsql as $$ begin
+  insert into public.activity_events (company_id, note) values (old.company_id, 'settings.changed'); return old; end $$;
+create trigger settings_like_audit after delete on public.settings_like for each row execute function public.log_settings_delete();
 create function public.my_person_id() returns uuid language sql stable as $$ select id from public.people where user_id = auth.uid() limit 1 $$;
 create function public._create_company(pid uuid, data jsonb) returns uuid language plpgsql as $$
 declare cid uuid; begin
@@ -104,6 +111,20 @@ check('5 existing company: direct insert is refused by the trigger', r.raised &&
 r = await fails(db, `delete from public.companies`, [], 'cannot be deleted');
 check('6 plain delete of the company is still blocked', r.raised && r.match && (await count(db, 'companies')) === 1, r.msg);
 
+await db.query(`insert into public.settings_like (company_id) select id from public.companies`);
+
+// The exact production failure: a plain delete (even with the lock bypass) trips the log trigger.
+{
+  let raised = '';
+  try { await db.exec(`begin; set local app.allow_company_delete = 'on'; delete from public.companies; commit;`); }
+  catch (e) { raised = String(e.message); }
+  await db.exec('rollback').catch(() => {});
+  check('6b production failure reproduced: raw delete fails because the log trigger writes a row for the vanishing company',
+    raised.includes('violates foreign key') && (await count(db, 'companies')) === 1, raised.slice(0, 110));
+}
+const trigState = async () => (await db.query(`select tgenabled as s from pg_trigger where tgname = 'settings_like_audit'`)).rows[0].s;
+check('6c the log trigger starts out enabled', (await trigState()) === 'O');
+
 await db.query(`insert into public.company_members (company_id, person_id, role) select id, $1, 'worker' from public.companies`, [worker.pid]);
 await asUser(db, worker.uid);
 r = await fails(db, `select public.delete_my_company('Brighton Lawn')`, [], 'owner');
@@ -130,6 +151,7 @@ const flag = (await db.query(`select coalesce(current_setting('app.allow_company
 check('11 deletion failure: company still exists, slot stays CLOSED, delete switch not left on',
   r.raised && (await count(db, 'companies')) === 1 && (await slot(db)) === false && flag !== 'on', r.msg);
 check('11b deletion failure: nothing was partially removed (members intact)', (await count(db, 'company_members')) === 2);
+check('11c deletion failure: the log trigger is still enabled (switch rolled back)', (await trigState()) === 'O');
 
 // successful deletion
 await db.query(`delete from public.keep_blocker`);
@@ -140,6 +162,8 @@ check('13 deletion success: accounts are kept, nobody is given ownership',
   (await count(db, 'people')) === peopleBefore && (await count(db, 'company_members')) === 0);
 const flagAfter = (await db.query(`select coalesce(current_setting('app.allow_company_delete', true), '') as f`)).rows[0].f;
 check('14 deletion switch is off after a successful delete', flagAfter !== 'on');
+check('14b deletion with a log trigger present succeeds, and the trigger is enabled again afterwards',
+  (await trigState()) === 'O' && (await count(db, 'settings_like')) === 0 && (await count(db, 'activity_events')) === 0);
 
 r = await fails(db, `delete from public.companies`, [], null);
 check('15 plain delete still blocked afterwards (nothing to delete, guard unchanged)', !r.raised || r.msg.includes('cannot be deleted'));

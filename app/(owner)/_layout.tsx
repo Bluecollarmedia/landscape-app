@@ -34,6 +34,8 @@ export default function OwnerLayout() {
         <Stack.Screen name="document" />
         <Stack.Screen name="document-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="document-edit" options={{ presentation: 'modal', gestureEnabled: false }} />
+        {/* Snow Mode activity log: opened from the snow dashboard and settings. */}
+        <Stack.Screen name="snow-activity" />
         <Stack.Screen name="setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
       </Stack>
     </ScheduleProvider>

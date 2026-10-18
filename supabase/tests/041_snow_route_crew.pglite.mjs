@@ -227,7 +227,7 @@ const canSee = (pid, ps) => asRole(pid, async () => (await q(db, `select public.
 check('29 crew can see the instructions for a stop on their route', (await canSee(crewA, psA)) === true);
 check('30 crew cannot see instructions for another route\'s property', (await canSee(crewA, psS)) === false);
 check('31 the lead and the owner still can; an outsider still cannot', (await canSee(lead, psA)) === true && (await canSee(owner, psA)) === true && (await canSee(outsider, psA)) === false);
-check('32 a worker with no snow access at all cannot see another route's instructions either', (await canSee(outsider, psS)) === false);
+check('32 a worker with no snow access at all cannot see instructions for the route either', (await canSee(outsider, psS)) === false);
 
 // ── My routes + role ─────────────────────────────────────────────────────────
 const mine = (pid) => asRole(pid, async () => q(db, `select route_id, role from public.snow_my_routes() order by role`));

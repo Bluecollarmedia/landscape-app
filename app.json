@@ -4,12 +4,12 @@
     "slug": "brighton-lawn-landscape",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo-icon.png",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "brighton-lawn",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.brightonlawn.app",
       "buildNumber": "4",
       "infoPlist": {
@@ -19,7 +19,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/logo-icon.png"
+        "foregroundImage": "./assets/images/icon-foreground.png"
       },
       "package": "com.brightonlawn.app",
       "permissions": [
@@ -27,7 +27,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/logo-icon.png",
+      "favicon": "./assets/images/icon.png",
       "bundler": "metro"
     },
     "plugins": [

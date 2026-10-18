@@ -64,6 +64,8 @@ export interface SnowStorm {
   reopenedCount: number;
   lastReopenedAt?: string;
   lastReopenedBy?: string;
+  /** Set by the create call so a double tap makes one storm (update 024). */
+  clientRequestId?: string;
   createdAt: string;
   updatedAt: string;
 }

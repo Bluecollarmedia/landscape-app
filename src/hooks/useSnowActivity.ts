@@ -1,3 +1,4 @@
+import { rangeStart, trimToRange, type DateRange } from '@/lib/snowActivityView';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { db, rpc, isDemo } from '@/data/store';
 import type { SnowActivityAction, SnowActivityEvent, SnowService } from '@/types/snow';
@@ -23,6 +24,8 @@ export interface SnowActivityFilters {
   propertyId?: string;
   /** A whole action ('visit.completed') or its first word ('visit'). */
   action?: string;
+  /** Only entries from this period (the feed is read newest first until the period's start). */
+  range?: DateRange;
 }
 
 export type SnowFilterKind = 'storm' | 'route' | 'property' | 'worker' | 'action';
@@ -136,9 +139,10 @@ export function useSnowActivity(filters: SnowActivityFilters) {
       setError(feed.error.message);
     } else {
       setError('');
-      const rows = (feed.data ?? []).map(fromRow);
-      setEvents(rows);
-      setHasMore(rows.length === PAGE);
+      const all = (feed.data ?? []).map(fromRow);
+      const t = trimToRange(all, rangeStart(filters.range));
+      setEvents(t.rows);
+      setHasMore(all.length === PAGE && !t.reachedStart);
     }
     if (!opts.error) {
       setOptions((opts.data ?? []).map((o) => ({
@@ -164,9 +168,10 @@ export function useSnowActivity(filters: SnowActivityFilters) {
       setError(rpcError.message);
       return;
     }
-    const rows = (data ?? []).map(fromRow);
-    setEvents((prev) => [...prev, ...rows.filter((r) => !prev.some((p) => p.id === r.id))]);
-    setHasMore(rows.length === PAGE);
+    const all = (data ?? []).map(fromRow);
+    const t = trimToRange(all, rangeStart(filters.range));
+    setEvents((prev) => [...prev, ...t.rows.filter((r) => !prev.some((p) => p.id === r.id))]);
+    setHasMore(all.length === PAGE && !t.reachedStart);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, events, hasMore, loadingMore]);
 

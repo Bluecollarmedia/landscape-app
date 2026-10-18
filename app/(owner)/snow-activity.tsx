@@ -23,6 +23,7 @@ import {
   useSnowActivity, type SnowActivityEntry, type SnowActivityFilters, type SnowFilterKind, type SnowFilterOption,
 } from '@/hooks/useSnowActivity';
 import { actionIcon, actionLabel, entityLabel, fieldChanges } from '@/lib/snowActivity';
+import { DATE_RANGES, buildView, entryServices, runSpan, servicesText, type ViewItem } from '@/lib/snowActivityView';
 
 const FILTERS: { kind: SnowFilterKind; label: string; field: keyof SnowActivityFilters }[] = [
   { kind: 'storm', label: 'Storm', field: 'stormId' },
@@ -59,6 +60,9 @@ export default function SnowActivityScreen() {
   const [picking, setPicking] = useState<SnowFilterKind | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Group by day and fold long runs of routine entries. Off shows the plain list. Either way nothing is hidden.
+  const [grouped, setGrouped] = useState(true);
+  const [openRuns, setOpenRuns] = useState<Record<string, boolean>>({});
   const { events, options, loading, loadingMore, hasMore, error, reload, loadMore } = useSnowActivity(filters);
 
   const labelOf = useMemo(() => {
@@ -67,7 +71,8 @@ export default function SnowActivityScreen() {
     return (kind: SnowFilterKind, value?: string) => (value ? map.get(`${kind}:${value}`) : undefined);
   }, [options]);
 
-  const activeCount = FILTERS.filter((f) => filters[f.field]).length;
+  const activeCount = FILTERS.filter((f) => filters[f.field]).length + (filters.range && filters.range !== 'all' ? 1 : 0);
+  const view = useMemo(() => buildView(events, { group: grouped, fold: grouped }), [events, grouped]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -82,14 +87,14 @@ export default function SnowActivityScreen() {
     setExpandedId(null);
   }
 
-  function renderEvent({ item: e }: { item: SnowActivityEntry }) {
+  function renderEvent(e: SnowActivityEntry, nested = false) {
     const isExpanded = expandedId === e.id;
     const who = e.actorName ?? (e.actorId ? 'Someone' : 'System');
     const context = [
       labelOf('storm', e.stormId),
       labelOf('route', e.routeId),
       labelOf('property', e.propertyId),
-      e.service ? SERVICE_LABEL[e.service] ?? e.service : undefined,
+      servicesText(entryServices(e), (k) => SERVICE_LABEL[k] ?? k) || undefined,
     ].filter(Boolean).join(' · ');
     const about = e.personName && e.personId !== e.actorId ? e.personName : undefined;
     const changes = isExpanded ? fieldChanges(e.before ?? null, e.after ?? null) : [];
@@ -97,7 +102,7 @@ export default function SnowActivityScreen() {
     return (
       <Pressable
         onPress={() => setExpandedId(isExpanded ? null : e.id)}
-        style={[styles.row, { borderBottomColor: colors.borderLight }]}
+        style={[styles.row, { borderBottomColor: colors.borderLight }, nested && { paddingLeft: spacing.xl }]}
         accessibilityRole="button"
         accessibilityLabel={`${actionLabel(e.action)} by ${who}, ${formatTime(e.occurredAt)}`}
         accessibilityHint={isExpanded ? 'Hides the details' : 'Shows what changed'}
@@ -150,6 +155,61 @@ export default function SnowActivityScreen() {
     );
   }
 
+  function dayLabel(day: string): string {
+    const [y, m, d] = day.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((today.getTime() - date.getTime()) / 86_400_000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+
+  function renderItem({ item }: { item: ViewItem<SnowActivityEntry> }) {
+    if (item.type === 'day') {
+      return (
+        <Text style={[typeScale.overline, styles.dayHeader, { color: colors.textSecondary, backgroundColor: colors.background }]}>
+          {dayLabel(item.day).toUpperCase()}
+        </Text>
+      );
+    }
+    if (item.type === 'event') return renderEvent(item.entry);
+    const open = !!openRuns[item.key];
+    const first = item.entries[0];
+    const services = servicesText(entryServices(first), (k) => SERVICE_LABEL[k] ?? k);
+    const storm = labelOf('storm', first.stormId);
+    return (
+      <View>
+        <Pressable
+          onPress={() => setOpenRuns((cur) => ({ ...cur, [item.key]: !open }))}
+          style={[styles.row, { borderBottomColor: colors.borderLight }]}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          accessibilityLabel={`${actionLabel(item.action)}, ${item.entries.length} entries. ${open ? 'Hides them' : 'Shows them'}`}
+        >
+          <View style={[styles.rowIcon, { backgroundColor: colors.backgroundTertiary }]}>
+            <Icon name={actionIcon(item.action)} size={18} color={colors.textSecondary} />
+          </View>
+          <View style={styles.rowBody}>
+            <View style={styles.rowTop}>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', flex: 1 }]} numberOfLines={2}>
+                {actionLabel(item.action)} ×{item.entries.length}
+              </Text>
+              <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} />
+            </View>
+            <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
+              {runSpan(item.entries, (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }))}
+            </Text>
+            {[storm, services].filter(Boolean).length ? (
+              <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>{[storm, services].filter(Boolean).join(' · ')}</Text>
+            ) : null}
+          </View>
+        </Pressable>
+        {open ? item.entries.map((e) => <View key={e.id}>{renderEvent(e, true)}</View>) : null}
+      </View>
+    );
+  }
+
   const pickingFilter = FILTERS.find((f) => f.kind === picking);
   const pickOptions = options.filter((o) => o.kind === picking);
 
@@ -164,6 +224,34 @@ export default function SnowActivityScreen() {
         </Text>
         <View style={{ width: 24 }} />
       </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar} style={styles.filterScroll}>
+        {DATE_RANGES.map((r) => {
+          const on = (filters.range ?? 'all') === r.key;
+          return (
+            <Pressable
+              key={r.key}
+              onPress={() => { setFilters((prev) => ({ ...prev, range: r.key === 'all' ? undefined : r.key })); setExpandedId(null); }}
+              style={[styles.chip, { backgroundColor: on ? colors.primary : colors.backgroundTertiary, borderColor: on ? colors.primary : colors.borderLight }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`Show ${r.label.toLowerCase()}`}
+            >
+              <Text style={[typeScale.labelSmall, { color: on ? colors.textOnPrimary : colors.textPrimary }]}>{r.label}</Text>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          onPress={() => setGrouped(!grouped)}
+          style={[styles.chip, { backgroundColor: grouped ? colors.primarySurface : colors.backgroundTertiary, borderColor: grouped ? colors.primary : colors.borderLight }]}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: grouped }}
+          accessibilityLabel="Group by day and fold repeated entries"
+        >
+          <Icon name={grouped ? 'check-square' : 'square'} size={14} color={grouped ? colors.primary : colors.textSecondary} />
+          <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Group by day</Text>
+        </Pressable>
+      </ScrollView>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar} style={styles.filterScroll}>
         {FILTERS.map((f) => {
@@ -202,9 +290,9 @@ export default function SnowActivityScreen() {
         <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
       ) : (
         <FlatList
-          data={events}
-          keyExtractor={(e) => e.id}
-          renderItem={renderEvent}
+          data={view}
+          keyExtractor={(v) => v.key}
+          renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing['3xl'] }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           onEndReached={loadMore}
@@ -215,7 +303,7 @@ export default function SnowActivityScreen() {
                 icon="activity"
                 title={activeCount > 0 ? 'Nothing matches these filters' : 'No snow activity yet'}
                 description={activeCount > 0
-                  ? 'Try removing a filter.'
+                  ? 'Try removing a filter or choosing a longer period.'
                   : 'Storms, routes, stops, media and time records show up here as soon as they change.'}
                 actionTitle={activeCount > 0 ? 'Clear filters' : undefined}
                 onAction={activeCount > 0 ? () => setFilters({}) : undefined}
@@ -278,6 +366,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.md },
   filterScroll: { flexGrow: 0 },
+  dayHeader: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xs },
   filterBar: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm, alignItems: 'center' },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 200,

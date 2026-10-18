@@ -31,13 +31,14 @@ export interface SnowShift {
 }
 
 /** Shifts the caller can see (own for workers, everyone's for owner/admin), newest first. */
-export async function loadShifts(sinceIso: string): Promise<Result<SnowShift[]>> {
+export async function loadShifts(sinceIso: string, untilIso?: string): Promise<Result<SnowShift[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const { data, error } = await supabase
+  let q = supabase
     .from('snow_shifts')
     .select('id, person_id, clock_in_at, clock_out_at, snow_shift_corrections(clock_in_at, clock_out_at, reason, created_at)')
-    .gte('clock_in_at', sinceIso)
-    .order('clock_in_at', { ascending: false });
+    .gte('clock_in_at', sinceIso);
+  if (untilIso) q = q.lt('clock_in_at', untilIso);
+  const { data, error } = await q.order('clock_in_at', { ascending: false });
   if (error) return fail(message(error, 'Couldn\'t load shifts.'));
   return ok((data ?? []).map((s) => {
     const fixes = ((s.snow_shift_corrections ?? []) as { clock_in_at: string; clock_out_at: string | null; reason: string; created_at: string }[])

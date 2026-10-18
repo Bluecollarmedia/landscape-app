@@ -243,7 +243,7 @@ export function StormDetailScreen() {
                     {r.name}{r.cancelled ? ' (cancelled)' : ''}
                   </Text>
                   <Text style={[typeScale.caption, { color: r.leadName ? colors.textSecondary : colors.warning }]} numberOfLines={1}>
-                    {SERVICE_LABEL[r.service]} · {r.leadName ? `Lead: ${r.leadName}` : 'No lead yet'}{r.crew > 0 ? ` · ${crewTag(r.crew)}` : ''}
+                    {SERVICE_LABEL[r.service]} · {r.leadName ? `Crew lead: ${r.leadName}` : 'No crew lead yet'}{r.crew > 0 ? ` · ${crewTag(r.crew)}` : ''}
                   </Text>
                 </View>
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]}>

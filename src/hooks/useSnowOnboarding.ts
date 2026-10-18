@@ -349,6 +349,21 @@ export function useSnowOnboardingAdmin() {
     [call],
   );
 
+  /** Gives an existing landscaping worker snow access directly (database function snow_grant_access); no request needed. */
+  const grantAccess = useCallback(
+    (person: { personId: string; firstName: string; lastName: string; email: string; phone?: string }, services: SnowService[]) => {
+      if (services.length === 0) return Promise.resolve<Result>({ ok: false, error: 'Pick at least one snow service.' });
+      return call('snow_grant_access', { p_person_id: person.personId, p_services: services }, () => {
+        demo.members = demo.members.filter((m) => m.personId !== person.personId);
+        demo.members.push({
+          personId: person.personId, firstName: person.firstName, lastName: person.lastName, email: person.email, phone: person.phone,
+          services, status: 'active', approvedAt: new Date().toISOString(), landscapingRole: 'worker',
+        });
+      });
+    },
+    [call],
+  );
+
   const revoke = useCallback(
     (member: SnowMember) =>
       call('revoke_snow_access', { p_person_id: member.personId }, () => {
@@ -362,6 +377,6 @@ export function useSnowOnboardingAdmin() {
 
   return {
     code, requests, pending, members, loading, loadError, reload,
-    regenerateCode, disableCode, approve, decline, remove, setServices, revoke,
+    regenerateCode, disableCode, approve, decline, remove, setServices, revoke, grantAccess,
   };
 }

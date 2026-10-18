@@ -1,7 +1,7 @@
 /**
- * Settings building blocks — grouped cards with solid colored icon tiles
- * (like iOS Settings) and rows that spring when pressed, so the owner's
- * Settings screen feels alive instead of a flat list of text rows.
+ * Settings building blocks — grouped white cards with a subtle border, simple
+ * line icons in the primary colour (no coloured tiles), plain chevrons and rows
+ * that spring when pressed.
  */
 
 import React from 'react';
@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius, shadow, sizing } from '@/theme/spacing';
+import { spacing, radius, sizing } from '@/theme/spacing';
 import { haptics } from '@/lib/haptics';
 
 type IconName = keyof typeof Feather.glyphMap;
@@ -62,11 +62,11 @@ export function PressScale({ onPress, disabled, pressedScale = 0.97, style, chil
   );
 }
 
-/** A rounded colored square holding a white icon. */
-export function IconTile({ name, color, size = 30 }: { name: IconName; color: string; size?: number }) {
+/** A simple line icon in a fixed-width slot, so row text always lines up. */
+export function IconTile({ name, color, size = 28 }: { name: IconName; color: string; size?: number }) {
   return (
-    <View style={[styles.tile, { width: size, height: size, borderRadius: size * 0.28, backgroundColor: color }]}>
-      <Icon name={name} size={size * 0.55} color="#FFFFFF" />
+    <View style={[styles.tile, { width: size, height: size }]}>
+      <Icon name={name} size={size * 0.92} color={color} />
     </View>
   );
 }
@@ -84,11 +84,11 @@ export function SettingsGroup({ title, footer, children }: SettingsGroupProps) {
   return (
     <View style={styles.group}>
       {title && (
-        <Text style={[typeScale.labelSmall, styles.groupTitle, { color: colors.textSecondary }]}>
+        <Text style={[typeScale.labelSmall, styles.groupTitle, { color: colors.textSecondary, fontWeight: '700' }]}>
           {title}
         </Text>
       )}
-      <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {items.map((child, i) => (
           <React.Fragment key={i}>
             {child}
@@ -118,13 +118,13 @@ interface SettingsRowProps {
 
 export function SettingsRow({ icon, tint = tileColors.green, title, subtitle, value, selected, destructive, onPress, children }: SettingsRowProps) {
   const { colors } = useTheme();
-  const titleColor = destructive ? tileColors.red : colors.textPrimary;
+  const titleColor = destructive ? colors.error : colors.textPrimary;
 
   return (
     <PressScale onPress={onPress} pressedScale={0.98} style={styles.row} accessibilityLabel={title}>
-      {icon && <IconTile name={icon} color={destructive ? tileColors.red : tint} />}
+      {icon && <IconTile name={icon} color={destructive ? colors.error : colors.primary} />}
       <View style={styles.rowText}>
-        <Text style={[typeScale.bodyLarge, { color: titleColor, fontWeight: '600' }]} numberOfLines={1}>
+        <Text style={[typeScale.bodyLarge, { color: titleColor, fontWeight: '700' }]} numberOfLines={1}>
           {title}
         </Text>
         {subtitle && (
@@ -141,9 +141,7 @@ export function SettingsRow({ icon, tint = tileColors.green, title, subtitle, va
       )}
       {selected && <Icon name="check" size={18} color={colors.primary} />}
       {onPress && !selected && !destructive && (
-        <View style={[styles.chevron, { backgroundColor: colors.backgroundTertiary }]}>
-          <Icon name="chevron-right" size={14} color={colors.textTertiary} />
-        </View>
+        <Icon name="chevron-right" size={20} color={colors.textSecondary} />
       )}
     </PressScale>
   );
@@ -157,9 +155,9 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
     marginBottom: spacing.sm,
   },
-  card: { borderRadius: radius.xl, overflow: 'hidden' },
+  card: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1 },
   footer: { marginTop: spacing.sm, marginHorizontal: spacing.md },
-  separator: { height: StyleSheet.hairlineWidth, marginLeft: spacing.md + 30 + spacing.md },
+  separator: { height: StyleSheet.hairlineWidth, marginLeft: spacing.md + 28 + spacing.md },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -170,13 +168,6 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1 },
   tile: { alignItems: 'center', justifyContent: 'center' },
-  chevron: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });
 
 /** A thin usage bar that grows to its value when it appears or changes. */

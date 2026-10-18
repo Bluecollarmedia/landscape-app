@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
 import { Avatar, GlassIconButton } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -17,7 +16,6 @@ import type { AppState } from '@/providers/AuthProvider';
 import { ListSection } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
-import { brand } from '@/theme/colors';
 import { db, useDb } from '@/data/store';
 import { documentDefaults } from '@/data/financials';
 import { useCompanyYard } from '@/hooks/useCompanyYard';
@@ -80,38 +78,40 @@ export default function SettingsScreen() {
       >
         <Text style={[typeScale.displaySmall, styles.title, { color: colors.textPrimary }]}>Settings</Text>
 
-        <LinearGradient
-          colors={[brand.primary, brand.primary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, shadow.md]}
-        >
-          <View style={styles.heroAvatarRing}>
-            <Avatar firstName={user?.firstName ?? 'O'} lastName={user?.lastName ?? ''} size={60} uri={user?.avatarUrl} />
-          </View>
+        <View style={[styles.hero, { backgroundColor: colors.backgroundTertiary, borderColor: colors.border }]}>
+          {user?.avatarUrl ? (
+            <Avatar firstName={user?.firstName ?? 'O'} lastName={user?.lastName ?? ''} size={66} uri={user.avatarUrl} />
+          ) : (
+            <View style={[styles.heroInitials, { backgroundColor: colors.primary }]}>
+              <Text style={[typeScale.headingLarge, { color: '#FFFFFF', fontWeight: '800' }]}>
+                {`${(user?.firstName ?? 'O')[0] ?? ''}${(user?.lastName ?? '')[0] ?? ''}`.toUpperCase()}
+              </Text>
+            </View>
+          )}
           <View style={{ flex: 1 }}>
-            <Text style={[typeScale.headingLarge, { color: '#FFFFFF' }]} numberOfLines={1}>
+            <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontWeight: '800' }]} numberOfLines={1}>
               {user?.firstName} {user?.lastName}
             </Text>
-            <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]} numberOfLines={1}>
               {user?.email ?? '—'}
             </Text>
             <View style={styles.heroChips}>
-              <View style={styles.heroChip}>
-                <Icon name="shield" size={12} color="#FFFFFF" />
-                <Text style={[typeScale.labelSmall, { color: '#FFFFFF' }]}>Owner</Text>
+              <View style={[styles.heroChip, { backgroundColor: colors.border }]}>
+                <Icon name="shield" size={13} color={colors.textPrimary} />
+                <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Owner</Text>
               </View>
               {!!company?.name && (
-                <View style={[styles.heroChip, { flexShrink: 1 }]}>
-                  <Icon name="briefcase" size={12} color="#FFFFFF" />
-                  <Text style={[typeScale.labelSmall, { color: '#FFFFFF', flexShrink: 1 }]} numberOfLines={1}>
+                <View style={[styles.heroChip, { backgroundColor: colors.border, flexShrink: 1 }]}>
+                  <Icon name="briefcase" size={13} color={colors.textPrimary} />
+                  <Text style={[typeScale.labelSmall, { color: colors.textPrimary, flexShrink: 1 }]} numberOfLines={1}>
                     {company.name}
                   </Text>
                 </View>
               )}
             </View>
           </View>
-        </LinearGradient>
+          <Icon name="chevron-right" size={20} color={colors.textSecondary} />
+        </View>
 
         <SettingsGroup title="Account">
           <SettingsRow
@@ -242,14 +242,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radius.xl + 4,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     marginBottom: spacing.xl,
   },
-  heroAvatarRing: {
-    padding: 3,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
+  heroInitials: { width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center' },
   heroChips: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
   heroChip: {
     flexDirection: 'row',
@@ -258,6 +255,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.22)',
   },
 });

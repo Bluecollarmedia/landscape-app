@@ -138,3 +138,77 @@ export function dueLabel(info: Pick<ServiceDueInfo, 'status' | 'daysOverdue' | '
     case 'inactive': return 'Inactive';
   }
 }
+
+// ── Display helpers (owner property screens, route builder) ────────────────
+
+/** StatusBadge tone for each due status. */
+export const DUE_TONE: Record<DueStatus, 'error' | 'warning' | 'info' | 'success' | 'neutral'> = {
+  overdue: 'error',
+  due: 'warning',
+  upcoming: 'info',
+  done_for_season: 'success',
+  not_configured: 'neutral',
+  not_scheduled: 'neutral',
+  out_of_season: 'neutral',
+  inactive: 'neutral',
+};
+
+/** Short badge text for each due status. */
+export const DUE_BADGE: Record<DueStatus, string> = {
+  overdue: 'Overdue',
+  due: 'Due',
+  upcoming: 'Upcoming',
+  done_for_season: 'Done',
+  not_configured: 'Not set',
+  not_scheduled: 'As needed',
+  out_of_season: 'Off season',
+  inactive: 'Inactive',
+};
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** 'YYYY-MM-DD' → 'Oct 14'. */
+export function shortDate(key?: string): string {
+  if (!key) return '';
+  const [, m, d] = key.split('-').map(Number);
+  return m && d ? `${MONTHS[m - 1]} ${d}` : key;
+}
+
+/** How often a service happens, e.g. "Every 2 weeks · 26 this season", "Once, Jul 1 – Jul 31". */
+export function frequencyLabel(rule: Pick<MaintenanceServiceRule, 'frequency' | 'intervalDays' | 'seasonQuantity' | 'windowStart' | 'windowEnd'>): string {
+  let text: string;
+  switch (rule.frequency) {
+    case 'weekly': text = 'Every week'; break;
+    case 'biweekly': text = 'Every 2 weeks'; break;
+    case 'every_n_days': text = rule.intervalDays ? `Every ${rule.intervalDays} day${rule.intervalDays === 1 ? '' : 's'}` : 'Days between visits not set'; break;
+    case 'seasonal_window': text = rule.windowStart && rule.windowEnd ? `Once, ${shortDate(rule.windowStart)} – ${shortDate(rule.windowEnd)}` : 'Dates not set'; break;
+    case 'as_needed': text = 'As needed'; break;
+  }
+  return rule.seasonQuantity != null ? `${text} · ${rule.seasonQuantity} this season` : text;
+}
+
+/** Timing line with readable dates, e.g. "Overdue by 5 days", "Due tomorrow", "Next due Oct 21". */
+export function dueText(info: Pick<ServiceDueInfo, 'status' | 'daysOverdue' | 'dueDate' | 'rule'>, onDate: string): string {
+  switch (info.status) {
+    case 'overdue': return `Overdue by ${info.daysOverdue} day${info.daysOverdue === 1 ? '' : 's'}`;
+    case 'due': {
+      if (!info.dueDate || info.dueDate <= onDate) return info.rule.frequency === 'seasonal_window' && info.dueDate ? `Due by ${shortDate(info.dueDate)}` : 'Due today';
+      if (info.rule.frequency === 'seasonal_window') return `Due by ${shortDate(info.dueDate)}`;
+      return daysBetween(onDate, info.dueDate) === 1 ? 'Due tomorrow' : `Due ${shortDate(info.dueDate)}`;
+    }
+    case 'upcoming': return info.dueDate ? `Next due ${shortDate(info.dueDate)}` : 'Upcoming';
+    case 'done_for_season': return 'Done for the season';
+    case 'not_configured': return info.rule.frequency === 'seasonal_window'
+      ? 'Pick the dates it’s due'
+      : 'Add a last-done or first-service date';
+    case 'not_scheduled': return 'As needed, not recommended automatically';
+    case 'out_of_season': return 'Outside the contract season';
+    case 'inactive': return 'Not active';
+  }
+}
+
+/** "21 of 26 done · 5 left", only when the service has a seasonal quantity. */
+export function seasonCountText(info: Pick<ServiceDueInfo, 'completedCount' | 'remainingCount' | 'rule'>): string | undefined {
+  if (info.rule.seasonQuantity == null) return undefined;
+  return `${info.completedCount} of ${info.rule.seasonQuantity} done · ${info.remainingCount ?? 0} left`;
+}

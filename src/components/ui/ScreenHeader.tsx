@@ -13,14 +13,12 @@ import { View, Text, StyleSheet, Platform, ViewStyle, StyleProp } from 'react-na
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Icon } from './Icon';
 import { PressableScale } from './PressableScale';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
-import { brand } from '@/theme/colors';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 const BUTTON_SIZE = 44;
@@ -70,27 +68,21 @@ interface RaisedAddButtonProps {
   icon?: string;
 }
 
-/** The raised green + button: gradient, glossy top, springs when tapped. */
+/** The + button: a flat deep-forest circle with a white plus. Springs when tapped. */
 export function RaisedAddButton({ onPress, accessibilityLabel, icon = 'plus' }: RaisedAddButtonProps) {
+  const { colors } = useTheme();
   return (
     <PressableScale
       onPress={onPress}
-      scaleTo={0.88}
+      scaleTo={0.9}
       haptic="light"
       hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={styles.raisedShadow}
     >
-      <LinearGradient
-        colors={['#66BB6A', brand.primaryDark]}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.8, y: 1 }}
-        style={styles.raisedButton}
-      >
-        <View style={styles.raisedHighlight} />
+      <View style={[styles.raisedButton, { backgroundColor: colors.primary }]}>
         <Icon name={icon as any} size={22} color="#FFFFFF" />
-      </LinearGradient>
+      </View>
     </PressableScale>
   );
 }
@@ -158,25 +150,15 @@ const styles = StyleSheet.create({
   frosted: {
     borderWidth: StyleSheet.hairlineWidth,
     ...Platform.select({
-      android: { elevation: 3 },
+      android: { elevation: 1 },
       default: {
-        shadowColor: '#1B3A2D',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
       },
     }),
   },
-  raisedShadow: Platform.select({
-    android: { elevation: 6, borderRadius: BUTTON_SIZE / 2 },
-    default: {
-      borderRadius: BUTTON_SIZE / 2,
-      shadowColor: brand.primaryDark,
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.4,
-      shadowRadius: 10,
-    },
-  })!,
   raisedButton: {
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,
@@ -184,13 +166,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-  },
-  raisedHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '48%',
-    backgroundColor: 'rgba(255,255,255,0.18)',
   },
 });

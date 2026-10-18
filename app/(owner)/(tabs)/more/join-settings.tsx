@@ -59,7 +59,7 @@ export default function JoinSettingsScreen() {
             <>
               <Animated.View key={activeCode.code} entering={ZoomIn.springify().damping(14)} style={styles.codeShadow}>
                 <LinearGradient
-                  colors={[brand.primaryDark, brand.primary, '#7CB342']}
+                  colors={[brand.primaryDark, brand.primary, brand.primaryLight]}
                   locations={[0, 0.6, 1]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}

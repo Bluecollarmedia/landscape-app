@@ -6,6 +6,7 @@
  * (src/data/snowDashboard.ts). Working layout in the existing app style; no
  * approved mockup yet.
  */
+import { servicesLabel, stormServices } from '@/lib/snowServices';
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -129,7 +130,7 @@ export function SnowDashboardScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm }]}>
             <Icon name="cloud-snow" size={22} color={colors.textTertiary} />
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>No storm is planned or dispatched right now.</Text>
-            <Button title="New storm" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
+            <Button title="Storm plan" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
           </View>
         )}
       </ScrollView>
@@ -145,7 +146,7 @@ function StormCard({ storm, onOpenStorm, onOpenRoute }: { storm: StormOverview; 
         <View style={{ flex: 1 }}>
           <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{storm.name}</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-            {SERVICE_LABEL[storm.service]}
+            {servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x])}
             {storm.reopenedCount > 0 ? ` · Reopened${storm.reopenedCount > 1 ? ` ${storm.reopenedCount}×` : ''}` : ''}
           </Text>
         </View>

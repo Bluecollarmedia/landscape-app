@@ -1,4 +1,5 @@
 import { copyText } from '@/lib/invite';
+import { IssuesSection } from '@/components/issues/IssuesSection';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking } from 'react-native';
 import { Switch } from '@/components/ui/Switch';
@@ -513,6 +514,7 @@ export default function ProjectDetailScreen() {
               <Button title="Reopen Project" icon="rotate-ccw" variant="secondary" onPress={handleReopenProject} fullWidth />
             </View>
           )}
+          <IssuesSection where={{ projectId: p.id }} />
         </View>
       </View>
     );

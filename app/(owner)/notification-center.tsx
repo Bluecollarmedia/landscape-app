@@ -13,6 +13,7 @@ import { useNotifications } from '@/hooks/useOperations';
 import type { NotificationEventType } from '@/types/operations';
 
 const EVENT_ICONS: Record<NotificationEventType, { icon: string; color: string }> = {
+  issue_reported: { icon: 'alert-triangle', color: semantic.warning },
   worker_checked_in: { icon: 'log-in', color: semantic.success },
   worker_checked_out: { icon: 'log-out', color: '#757575' },
   worker_checked_in_late: { icon: 'alert-circle', color: semantic.warning },
@@ -96,6 +97,11 @@ export default function NotificationCenterScreen() {
               ]}
               onPress={() => {
                 if (isUnread) markRead(n.id);
+                if (n.linkedEntityType === 'issue' && n.linkedEntityId) {
+                  router.back();
+                  router.push({ pathname: '/(owner)/issue-detail', params: { id: n.linkedEntityId } } as any);
+                  return;
+                }
                 if ((n.linkedEntityType === 'quote' || n.linkedEntityType === 'change_order' || n.linkedEntityType === 'invoice') && n.linkedEntityId) {
                   // This screen is a modal: close it first so the document opens on the main stack.
                   router.back();

@@ -4,20 +4,23 @@
  * the order is saved in one database call (update 025). Working layout in
  * the existing app style; no approved mockup yet.
  */
+import { crewChoices, crewCountLabel, nextCrew } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, ScreenHeader, StatusBadge, Switch } from '@/components/ui';
+import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, PressableScale, ScreenHeader, StatusBadge, Switch } from '@/components/ui';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
 import {
-  addStops, cancelRoute, loadLeadLoad, loadRoute, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, updateRoute,
+  addStops, cancelRoute, loadLeadLoad, loadRoute, loadRouteCrew, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, updateRoute,
+  type RouteCrewMember,
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
 import { OwnerSkipRequests } from './SkipRequests';
 import { typeScale } from '@/theme/typography';
+import { ReorderableList } from '@/components/ui/ReorderableList';
 import { spacing, radius } from '@/theme/spacing';
 
 export const STOP_TONE = { pending: 'neutral', arrived: 'info', completed: 'success', skipped: 'warning' } as const;
@@ -38,7 +41,10 @@ export function RouteEditScreen() {
   const [pickStops, setPickStops] = useState(false);
   const [chosen, setChosen] = useState<string[]>([]);
   const [doNext, setDoNext] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [leadLoad, setLeadLoad] = useState<Record<string, string[]>>({});
+  const [crew, setCrew] = useState<RouteCrewMember[]>([]);
+  const [pickCrew, setPickCrew] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -49,8 +55,10 @@ export function RouteEditScreen() {
     setRoute(r.data);
     setName(r.data.name);
     const [l, e, load] = await Promise.all([
-      loadSnowLeads(r.data.service), loadEligibleProperties(r.data.stormId), loadLeadLoad(r.data.id),
+      loadSnowLeads(r.data.service), loadEligibleProperties(r.data.stormId, r.data.service), loadLeadLoad(r.data.id),
     ]);
+    const c = await loadRouteCrew(r.data.id);
+    if (c.ok) setCrew(c.data);
     if (l.ok) setLeads(l.data);
     if (e.ok) setEligible(e.data);
     if (load.ok) setLeadLoad(load.data);
@@ -64,6 +72,26 @@ export function RouteEditScreen() {
     const res = await updateRoute(route.id, patch);
     setBusy(false);
     if (!res.ok) return showMessage('Couldn\'t save', res.error);
+    reload();
+  }
+
+  /** Saves a new stop order (from a drag): shows it right away, then lets the database have the final word. */
+  async function applyOrder(ids: string[]) {
+    if (!route) return;
+    setRoute({ ...route, stops: ids.map((sid) => route.stops.find((s) => s.id === sid)!) });
+    const res = await reorderStops(route.id, ids);
+    if (!res.ok) showMessage("Couldn't reorder", res.error);
+    reload();
+  }
+
+  /** Adds or removes one crew member. The database gets the whole new list, so a double tap changes nothing. */
+  async function changeCrew(personId: string, add: boolean) {
+    if (!route) return;
+    setBusy(true);
+    const res = await setRouteCrew(route.id, nextCrew(crew.map((c) => c.personId), personId, add));
+    setBusy(false);
+    if (!res.ok) return showMessage("Couldn't change the crew", res.error);
+    setPickCrew(false);
     reload();
   }
 
@@ -127,6 +155,17 @@ export function RouteEditScreen() {
       res.ok ? `"${route.name}" can be added to the next ${SERVICE_LABEL[route.service].toLowerCase()} storm.` : res.error);
   }
 
+  /** Everything on this screen saves as it changes; Done also saves a name still being typed, then closes. */
+  async function done() {
+    if (route && name.trim() && name.trim() !== route.name) {
+      setBusy(true);
+      const res = await updateRoute(route.id, { name });
+      setBusy(false);
+      if (!res.ok) return showMessage("Couldn't save", res.error);
+    }
+    router.back();
+  }
+
   function onCancelRoute() {
     if (!route) return;
     confirmAction(`Cancel ${route.name}?`, 'Its lead stops seeing it. Work already done stays recorded.', 'Cancel route', async () => {
@@ -165,13 +204,35 @@ export function RouteEditScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title={route.name} subtitle={`${route.stormName} · ${SERVICE_LABEL[route.service]}`} />
+      <ScreenHeader
+        title={route.name}
+        subtitle={`${route.stormName} · ${SERVICE_LABEL[route.service]}`}
+        right={
+          <PressableScale
+            onPress={done}
+            disabled={busy}
+            scaleTo={0.92}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Done"
+            style={[styles.done, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}
+          >
+            <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary }]}>Done</Text>
+          </PressableScale>
+        }
+      />
       <ScrollView
+        scrollEnabled={!dragging}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
         keyboardShouldPersistTaps="handled"
       >
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
+        {!route.cancelled ? (
+          <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
+            Changes save as you make them. Tap Done when you are finished.
+          </Text>
+        ) : null}
         {route.cancelled ? <InlineNotice icon="slash" tone="warning" text="This route was cancelled." style={{ marginBottom: spacing.md }} /> : null}
 
         {route.stormStatus === 'dispatched' ? (
@@ -190,8 +251,11 @@ export function RouteEditScreen() {
           />
           <Pressable onPress={() => editable && setPickLead(!pickLead)} style={styles.inline} accessibilityRole="button">
             <View style={{ flex: 1 }}>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Lead</Text>
-              <Text style={[typeScale.bodyLarge, { color: leadName ? colors.textPrimary : colors.warning }]}>{leadName ?? 'Pick a lead'}</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew lead</Text>
+              <Text style={[typeScale.bodyLarge, { color: leadName ? colors.textPrimary : colors.warning }]}>{leadName ?? 'Assign a crew lead'}</Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                Needed before you can dispatch a route that has stops. The lead marks arrivals, finishes stops and adds photos.
+              </Text>
               {route.leadPersonId && leadLoad[route.leadPersonId] ? (
                 <Text style={[typeScale.caption, { color: colors.warning }]}>
                   Also leads {leadLoad[route.leadPersonId].join(', ')}. That's allowed; check the timing.
@@ -225,6 +289,40 @@ export function RouteEditScreen() {
               </Text>
             )
           ) : null}
+          <View>
+            <View style={styles.inline}>
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew (optional)</Text>
+                <Text style={[typeScale.bodyLarge, { color: crew.length ? colors.textPrimary : colors.textTertiary }]}>{crewCountLabel(crew.length)}</Text>
+              </View>
+              {editable ? <Button title={pickCrew ? 'Close' : 'Add crew'} size="sm" variant="secondary" icon={pickCrew ? 'x' : 'plus'} disabled={busy} onPress={() => setPickCrew(!pickCrew)} /> : null}
+            </View>
+            {crew.map((c) => (
+              <View key={c.personId} style={[styles.inline, { paddingVertical: spacing.xs }]}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{c.name}</Text>
+                {editable ? <Button title="Remove" size="sm" variant="ghost" disabled={busy} onPress={() => changeCrew(c.personId, false)} /> : null}
+              </View>
+            ))}
+            {pickCrew ? (
+              crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).length ? (
+                <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.sm }]}>
+                  {crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).map((l, i) => (
+                    <Pressable key={l.personId} style={[styles.row, i > 0 && sep]} onPress={() => changeCrew(l.personId, true)} accessibilityRole="button">
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{l.name}</Text>
+                      <Icon name="plus" size={18} color={colors.primary} />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+                  No one else on the snow team does {SERVICE_LABEL[route.service].toLowerCase()}.
+                </Text>
+              )
+            ) : null}
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
+              Crew can see this route, its stops and instructions. Only the lead can mark arrival, finish stops and add photos.
+            </Text>
+          </View>
           <View style={styles.inline}>
             <View style={{ flex: 1 }}>
               <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Photos required</Text>
@@ -247,28 +345,37 @@ export function RouteEditScreen() {
         <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>Stops</Text>
         {route.stops.length ? (
           <View style={[styles.group, { backgroundColor: colors.surface, borderColor: 'transparent' }]}>
-            {route.stops.map((s, i) => {
-              const movable = editable && s.status === 'pending';
-              return (
-                <View key={s.id} style={[styles.row, i > 0 && sep]}>
-                  <Text style={[typeScale.labelLarge, { color: colors.textTertiary, width: 22 }]}>{i + 1}</Text>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{s.propertyName}</Text>
-                    <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
-                  </View>
-                  {movable ? (
-                    <View style={styles.inline}>
-                      <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} />
-                      <IconTap icon="arrow-up" label="Move up" disabled={i === 0} onPress={() => move(i, -1)} color={colors.textSecondary} />
-                      <IconTap icon="arrow-down" label="Move down" disabled={i === route.stops.length - 1} onPress={() => move(i, 1)} color={colors.textSecondary} />
-                      <IconTap icon="x" label="Remove stop" onPress={() => onRemove(s.id, s.propertyName)} color={colors.error} />
+            <ReorderableList
+              items={route.stops}
+              keyOf={(s) => s.id}
+              rowHeight={STOP_ROW_HEIGHT}
+              canDrag={(s) => editable && s.status === 'pending'}
+              onReorder={applyOrder}
+              onDragActive={setDragging}
+              renderRow={(s, i, handle) => {
+                const movable = editable && s.status === 'pending';
+                return (
+                  <View style={[styles.row, { flex: 1 }, i > 0 && sep]}>
+                    {handle ?? <View style={{ width: 32 }} />}
+                    <Text style={[typeScale.labelLarge, { color: colors.textTertiary, width: 18 }]}>{i + 1}</Text>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{s.propertyName}</Text>
+                      <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
                     </View>
-                  ) : (
-                    <StatusBadge label={STOP_STATUS_LABEL[s.status]} status={STOP_TONE[s.status]} />
-                  )}
-                </View>
-              );
-            })}
+                    {movable ? (
+                      <View style={styles.inline}>
+                        <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} />
+                        <IconTap icon="arrow-up" label="Move up" disabled={i === 0} onPress={() => move(i, -1)} color={colors.textSecondary} />
+                        <IconTap icon="arrow-down" label="Move down" disabled={i === route.stops.length - 1} onPress={() => move(i, 1)} color={colors.textSecondary} />
+                        <IconTap icon="x" label="Remove stop" onPress={() => onRemove(s.id, s.propertyName)} color={colors.error} />
+                      </View>
+                    ) : (
+                      <StatusBadge label={STOP_STATUS_LABEL[s.status]} status={STOP_TONE[s.status]} />
+                    )}
+                  </View>
+                );
+              }}
+            />
           </View>
         ) : (
           <Text style={[typeScale.bodySmall, styles.help, { color: colors.textSecondary }]}>No stops yet.</Text>
@@ -342,7 +449,11 @@ function IconTap({ icon, label, onPress, disabled, color }: { icon: React.Compon
   );
 }
 
+/** Every stop row is this tall so a dragged row can slide between its neighbours. */
+const STOP_ROW_HEIGHT = 72;
+
 const styles = StyleSheet.create({
+  done: { height: 44, paddingHorizontal: spacing.lg, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   screen: { flex: 1 },
   card: { borderRadius: radius.lg, padding: spacing.lg },
   label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },

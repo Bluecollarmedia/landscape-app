@@ -80,6 +80,7 @@ export const SERVICE_TYPES = [
   { key: 'shrub_trim', label: 'Shrub trimming' },
   { key: 'fertilization', label: 'Fertilization' },
   { key: 'mulch', label: 'Mulch' },
+  { key: 'basin_cuts', label: 'Basin Cuts' },
   { key: 'other', label: 'Other' },
 ] as const;
 

@@ -53,7 +53,10 @@ export interface SnowStorm {
   id: string;
   companyId: string;
   name: string;
+  /** The first service (kept for older records). Use `services` (update 40) when it is there. */
   service: SnowService;
+  /** Every service this storm covers (update 40). Missing on older databases: see `stormServices`. */
+  services?: SnowService[];
   status: StormStatus;
   notes?: string;
   createdBy?: string;

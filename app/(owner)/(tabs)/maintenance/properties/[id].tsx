@@ -4,12 +4,14 @@
  * visit so far. Deactivating the contract or the property keeps all history.
  */
 
+import { IssuesSection } from '@/components/issues/IssuesSection';
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader, GlassIconButton, EmptyState, StatusBadge, ListSection, ListRow } from '@/components/ui';
 import { ServiceDueLine } from '@/components/maintenance/ServiceDueLine';
+import { CustomerAccessSection } from '@/components/maintenance/CustomerAccessSection';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenance, useMaintenanceProperty } from '@/hooks/useMaintenance';
@@ -137,6 +139,8 @@ export default function MaintenancePropertyScreen() {
           )}
         </ListSection>
 
+        <CustomerAccessSection propertyId={p.id} propertyName={p.name} linked={!!p.customer} />
+
         {(!!p.accessNotes || !!p.notes) && (
           <ListSection title="NOTES">
             {!!p.accessNotes && <NoteBlock icon="key" title="Access" body={p.accessNotes} />}
@@ -236,6 +240,8 @@ export default function MaintenancePropertyScreen() {
             onPress={toggleProperty}
           />
         </ListSection>
+
+        <IssuesSection where={{ maintenancePropertyId: p.id }} />
       </ScrollView>
     </View>
   );

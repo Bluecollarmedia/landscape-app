@@ -1,6 +1,7 @@
 import type { NotificationEventType } from '@/types/operations';
 
 export const EVENT_LABELS: Record<NotificationEventType, { label: string; icon: string; description: string }> = {
+  issue_reported: { label: 'Problem Reported', icon: 'alert-triangle', description: 'When a worker reports a problem at a property' },
   worker_checked_in: { label: 'Worker Checked In', icon: 'log-in', description: 'When a worker checks in at a job site' },
   worker_checked_out: { label: 'Worker Checked Out', icon: 'log-out', description: 'When a worker checks out from a job site' },
   worker_checked_in_late: { label: 'Late Check-In', icon: 'alert-circle', description: 'When a worker checks in after the scheduled time' },

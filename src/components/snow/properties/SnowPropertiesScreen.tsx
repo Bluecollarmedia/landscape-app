@@ -4,6 +4,8 @@
  * reference media are edited on the property screen (update 022). Working
  * layout in the existing app style; no approved mockup yet.
  */
+import { applyStreetInput } from '@/lib/address';
+import { AddFromCustomer } from './AddFromCustomer';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -19,7 +21,7 @@ import type { SnowService } from '@/types/snow';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
-interface Row { id: string; name: string; address: string; status: 'active' | 'inactive'; services: SnowService[] }
+interface Row { id: string; name: string; address: string; street: string; zip?: string; status: 'active' | 'inactive'; services: SnowService[] }
 
 const EMPTY = { name: '', address: '', city: '', state: '', zip: '' };
 
@@ -33,6 +35,7 @@ export function SnowPropertiesScreen() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
+  const [fromCustomer, setFromCustomer] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
 
@@ -40,7 +43,7 @@ export function SnowPropertiesScreen() {
     if (!isSupabaseConfigured) { setLoading(false); return setError('Snow properties need the live database.'); }
     const { data, error: e } = await supabase
       .from('snow_properties')
-      .select('id, name, address, city, state, status, snow_property_services(service, is_active)')
+      .select('id, name, address, city, state, zip, status, snow_property_services(service, is_active)')
       .order('name');
     setLoading(false);
     if (e) return setError('Couldn\'t load snow properties.');
@@ -49,6 +52,8 @@ export function SnowPropertiesScreen() {
       id: p.id,
       name: p.name,
       address: [p.address, p.city, p.state].filter(Boolean).join(', '),
+      street: p.address,
+      zip: p.zip ?? undefined,
       status: p.status,
       services: ((p.snow_property_services ?? []) as { service: SnowService; is_active: boolean }[])
         .filter((s) => s.is_active).map((s) => s.service),
@@ -97,14 +102,30 @@ export function SnowPropertiesScreen() {
       >
         <View style={styles.titleRow}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]}>Properties</Text>
-          {!adding ? <Button title="Add" icon="plus" size="sm" onPress={() => setAdding(true)} /> : null}
+          {!adding && !fromCustomer ? <Button title="From a customer" icon="user-plus" size="sm" variant="secondary" onPress={() => setFromCustomer(true)} /> : null}
+          {!adding && !fromCustomer ? <Button title="Add" icon="plus" size="sm" onPress={() => setAdding(true)} /> : null}
         </View>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
+
+        {fromCustomer ? (
+          <AddFromCustomer
+            snowProperties={rows.map((r) => ({ id: r.id, name: r.name, address: r.street, zip: r.zip }))}
+            onCancel={() => setFromCustomer(false)}
+            onDone={(id) => { setFromCustomer(false); reload(); open(id); }}
+          />
+        ) : null}
 
         {adding ? (
           <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md, gap: spacing.sm }]}>
             <Input label="Property name" value={form.name} onChangeText={set('name')} placeholder="Oak Plaza" />
-            <Input label="Street address" value={form.address} onChangeText={set('address')} placeholder="1 Oak St" />
+            <Input
+              label="Street address"
+              value={form.address}
+              onChangeText={(text) => setForm((f) => ({ ...f, ...applyStreetInput(text, f) }))}
+              placeholder="1 Oak St"
+              textContentType="fullStreetAddress"
+              autoComplete="street-address"
+            />
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <Input label="City" value={form.city} onChangeText={set('city')} containerStyle={{ flex: 2 }} />
               <Input label="State" value={form.state} onChangeText={set('state')} containerStyle={{ flex: 1 }} autoCapitalize="characters" />

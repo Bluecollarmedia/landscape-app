@@ -4,6 +4,7 @@
  *
  * Working layout in the existing app style; no approved mockup yet.
  */
+import { servicesLabel, stormServices } from '@/lib/snowServices';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -60,15 +61,15 @@ export function StormsListScreen() {
                 pressed && { opacity: 0.6 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`${s.name}, ${SERVICE_LABEL[s.service]}, ${STORM_STATUS_LABEL[s.status]}`}
+              accessibilityLabel={`${s.name}, ${servicesLabel(stormServices(s), (x) => SERVICE_LABEL[x])}, ${STORM_STATUS_LABEL[s.status]}`}
             >
               <View style={[styles.rowIcon, { backgroundColor: colors.primarySurface }]}>
-                <Icon name={SERVICE_ICON[s.service]} size={18} color={colors.primary} />
+                <Icon name={stormServices(s).length > 1 ? 'cloud-snow' : SERVICE_ICON[s.service]} size={18} color={colors.primary} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{s.name}</Text>
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {SERVICE_LABEL[s.service]} · {when(s)}
+                  {servicesLabel(stormServices(s), (x) => SERVICE_LABEL[x])} · {when(s)}
                 </Text>
               </View>
               <StatusBadge label={STORM_STATUS_LABEL[s.status]} status={STATUS_TONE[s.status]} />
@@ -90,7 +91,7 @@ export function StormsListScreen() {
       >
         <View style={styles.header}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]} accessibilityRole="header">Storms</Text>
-          <Button title="New storm" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
+          <Button title="Storm plan" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
         </View>
 
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.lg }} /> : null}
@@ -100,7 +101,7 @@ export function StormsListScreen() {
             icon="cloud-snow"
             title="No storms yet"
             description="Create a storm for a service, plan its routes, then dispatch it when you're ready."
-            actionTitle="New storm"
+            actionTitle="Storm plan"
             onAction={() => router.push('/snow/owner/storm-new')}
           />
         ) : null}

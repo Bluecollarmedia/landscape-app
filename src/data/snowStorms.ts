@@ -12,6 +12,7 @@
  * Reopening only changes the storm: earlier visits stay completed or
  * skipped, and no customer notification or media share is repeated.
  */
+import { defaultStormNameFor } from '@/lib/snowServices';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { uuid } from '@/lib/ids';
 import type { SnowService, SnowStorm } from '@/types/snow';
@@ -19,6 +20,10 @@ import type { SnowService, SnowStorm } from '@/types/snow';
 export type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 const ok = <T,>(data: T): Result<T> => ({ ok: true, data });
 const fail = (error: string): Result<never> => ({ ok: false, error });
+
+/** The database doesn't have update 40 yet (the function or its new option isn't there). */
+const OLD_DATABASE = /could not find the function|schema cache/i;
+const NEEDS_UPDATE_40 = 'Several services in one storm need database update 40, which has not been installed yet. Pick one service for now.';
 
 const NOT_CONNECTED = 'Storms need the live database, which isn\'t connected in this version of the app.';
 
@@ -106,12 +111,18 @@ export interface EligibleProperty {
   latitude?: number;
   longitude?: number;
   mapDestination?: string;
+  /** Which of the storm's services this property offers (update 40). */
+  services?: SnowService[];
 }
 
-/** Active properties that offer this storm's service, for building its routes. */
-export async function loadEligibleProperties(stormId: string): Promise<Result<EligibleProperty[]>> {
+/** Active properties that offer one of this storm's services (or just `service`), for building its routes. */
+export async function loadEligibleProperties(stormId: string, service?: SnowService): Promise<Result<EligibleProperty[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const { data, error } = await supabase.rpc('snow_storm_eligible_properties', { p_storm_id: stormId });
+  let { data, error } = await supabase.rpc('snow_storm_eligible_properties', service ? { p_storm_id: stormId, p_service: service } : { p_storm_id: stormId });
+  // Before update 40 the function has no service choice, and a storm has one service anyway.
+  if (error && service && OLD_DATABASE.test(error.message)) {
+    ({ data, error } = await supabase.rpc('snow_storm_eligible_properties', { p_storm_id: stormId }));
+  }
   if (error) return fail(message(error, 'Couldn\'t load properties.'));
   return ok(((data ?? []) as Row[]).map((r) => fromDb<EligibleProperty>(r)));
 }
@@ -128,6 +139,10 @@ export interface StormRouteRow {
   position: number;
   leadPersonId?: string;
   leadName?: string;
+  /** The one service this route performs. */
+  service: SnowService;
+  /** Crew members besides the lead (update 41; 0 before it). */
+  crew: number;
   cancelled: boolean;
   stops: number;
   completed: number;
@@ -137,10 +152,12 @@ export interface StormRouteRow {
 /** Routes with their lead and stop counts. Route editing lives with the routes screens (update 025). */
 export async function loadStormRoutes(stormId: string): Promise<Result<StormRouteRow[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const [routes, visits] = await Promise.all([
-    supabase.from('snow_routes').select('id, name, position, lead_person_id, cancelled_at').eq('storm_id', stormId)
+  const [routes, visits, crew] = await Promise.all([
+    supabase.from('snow_routes').select('id, name, position, service, lead_person_id, cancelled_at').eq('storm_id', stormId)
       .order('position').order('created_at'),
     supabase.from('snow_visits').select('route_id, status').eq('storm_id', stormId),
+    // Update 41. If it isn't installed this just fails and every route shows no crew.
+    supabase.from('snow_route_crew').select('route_id').eq('storm_id', stormId),
   ]);
   if (routes.error) return fail(message(routes.error, 'Couldn\'t load routes.'));
   if (visits.error) return fail(message(visits.error, 'Couldn\'t load stops.'));
@@ -158,6 +175,8 @@ export async function loadStormRoutes(stormId: string): Promise<Result<StormRout
       position: r.position,
       leadPersonId: r.lead_person_id ?? undefined,
       leadName: r.lead_person_id ? names.get(r.lead_person_id) : undefined,
+      service: r.service as SnowService,
+      crew: crew.error ? 0 : (crew.data ?? []).filter((c) => c.route_id === r.id).length,
       cancelled: !!r.cancelled_at,
       stops: mine.length,
       completed: mine.filter((v) => v.status === 'completed').length,
@@ -172,13 +191,20 @@ export async function loadStormRoutes(stormId: string): Promise<Result<StormRout
  * Creates a draft storm. Pass the same `requestId` when retrying the same
  * tap so only one storm is made (keep it for the life of the form).
  */
-export function createStorm(input: { name: string; service: SnowService; notes?: string; requestId?: string }) {
-  return call('snow_create_storm', {
-    p_name: input.name.trim(),
-    p_service: input.service,
-    p_notes: input.notes?.trim() || null,
-    p_client_request_id: input.requestId ?? uuid(),
-  }, 'Couldn\'t create the storm.');
+export async function createStorm(input: { name: string; services: SnowService[]; notes?: string; requestId?: string }): Promise<Result<StormActionResult>> {
+  if (input.services.length === 0) return fail('Choose at least one service.');
+  const common = { p_name: input.name.trim(), p_notes: input.notes?.trim() || null, p_client_request_id: input.requestId ?? uuid() };
+  const res = await call('snow_create_storm', { ...common, p_services: input.services }, 'Couldn\'t create the storm.');
+  if (res.ok || !OLD_DATABASE.test(res.error)) return res;
+  // Database update 40 isn't installed: it only knows one service per storm.
+  if (input.services.length === 1) return call('snow_create_storm', { ...common, p_service: input.services[0] }, 'Couldn\'t create the storm.');
+  return fail(NEEDS_UPDATE_40);
+}
+
+/** Changes the services a draft or running storm covers (a service that has a route can't be removed). */
+export async function setStormServices(stormId: string, services: SnowService[]): Promise<Result<StormActionResult>> {
+  const res = await call('snow_set_storm_services', { p_storm_id: stormId, p_services: services }, 'Couldn\'t change the services.');
+  return !res.ok && OLD_DATABASE.test(res.error) ? fail(NEEDS_UPDATE_40) : res;
 }
 
 /** Draft → dispatched. Needs a route with stops, and a lead on every route with stops. */
@@ -234,10 +260,9 @@ export const STORM_STATUS_LABEL: Record<SnowStorm['status'], string> = {
   ended: 'Ended',
 };
 
-/** A starting name for a new storm, e.g. "Jan 12 Plowing". */
-export function defaultStormName(service: SnowService, now = new Date()): string {
-  const day = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return `${day} ${service === 'shoveling' ? 'Sidewalks' : SERVICE_LABEL[service]}`;
+/** A starting name for a new storm, e.g. "Jan 12 Plowing", or "Jan 12 Storm" for several services. */
+export function defaultStormName(services: SnowService | SnowService[], now = new Date()): string {
+  return defaultStormNameFor(Array.isArray(services) ? services : [services], (s) => SERVICE_LABEL[s], now);
 }
 
 /** Plain-language implications of ending, from `previewEndStorm`. Layout is up to the screen. */

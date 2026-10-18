@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
@@ -13,6 +13,8 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { uploadImage } from '@/lib/media';
+import { loadMyBirthday, saveMyBirthday } from '@/data/birthday';
+import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
 
 interface EditProfileScreenProps {
   /** Workers must fill in every field (photo and phone included); owners only need a name. */
@@ -37,7 +39,21 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const hasChanges = firstName !== user?.firstName || lastName !== user?.lastName || phone !== (user?.phone ?? '') || avatarUrl !== user?.avatarUrl;
+  const [birthday, setBirthday] = useState('');
+  const [savedBirthday, setSavedBirthday] = useState('');
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    loadMyBirthday(user.id).then((iso) => {
+      if (!live) return;
+      const t = birthdayInputText(iso);
+      setSavedBirthday(t);
+      setBirthday((cur) => cur || t);
+    });
+    return () => { live = false; };
+  }, [user?.id]);
+
+  const hasChanges = birthday.trim() !== savedBirthday || firstName !== user?.firstName || lastName !== user?.lastName || phone !== (user?.phone ?? '') || avatarUrl !== user?.avatarUrl;
 
   const phoneDigits = phone.replace(/\D/g, '').length;
   const errors = {
@@ -45,6 +61,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
     firstName: firstName.trim() ? '' : 'Enter your first name',
     lastName: lastName.trim() ? '' : 'Enter your last name',
     phone: phoneDigits >= 10 || (!requireAll && phoneDigits === 0) ? '' : 'Enter a 10-digit phone number',
+    birthday: birthdayProblem(birthday),
   };
   const isValid = !Object.values(errors).some(Boolean);
   const show = (key: keyof typeof errors) => (triedSave ? errors[key] || undefined : undefined);
@@ -61,6 +78,11 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
       if (avatarUrl && avatarUrl !== user.avatarUrl) {
         savedAvatarUrl = (await uploadImage(avatarUrl, `avatars/${user.id}`)).url;
       }
+      let birthdayNote: string | null = null;
+      if (birthday.trim() !== savedBirthday) {
+        const res = await saveMyBirthday(user.id, parseBirthday(birthday));
+        if (!res.ok) birthdayNote = res.error;
+      }
       updateProfile({
         ...user,
         firstName: firstName.trim(),
@@ -69,6 +91,11 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
         avatarUrl: savedAvatarUrl,
         updatedAt: new Date().toISOString(),
       });
+      if (birthdayNote) {
+        setSavedBirthday(savedBirthday);
+        setSaveError(birthdayNote);
+        return;
+      }
       router.back();
     } catch (err: any) {
       setSaveError(err?.message ?? 'Could not save your photo. Please try again.');
@@ -180,6 +207,16 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
             autoComplete="tel"
             icon="phone"
             error={show('phone')}
+          />
+          <Input
+            label="Birthday (optional)"
+            value={birthday}
+            onChangeText={setBirthday}
+            placeholder="MM/DD/YYYY"
+            keyboardType="numbers-and-punctuation"
+            icon="gift"
+            error={show('birthday')}
+            hint="Only you and your managers can see this."
           />
           <Input
             label="Email"

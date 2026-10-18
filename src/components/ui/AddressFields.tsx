@@ -6,7 +6,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { splitAddress, type AddressParts } from '@/lib/address';
+import { applyStreetInput, type AddressParts } from '@/lib/address';
 import { verifyAddress, previewOnMap } from '@/lib/maps';
 
 /** Map check state for an address: exact spot found, or the owner chose to keep it as typed. */
@@ -43,17 +43,7 @@ export function AddressFields({ value, onChange, required, streetLabel = 'Street
   }
 
   function handleStreet(text: string) {
-    const parts = splitAddress(text);
-    if (parts) {
-      change({
-        address: parts.address,
-        city: parts.city || value.city,
-        state: parts.state || value.state,
-        zip: parts.zip || value.zip,
-      });
-    } else {
-      change({ ...value, address: text });
-    }
+    change(applyStreetInput(text, value));
   }
 
   return (

@@ -17,6 +17,14 @@ export default function SnowOwnerMoreScreen() {
       icon="menu"
       purpose="Activity log, time corrections, customer media review and Snow Mode settings."
     >
+      <SettingsGroup title="Settings">
+        <SettingsRow
+          icon="settings"
+          title="Snow settings"
+          subtitle="Stop rule, alerts, team and customers"
+          onPress={() => router.push('/snow/owner/settings')}
+        />
+      </SettingsGroup>
       <SettingsGroup title="Records">
         <SettingsRow
           icon="activity"

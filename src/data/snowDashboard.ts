@@ -218,7 +218,7 @@ export function buildNeedsAttention(input: SnowDashboardInput): AttentionItem[] 
       items.push({
         key: `nolead:${route.id}`,
         kind: 'route_without_lead',
-        title: `No lead on ${route.name}`,
+        title: `No crew lead on ${route.name}`,
         detail: `${storm.name}: ${plural(open, 'stop')} left and nobody assigned`,
         stormId: storm.id, routeId: route.id,
         since: storm.dispatchedAt ?? storm.createdAt,

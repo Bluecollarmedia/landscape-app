@@ -5,6 +5,8 @@
  * allowed (order, one stop at a time, photo minimum, dispatched storm only;
  * update 026). Working layout in the existing app style; no approved mockup.
  */
+import { pickActiveRoute, splitMyRoutes } from '@/lib/snowMyRoute';
+import { canWorkRoute } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +33,9 @@ export function MyRouteScreen() {
   const tabBarClearance = useTabBarClearance();
   const [routes, setRoutes] = useState<MyRoute[]>([]);
   const [routeId, setRouteId] = useState<string | null>(null);
+  // A past route the worker opened from History (read-only). Never chosen automatically.
+  const [historyId, setHistoryId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [route, setRoute] = useState<RouteDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,15 +46,18 @@ export function MyRouteScreen() {
     const mine = await loadMyRoutes();
     if (!mine.ok) { setLoading(false); return setError(mine.error); }
     setRoutes(mine.data);
-    const live = mine.data.filter((r) => r.stormStatus === 'dispatched');
-    const pick = routeId && mine.data.some((r) => r.id === routeId) ? routeId : (live[0] ?? mine.data[0])?.id ?? null;
-    setRouteId(pick);
+    // Current work is only ever a route on a dispatched storm. A past route is shown
+    // only when the worker opens it from History.
+    const { active } = splitMyRoutes(mine.data);
+    const current = pickActiveRoute(active, routeId);
+    setRouteId(current);
+    const pick = historyId && mine.data.some((r) => r.id === historyId) ? historyId : current;
     if (!pick) { setRoute(null); setLoading(false); return setError(null); }
     const r = await loadRoute(pick);
     setLoading(false);
     setError(r.ok ? null : r.error);
     if (r.ok) setRoute(r.data);
-  }, [routeId]);
+  }, [routeId, historyId]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -69,6 +77,9 @@ export function MyRouteScreen() {
   const current = route?.stops.find((s) => s.status === 'arrived') ?? route?.stops.find((s) => s.status === 'pending');
   const done = route?.stops.filter((s) => s.status === 'completed' || s.status === 'skipped').length ?? 0;
   const working = route?.stormStatus === 'dispatched' && !route.cancelled;
+  const { active: activeRoutes, history: pastRoutes } = splitMyRoutes(routes);
+  // Update 41: crew can see the route, its stops and instructions; only the lead can act on it.
+  const isLead = canWorkRoute(routes.find((r) => r.id === route?.id)?.role);
   const needMedia = route && current && route.mediaRequired ? Math.max(0, route.minMedia - current.mediaCount) : 0;
 
   return (
@@ -81,9 +92,16 @@ export function MyRouteScreen() {
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>My Route</Text>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
 
-        {routes.length > 1 ? (
+        {historyId ? (
+          <Pressable onPress={() => setHistoryId(null)} style={styles.backToCurrent} accessibilityRole="button" accessibilityLabel="Back to current work">
+            <Icon name="arrow-left" size={18} color={colors.primary} />
+            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Back to current work</Text>
+          </Pressable>
+        ) : null}
+
+        {!historyId && activeRoutes.length > 1 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, marginTop: spacing.md }}>
-            {routes.map((r) => {
+            {activeRoutes.map((r) => {
               const on = r.id === routeId;
               return (
                 <Pressable
@@ -93,8 +111,8 @@ export function MyRouteScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
                 >
-                  <Text style={[typeScale.labelLarge, { color: on ? '#fff' : colors.textPrimary }]}>{r.name}</Text>
-                  <Text style={[typeScale.caption, { color: on ? '#fff' : colors.textSecondary }]}>{r.stormName}</Text>
+                  <Text style={[typeScale.labelLarge, { color: on ? colors.textOnPrimary : colors.textPrimary }]}>{r.name}</Text>
+                  <Text style={[typeScale.caption, { color: on ? colors.textOnPrimary : colors.textSecondary }]}>{r.stormName}</Text>
                 </Pressable>
               );
             })}
@@ -102,7 +120,7 @@ export function MyRouteScreen() {
         ) : null}
 
         {!route ? (
-          <EmptyState icon="navigation" title="No route right now" description="When the owner dispatches a storm and makes you a route lead, your stops show up here." />
+          <EmptyState icon="navigation" title="No active route" description="When the owner dispatches a storm and makes you a route lead, your stops show up here. Finished storms are under Past work below." />
         ) : (
           <>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>
@@ -125,7 +143,9 @@ export function MyRouteScreen() {
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{current.propertyAddress}</Text>
                 </View>
                 <Button title="Directions" icon="navigation" variant="secondary" onPress={() => openDirections({ address: current.propertyAddress })} fullWidth />
-                {current.status === 'pending' ? (
+                {!isLead ? (
+                  <InlineNotice icon="eye" tone="info" text="You're on this route's crew. The route lead marks arrivals, finishes stops and adds photos." />
+                ) : current.status === 'pending' ? (
                   <Button title="I'm Here" icon="map-pin" loading={busy} onPress={() => act(() => arriveAtStop(current.id), 'Can\'t start this stop')} fullWidth />
                 ) : (
                   <>
@@ -156,7 +176,7 @@ export function MyRouteScreen() {
                     />
                   </>
                 )}
-                <LeadSkipPanel visitId={current.id} disabled={busy} onChanged={reload} />
+                {isLead ? <LeadSkipPanel visitId={current.id} disabled={busy} onChanged={reload} /> : null}
               </View>
             ) : null}
             {working && current ? (
@@ -188,6 +208,33 @@ export function MyRouteScreen() {
             </View>
           </>
         )}
+
+        {!historyId && pastRoutes.length > 0 ? (
+          <>
+            <Pressable onPress={() => setShowHistory(!showHistory)} style={styles.historyHeader} accessibilityRole="button" accessibilityState={{ expanded: showHistory }}>
+              <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>PAST WORK ({pastRoutes.length})</Text>
+              <Icon name={showHistory ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
+            </Pressable>
+            {showHistory ? (
+              <View style={[styles.group, { backgroundColor: colors.surface }]}>
+                {pastRoutes.map((r, i) => (
+                  <Pressable
+                    key={r.id}
+                    onPress={() => { setHistoryId(r.id); setLoading(true); }}
+                    style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}
+                    accessibilityRole="button"
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]} numberOfLines={1}>{r.name}</Text>
+                      <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{r.stormName} · {SERVICE_LABEL[r.service]} · Ended</Text>
+                    </View>
+                    <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -196,6 +243,8 @@ export function MyRouteScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   card: { borderRadius: radius.lg, padding: spacing.lg },
+  backToCurrent: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
+  historyHeader: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.sm, marginLeft: spacing.sm },
   chip: { borderRadius: radius.lg, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },
   group: { borderRadius: radius.lg, overflow: 'hidden' },

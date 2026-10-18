@@ -1,3 +1,4 @@
+import { useOpenIssueCount } from '@/data/issues';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -55,6 +56,7 @@ export default function OwnerDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const openIssueCount = useOpenIssueCount();
   const {
     todayStats, attentionItems, attentionTotalCount,
     crewToday, crewTodayTotal, activeProjects, activeProjectsTotal,
@@ -317,6 +319,25 @@ export default function OwnerDashboard() {
                 </Pressable>
               ))}
             </View>
+          )}
+
+          {/* Problems the crew reported */}
+          {openIssueCount > 0 && (
+            <Pressable
+              onPress={() => router.push('/(owner)/issues' as any)}
+              accessibilityRole="button"
+              accessibilityLabel={`${openIssueCount} open issues`}
+              style={[styles.setupCard, { backgroundColor: colors.surface, borderColor: semantic.warning, flexDirection: 'row', alignItems: 'center', gap: spacing.md }]}
+            >
+              <Icon name="alert-triangle" size={20} color={semantic.warning} />
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
+                  {openIssueCount} open {openIssueCount === 1 ? 'issue' : 'issues'}
+                </Text>
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Problems your crew reported</Text>
+              </View>
+              <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+            </Pressable>
           )}
 
           {/* Needs Attention */}

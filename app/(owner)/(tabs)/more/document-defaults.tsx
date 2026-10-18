@@ -32,6 +32,7 @@ export default function DocumentDefaultsScreen() {
   const [tax, setTax] = useState(saved?.defaultTaxRate != null ? String(saved.defaultTaxRate) : start.taxRate ? String(start.taxRate) : '');
   const [terms, setTerms] = useState(saved?.defaultTerms ?? start.terms ?? '');
   const [exclusions, setExclusions] = useState(saved?.defaultExclusions ?? start.exclusions ?? '');
+  const [invoiceNotes, setInvoiceNotes] = useState(saved?.defaultInvoiceNotes ?? start.invoiceNotes ?? '');
   const [payment, setPayment] = useState(saved?.defaultPaymentInstructions ?? start.paymentInstructions ?? '');
 
   const taxRate = tax.trim() === '' ? 0 : parseAmount(tax);
@@ -47,6 +48,7 @@ export default function DocumentDefaultsScreen() {
       defaultTerms: terms.trim() || undefined,
       defaultExclusions: exclusions.trim() || undefined,
       defaultPaymentInstructions: payment.trim() || undefined,
+      defaultInvoiceNotes: invoiceNotes.trim() || undefined,
     });
     router.back();
   };
@@ -86,6 +88,9 @@ export default function DocumentDefaultsScreen() {
         </ListSection>
         <ListSection title="QUOTE EXCLUSIONS">
           <NoteField label="Exclusions" placeholder="Work not included unless listed" value={exclusions} onChangeText={setExclusions} />
+        </ListSection>
+        <ListSection title="INVOICE NOTES" footer="Printed on every new invoice. Each invoice can still be edited on its own.">
+          <NoteField label="Notes" placeholder="e.g. Thank you for your business!" value={invoiceNotes} onChangeText={setInvoiceNotes} />
         </ListSection>
         <ListSection title="INVOICE PAYMENT INSTRUCTIONS">
           <NoteField label="Payment instructions" placeholder="e.g. Make checks payable to…" value={payment} onChangeText={setPayment} />

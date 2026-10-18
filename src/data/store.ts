@@ -107,7 +107,7 @@ const TABLES = {
   invoices: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'changeOrderIds', 'customerId', 'number', 'title', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'paymentInstructions', 'invoiceDate', 'dueDate', 'snapshot', 'issuedAt', 'voidedAt', 'voidReason', 'createdBy', 'createdAt', 'updatedAt'] },
   financial_events: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'documentType', 'documentId', 'eventType', 'actorId', 'note', 'metadata', 'createdAt'] },
   // Update 015: document defaults and materials preparation (owner/admin only).
-  financial_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'defaultTaxRate', 'defaultTerms', 'defaultExclusions', 'defaultPaymentInstructions', 'updatedAt'] },
+  financial_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'defaultTaxRate', 'defaultTerms', 'defaultExclusions', 'defaultPaymentInstructions', 'defaultInvoiceNotes', 'updatedAt'] },
   material_vendors: { scope: 'company', cols: ['id', 'companyId', 'name', 'contactName', 'phone', 'email', 'address', 'pickupInstructions', 'notes', 'createdAt', 'updatedAt'] },
   // Update 017: photos/videos the owner attaches to a task.
   task_attachments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'taskId', 'mediaType', 'fileUrl', 'fileKey', 'sizeBytes', 'createdBy', 'createdAt'] },

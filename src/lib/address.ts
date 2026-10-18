@@ -22,18 +22,46 @@ function stateCode(s: string): string | null {
   return STATES[t.toLowerCase()] ?? null;
 }
 
+/** A street up to its "St/Ln/Ave…" word (plus any apt/unit), then the city. */
+const STREET_THEN_CITY = /^(.*?\b(?:st|street|ave|avenue|ln|lane|rd|road|dr|drive|ct|court|blvd|boulevard|way|pl|place|cir|circle|ter|terrace|pkwy|parkway|hwy|highway|trl|trail|sq|square|loop|run|path|row|walk|pike|aly|alley)\b\.?(?:\s+(?:apt|unit|ste|suite|#)\s*[\w-]+)?)\s+(.+)$/i;
+const COUNTRY_END = /[\s,]+(?:usa|u\.s\.a\.|us|united states(?: of america)?)\.?$/i;
+
 /**
  * Splits a whole US address pasted or autofilled into the street field
- * ("205 Cathy Ln, Lakewood NJ 08701", "205 Cathy Ln\nLakewood, NJ 08701, United States")
+ * ("205 Cathy Ln, Lakewood NJ 08701", "205 Cathy Ln\nLakewood, NJ 08701, United States",
+ * or the same with the line breaks turned into spaces by the keyboard)
  * into its parts. Returns null when the text is just a street.
  */
 export function splitAddress(text: string): AddressParts | null {
-  const parts = text
+  const cleaned = text.replace(COUNTRY_END, '').trim();
+  const parts = cleaned
     .split(/[,\n]/)
     .map((p) => p.trim())
     .filter(Boolean)
     .filter((p) => !/^(usa|us|united states( of america)?)$/i.test(p));
-  if (parts.length < 2) return null;
+  if (parts.length === 0) return null;
+
+  // No commas or line breaks at all ("205 Kathy Lane Lakewood NJ 08701"): needs a state and a ZIP.
+  if (parts.length === 1) {
+    const z = parts[0].match(/^(.*\S)\s+(\d{5})(?:-\d{4})?$/);
+    if (!z) return null;
+    // The state is the last word ("NJ") or last two words ("New Jersey") before the ZIP.
+    const words = z[1].split(/\s+/);
+    let state: string | null = null;
+    let used = 0;
+    for (const n of [2, 1]) {
+      if (words.length > n) {
+        state = stateCode(words.slice(-n).join(' '));
+        if (state) { used = n; break; }
+      }
+    }
+    if (!state) return null;
+    const rest = words.slice(0, -used).join(' ');
+    // The city is whatever follows the street's last "St/Ln/Ave…" word (and any unit).
+    const street = rest.match(STREET_THEN_CITY);
+    if (street) return { address: street[1].trim(), city: street[2].trim(), state, zip: z[2] };
+    return { address: rest, city: '', state, zip: z[2] };
+  }
 
   // Last part should end with "STATE ZIP", "STATE", or "ZIP" (state may then be its own part).
   let last = parts.pop()!;
@@ -66,6 +94,22 @@ export function splitAddress(text: string): AddressParts | null {
   const address = parts.join(', ');
   if (!address) return null;
   return { address, city, state, zip };
+}
+
+/**
+ * What the four address boxes should hold after the street box changed to
+ * `text`. A whole address dropped in (autofill, paste) fills all four; plain
+ * typing only changes the street.
+ */
+export function applyStreetInput(text: string, current: AddressParts): AddressParts {
+  const parts = splitAddress(text);
+  if (!parts) return { ...current, address: text };
+  return {
+    address: parts.address,
+    city: parts.city || current.city,
+    state: parts.state || current.state,
+    zip: parts.zip || current.zip,
+  };
 }
 
 export function formatAddress(a: Partial<AddressParts>): string {

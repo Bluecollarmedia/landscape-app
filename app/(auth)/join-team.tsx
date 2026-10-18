@@ -4,7 +4,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
@@ -15,17 +15,24 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { useTeamCode } from '@/hooks/useOnboarding';
+import { lookupSnowCode, requestSnowAccess } from '@/hooks/useSnowOnboarding';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/media';
 
 type Step = 'code' | 'account' | 'profile';
+
+/** Same screen for the landscaping team code and the separate Snow code
+ * (`?kind=snow`). A Snow code only files a Snow access request. */
 
 export default function JoinTeamScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { setAppState, signUp, isAuthenticated, user, refreshContext } = useAuth();
-  const { validateCode } = useTeamCode();
+  const { validateCode: validateTeamCode } = useTeamCode();
+  const isSnow = useLocalSearchParams<{ kind?: string }>().kind === 'snow';
+  const validateCode = isSnow ? lookupSnowCode : validateTeamCode;
+  const codeLabel = isSnow ? 'Snow Code' : 'Team Code';
   // Already signed in (came from "Finish setting up"): skip the account step.
   const signedIn = isSupabaseConfigured && isAuthenticated && !!user;
 
@@ -56,7 +63,7 @@ export default function JoinTeamScreen() {
       setCompanyName(result.companyName ?? '');
     } else {
       setCodeValid(false);
-      setCodeError('Invalid team code. Please check and try again.');
+      setCodeError(`Invalid ${codeLabel.toLowerCase()}. Please check and try again.`);
     }
   }
 
@@ -133,6 +140,7 @@ export default function JoinTeamScreen() {
         onboardingStep: 'pending_approval',
         pendingCompanyName: companyName,
         pendingRequestId: 'jr-new',
+        pendingKind: isSnow ? 'snow' : 'team',
       });
       setLoading(false);
       return;
@@ -140,7 +148,13 @@ export default function JoinTeamScreen() {
 
     try {
       const profile = { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() };
-      if (signedIn) {
+      if (signedIn && isSnow) {
+        const res = await requestSnowAccess(teamCode);
+        if (!res.ok) throw new Error(res.error);
+        await supabase.from('people').update({
+          first_name: profile.firstName, last_name: profile.lastName, phone: profile.phone,
+        }).eq('id', user!.id);
+      } else if (signedIn) {
         const { data, error: rpcError } = await supabase.rpc('request_join', { p_code: teamCode.trim() });
         if (rpcError) throw rpcError;
         const result = data as { success: boolean; error?: string };
@@ -151,9 +165,9 @@ export default function JoinTeamScreen() {
           first_name: profile.firstName, last_name: profile.lastName, phone: profile.phone,
         }).eq('id', user!.id);
       } else {
-        const result = await signUp(email.trim(), password, profile, { teamCode: teamCode.trim() });
+        const result = await signUp(email.trim(), password, profile, isSnow ? { snowCode: teamCode.trim() } : { teamCode: teamCode.trim() });
         if (result.needsEmailConfirmation) {
-          const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in. Your request to join ${companyName} has been sent.`;
+          const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in. Your request to join ${isSnow ? `the ${companyName} snow team` : companyName} has been sent.`;
           if (Platform.OS === 'web') alert(msg);
           else Alert.alert('Check your email', msg);
           router.replace('/(auth)/login');
@@ -198,7 +212,7 @@ export default function JoinTeamScreen() {
           <Icon name="arrow-left" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
-          Join a Team
+          {isSnow ? 'Join the Snow Team' : 'Join a Team'}
         </Text>
         <View style={{ width: 24 }} />
       </View>
@@ -209,7 +223,7 @@ export default function JoinTeamScreen() {
         ))}
       </View>
       <Text style={[typeScale.labelSmall, { color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg }]}>
-        Step {stepNumber} of 3 — {step === 'code' ? 'Team Code' : step === 'account' ? 'Create Account' : 'Complete Profile'}
+        Step {stepNumber} of 3 — {step === 'code' ? codeLabel : step === 'account' ? 'Create Account' : 'Complete Profile'}
       </Text>
 
       <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -223,11 +237,13 @@ export default function JoinTeamScreen() {
         {step === 'code' && (
           <View style={styles.form}>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-              Enter the team code provided by your company. Ask your manager or team lead if you don't have one.
+              {isSnow
+                ? 'Enter the Snow code from the owner. It sends a request; you get snow access only after the owner approves it.'
+                : "Enter the team code provided by your company. Ask your manager or team lead if you don't have one."}
             </Text>
             <Input
-              label="Team Code"
-              placeholder="e.g. BRIGHTON-4821"
+              label={codeLabel}
+              placeholder={isSnow ? 'e.g. SNOW-7KQ4HM' : 'e.g. BRIGHTON-4821'}
               value={teamCode}
               onChangeText={(v) => { setTeamCode(v.toUpperCase()); setCodeValid(false); setCodeError(''); }}
               autoCapitalize="characters"
@@ -244,7 +260,9 @@ export default function JoinTeamScreen() {
                 <Icon name="check-circle" size={16} color={semantic.success} />
                 <View style={{ marginLeft: spacing.sm, flex: 1 }}>
                   <Text style={[typeScale.bodySmall, { color: semantic.success, fontWeight: '600' }]}>Code verified!</Text>
-                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>You're joining {companyName}</Text>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                    {isSnow ? `You're asking to join the ${companyName} snow team` : `You're joining ${companyName}`}
+                  </Text>
                 </View>
               </View>
             ) : null}
@@ -263,7 +281,7 @@ export default function JoinTeamScreen() {
             <View style={[styles.companyBanner, { backgroundColor: colors.primarySurface }]}>
               <Icon name="briefcase" size={16} color={colors.primary} />
               <Text style={[typeScale.labelSmall, { color: colors.primary, marginLeft: spacing.sm }]}>
-                Joining {companyName}
+                Joining {companyName}{isSnow ? ' (Snow)' : ''}
               </Text>
             </View>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
@@ -286,7 +304,7 @@ export default function JoinTeamScreen() {
             <View style={[styles.companyBanner, { backgroundColor: colors.primarySurface }]}>
               <Icon name="briefcase" size={16} color={colors.primary} />
               <Text style={[typeScale.labelSmall, { color: colors.primary, marginLeft: spacing.sm }]}>
-                Joining {companyName}
+                Joining {companyName}{isSnow ? ' (Snow)' : ''}
               </Text>
             </View>
 
@@ -348,7 +366,7 @@ export default function JoinTeamScreen() {
               </Text>
             </View>
 
-            <Button title="Submit Join Request" onPress={handleSubmitRequest} loading={loading} fullWidth size="lg" icon="send" />
+            <Button title={isSnow ? 'Submit Snow Request' : 'Submit Join Request'} onPress={handleSubmitRequest} loading={loading} fullWidth size="lg" icon="send" />
           </View>
         )}
       </KeyboardAwareScrollView>

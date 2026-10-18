@@ -42,6 +42,14 @@ export default function CustomerAccountScreen() {
             </Text>
           </View>
         </View>
+        <ListRow
+          icon="edit-2"
+          iconColor={colors.primary}
+          title="Edit profile & photo"
+          subtitle="Your name, phone and picture"
+          showChevron
+          onPress={() => router.push('/(customer)/edit-profile' as any)}
+        />
       </ListSection>
 
       {myMaintenance.length > 0 ? (

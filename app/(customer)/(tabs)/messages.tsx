@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useHasSnow } from '@/hooks/useHasSnow';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import { db, useDb } from '@/data/store';
  * and the messages scroll above it.
  */
 export default function CustomerMessagesScreen() {
+  const hasSnow = useHasSnow();
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
@@ -104,7 +106,9 @@ export default function CustomerMessagesScreen() {
         <EmptyState
           icon="message-circle"
           title="No messages"
-          description="Once you're added to a project, you can message your landscaper here."
+          description={hasSnow
+            ? 'Messages are for landscaping projects. Your snow updates and photos are on the Account tab.'
+            : "Once you're added to a project, you can message your landscaper here."}
         />
       )}
     </KeyboardAvoidingView>

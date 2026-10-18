@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { ServiceIcon } from '@/components/maintenance/ServiceIcon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -168,7 +169,7 @@ export default function MaintenanceTodayScreen() {
           ) : (
             <View>
               <View style={styles.routeHeader}>
-                <Feather name="map-pin" size={26} color={colors.primary} />
+                <MaterialCommunityIcons name="map-marker-path" size={30} color={colors.primary} />
                 <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
                   Today's Route
                 </Text>
@@ -313,7 +314,7 @@ function NextStopCard({ stop, onOpen, onDirections }: { stop: MaintenanceStopDet
               </Text>
             </View>
             <View style={styles.meta}>
-              <Feather name="scissors" size={13} color={colors.primary} />
+              <ServiceIcon label={servicesLabel(stop)} size={15} color={colors.primary} />
               <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]} numberOfLines={2}>
                 {servicesLabel(stop)}
               </Text>

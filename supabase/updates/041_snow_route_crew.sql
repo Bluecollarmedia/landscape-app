@@ -1,5 +1,5 @@
 -- ============================================================================
--- Update 41 — run once in Supabase → SQL Editor, AFTER 026, 027 and 040
+-- Update 41 — run once in Supabase → SQL Editor, AFTER 026, 027, 029 and 040
 -- (safe to run again). NOT run yet; read it before running.
 --
 -- Crew members on a Snow route.

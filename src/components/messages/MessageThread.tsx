@@ -6,6 +6,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { db } from '@/data/store';
 import { useProjectMessages } from '@/hooks/useProjectMessages';
+import { ReportSheet, type ReportTarget } from '@/components/reports/ReportSheet';
 import { isoToLocalDateKey, todayKey } from '@/lib/ids';
 import type { ProjectMessage } from '@/types/project';
 
@@ -36,6 +37,7 @@ export function MessageThread({ projectId, emptyTitle = 'No messages yet', empty
 export function MessageList({ projectId, emptyTitle = 'No messages yet', emptyText }: MessageThreadProps) {
   const { colors } = useTheme();
   const { messages, remove } = useProjectMessages(projectId);
+  const [reporting, setReporting] = useState<ReportTarget | null>(null);
 
   function handleLongPress(m: ProjectMessage) {
     if (m.senderId !== db.personId) return;
@@ -85,12 +87,25 @@ export function MessageList({ projectId, emptyTitle = 'No messages yet', emptyTe
             >
               <Text style={[typeScale.bodyLarge, { color: mine ? '#FFFFFF' : colors.textPrimary }]}>{m.body}</Text>
             </View>
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2, marginHorizontal: spacing.sm }]}>
-              {timeLabel(m.createdAt)}
-            </Text>
+            <View style={styles.metaRow}>
+              <Text style={[typeScale.caption, { color: colors.textTertiary, marginHorizontal: spacing.sm }]}>
+                {timeLabel(m.createdAt)}
+              </Text>
+              {!mine ? (
+                <Pressable
+                  onPress={() => setReporting({ projectId, type: 'message', contentId: m.id })}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Report this message"
+                >
+                  <Text style={[typeScale.caption, { color: colors.textSecondary, textDecorationLine: 'underline' }]}>Report</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </Pressable>
         );
       })}
+      <ReportSheet target={reporting} onClose={() => setReporting(null)} />
     </View>
   );
 }
@@ -136,6 +151,7 @@ const styles = StyleSheet.create({
   row: { maxWidth: '85%' },
   rowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   rowTheirs: { alignSelf: 'flex-start', alignItems: 'flex-start' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   bubble: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.lg },
   composer: {
     flexDirection: 'row',

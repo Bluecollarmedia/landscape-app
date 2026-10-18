@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions, Platform, Alert } from 'react-native';
+import { View, Text, Image, TextInput, StyleSheet, Pressable, Dimensions, Platform, Alert, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -50,6 +50,7 @@ export default function SignUpScreen() {
     }
 
     setError('');
+    Keyboard.dismiss();
     setLoading(true);
 
     try {

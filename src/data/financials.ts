@@ -158,12 +158,13 @@ export function documentDefaults() {
     terms: s?.defaultTerms ?? quote?.terms,
     exclusions: s?.defaultExclusions ?? quote?.exclusions,
     paymentInstructions: s?.defaultPaymentInstructions ?? invoice?.paymentInstructions,
+    invoiceNotes: s?.defaultInvoiceNotes,
   };
 }
 const lastUsed = documentDefaults;
 
 /** Saves the company's document defaults. Existing documents don't change. */
-export function saveDocumentDefaults(patch: { defaultTaxRate?: number; defaultTerms?: string; defaultExclusions?: string; defaultPaymentInstructions?: string }) {
+export function saveDocumentDefaults(patch: { defaultTaxRate?: number; defaultTerms?: string; defaultExclusions?: string; defaultPaymentInstructions?: string; defaultInvoiceNotes?: string }) {
   upsertRow('financial_settings', { companyId: db.companyId, ...db.financialSettings, ...patch });
 }
 
@@ -397,6 +398,7 @@ export function createInvoice(projectId: string, opts: { quoteId?: string; chang
     lineItems,
     taxRate,
     ...calcTotals(lineItems, taxRate),
+    notes: d.invoiceNotes,
     paymentInstructions: d.paymentInstructions,
     invoiceDate: todayKey(),
     dueDate: localDateKey(due),

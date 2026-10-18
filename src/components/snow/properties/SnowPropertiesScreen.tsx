@@ -4,6 +4,7 @@
  * reference media are edited on the property screen (update 022). Working
  * layout in the existing app style; no approved mockup yet.
  */
+import { applyStreetInput } from '@/lib/address';
 import { AddFromCustomer } from './AddFromCustomer';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
@@ -117,7 +118,14 @@ export function SnowPropertiesScreen() {
         {adding ? (
           <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md, gap: spacing.sm }]}>
             <Input label="Property name" value={form.name} onChangeText={set('name')} placeholder="Oak Plaza" />
-            <Input label="Street address" value={form.address} onChangeText={set('address')} placeholder="1 Oak St" />
+            <Input
+              label="Street address"
+              value={form.address}
+              onChangeText={(text) => setForm((f) => ({ ...f, ...applyStreetInput(text, f) }))}
+              placeholder="1 Oak St"
+              textContentType="fullStreetAddress"
+              autoComplete="street-address"
+            />
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <Input label="City" value={form.city} onChangeText={set('city')} containerStyle={{ flex: 2 }} />
               <Input label="State" value={form.state} onChangeText={set('state')} containerStyle={{ flex: 1 }} autoCapitalize="characters" />

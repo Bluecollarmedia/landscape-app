@@ -107,7 +107,7 @@ const TABLES = {
   invoices: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'quoteId', 'changeOrderIds', 'customerId', 'number', 'title', 'status', 'lineItems', 'taxRate', 'subtotal', 'taxAmount', 'total', 'notes', 'paymentInstructions', 'invoiceDate', 'dueDate', 'snapshot', 'issuedAt', 'voidedAt', 'voidReason', 'createdBy', 'createdAt', 'updatedAt'] },
   financial_events: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'documentType', 'documentId', 'eventType', 'actorId', 'note', 'metadata', 'createdAt'] },
   // Update 015: document defaults and materials preparation (owner/admin only).
-  financial_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'defaultTaxRate', 'defaultTerms', 'defaultExclusions', 'defaultPaymentInstructions', 'updatedAt'] },
+  financial_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'defaultTaxRate', 'defaultTerms', 'defaultExclusions', 'defaultPaymentInstructions', 'defaultInvoiceNotes', 'updatedAt'] },
   material_vendors: { scope: 'company', cols: ['id', 'companyId', 'name', 'contactName', 'phone', 'email', 'address', 'pickupInstructions', 'notes', 'createdAt', 'updatedAt'] },
   // Update 017: photos/videos the owner attaches to a task.
   task_attachments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'taskId', 'mediaType', 'fileUrl', 'fileKey', 'sizeBytes', 'createdBy', 'createdAt'] },
@@ -126,6 +126,7 @@ const TABLES = {
   maintenance_stop_tasks: { scope: 'company', cols: ['id', 'companyId', 'routeId', 'stopId', 'title', 'isRequired', 'sortOrder', 'completedAt', 'completedBy', 'createdAt', 'updatedAt'] },
   maintenance_photos: { scope: 'company', cols: ['id', 'companyId', 'routeId', 'stopId', 'propertyId', 'uploadedBy', 'fileUrl', 'fileKey', 'sizeBytes', 'caption', 'isCustomerVisible', 'sharedBy', 'sharedAt', 'takenAt', 'createdAt'] },
   maintenance_day_attendance: { scope: 'company', cols: ['id', 'companyId', 'personId', 'serviceDate', 'routeId', 'startedAt', 'source', 'latitude', 'longitude', 'accuracyM', 'distanceM', 'locationStatus', 'originalStartedAt', 'correctedAt', 'correctedBy', 'correctionNote', 'createdAt', 'updatedAt'] },
+  property_issues: { scope: 'company', cols: ['id', 'companyId', 'reportedBy', 'issueType', 'notes', 'photos', 'maintenancePropertyId', 'projectId', 'placeName', 'status', 'resolvedBy', 'resolvedAt', 'resolutionNote', 'createdAt', 'updatedAt'] },
   maintenance_events: { scope: 'company', cols: ['id', 'companyId', 'routeId', 'stopId', 'personId', 'eventType', 'occurredAt', 'latitude', 'longitude', 'accuracyM', 'distanceM', 'locationStatus', 'note', 'metadata', 'createdAt'] },
 } satisfies Record<string, TableDef>;
 

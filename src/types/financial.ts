@@ -172,5 +172,6 @@ export interface FinancialSettings {
   defaultTerms?: string;
   defaultExclusions?: string;
   defaultPaymentInstructions?: string;
+  defaultInvoiceNotes?: string;
   updatedAt?: string;
 }

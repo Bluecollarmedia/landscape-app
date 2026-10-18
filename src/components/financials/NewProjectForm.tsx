@@ -5,6 +5,7 @@
  * nothing is created twice. The project is saved as a Prospect.
  */
 
+import { applyStreetInput } from '@/lib/address';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Button, ListSection, ListRow, SearchBar } from '@/components/ui';
@@ -166,7 +167,16 @@ export function NewProjectForm({ onReady }: { onReady: (projectId: string, creat
       )}
 
       <ListSection title="PROPERTY" footer="Saved as a Prospect: not on the schedule and no crew until the quote is approved and you start the project.">
-        <InputRow label="Street" value={address} onChangeText={setAddress} placeholder="Required" autoCapitalize="words" />
+        <InputRow
+          label="Street"
+          value={address}
+          onChangeText={(text) => {
+            const next = applyStreetInput(text, { address, city, state, zip });
+            setAddress(next.address); setCity(next.city); setState(next.state); setZip(next.zip);
+          }}
+          placeholder="Required"
+          autoCapitalize="words"
+        />
         <InputRow label="City" value={city} onChangeText={setCity} placeholder="Optional" autoCapitalize="words" />
         <InputRow label="State" value={state} onChangeText={setState} placeholder="Optional" autoCapitalize="characters" maxLength={2} />
         <InputRow label="ZIP" value={zip} onChangeText={setZip} placeholder="Optional" keyboardType="number-pad" maxLength={10} />

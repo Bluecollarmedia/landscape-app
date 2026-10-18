@@ -9,6 +9,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useJoinRequests } from '@/hooks/useOnboarding';
 import { useSnowOnboardingAdmin } from '@/hooks/useSnowOnboarding';
 import { Avatar, MenuGroup, MenuRow } from '@/components/ui';
+import { useOpenIssueCount } from '@/data/issues';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -21,6 +22,7 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const { pendingRequests } = useJoinRequests();
   const { pending: pendingSnow } = useSnowOnboardingAdmin();
+  const openIssueCount = useOpenIssueCount();
 
   const go = (route: string) => router.push(route as any);
 
@@ -61,6 +63,7 @@ export default function MoreScreen() {
         <MenuGroup title="BUSINESS">
           <MenuRow icon="user" label="Customers" subtitle="Customer directory and their projects" onPress={() => go('/(owner)/customers')} />
           <MenuRow icon="file-text" label="Quotes & Invoices" subtitle="Quotes, change orders and invoices" onPress={() => go('/(owner)/more/financials')} />
+          <MenuRow icon="alert-triangle" label="Issues" subtitle="Problems your crew reported" count={openIssueCount} onPress={() => go('/(owner)/issues')} />
           <MenuRow icon="clipboard" label="Materials" subtitle="What to order or pick up for upcoming jobs" onPress={() => go('/(owner)/more/materials')} />
           <MenuRow icon="key" label="Company Resources" subtitle="Codes and info, and who can see them" onPress={() => go('/(owner)/resources')} />
           <MenuRow icon="volume-2" label="Announcements" subtitle="Company-wide messages" onPress={() => go('/(owner)/more/announcements')} />

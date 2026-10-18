@@ -44,6 +44,9 @@ export default function OwnerLayout() {
         <Stack.Screen name="maintenance-property-edit" options={{ presentation: 'modal' }} />
         {/* Snow Mode activity log: opened from the snow dashboard and settings. */}
         <Stack.Screen name="snow-activity" />
+        {/* Reported problems: opened from the dashboard card, More, and a notification. */}
+        <Stack.Screen name="issues" />
+        <Stack.Screen name="issue-detail" />
         <Stack.Screen name="setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
       </Stack>
     </ScheduleProvider>

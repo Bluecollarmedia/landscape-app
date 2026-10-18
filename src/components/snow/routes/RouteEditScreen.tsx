@@ -251,8 +251,11 @@ export function RouteEditScreen() {
           />
           <Pressable onPress={() => editable && setPickLead(!pickLead)} style={styles.inline} accessibilityRole="button">
             <View style={{ flex: 1 }}>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Lead</Text>
-              <Text style={[typeScale.bodyLarge, { color: leadName ? colors.textPrimary : colors.warning }]}>{leadName ?? 'Pick a lead'}</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew lead</Text>
+              <Text style={[typeScale.bodyLarge, { color: leadName ? colors.textPrimary : colors.warning }]}>{leadName ?? 'Assign a crew lead'}</Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                Needed before you can dispatch a route that has stops. The lead marks arrivals, finishes stops and adds photos.
+              </Text>
               {route.leadPersonId && leadLoad[route.leadPersonId] ? (
                 <Text style={[typeScale.caption, { color: colors.warning }]}>
                   Also leads {leadLoad[route.leadPersonId].join(', ')}. That's allowed; check the timing.

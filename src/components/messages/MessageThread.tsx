@@ -24,15 +24,18 @@ interface MessageThreadProps {
 
 /** Chat bubbles plus a composer. The parent provides the scrolling container. */
 export function MessageThread({ projectId, emptyTitle = 'No messages yet', emptyText }: MessageThreadProps) {
-  const { colors } = useTheme();
-  const { messages, send, remove } = useProjectMessages(projectId);
-  const [draft, setDraft] = useState('');
+  return (
+    <View>
+      <MessageList projectId={projectId} emptyTitle={emptyTitle} emptyText={emptyText} />
+      <MessageComposer projectId={projectId} />
+    </View>
+  );
+}
 
-  function handleSend() {
-    if (!draft.trim()) return;
-    send(draft);
-    setDraft('');
-  }
+/** The chat bubbles only (or the empty note). */
+export function MessageList({ projectId, emptyTitle = 'No messages yet', emptyText }: MessageThreadProps) {
+  const { colors } = useTheme();
+  const { messages, remove } = useProjectMessages(projectId);
 
   function handleLongPress(m: ProjectMessage) {
     if (m.senderId !== db.personId) return;
@@ -47,68 +50,82 @@ export function MessageThread({ projectId, emptyTitle = 'No messages yet', empty
     ]);
   }
 
-  return (
-    <View>
-      {messages.length === 0 ? (
-        <View style={styles.empty}>
-          <Icon name="message-circle" size={28} color={colors.textTertiary} />
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>{emptyTitle}</Text>
-          {emptyText ? (
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>{emptyText}</Text>
-          ) : null}
-        </View>
-      ) : (
-        <View style={styles.list}>
-          {messages.map((m) => {
-            const mine = m.senderId === db.personId;
-            const name = m.sender ? `${m.sender.firstName} ${m.sender.lastName}`.trim() : '';
-            return (
-              <Pressable
-                key={m.id}
-                onLongPress={() => handleLongPress(m)}
-                style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}
-              >
-                {!mine && name ? (
-                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginBottom: 2, marginLeft: spacing.sm }]}>{name}</Text>
-                ) : null}
-                <View
-                  style={[
-                    styles.bubble,
-                    mine
-                      ? { backgroundColor: colors.primary, borderBottomRightRadius: 4 }
-                      : { backgroundColor: colors.backgroundTertiary, borderBottomLeftRadius: 4 },
-                  ]}
-                >
-                  <Text style={[typeScale.bodyLarge, { color: mine ? '#FFFFFF' : colors.textPrimary }]}>{m.body}</Text>
-                </View>
-                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2, marginHorizontal: spacing.sm }]}>
-                  {timeLabel(m.createdAt)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-
-      <View style={[styles.composer, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-        <TextInput
-          style={[typeScale.bodyLarge, styles.input, { color: colors.textPrimary }]}
-          value={draft}
-          onChangeText={setDraft}
-          placeholder="Write a message…"
-          placeholderTextColor={colors.textTertiary}
-          multiline
-        />
-        <Pressable
-          onPress={handleSend}
-          disabled={!draft.trim()}
-          style={[styles.sendButton, { backgroundColor: draft.trim() ? colors.primary : colors.backgroundTertiary }]}
-          accessibilityRole="button"
-          accessibilityLabel="Send message"
-        >
-          <Icon name="send" size={18} color={draft.trim() ? '#FFFFFF' : colors.textTertiary} />
-        </Pressable>
+  if (messages.length === 0) {
+    return (
+      <View style={styles.empty}>
+        <Icon name="message-circle" size={28} color={colors.textTertiary} />
+        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>{emptyTitle}</Text>
+        {emptyText ? (
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>{emptyText}</Text>
+        ) : null}
       </View>
+    );
+  }
+  return (
+    <View style={styles.list}>
+      {messages.map((m) => {
+        const mine = m.senderId === db.personId;
+        const name = m.sender ? `${m.sender.firstName} ${m.sender.lastName}`.trim() : '';
+        return (
+          <Pressable
+            key={m.id}
+            onLongPress={() => handleLongPress(m)}
+            style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}
+          >
+            {!mine && name ? (
+              <Text style={[typeScale.caption, { color: colors.textTertiary, marginBottom: 2, marginLeft: spacing.sm }]}>{name}</Text>
+            ) : null}
+            <View
+              style={[
+                styles.bubble,
+                mine
+                  ? { backgroundColor: colors.primary, borderBottomRightRadius: 4 }
+                  : { backgroundColor: colors.backgroundTertiary, borderBottomLeftRadius: 4 },
+              ]}
+            >
+              <Text style={[typeScale.bodyLarge, { color: mine ? '#FFFFFF' : colors.textPrimary }]}>{m.body}</Text>
+            </View>
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2, marginHorizontal: spacing.sm }]}>
+              {timeLabel(m.createdAt)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** The "Write a message…" box with its send button. */
+export function MessageComposer({ projectId }: { projectId: string }) {
+  const { colors } = useTheme();
+  const { send } = useProjectMessages(projectId);
+  const [draft, setDraft] = useState('');
+
+  function handleSend() {
+    if (!draft.trim()) return;
+    send(draft);
+    setDraft('');
+  }
+
+  return (
+    <View style={[styles.composer, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+      <TextInput
+        style={[typeScale.bodyLarge, styles.input, { color: colors.textPrimary }]}
+        value={draft}
+        onChangeText={setDraft}
+        placeholder="Write a message…"
+        placeholderTextColor={colors.textTertiary}
+        multiline
+      />
+      <Pressable
+        onPress={handleSend}
+        disabled={!draft.trim()}
+        style={[styles.sendButton, { backgroundColor: draft.trim() ? colors.primary : colors.backgroundTertiary }]}
+        accessibilityRole="button"
+        accessibilityLabel="Send message"
+      >
+        <Icon name="send" size={18} color={draft.trim() ? '#FFFFFF' : colors.textTertiary} />
+      </Pressable>
     </View>
   );
 }

@@ -208,7 +208,7 @@ export default function TaskDetailScreen() {
           {isLead && task.status === 'pending' && (
             <Pressable onPress={handleStart}>
               <LinearGradient
-                colors={[colors.primary, colors.primaryDark]}
+                colors={[colors.primary, colors.primary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.pillButton}
@@ -235,7 +235,7 @@ export default function TaskDetailScreen() {
               )}
               <Pressable onPress={handleMarkComplete} disabled={!canComplete}>
                 <LinearGradient
-                  colors={canComplete ? [colors.primary, colors.primaryDark] : [colors.border, colors.border]}
+                  colors={canComplete ? [colors.primary, colors.primary] : [colors.border, colors.border]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.pillButton}

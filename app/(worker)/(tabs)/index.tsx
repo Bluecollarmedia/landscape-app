@@ -305,7 +305,7 @@ export default function WorkerTodayScreen() {
 
         <Pressable onPress={handleBackToToday} style={{ width: '100%' }}>
           <LinearGradient
-            colors={[colors.primary, colors.primaryDark]}
+            colors={[colors.primary, colors.primary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.pillButton}
@@ -442,7 +442,7 @@ export default function WorkerTodayScreen() {
               </Text>
               <Pressable onPress={handleConfirm} style={{ marginTop: spacing.lg }}>
                 <LinearGradient
-                  colors={[colors.primary, colors.primaryDark]}
+                  colors={[colors.primary, colors.primary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.pillButton}
@@ -500,7 +500,7 @@ export default function WorkerTodayScreen() {
 
               <Pressable onPress={handleCheckIn}>
                 <LinearGradient
-                  colors={[colors.primary, colors.primaryDark]}
+                  colors={[colors.primary, colors.primary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[styles.pillButton, styles.checkInButton]}

@@ -54,7 +54,7 @@ export function FinishStopButton({ stopId, missing, onPress, uploading = 0 }: Pr
         accessibilityState={{ disabled: !ready, busy: saving }}
       >
         <LinearGradient
-          colors={ready || saving ? [colors.primary, colors.primaryDark] : [colors.border, colors.border]}
+          colors={ready || saving ? [colors.primary, colors.primary] : [colors.border, colors.border]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.button}

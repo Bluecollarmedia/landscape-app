@@ -23,6 +23,8 @@
  *          (or paste this file into the dashboard editor as
  *          send-snow-notification and turn off "Enforce JWT verification")
  * Secrets: the same RESEND_API_KEY and NOTIFY_EMAIL_FROM as send-notification.
+ * Optional: SNOW_NOTIFY_SECRET. When set, calls must send it as the x-snow-secret header (the database does this
+ *           once SQL 047 is run and the same value is stored in app_settings as 'snow_notify_secret').
  */
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0';
@@ -54,6 +56,10 @@ type Outcome = { status: 'accepted' | 'failed' | 'unavailable'; ref?: string; de
 
 serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+
+  // Optional shared secret (SQL 047). When SNOW_NOTIFY_SECRET is set here, only calls that carry it are accepted.
+  const expected = Deno.env.get('SNOW_NOTIFY_SECRET');
+  if (expected && req.headers.get('x-snow-secret') !== expected) return json({ error: 'unauthorized' }, 401);
 
   let id: string | undefined;
   try {

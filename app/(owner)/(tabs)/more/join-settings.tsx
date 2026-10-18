@@ -103,6 +103,25 @@ export default function JoinSettingsScreen() {
           )}
         </Card>
 
+        {/* Maintenance customer codes live on each property */}
+        <Card title="Maintenance Customer Codes" style={styles.card}>
+          <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>
+            Maintenance customers join with a code for their own property, not the team code above.
+          </Text>
+          <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+            Open a property to see, copy or replace its code.
+          </Text>
+          <PressableScale
+            onPress={() => router.push('/(owner)/(tabs)/maintenance/properties' as any)}
+            style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }}
+            accessibilityRole="button"
+            accessibilityLabel="Open maintenance properties"
+          >
+            <Icon name="home" size={16} color={colors.primary} />
+            <Text style={[typeScale.labelSmall, { color: colors.primary, marginLeft: spacing.sm }]}>Open maintenance properties</Text>
+          </PressableScale>
+        </Card>
+
         {/* Direct Invitations */}
         <Card title="Direct Invitations" style={styles.card}>
           <View style={styles.toggleRow}>

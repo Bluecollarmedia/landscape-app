@@ -52,6 +52,8 @@ create table public.companies (
   cover_photo_url text,
   -- Header photo on the workers' home screens (cover_photo_url is the owner dashboard's).
   worker_cover_photo_url text,
+  -- Storage limit the owner picked under More → Settings → Storage, in GB (0 = no limit).
+  storage_limit_gb integer not null default 1 check (storage_limit_gb >= 0),
   setup_state jsonb not null default '{}'::jsonb,
   setup_completed_at timestamptz,
   created_at timestamptz not null default now(),

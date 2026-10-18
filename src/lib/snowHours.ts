@@ -10,6 +10,8 @@ export interface HoursShift {
   /** The times that count (the latest correction, else the tapped times). */
   clockInAt: string;
   clockOutAt?: string;
+  /** The storm tagged at clock-in (update 42), if any. */
+  stormId?: string;
   corrected: boolean;
 }
 
@@ -42,7 +44,26 @@ export interface HoursFilters {
   toDay?: string;
   /** Shifts that overlap this period (a storm's dispatch to end; `end` missing = still going). */
   window?: { start: string; end?: string };
+  /**
+   * Only shifts TAGGED with this storm at clock-in (update 42). With `includeUntagged` (and a `window`),
+   * shifts that have no tag but overlapped the window are shown too. Tagged shifts are never guessed from times.
+   */
+  stormId?: string;
+  includeUntagged?: boolean;
   onlyNeedsReview?: boolean;
+}
+
+function overlaps(s: Pick<HoursShift, 'clockInAt' | 'clockOutAt'>, w: { start: string; end?: string }, now: number): boolean {
+  const start = new Date(s.clockInAt).getTime();
+  const end = s.clockOutAt ? new Date(s.clockOutAt).getTime() : now;
+  const ws = new Date(w.start).getTime();
+  const we = w.end ? new Date(w.end).getTime() : now;
+  return !(end < ws || start > we);
+}
+
+/** Shifts with no storm tag that overlapped a period (what "include untagged" would add), optionally for one worker. */
+export function countUntaggedDuring<T extends HoursShift>(shifts: T[], w: { start: string; end?: string }, personId?: string, now = Date.now()): number {
+  return shifts.filter((s) => !s.stormId && (!personId || s.personId === personId) && overlaps(s, w, now)).length;
 }
 
 export function filterShifts<T extends HoursShift>(shifts: T[], f: HoursFilters, now = Date.now()): T[] {
@@ -51,12 +72,12 @@ export function filterShifts<T extends HoursShift>(shifts: T[], f: HoursFilters,
     const day = dayKeyOf(s.clockInAt);
     if (f.fromDay && day < f.fromDay) return false;
     if (f.toDay && day > f.toDay) return false;
-    if (f.window) {
-      const start = new Date(s.clockInAt).getTime();
-      const end = s.clockOutAt ? new Date(s.clockOutAt).getTime() : now;
-      const ws = new Date(f.window.start).getTime();
-      const we = f.window.end ? new Date(f.window.end).getTime() : now;
-      if (end < ws || start > we) return false;
+    if (f.stormId) {
+      const tagged = s.stormId === f.stormId;
+      const untaggedInWindow = !!f.includeUntagged && !s.stormId && !!f.window && overlaps(s, f.window, now);
+      if (!tagged && !untaggedInWindow) return false;
+    } else if (f.window) {
+      if (!overlaps(s, f.window, now)) return false;
     }
     if (f.onlyNeedsReview && !isShortShift(s)) return false;
     return true;

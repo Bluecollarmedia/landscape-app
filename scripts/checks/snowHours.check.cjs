@@ -6,7 +6,7 @@ const path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '../../src/lib/snowHours.ts'), 'utf8');
 const m = { exports: {} };
 new Function('module', 'exports', ts.transpileModule(src, { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports);
-const { filterShifts, groupByWorkerDay, isShortShift, shiftMs, dayKeyOf, weekStartDay, addDays } = m.exports;
+const { filterShifts, groupByWorkerDay, isShortShift, shiftMs, dayKeyOf, weekStartDay, addDays, countUntaggedDuring } = m.exports;
 
 let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  — ' + detail}`); };
@@ -60,5 +60,28 @@ check('17 review counts roll up to the day and the worker', bob.needsReview === 
 check('18 recorded times are never changed by filtering or grouping', JSON.stringify(shifts) === before);
 check('19 weekStartDay is a Monday', new Date(`${weekStartDay(new Date('2026-02-11T10:00:00'))}T00:00:00`).getDay() === 1 && weekStartDay(new Date('2026-02-11T10:00:00')) === '2026-02-09');
 check('20 addDays crosses month ends', addDays('2026-02-28', 1) === '2026-03-01' && addDays('2026-03-01', -1) === '2026-02-28');
+
+// ── Storm tags (update 42) ──────────────────────────────────────────────────
+const stormA = 'storm-A', stormB = 'storm-B';
+const tagWin = { start: at('2026-02-09', 5), end: at('2026-02-09', 20) };
+const tagged = [
+  shift('ann', '2026-02-09', 6, 10, { stormId: stormA }),   // tagged to A
+  shift('bob', '2026-02-09', 7, 9, { stormId: stormB }),    // tagged to B, overlaps A's window
+  shift('cy', '2026-02-09', 8, 9),                          // untagged, inside the window
+  shift('cy', '2026-02-12', 8, 9),                          // untagged, outside the window
+  shift('dee', '2026-02-09', 11, 12, { stormId: stormA }),  // tagged to A
+];
+const beforeTags = JSON.stringify(tagged);
+let tr = filterShifts(tagged, { stormId: stormA, window: tagWin }, NOW);
+check('21 the storm filter shows only shifts TAGGED to that storm', tr.length === 2 && tr.every((x) => x.stormId === stormA), JSON.stringify(tr.map((x) => x.id)));
+tr = filterShifts(tagged, { stormId: stormA, window: tagWin, includeUntagged: true }, NOW);
+check('22 "include untagged" adds untagged shifts that overlapped the storm, and nothing else', tr.length === 3 && tr.filter((x) => !x.stormId).length === 1 && tr.find((x) => !x.stormId).personId === 'cy', JSON.stringify(tr.map((x) => [x.personId, x.stormId])));
+check('23 a shift tagged to ANOTHER storm is never shown, even when the times overlap', !tr.some((x) => x.stormId === stormB));
+check('24 untagged shifts outside the storm\'s time are not added', tr.every((x) => !(x.personId === 'cy' && new Date(x.clockInAt).getDate() === 12)));
+check('25 the untagged count only counts overlapping untagged shifts', countUntaggedDuring(tagged, tagWin, undefined, NOW) === 1 && countUntaggedDuring(tagged, tagWin, 'ann', NOW) === 0 && countUntaggedDuring(tagged, tagWin, 'cy', NOW) === 1);
+check('26 a storm with no tags at all shows nothing until untagged are included (old data stays visible on request)', filterShifts(shifts, { stormId: 'none', window: tagWin }, NOW).length === 0 && filterShifts(shifts, { stormId: 'none', window: tagWin, includeUntagged: true }, NOW).length > 0);
+check('27 with a worker filter the tag filter still narrows to that worker', filterShifts(tagged, { stormId: stormA, personId: 'dee', window: tagWin }, NOW).length === 1);
+check('28 recorded times and tags are never changed by filtering', JSON.stringify(tagged) === beforeTags);
+check('29 without a storm, the old window filter works exactly as before', filterShifts(shifts, { window: { start: at('2026-02-09', 8, 30), end: at('2026-02-09', 12) } }, NOW).some((x) => x.personId === 'ann'));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

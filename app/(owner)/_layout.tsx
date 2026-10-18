@@ -24,6 +24,9 @@ export default function OwnerLayout() {
         <Stack.Screen name="resource-edit" options={{ presentation: 'modal' }} />
         <Stack.Screen name="resource-access" options={{ presentation: 'modal' }} />
         <Stack.Screen name="worker-access" options={{ presentation: 'modal' }} />
+        {/* Crews: opened from Workers and from a worker's profile. */}
+        <Stack.Screen name="crews" />
+        <Stack.Screen name="crew-edit" options={{ presentation: 'modal' }} />
         <Stack.Screen name="document" />
         <Stack.Screen name="document-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="document-edit" options={{ presentation: 'modal', gestureEnabled: false }} />

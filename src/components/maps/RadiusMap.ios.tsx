@@ -5,7 +5,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { findCoords, cachedCoords } from '@/lib/maps';
 import { validCoords } from '@/lib/checkInRadius';
 import { formatAddress } from '@/lib/address';
-import { RadiusMap as DrawnRadius, type RadiusMapProps } from './RadiusMap';
+import { RadiusMapDrawn as DrawnRadius, type RadiusMapProps } from './RadiusMapDrawn';
 
 type Coords = { latitude: number; longitude: number };
 

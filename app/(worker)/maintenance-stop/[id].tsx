@@ -178,7 +178,7 @@ export default function MaintenanceStopScreen() {
 
         {stop.tasks.length > 0 && (
           <Section title={required.length ? `Checklist · ${required.filter((t) => t.completedAt).length} of ${required.length} required` : 'Checklist'}>
-            <StopChecklist tasks={stop.tasks} locked={locked} onError={setError} />
+            <StopChecklist tasks={stop.tasks} locked={locked} stopId={stop.id} requiresPhotos={stop.requiresPhotos} photoCount={stop.photos.length} onError={setError} />
           </Section>
         )}
 

@@ -9,6 +9,7 @@ import { Icon, PressableScale } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { db } from '@/data/store';
 import { setTaskDone } from '@/data/maintenance';
+import { askForTaskPhoto } from '@/lib/stopPhotoPicker';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { haptics } from '@/lib/haptics';
@@ -18,10 +19,14 @@ interface Props {
   tasks: MaintenanceStopTask[];
   /** Finished or skipped stops show the list read-only. */
   locked: boolean;
+  /** Ticking a task offers a photo when the stop has none yet; when the property requires photos it must be added first. */
+  stopId: string;
+  requiresPhotos: boolean;
+  photoCount: number;
   onError?: (message: string) => void;
 }
 
-export function StopChecklist({ tasks, locked, onError }: Props) {
+export function StopChecklist({ tasks, locked, stopId, requiresPhotos, photoCount, onError }: Props) {
   const { colors } = useTheme();
   const [saving, setSaving] = useState<string | null>(null);
   const sorted = tasks.slice().sort((a, b) => a.sortOrder - b.sortOrder);
@@ -29,6 +34,12 @@ export function StopChecklist({ tasks, locked, onError }: Props) {
   async function toggle(t: MaintenanceStopTask) {
     if (locked || saving) return;
     haptics.light();
+    if (!t.completedAt && photoCount === 0) {
+      setSaving(t.id);
+      const go = await askForTaskPhoto(stopId, requiresPhotos);
+      setSaving(null);
+      if (!go) return;
+    }
     setSaving(t.id);
     const res = await setTaskDone(t.id, !t.completedAt);
     setSaving(null);

@@ -43,6 +43,14 @@ export default function AnnouncementsScreen() {
           Announcements
         </Text>
         <Pressable
+          onPress={() => router.push('/(owner)/more/announcements/customers' as any)}
+          style={[styles.composeBtn, { backgroundColor: colors.backgroundTertiary, marginRight: spacing.sm }]}
+          accessibilityRole="button"
+          accessibilityLabel="Message customers"
+        >
+          <Icon name="users" size={18} color={colors.textPrimary} />
+        </Pressable>
+        <Pressable
           onPress={() => router.push('/(owner)/more/announcements/new' as any)}
           style={[styles.composeBtn, { backgroundColor: colors.primary }]}
           accessibilityRole="button"

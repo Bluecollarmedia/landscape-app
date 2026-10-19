@@ -62,6 +62,7 @@ export default function SnowOwnerMoreScreen() {
           <Group title="Records">
             <Row icon="activity" title="Activity log" subtitle="Everything that happened, by storm, route and person" onPress={() => router.push('/snow/owner/activity')} />
             <Row icon="clock" title="Snow hours" subtitle="Who clocked in this week, and fix a missed clock-out" onPress={() => router.push('/snow/owner/hours')} />
+            <Row icon="send" title="Message customers" subtitle="Send a push notification and banner to customers" onPress={() => router.push('/snow/owner/message-customers')} />
             <Row icon="camera" title="Photo review" subtitle="Approve photos and send updates to customers" onPress={() => router.push('/snow/owner/review')} />
           </Group>
 

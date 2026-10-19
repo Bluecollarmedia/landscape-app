@@ -70,7 +70,7 @@ export default function CustomerHomeScreen() {
   return (
     <ScreenContainer scrollable padded>
       <View style={{ paddingTop: insets.top + spacing.sm, marginBottom: spacing.md }}>
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Welcome back</Text>
+        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Welcome Back</Text>
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontWeight: '800' }]}>{user?.firstName ?? 'there'}</Text>
       </View>
 

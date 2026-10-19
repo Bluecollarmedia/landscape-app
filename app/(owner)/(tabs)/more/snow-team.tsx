@@ -327,7 +327,8 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader title="Snow Team" subtitle="Who can work snow, and who is waiting" hideBack={asTab} />
       <ScrollView
-        contentContainerStyle={[styles.content, asTab && { paddingBottom: tabBarClearance + spacing.lg }]}
+        // Always clear the floating tab bar (also when opened from More), so the last row can be reached.
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance + spacing.lg }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await admin.reload(); setRefreshing(false); }} />}
       >
         {savedNote ? <InlineNotice icon="check-circle" tone="success" text={savedNote} style={{ marginBottom: spacing.md }} /> : null}

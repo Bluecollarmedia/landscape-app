@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/Icon';
 import { ScreenHeader, GlassIconButton, Button, SearchBar, FilterChips, ListSection, EmptyState, LoadingSpinner } from '@/components/ui';
 import { DocumentRow } from '@/components/financials/DocumentRow';
 import { useTheme } from '@/providers/ThemeProvider';
+import { useFixedBottomOffset } from '@/hooks/useFixedBottomOffset';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useFinancialDocs } from '@/hooks/useFinancials';
 import { db } from '@/data/store';
@@ -38,6 +39,7 @@ export default function FinancialsOverviewScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const clearance = useTabBarClearance();
+  const fab = useFixedBottomOffset();
   const docs = useFinancialDocs();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
@@ -65,7 +67,7 @@ export default function FinancialsOverviewScreen() {
   ];
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+    <View ref={fab.ref} onLayout={fab.onLayout} style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader
         title="Quotes & Invoices"
         subtitle="Quotes, change orders and invoices"
@@ -122,7 +124,7 @@ export default function FinancialsOverviewScreen() {
         )}
       </KeyboardAwareScrollView>
 
-      <View style={[styles.fab, { bottom: clearance + spacing.sm }]} pointerEvents="box-none">
+      <View style={[styles.fab, { bottom: fab.bottom }]} pointerEvents="box-none">
         <Button
           title="Create Quote"
           icon="plus"

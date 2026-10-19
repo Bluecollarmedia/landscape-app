@@ -1,8 +1,8 @@
 import { useOpenIssueCount } from '@/data/issues';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
@@ -57,6 +57,18 @@ export default function OwnerDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+
+  // The Dashboard always opens at the top: every time its tab comes into view, and when its tab is tapped again.
+  const scrollRef = useRef<ScrollView>(null);
+  const navigation = useNavigation();
+  const toTop = useCallback(() => scrollRef.current?.scrollTo({ y: 0, animated: false }), []);
+  useFocusEffect(toTop);
+  useEffect(() => {
+    const subs = [navigation, navigation.getParent?.()]
+      .filter(Boolean)
+      .map((n: any) => n.addListener('tabPress', () => scrollRef.current?.scrollTo({ y: 0, animated: true })));
+    return () => subs.forEach((unsub: () => void) => unsub());
+  }, [navigation]);
   const openIssueCount = useOpenIssueCount();
   const {
     todayStats, attentionItems, attentionTotalCount,
@@ -199,7 +211,7 @@ export default function OwnerDashboard() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
           <View>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>

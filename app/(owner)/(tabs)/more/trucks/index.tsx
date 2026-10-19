@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTrucks } from '@/hooks/useTrucks';
-import { StatusBadge, OptimizedImage, ScreenHeader, RaisedAddButton, IconTile, PressableScale, FadeInItem } from '@/components/ui';
+import { StatusBadge, OptimizedImage, ScreenHeader, RaisedAddButton, IconTile, PressableScale } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { TruckStatus } from '@/types/truck';
@@ -35,7 +35,7 @@ export default function TrucksScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <FadeInItem index={0} style={styles.statsRow}>
+        <View style={styles.statsRow}>
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <IconTile name="truck" size={32} />
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{counts.all}</Text>
@@ -51,12 +51,12 @@ export default function TrucksScreen() {
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{counts.maintenance}</Text>
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Maintenance</Text>
           </View>
-        </FadeInItem>
+        </View>
 
         {trucks.map((truck, index) => {
           const badge = STATUS_MAP[truck.status];
           return (
-            <FadeInItem key={truck.id} index={index + 1}>
+            <View key={truck.id}>
               <PressableScale
                 style={[styles.truckCard, { backgroundColor: colors.surface }]}
                 scaleTo={0.97}
@@ -107,7 +107,7 @@ export default function TrucksScreen() {
 
                 <Icon name="chevron-right" size={18} color={colors.textTertiary} />
               </PressableScale>
-            </FadeInItem>
+            </View>
           );
         })}
       </ScrollView>

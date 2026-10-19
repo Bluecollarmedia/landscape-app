@@ -69,6 +69,8 @@ const TABLES = {
   project_requests: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'requestedBy', 'title', 'description', 'category', 'attachmentUrl', 'status', 'linkedTaskId', 'respondedAt', 'responseNote', 'createdAt', 'updatedAt'] },
   project_history: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'actorId', 'eventType', 'description', 'metadata', 'createdAt'] },
   customer_timeline: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'eventType', 'title', 'description', 'photoUrl', 'timestamp'] },
+  truck_documents: { scope: 'company', cols: ['id', 'companyId', 'truckId', 'kind', 'title', 'fileUrl', 'fileKey', 'contentType', 'sizeBytes', 'expiresOn', 'createdBy', 'createdAt', 'updatedAt'] },
+  truck_notes: { scope: 'company', cols: ['id', 'companyId', 'truckId', 'body', 'createdBy', 'createdAt', 'updatedAt'] },
   trucks: { scope: 'company', cols: ['id', 'companyId', 'name', 'make', 'model', 'year', 'licensePlate', 'vin', 'color', 'photoUrl', 'status', 'notes', 'assignedTo', 'createdAt', 'updatedAt'] },
   assignments: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'scheduledDate', 'startTime', 'endTime', 'isFullDay', 'sortOrder', 'status', 'confirmationState', 'truckId', 'notes', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'reassignedFrom', 'reassignedTo', 'seriesId', 'createdAt', 'updatedAt'] },
   // Repeating schedules (supabase/updates/012). Their days are filled in as

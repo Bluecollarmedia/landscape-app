@@ -28,6 +28,7 @@ function guessContentType(uri: string, mimeType?: string): { contentType: string
   if (mime === 'image/png' || lower.endsWith('.png')) return { contentType: 'image/png', ext: 'png' };
   if (mime === 'image/webp' || lower.endsWith('.webp')) return { contentType: 'image/webp', ext: 'webp' };
   if (lower.endsWith('.heic') || lower.endsWith('.heif')) return { contentType: 'image/heic', ext: 'heic' };
+  if (mime === 'application/pdf' || lower.endsWith('.pdf')) return { contentType: 'application/pdf', ext: 'pdf' };
   return { contentType: 'image/jpeg', ext: 'jpg' };
 }
 

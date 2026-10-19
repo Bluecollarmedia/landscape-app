@@ -21,6 +21,8 @@ import { previewProjectClear, runProjectClear } from '@/data/activityClear';
 import { refresh as refreshStore } from '@/data/store';
 import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
 import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
+import { ProjectPrivateNotes } from '@/components/projects/ProjectPrivateNotes';
+import { useIsProjectOwner } from '@/data/ownerProjectNotes';
 import { MessageThread } from '@/components/messages/MessageThread';
 import { db } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
@@ -97,6 +99,11 @@ const MORE_ITEMS = [
     iconBg: '#F3EEDF', iconColor: '#8A6D1F',
   },
   {
+    key: 'notes', label: 'My Notes', icon: 'edit-3' as const,
+    description: 'Your private notes, pictures and materials list. Only you see these',
+    iconBg: '#FBEFD9', iconColor: '#9A6A12',
+  },
+  {
     key: 'people', label: 'People', icon: 'users' as const,
     description: 'View and manage the customer and project team members',
     iconBg: '#DCE9FB', iconColor: '#2E6BD6',
@@ -113,8 +120,8 @@ const MORE_ITEMS = [
   },
 ];
 
-type MoreSubSection = 'financials' | 'materials' | 'people' | 'activity' | 'settings';
-const MORE_DEEP_LINKS: string[] = ['financials', 'materials'];
+type MoreSubSection = 'financials' | 'materials' | 'notes' | 'people' | 'activity' | 'settings';
+const MORE_DEEP_LINKS: string[] = ['financials', 'materials', 'notes'];
 
 const PHOTO_TYPE_LABEL: Record<string, string> = {
   before: 'Before', after: 'After', progress: 'Progress', issue: 'Issue', general: 'General',
@@ -229,6 +236,7 @@ export default function ProjectDetailScreen() {
 
   const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, editRequestResponse, reopenRequest, deleteRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
   const { user } = useAuth();
+  const isProjectOwner = useIsProjectOwner();
   const schedule = useSchedule();
   const customerAccess = useCustomerAccess();
   const { workers: companyWorkers } = useWorkers();
@@ -1146,7 +1154,7 @@ export default function ProjectDetailScreen() {
             </View>
           </View>
 
-          {MORE_ITEMS.map((item) => (
+          {MORE_ITEMS.filter((item) => item.key !== 'notes' || isProjectOwner).map((item) => (
             <Pressable
               key={item.key}
               style={[styles.moreCardRow, { backgroundColor: colors.surface }, shadow.sm]}
@@ -1174,6 +1182,11 @@ export default function ProjectDetailScreen() {
       <View>
         {moreSubSection === 'financials' && <ProjectFinancials projectId={p.id} />}
         {moreSubSection === 'materials' && <ProjectMaterials projectId={p.id} />}
+        {moreSubSection === 'notes' && isProjectOwner && (
+          <View style={styles.sectionContent}>
+            <ProjectPrivateNotes projectId={p.id} projectName={p.name} address={[p.address, p.city].filter(Boolean).join(', ') || undefined} />
+          </View>
+        )}
         {moreSubSection === 'people' && renderPeople()}
         {moreSubSection === 'activity' && renderActivity()}
         {moreSubSection === 'settings' && renderSettings()}

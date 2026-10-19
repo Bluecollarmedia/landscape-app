@@ -11,6 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Button, ListSection, EmptyState, InlineNotice } from '@/components/ui';
+import { ProjectPrivateNotes } from '@/components/projects/ProjectPrivateNotes';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { DateRow, InputRow, ValueRow, NoteField } from '@/components/financials/FormBits';
 import { LineItemSheet } from '@/components/financials/LineItemSheet';
@@ -228,6 +229,7 @@ export default function DocumentEditScreen() {
         </View>
       </View>
 
+      {/* The owner's private notes for this project (what to order, measurements, materials, pictures). Never on the document. */}
       <KeyboardAwareScrollView
         bottomOffset={KEYBOARD_GAP}
         keyboardShouldPersistTaps="handled"
@@ -271,6 +273,12 @@ export default function DocumentEditScreen() {
               />
             </ListSection>
           </>
+        )}
+
+        {step === 0 && doc.kind === 'quote' && project && (
+          <View style={{ marginTop: spacing.lg }}>
+            <ProjectPrivateNotes projectId={project.id} projectName={project.name} address={address} />
+          </View>
         )}
 
         {step === 1 && (
@@ -319,6 +327,12 @@ export default function DocumentEditScreen() {
             <Button title="Add Item" icon="plus" variant="secondary" onPress={() => setEditing({ item: newLineItem(), isNew: true })} fullWidth style={{ marginBottom: spacing.lg }} />
             {totalsBlock}
           </>
+        )}
+
+        {step === 1 && doc.kind === 'quote' && project && (
+          <View style={{ marginTop: spacing.lg }}>
+            <ProjectPrivateNotes projectId={project.id} projectName={project.name} address={address} />
+          </View>
         )}
 
         {step === 2 && (

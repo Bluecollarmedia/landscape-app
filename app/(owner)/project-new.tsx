@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Button, Input, Card, DateField } from '@/components/ui';
+import { QuickAddCustomer } from '@/components/customers/QuickAddCustomer';
 import { useCustomers } from '@/hooks/useCustomers';
 import { generateProjectCode } from '@/hooks/useCustomerAccess';
 import { useProject } from '@/hooks/useProject';
@@ -284,7 +285,7 @@ export default function NewProjectScreen() {
           <Card title="Customer" style={{ marginTop: spacing.lg }}>
             {customers.length === 0 ? (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                No customers yet. Add one from the Customers tab, or share the project code later so the customer can join on their own.
+                No customers yet. Add one below, or share the project code later so the customer can join on their own.
               </Text>
             ) : (
               <View style={styles.chipRow}>
@@ -312,6 +313,7 @@ export default function NewProjectScreen() {
                 })}
               </View>
             )}
+            <QuickAddCustomer onAdded={setCustomerId} />
           </Card>
 
           <Card title="Internal Notes" style={{ marginTop: spacing.lg }}>

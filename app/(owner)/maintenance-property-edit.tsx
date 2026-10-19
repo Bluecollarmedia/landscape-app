@@ -23,6 +23,7 @@ import { AddressFields, type AddressCheck } from '@/components/ui/AddressFields'
 import { DateRow, InputRow, NoteField } from '@/components/financials/FormBits';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCustomers } from '@/hooks/useCustomers';
+import { QuickAddCustomer } from '@/components/customers/QuickAddCustomer';
 import { useMaintenanceProperty } from '@/hooks/useMaintenance';
 import { db } from '@/data/store';
 import {
@@ -350,7 +351,7 @@ export default function MaintenancePropertyEditScreen() {
           <ListRow
             icon="user"
             title={customer ? `${customer.person.firstName} ${customer.person.lastName}` : 'Customer'}
-            subtitle={customer ? 'Linked customer' : 'Optional · pick an existing customer'}
+            subtitle={customer ? 'Linked customer' : 'Optional · pick one or add a new customer'}
             value={customer ? 'Change' : 'Choose'}
             onPress={() => setPicking((v) => !v)}
           />
@@ -375,9 +376,10 @@ export default function MaintenancePropertyEditScreen() {
               ))}
               {customerMatches.length === 0 && (
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary, paddingVertical: spacing.sm }]}>
-                  No customers match. Add them from More → Customers first, or leave this empty.
+                  No customers match. Add a new one below, or leave this empty.
                 </Text>
               )}
+              <QuickAddCustomer onAdded={(id) => pickCustomer(id)} />
               {!!customerId && (
                 <Pressable onPress={() => pickCustomer(undefined)} style={styles.pickRow} accessibilityRole="button">
                   <Icon name="x-circle" size={18} color={colors.textSecondary} />

@@ -11,7 +11,8 @@ import { PressScale, UsageBar } from '@/components/settings/SettingsList';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { useStorageInfo, useStorageLimit } from '@/hooks/useStorage';
+import { useStorageInfo, useStorageLimit, useMaxFileSize } from '@/hooks/useStorage';
+import { MAX_FILE_PRESETS_MB, SERVER_MAX_FILE_MB, mbLabel, parseMaxFileMb } from '@/lib/uploadLimit';
 import { haptics } from '@/lib/haptics';
 import {
   formatBytes,
@@ -26,6 +27,9 @@ export default function StorageScreen() {
   const insets = useSafeAreaInsets();
   const { info, loading, error, refresh } = useStorageInfo();
   const { limitGb, limitBytes, setLimitGb } = useStorageLimit();
+  const { maxMb, setMaxMb } = useMaxFileSize();
+  const [maxText, setMaxText] = useState('');
+  const typedMax = parseMaxFileMb(maxText);
   const presetIndex = STORAGE_LIMIT_OPTIONS_GB.indexOf(limitGb as typeof STORAGE_LIMIT_OPTIONS_GB[number]);
   const [customOpen, setCustomOpen] = useState(presetIndex === -1);
   const [customText, setCustomText] = useState(presetIndex === -1 ? String(limitGb) : '');
@@ -225,11 +229,53 @@ export default function StorageScreen() {
 
         {/* Storage Limits */}
         <Card title="Upload Limits" style={styles.card}>
-          <LimitRow
-            label="Max File Size"
-            value={formatBytes(settings?.maxFileSizeBytes ?? 0)}
-            colors={colors}
-          />
+          <View>
+            <View style={styles.maxHead}>
+              <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Max File Size</Text>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{mbLabel(maxMb)}</Text>
+            </View>
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+              The biggest single photo or video anyone can upload. Bigger files are turned away with a clear message.
+            </Text>
+            <View style={styles.maxChips}>
+              {MAX_FILE_PRESETS_MB.map((mb) => (
+                <Pressable
+                  key={mb}
+                  onPress={() => { haptics.select(); setMaxText(''); setMaxMb(mb); }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: maxMb === mb }}
+                  accessibilityLabel={`Set the max file size to ${mbLabel(mb)}`}
+                  style={[styles.maxChip, { backgroundColor: maxMb === mb ? colors.primary : colors.groupedBackground }]}
+                >
+                  <Text style={[typeScale.labelLarge, { color: maxMb === mb ? '#FFFFFF' : colors.textSecondary }]}>{mb}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.customRow}>
+              <View style={[styles.customField, { backgroundColor: colors.groupedBackground }]}>
+                <TextInput
+                  value={maxText}
+                  onChangeText={(t) => setMaxText(t.replace(/[^0-9]/g, '').slice(0, 3))}
+                  onSubmitEditing={() => { if (typedMax) { haptics.success(); setMaxMb(typedMax); setMaxText(''); } }}
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                  placeholder={`Other, 1 to ${SERVER_MAX_FILE_MB}`}
+                  placeholderTextColor={colors.textTertiary}
+                  style={[typeScale.bodyLarge, styles.customInput, { color: colors.textPrimary }]}
+                  accessibilityLabel="Custom max file size in MB"
+                />
+                <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>MB</Text>
+              </View>
+              <PressScale
+                onPress={typedMax ? () => { haptics.success(); setMaxMb(typedMax); setMaxText(''); } : undefined}
+                disabled={!typedMax}
+                style={[styles.customSave, { backgroundColor: typedMax ? colors.primary : colors.backgroundTertiary }]}
+                accessibilityLabel="Save max file size"
+              >
+                <Text style={[typeScale.labelLarge, { color: typedMax ? '#FFFFFF' : colors.textTertiary }]}>Save</Text>
+              </PressScale>
+            </View>
+          </View>
           <LimitRow
             label="Upload Rate"
             value={`${settings?.rateLimitPerMinute ?? 0}/min, ${settings?.rateLimitPerHour ?? 0}/hr`}
@@ -322,6 +368,9 @@ function LimitRow({ label, value, colors }: { label: string; value: string; colo
 }
 
 const styles = StyleSheet.create({
+  maxHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  maxChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
+  maxChip: { minWidth: 52, height: 38, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
   screen: { flex: 1 },
   header: {
     flexDirection: 'row',

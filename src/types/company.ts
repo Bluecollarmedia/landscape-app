@@ -23,6 +23,8 @@ export interface Company {
   workerCoverPhotoUrl?: string;
   /** Storage limit the owner picked, in GB. 0 means no limit. Missing means the 1 GB default. */
   storageLimitGb?: number;
+  /** Biggest single upload the owner allows, in MB (1 to 200). Missing means the upload service's own maximum (200 MB). */
+  maxFileSizeMb?: number;
   /** Payroll: pay each worker's target rate × hours, absorbing overtime into a lower base. */
   targetPayEnabled?: boolean;
   /** Landscaping Mode or Snow Mode. Set by the owner; never grants anyone access. Missing means landscaping. */

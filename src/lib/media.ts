@@ -13,6 +13,7 @@ import { Platform } from 'react-native';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { uuid } from './ids';
 import { explainUploadError, SIGNED_OUT_UPLOAD_MESSAGE } from './uploadErrors';
+import { tooLargeMessage } from './uploadLimit';
 
 export const MEDIA_BUCKET = 'media';
 
@@ -78,6 +79,10 @@ export async function requireSession(): Promise<void> {
 
 async function uploadToR2(localUri: string, folder: string, contentType: string): Promise<{ url: string; key: string }> {
   const blob = await (await fetch(localUri)).blob();
+  // The owner's max file size (More > Storage). The media function checks it again on the server.
+  const { db } = require('@/data/store') as typeof import('@/data/store');
+  const tooBig = tooLargeMessage(blob.size, db?.company?.maxFileSizeMb);
+  if (tooBig) throw new Error(tooBig);
   const { data, error } = await supabase.functions.invoke('media', {
     body: { action: 'put', folder, contentType, size: blob.size },
   });

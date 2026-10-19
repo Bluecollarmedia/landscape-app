@@ -10,6 +10,8 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { Input, Button } from '@/components/ui';
+import { SignupPhotoPicker } from '@/components/account/SignupPhotoPicker';
+import { saveSignupPhoto } from '@/data/signupPhoto';
 import { AddressFields, missingAddressPart } from '@/components/ui/AddressFields';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -41,6 +43,7 @@ export default function CreateCompanyScreen() {
 
   // Owner info
   const [firstName, setFirstName] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -165,6 +168,15 @@ export default function CreateCompanyScreen() {
         { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() },
         { company: { ...company, email: email.trim() } },
       );
+      // The photo is optional and can only be saved once signed in. A problem with it never undoes the account.
+      if (photoUri && !result.needsEmailConfirmation) {
+        const saved = await saveSignupPhoto(photoUri);
+        if (!saved.ok) {
+          const note = `Your account is ready, but your profile photo wasn't saved. ${saved.error} You can add it in Edit Profile.`;
+          if (Platform.OS === 'web') alert(note);
+          else Alert.alert('Photo not saved', note);
+        }
+      }
       if (result.needsEmailConfirmation) {
         const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in. Your company is already set up.`;
         if (Platform.OS === 'web') alert(msg);
@@ -243,6 +255,7 @@ export default function CreateCompanyScreen() {
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.md }]}>
               You'll be the company owner with full administrative access.
             </Text>
+            {!signedIn && <SignupPhotoPicker uri={photoUri} onChange={setPhotoUri} onError={setError} firstName={firstName} lastName={lastName} />}
             <View style={styles.row}>
               <Input label="First Name *" placeholder="Joey" value={firstName} onChangeText={setFirstName} containerStyle={{ flex: 1 }} />
               <Input label="Last Name *" placeholder="Angeloco" value={lastName} onChangeText={setLastName} containerStyle={{ flex: 1 }} />

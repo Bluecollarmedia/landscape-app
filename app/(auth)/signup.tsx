@@ -15,6 +15,8 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { ScreenContainer } from '@/components/layout';
 import { Button, Input } from '@/components/ui';
+import { SignupPhotoPicker } from '@/components/account/SignupPhotoPicker';
+import { saveSignupPhoto } from '@/data/signupPhoto';
 import { Icon } from '@/components/ui/Icon';
 import { semantic } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
@@ -41,6 +43,8 @@ export default function SignUpScreen() {
   const passwordRef = useRef<TextInput>(null);
 
   const [agreed, setAgreed] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+
 
   async function handleSignUp() {
     if (!agreed) {
@@ -62,6 +66,15 @@ export default function SignUpScreen() {
 
     try {
       const result = await signUp(email.trim(), password, { firstName: firstName.trim(), lastName: lastName.trim() });
+      // The photo is optional and can only be saved once signed in. A problem with it never undoes the account.
+      if (photoUri && !result.needsEmailConfirmation) {
+        const saved = await saveSignupPhoto(photoUri);
+        if (!saved.ok) {
+          const note = `Your account is ready, but your profile photo wasn't saved. ${saved.error} You can add it in Edit Profile.`;
+          if (Platform.OS === 'web') alert(note);
+          else Alert.alert('Photo not saved', note);
+        }
+      }
       if (result.needsEmailConfirmation) {
         const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in.`;
         if (Platform.OS === 'web') alert(msg);
@@ -109,6 +122,8 @@ export default function SignUpScreen() {
             <Text style={[typeScale.bodySmall, { color: semantic.error, flex: 1, marginLeft: spacing.sm }]}>{error}</Text>
           </View>
         ) : null}
+
+        <SignupPhotoPicker uri={photoUri} onChange={setPhotoUri} onError={setError} firstName={firstName} lastName={lastName} />
 
         <View style={styles.nameRow}>
           <Input

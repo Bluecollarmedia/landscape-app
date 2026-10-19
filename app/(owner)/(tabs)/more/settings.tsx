@@ -9,6 +9,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { DeleteCompanyRow } from '@/components/account/DeleteCompanyRow';
 import { ModeSwitchRow } from '@/components/snow/ModeSwitchRow';
+import { CustomerMessagePushRow } from '@/components/settings/CustomerMessagePushRow';
 import { SettingsGroup, SettingsRow, PressScale, UsageBar, tileColors } from '@/components/settings/SettingsList';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useAuth } from '@/providers/AuthProvider';
@@ -186,6 +187,10 @@ export default function SettingsScreen() {
             </Text>
             <UsageBar percent={limitBytes > 0 ? usedPercent : 0} color={usageColor} />
           </SettingsRow>
+        </SettingsGroup>
+
+        <SettingsGroup title="Notifications" footer="Turning this off only stops the phone alert. Customer messages still appear in your notification center and on the bell.">
+          <CustomerMessagePushRow />
         </SettingsGroup>
 
         <SettingsGroup title="App">

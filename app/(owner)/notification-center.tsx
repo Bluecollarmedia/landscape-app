@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic, brand } from '@/theme/colors';
 import { useNotifications } from '@/hooks/useOperations';
+import { ownerNotificationTarget } from '@/lib/notificationTarget';
 import type { NotificationEventType } from '@/types/operations';
 
 const EVENT_ICONS: Record<NotificationEventType, { icon: string; color: string }> = {
@@ -51,7 +52,22 @@ export default function NotificationCenterScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead, clearAll } = useNotifications();
+
+  function confirmClearAll() {
+    const title = 'Clear all notifications?';
+    const message = 'This will remove all notifications from your notification center. Your messages and project data will not be deleted.';
+    if (Platform.OS === 'web') {
+      if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`${title}
+
+${message}`)) clearAll();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear All', style: 'destructive', onPress: clearAll },
+    ]);
+  }
 
   const sorted = [...notifications].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -66,13 +82,18 @@ export default function NotificationCenterScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
           Notifications
         </Text>
-        {unreadCount > 0 ? (
-          <Pressable onPress={markAllRead} hitSlop={12}>
-            <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Read All</Text>
-          </Pressable>
-        ) : (
-          <View style={{ width: 50 }} />
-        )}
+        <View style={styles.topActions}>
+          {unreadCount > 0 && (
+            <Pressable onPress={markAllRead} hitSlop={10} accessibilityRole="button" accessibilityLabel="Mark all notifications as read">
+              <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Read All</Text>
+            </Pressable>
+          )}
+          {sorted.length > 0 && (
+            <Pressable onPress={confirmClearAll} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear all notifications">
+              <Text style={[typeScale.labelSmall, { color: colors.error }]}>Clear All</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {unreadCount > 0 && (
@@ -97,16 +118,12 @@ export default function NotificationCenterScreen() {
               ]}
               onPress={() => {
                 if (isUnread) markRead(n.id);
-                if (n.linkedEntityType === 'issue' && n.linkedEntityId) {
-                  router.back();
-                  router.push({ pathname: '/(owner)/issue-detail', params: { id: n.linkedEntityId } } as any);
-                  return;
-                }
-                if ((n.linkedEntityType === 'quote' || n.linkedEntityType === 'change_order' || n.linkedEntityType === 'invoice') && n.linkedEntityId) {
-                  // This screen is a modal: close it first so the document opens on the main stack.
-                  router.back();
-                  router.push({ pathname: '/(owner)/document', params: { kind: n.linkedEntityType, id: n.linkedEntityId } } as any);
-                }
+                // Only THIS notification is marked read. Then go straight to what it is about (a customer
+                // message opens that customer's thread). This screen is a modal: close it first.
+                const target = ownerNotificationTarget(n);
+                if (!target) return;
+                router.back();
+                router.push(target as any);
               }}
             >
               <View
@@ -150,6 +167,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
   },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minWidth: 50, justifyContent: 'flex-end' },
   unreadBanner: {
     paddingVertical: spacing.sm,
     alignItems: 'center',

@@ -11,6 +11,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useOwnerDashboard, type AttentionItem, type CrewMember, type ProjectHomeSummary } from '@/hooks/useOwnerDashboard';
 import { Avatar, ProgressBar } from '@/components/ui';
+import { UnreadBadge } from '@/components/ui/UnreadBadge';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -219,7 +220,8 @@ export default function OwnerDashboard() {
               hitSlop={6}
             >
               {({ pressed }) => (
-                HAS_LIQUID_GLASS ? (
+                <View>
+                {HAS_LIQUID_GLASS ? (
                   <GlassView glassEffectStyle="regular" isInteractive style={[styles.glassIconButton, pressed && styles.iconButtonPressed]}>
                     <Icon name="bell" size={19} color={colors.textPrimary} />
                   </GlassView>
@@ -227,7 +229,9 @@ export default function OwnerDashboard() {
                   <View style={[styles.smallIconButton, { backgroundColor: colors.backgroundTertiary }, pressed && styles.iconButtonPressed]}>
                     <Icon name="bell" size={19} color={colors.textPrimary} />
                   </View>
-                )
+                )}
+                <UnreadBadge />
+                </View>
               )}
             </Pressable>
             <Pressable

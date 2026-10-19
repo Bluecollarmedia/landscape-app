@@ -82,6 +82,17 @@ interface Notification {
 }
 
 async function sendPush(db: Db, n: Notification): Promise<string> {
+  // A customer message only reaches the phone when the owner's "Customer Message Notifications" is on (no row = on).
+  // The message itself is already in their notification center either way.
+  if (n.event_type === 'customer_message') {
+    const { data: pref } = await db
+      .from('notification_preferences')
+      .select('enabled')
+      .eq('person_id', n.recipient_id)
+      .eq('event_type', 'customer_message_push')
+      .maybeSingle();
+    if (pref && pref.enabled === false) return 'customer message pushes are turned off by the recipient';
+  }
   const { data: tokens } = await db.from('push_tokens').select('token').eq('person_id', n.recipient_id);
   if (!tokens?.length) return 'no devices';
 

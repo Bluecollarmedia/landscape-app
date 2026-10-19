@@ -48,6 +48,10 @@
     "development": {},
     "preview": {},
     "production": {},
-    "live-test": {}
+    "live-test": {
+      "ios": {
+        "ascAppId": "6809995492"
+      }
+    }
   }
 }

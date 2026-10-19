@@ -132,6 +132,16 @@ serve(async (req: Request) => {
       const mine = first === 'avatars' ? second === me.personId : first in me.roles;
       if (!mine) return reply({ error: 'You cannot upload there' }, 403);
 
+      // The owner's max file size for this company (More > Storage). Empty = the 200 MB maximum above. Needs update 53.
+      if (first !== 'avatars' && typeof body.size === 'number') {
+        const { data: co } = await createClient(SUPABASE_URL, SERVICE_KEY)
+          .from('companies').select('max_file_size_mb').eq('id', first).maybeSingle();
+        const limitMb = Number(co?.max_file_size_mb ?? 0);
+        if (limitMb > 0 && body.size > limitMb * 1024 * 1024) {
+          return reply({ error: `That file is larger than the ${limitMb} MB limit the owner set` }, 400);
+        }
+      }
+
       const key = `${folder}/${crypto.randomUUID()}.${ext}`;
       const url = new URL(`${BUCKET_URL}/${key}`);
       url.searchParams.set('X-Amz-Expires', '600');

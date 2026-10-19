@@ -12,6 +12,7 @@ import {
   UploadError,
 } from '@/lib/storage';
 import { logger } from '@/lib/logger';
+import { effectiveMaxFileMb } from '@/lib/uploadLimit';
 import { db, useDb, updateRow } from '@/data/store';
 import { DEFAULT_STORAGE_LIMIT_GB, storageLimitBytes } from '@/types/storage';
 import type {
@@ -157,6 +158,22 @@ export function useStorageLimit() {
   }, []);
 
   return { limitGb, limitBytes: storageLimitBytes(limitGb), setLimitGb };
+}
+
+// ── useMaxFileSize — the biggest single file the owner allows ──────
+
+/** The owner's max file size in MB (saved on the company row). Saving updates every screen and every upload check right away. */
+export function useMaxFileSize() {
+  useDb();
+  const savedMb = db.company?.maxFileSizeMb;
+  const maxMb = effectiveMaxFileMb(savedMb);
+
+  const setMaxMb = useCallback((next: number) => {
+    if (!db.company) return;
+    updateRow('companies', db.company.id, { maxFileSizeMb: next });
+  }, []);
+
+  return { maxMb, setMaxMb };
 }
 
 // ── usePhotoDelete — handles media deletion with confirmation ─────

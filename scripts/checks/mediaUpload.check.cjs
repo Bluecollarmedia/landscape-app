@@ -36,6 +36,7 @@ const load = (r2) => {
     if (name === './supabase') return { supabase: fakeSupabase, isSupabaseConfigured: true };
     if (name === './ids') return { uuid: () => 'uuid-1' };
     if (name === './uploadErrors') return errors;
+    if (name === './uploadLimit') return { tooLargeMessage: () => null };
     return {};
   };
   req.env = r2 ? { EXPO_PUBLIC_R2_PUBLIC_URL: 'https://r2.test' } : {};

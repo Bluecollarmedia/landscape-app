@@ -115,7 +115,7 @@ export function SnowDashboardScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }]}>
             <Icon name="cloud-snow" size={22} color={colors.textTertiary} />
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>No storm is planned or dispatched right now.</Text>
-            <Button title="Add Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
+            <Button title="Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
           </View>
         )}
 

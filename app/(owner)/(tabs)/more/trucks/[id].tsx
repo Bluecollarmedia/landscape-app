@@ -5,7 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTrucks } from '@/hooks/useTrucks';
-import { Card, StatusBadge, EmptyState, OptimizedImage, GlassIconButton } from '@/components/ui';
+import { Button, Card, StatusBadge, EmptyState, OptimizedImage, GlassIconButton } from '@/components/ui';
+import { TruckPrivateSection } from '@/components/trucks/TruckPrivateSection';
+import { useIsOwner } from '@/data/truckFiles';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { TruckStatus } from '@/types/truck';
@@ -33,6 +35,7 @@ export default function TruckDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { allTrucks } = useTrucks();
+  const isOwner = useIsOwner();
 
   const truck = allTrucks.find((t) => t.id === id);
 
@@ -55,7 +58,8 @@ export default function TruckDetailScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Go back" />
-        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>{truck.name}</Text>
+        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>{truck.name}</Text>
+        <GlassIconButton icon="edit-2" onPress={() => router.push({ pathname: '/(owner)/more/trucks/edit', params: { id: truck.id } } as any)} accessibilityLabel="Edit this truck" />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -70,6 +74,15 @@ export default function TruckDetailScreen() {
         <View style={{ marginTop: spacing.md, alignSelf: 'flex-start' }}>
           <StatusBadge label={badge.label} status={badge.status} />
         </View>
+
+        <Button
+          title="Edit Truck"
+          icon="edit-2"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/(owner)/more/trucks/edit', params: { id: truck.id } } as any)}
+          fullWidth
+          style={{ marginTop: spacing.md }}
+        />
 
         <Card title="Vehicle Info" style={styles.card}>
           {(truck.year || truck.make || truck.model) && (
@@ -91,6 +104,7 @@ export default function TruckDetailScreen() {
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{truck.notes}</Text>
           </Card>
         )}
+        {isOwner && <TruckPrivateSection truckId={truck.id} />}
       </ScrollView>
     </View>
   );

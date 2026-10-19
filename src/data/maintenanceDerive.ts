@@ -4,6 +4,7 @@
  * doesn't import itself.
  */
 import type { PersonSummary } from '@/types/company';
+import { cleanDates } from '@/lib/serviceDates';
 import type {
   MaintenanceContract, MaintenanceDayAttendance, MaintenanceEvent, MaintenancePhoto,
   MaintenanceProperty, MaintenanceRoute, MaintenanceRouteCrewMember, MaintenanceRouteDetail,
@@ -97,6 +98,7 @@ export function deriveMaintenance(raw: MaintenanceRaw, people: Record<string, Pe
   const rules = raw.maintenance_service_rules.map((r) => ({
     ...r,
     intervalDays: num(r.intervalDays),
+    scheduledDates: Array.isArray(r.scheduledDates) ? cleanDates(r.scheduledDates) : undefined,
     seasonQuantity: num(r.seasonQuantity),
     priorCompletedCount: Number(r.priorCompletedCount ?? 0),
     requiresPhotos: !!r.requiresPhotos,

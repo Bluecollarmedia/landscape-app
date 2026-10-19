@@ -10,6 +10,7 @@ import { useJoinRequests } from '@/hooks/useOnboarding';
 import type { JoinRequest } from '@/types/onboarding';
 import type { WorkerType } from '@/types/maintenance';
 import { haptics } from '@/lib/haptics';
+import { OwnerWorkerExtras } from '@/components/account/WorkerExtras';
 
 function formatTimeAgo(isoStr: string): string {
   const now = Date.now();
@@ -132,6 +133,12 @@ export default function PendingRequestsScreen() {
               </Text>
             </View>
           </View>
+
+          {request.personId ? (
+            <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.sm }}>
+              <OwnerWorkerExtras personId={request.personId} />
+            </View>
+          ) : null}
 
           {request.status === 'pending' && (
             <View style={styles.typePicker}>

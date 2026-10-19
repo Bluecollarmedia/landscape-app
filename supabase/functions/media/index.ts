@@ -130,11 +130,11 @@ serve(async (req: Request) => {
       if (typeof body.size === 'number' && body.size > MAX_BYTES) return reply({ error: 'That file is too large' }, 400);
 
       const [first, second] = folder.split('/');
-      const mine = first === 'avatars' ? second === me.personId : first in me.roles;
+      const mine = first === 'avatars' || first === 'ids' ? second === me.personId : first in me.roles;
       if (!mine) return reply({ error: 'You cannot upload there' }, 403);
 
       // The owner's max file size for this company (More > Storage). Empty = the 200 MB maximum above. Needs update 53.
-      if (first !== 'avatars' && typeof body.size === 'number') {
+      if (first !== 'avatars' && first !== 'ids' && typeof body.size === 'number') {
         const { data: co } = await createClient(SUPABASE_URL, SERVICE_KEY)
           .from('companies').select('max_file_size_mb').eq('id', first).maybeSingle();
         const limitMb = Number(co?.max_file_size_mb ?? 0);
@@ -157,13 +157,33 @@ serve(async (req: Request) => {
       const key = body.key;
       if (!safePath(key)) return reply({ error: 'Bad key' }, 400);
       const [first, second] = key.split('/');
-      const allowed = first === 'avatars'
+      const allowed = first === 'avatars' || first === 'ids'
         ? second === me.personId
         : first in me.roles && CAN_DELETE.has(me.roles[first]);
       if (!allowed) return reply({ error: 'You cannot delete that' }, 403);
       const res = await r2.fetch(`${BUCKET_URL}/${key}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 404) return reply({ error: 'Delete failed' }, 502);
       return reply({ ok: true });
+    }
+
+    // A worker's ID photo is never served from the public address. The person themself, or the OWNER of a company they belong to
+    // (or asked to join), gets a short-lived private link; nobody else does.
+    if (body.action === 'id-sign') {
+      const key = body.key;
+      if (!safePath(key)) return reply({ error: 'Bad key' }, 400);
+      const [first, pid] = key.split('/');
+      if (first !== 'ids' || !pid) return reply({ error: 'Bad key' }, 400);
+      let allowed = pid === me.personId;
+      if (!allowed) {
+        const svc = createClient(SUPABASE_URL, SERVICE_KEY);
+        const [{ data: members }, { data: reqs }] = await Promise.all([
+          svc.from('company_members').select('company_id').eq('person_id', pid),
+          svc.from('join_requests').select('company_id').eq('person_id', pid),
+        ]);
+        allowed = [...(members ?? []), ...(reqs ?? [])].some((r) => me.roles[r.company_id] === 'owner');
+      }
+      if (!allowed) return reply({ error: 'You cannot view that' }, 403);
+      return reply({ url: await presignGet(key, 300) });
     }
 
     if (body.action === 'snow-put') {

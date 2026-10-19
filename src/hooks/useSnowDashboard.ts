@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { db, getSession, isDemo, useDb } from '@/data/store';
+import { uniqueById } from '@/lib/snowDashboardView';
 import {
   buildSnowDashboard, type DashboardRoute, type DashboardSkipRequest, type DashboardStorm,
   type DashboardVisit, type OpenShift,
@@ -52,10 +53,20 @@ interface Loaded {
 async function load(companyId: string): Promise<{ ok: true; data: Loaded } | { ok: false; missing: boolean; message: string }> {
   const fail = (e: { code?: string; message?: string }) => ({ ok: false as const, missing: isMissingTable(e), message: e.message ?? 'Could not load snow data' });
 
-  const [stormsRes, skipsRes, shiftsRes, reviewRes] = await Promise.all([
-    supabase.from('snow_storms')
+  // `services` (update 40) lists every service of a multi-service storm. A database without that update has no such
+  // column, so the same query is repeated without it and the storm shows its first service only.
+  const loadStorms = async () => {
+    const withServices = await supabase.from('snow_storms')
+      .select('id, name, service, services, status, dispatched_at, reopened_count, created_at')
+      .eq('company_id', companyId).neq('status', 'ended');
+    if (!withServices.error) return withServices;
+    if (!/services|column|schema cache/i.test(withServices.error.message ?? '')) return withServices;
+    return supabase.from('snow_storms')
       .select('id, name, service, status, dispatched_at, reopened_count, created_at')
-      .eq('company_id', companyId).neq('status', 'ended'),
+      .eq('company_id', companyId).neq('status', 'ended');
+  };
+  const [stormsRes, skipsRes, shiftsRes, reviewRes] = await Promise.all([
+    loadStorms(),
     supabase.from('snow_skip_requests')
       .select('id, storm_id, route_id, visit_id, property_id, requested_by, reason, status, created_at')
       .eq('company_id', companyId).eq('status', 'pending'),
@@ -110,8 +121,9 @@ async function load(companyId: string): Promise<{ ok: true; data: Loaded } | { o
     ok: true,
     data: {
       storms,
-      routes: (routesRes.data ?? []).map((r) => camelRow<DashboardRoute>(r)),
-      visits: (visitsRes.data ?? []).map((r) => camelRow<DashboardVisit>(r)),
+      // A stop or route returned twice must never be counted twice.
+      routes: uniqueById((routesRes.data ?? []).map((r) => camelRow<DashboardRoute>(r))),
+      visits: uniqueById((visitsRes.data ?? []).map((r) => camelRow<DashboardVisit>(r))),
       mediaCountByVisit,
       pendingSkips,
       extraStormNames,

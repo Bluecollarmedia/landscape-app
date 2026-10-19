@@ -4,7 +4,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { useTheme } from '@/providers/ThemeProvider';
 import { findCoords, cachedCoords } from '@/lib/maps';
 import { formatAddress } from '@/lib/address';
-import { JobMap as PinCard, type JobMapProps } from './JobMap';
+import { JobMapPin as PinCard, type JobMapProps } from './JobMapPin';
 
 type Coords = { latitude: number; longitude: number };
 

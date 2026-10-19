@@ -18,7 +18,7 @@ check('7 clearAll removes only notification records; markAllRead only flips them
 check('8 tapping marks only that notification read, then goes to the shared target', /if \(isUnread\) markRead\(n\.id\)/.test(center) && /ownerNotificationTarget\(n\)/.test(center));
 check('9 push taps use the same target (foreground, background, cold start via the last-response hook)', /ownerNotificationTarget\(\{ eventType: d\.eventType/.test(push) && /useLastNotificationResponse/.test(push) && /status === 'unread'/.test(push));
 const dash = read('app/(owner)/(tabs)/index.tsx'), layout = read('app/(owner)/(tabs)/_layout.tsx'), badge = read('src/components/ui/UnreadBadge.tsx');
-check('10 one unread count (from the notification records) drives the dashboard bell, the notifications-screen bell and the Dashboard tab', /<UnreadBadge \/>/.test(dash) && /badge=\{unreadCount\}/.test(read('app/(owner)/(tabs)/more/notifications.tsx')) && /Trigger\.Badge hidden=\{unreadCount <= 0\}/.test(layout) && /tabBarBadge: unreadCount > 0/.test(layout));
+check('10 the unread count shows only on the bells (dashboard and notifications screen), never on the tab bar', /<UnreadBadge \/>/.test(dash) && /badge=\{unreadCount\}/.test(read('app/(owner)/(tabs)/more/notifications.tsx')) && !/Trigger\.Badge|tabBarBadge|badgeText/.test(layout));
 check('11 no badge at zero', /if \(n <= 0\) return null;/.test(badge));
 const prefs = read('src/data/pushPrefs.ts'), row = read('src/components/settings/CustomerMessagePushRow.tsx'), fn = read('supabase/functions/send-notification/index.ts');
 check('12 push preference defaults on and lives in the owner\'s own preference row', /\?\? true/.test(prefs) && /personId: db\.personId, eventType: CUSTOMER_MESSAGE_PUSH/.test(prefs));

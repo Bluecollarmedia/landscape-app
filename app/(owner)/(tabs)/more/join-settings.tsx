@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { Easing, FadeInDown, FadeOut, ZoomIn, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeInDown, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Switch } from '@/components/ui/Switch';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
@@ -57,7 +57,7 @@ export default function JoinSettingsScreen() {
 
           {settings.joinByCodeEnabled && activeCode && (
             <>
-              <Animated.View key={activeCode.code} entering={ZoomIn.springify().damping(14)} style={styles.codeShadow}>
+              <Animated.View key={activeCode.code} style={styles.codeShadow}>
                 <LinearGradient
                   colors={[brand.primaryDark, brand.primary, brand.primaryLight]}
                   locations={[0, 0.6, 1]}

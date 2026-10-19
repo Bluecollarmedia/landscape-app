@@ -7,6 +7,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { ScreenContainer } from '@/components/layout';
 import { EmptyState } from '@/components/ui';
+import { AnnouncementBanner } from '@/components/customer/AnnouncementBanner';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -72,6 +73,8 @@ export default function CustomerHomeScreen() {
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Welcome back</Text>
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontWeight: '800' }]}>{user?.firstName ?? 'there'}</Text>
       </View>
+
+      <AnnouncementBanner />
 
       {all.length === 0 ? (
         <EmptyState icon="layers" title={emptyPortalText().title} description={emptyPortalText().description} />

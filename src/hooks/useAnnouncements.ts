@@ -10,7 +10,8 @@ function activeWorkerIds(): string[] {
 
 export function useAnnouncements() {
   const v = useDb();
-  const announcements = useMemo(() => db.announcements, [v]);
+  // Messages to customers have their own screen (Message Customers); they never mix into the workers' announcements.
+  const announcements = useMemo(() => db.announcements.filter((a) => !String(a.audience).startsWith('customers_')), [v]);
   const reads = useMemo(() => db.announcementReads, [v]);
 
   const addAnnouncement = useCallback(

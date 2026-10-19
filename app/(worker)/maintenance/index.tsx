@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, ScrollView, Alert, Platform, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ServiceIcon } from '@/components/maintenance/ServiceIcon';
@@ -53,6 +53,20 @@ export default function MaintenanceTodayScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const tabBarClearance = useTabBarClearance();
+  // The action button is pinned to the bottom of the WINDOW, not of this screen's container: native tabs sometimes
+  // shrink the container to end above the tab bar, which used to leave the button floating too high. We measure how far
+  // the container's bottom edge sits above the window bottom and subtract it, so the button lands in the same place
+  // either way.
+  const { height: windowHeight } = useWindowDimensions();
+  const screenRef = useRef<View>(null);
+  const [gapBelow, setGapBelow] = useState(0);
+  const measureGap = useCallback(() => {
+    screenRef.current?.measureInWindow((_x, y, _w, h) => {
+      if (!h) return;
+      const gap = Math.max(0, Math.round(windowHeight - (y + h)));
+      setGapBelow((prev) => (prev === gap ? prev : gap));
+    });
+  }, [windowHeight]);
   const { openMapsNavigation } = useWorkerContext();
   const checkIn = useMaintenanceCheckIn();
   const { yard, yardName, dayStart } = checkIn;
@@ -131,10 +145,12 @@ export default function MaintenanceTodayScreen() {
     };
   }
 
-  const scrollPadding = tabBarClearance + (action ? ACTION_AREA + (dayStart.started || !route ? 0 : 24) : 0);
+  // Distance from the container's bottom edge up to just above the tab bar (never below a small margin).
+  const bottomOffset = Math.max((Platform.OS === 'ios' ? tabBarClearance - spacing.sm : spacing.md) - gapBelow, spacing.md);
+  const scrollPadding = Math.max(tabBarClearance - gapBelow, spacing.md) + (action ? ACTION_AREA + (dayStart.started || !route ? 0 : 24) : 0);
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+    <View ref={screenRef} onLayout={measureGap} style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: scrollPadding }}>
         <View style={styles.hero}>
           <BrandCover uri={getWorkerHeaderImageUri()} style={styles.heroImage} />
@@ -245,7 +261,7 @@ export default function MaintenanceTodayScreen() {
 
       {action && (
         <View
-          style={[styles.actionArea, { bottom: Platform.OS === 'ios' ? tabBarClearance - spacing.sm : spacing.md }]}
+          style={[styles.actionArea, { bottom: bottomOffset }]}
           pointerEvents="box-none"
         >
           <LinearGradient

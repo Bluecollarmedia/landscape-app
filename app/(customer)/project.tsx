@@ -8,10 +8,12 @@ import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import { SectionTabs, ProgressBar, Card, EmptyState, StatusBadge, Button, OptimizedImage } from '@/components/ui';
+import { SectionTabs, Card, EmptyState, StatusBadge, Button, OptimizedImage } from '@/components/ui';
 import { useProject } from '@/hooks/useProject';
 import { db } from '@/data/store';
-import { CustomerDocuments } from '@/components/financials/CustomerDocuments';
+import { CustomerBillingCard } from '@/components/financials/CustomerBillingCard';
+import { ProgressRing } from '@/components/ui/ProgressRing';
+import { meaningfulUpdates } from '@/lib/customerOverview';
 import { ReportSheet, type ReportTarget } from '@/components/reports/ReportSheet';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -126,36 +128,65 @@ export default function CustomerProjectScreen() {
   }
 
   function renderOverview() {
+    const recent = meaningfulUpdates(customerTimeline, 3);
+    const statusTitle = isCompleted ? 'Complete' : config.label;
+    const statusLine = isCompleted && p.completedAt
+      ? `Project finished on ${formatDate(p.completedAt)}`
+      : p.estimatedEndDate ? `Estimated completion ${formatDate(p.estimatedEndDate)}` : undefined;
+    const ringColor = isCompleted ? semantic.success : colors.primary;
+    const cardStyle = [styles.ovCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }];
+
     return (
       <View style={styles.sectionContent}>
-        {isCompleted && (
-          <View style={[styles.completedBanner, { backgroundColor: semantic.successLight }]}>
-            <Icon name="check-circle" size={18} color={semantic.success} />
-            <View style={{ flex: 1, marginLeft: spacing.sm }}>
-              <Text style={[typeScale.bodySmall, { color: semantic.success, fontWeight: '600' }]}>Project Complete</Text>
-              <Text style={[typeScale.caption, { color: semantic.success, marginTop: 2 }]}>
-                This project has been completed. You can view photos, timeline, and updates.
-              </Text>
-            </View>
+        {/* 1. Completion */}
+        <View style={[cardStyle, styles.ringCard]}>
+          <ProgressRing progress={p.progress} color={ringColor} />
+          <View style={{ flex: 1 }}>
+            <Text style={[typeScale.headingLarge, { color: isCompleted ? semantic.success : colors.textPrimary }]}>{statusTitle}</Text>
+            {statusLine && <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{statusLine}</Text>}
           </View>
-        )}
-        <CustomerDocuments projectId={p.id} />
-        <Card>
-          <View style={styles.progressSection}>
-            <Text style={[typeScale.displayLarge, { color: colors.primary }]}>{p.progress}%</Text>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>complete</Text>
-          </View>
-          <ProgressBar progress={p.progress} height={10} style={{ marginTop: spacing.sm }} />
-          <View style={{ marginTop: spacing.md }}>
-            <StatusBadge label={config.label} status={config.type} />
-          </View>
-        </Card>
+        </View>
 
-        <Card title="Project Details" style={{ marginTop: spacing.lg }}>
+        {/* 2. Project Activity: a few meaningful updates only */}
+        <View style={cardStyle}>
+          <View style={styles.ovHead}>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Project Activity</Text>
+            {customerTimeline.length > 0 && (
+              <Pressable onPress={() => setActiveSection('timeline')} hitSlop={8} accessibilityRole="button" accessibilityLabel="View all project activity" style={styles.viewAll}>
+                <Text style={[typeScale.labelLarge, { color: colors.primary }]}>View all</Text>
+                <Icon name="chevron-right" size={16} color={colors.primary} />
+              </Pressable>
+            )}
+          </View>
+          {recent.length === 0 ? (
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, paddingBottom: spacing.xs }]}>
+              No updates yet. Completed work will show up here.
+            </Text>
+          ) : (
+            recent.map((e, i) => (
+              <View key={e.id} style={[styles.actRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                <View style={[styles.actCheck, { backgroundColor: semantic.successLight }]}>
+                  <Icon name="check" size={14} color={semantic.success} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]} numberOfLines={2}>{e.title}</Text>
+                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>{formatDateTime(e.timestamp)}</Text>
+                </View>
+                {e.photoUrl ? (
+                  <OptimizedImage source={e.photoUrl} style={[styles.actThumb, { backgroundColor: colors.backgroundTertiary }]} />
+                ) : null}
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* 3. Project Details */}
+        <View style={cardStyle}>
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.xs }]}>Project Details</Text>
           {p.address && (
             <View style={styles.detailRow}>
               <Icon name="map-pin" size={16} color={colors.textTertiary} />
-              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
                 {p.address}{p.city ? `, ${p.city}` : ''}{p.state ? ` ${p.state}` : ''} {p.zip ?? ''}
               </Text>
             </View>
@@ -163,60 +194,25 @@ export default function CustomerProjectScreen() {
           {p.startDate && (
             <View style={styles.detailRow}>
               <Icon name="calendar" size={16} color={colors.textTertiary} />
-              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                Started {formatDate(p.startDate)}
-              </Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>Started {formatDate(p.startDate)}</Text>
             </View>
           )}
-          {p.estimatedEndDate && (
+          {!isCompleted && p.estimatedEndDate && (
             <View style={styles.detailRow}>
               <Icon name="clock" size={16} color={colors.textTertiary} />
-              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                Est. completion: {formatDate(p.estimatedEndDate)}
-              </Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>Est. completion: {formatDate(p.estimatedEndDate)}</Text>
             </View>
           )}
           {p.completedAt && (
             <View style={styles.detailRow}>
               <Icon name="check-circle" size={16} color={semantic.success} />
-              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                Completed {formatDate(p.completedAt)}
-              </Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>Completed {formatDate(p.completedAt)}</Text>
             </View>
           )}
-        </Card>
-
-        {visibleUpdates.length > 0 && (
-          <Card title="Latest Update" style={{ marginTop: spacing.lg }}>
-            <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
-              {visibleUpdates[0].title}
-            </Text>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-              {visibleUpdates[0].body}
-            </Text>
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.md }]}>
-              {formatDateTime(visibleUpdates[0].createdAt)}
-            </Text>
-          </Card>
-        )}
-
-        <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: colors.surface }, shadow.sm]}>
-            <Icon name="camera" size={18} color={colors.primary} />
-            <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{sharedPhotos.length}</Text>
-            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Photos</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: colors.surface }, shadow.sm]}>
-            <Icon name="send" size={18} color={colors.primary} />
-            <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{visibleUpdates.length}</Text>
-            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Updates</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: colors.surface }, shadow.sm]}>
-            <Icon name="activity" size={18} color={colors.primary} />
-            <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{customerTimeline.length}</Text>
-            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Events</Text>
-          </View>
         </View>
+
+        {/* 4. Billing, always last */}
+        <CustomerBillingCard projectId={p.id} />
       </View>
     );
   }
@@ -492,27 +488,14 @@ const styles = StyleSheet.create({
   },
 
   // Overview
-  progressSection: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    gap: spacing.xs,
-  },
+  ovCard: { borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth, padding: spacing.lg, marginBottom: spacing.md },
+  ringCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  ovHead: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
+  viewAll: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  actRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  actCheck: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  actThumb: { width: 44, height: 44, borderRadius: radius.sm },
+  detailRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs + 2 },
 
   // Timeline
   timeline: {
@@ -597,12 +580,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     marginTop: spacing.lg,
-  },
-  completedBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginBottom: spacing.lg,
   },
 });

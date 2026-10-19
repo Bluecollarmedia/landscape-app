@@ -18,6 +18,7 @@ export default function OwnerLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="worker-new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="project-new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="schedule" />
         <Stack.Screen name="schedule-create" options={{ presentation: 'modal' }} />
         <Stack.Screen name="search" options={{ presentation: 'modal' }} />
         <Stack.Screen name="notification-center" options={{ presentation: 'modal' }} />

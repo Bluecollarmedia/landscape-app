@@ -291,7 +291,7 @@ export default function OwnerDashboard() {
               </View>
               <Pressable
                 style={styles.heroButton}
-                onPress={() => router.push('/(owner)/more/schedule' as any)}
+                onPress={() => router.push('/(owner)/schedule' as any)}
               >
                 <Text style={[typeScale.labelLarge, { color: colors.primaryDark }]}>View Today's Schedule</Text>
                 <Icon name="chevron-right" size={16} color={colors.primaryDark} />

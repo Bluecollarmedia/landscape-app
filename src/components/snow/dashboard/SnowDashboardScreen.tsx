@@ -1,10 +1,7 @@
 /**
- * Snow Mode Dashboard (Owner): Needs Attention and Storm Overview, kept as two
- * separate sections. Needs Attention lists each item that waits on the owner
- * and opens its record; Storm Overview shows every draft and dispatched storm
- * by route, with leads and progress. Data comes from useSnowDashboard
- * (src/data/snowDashboard.ts). Working layout in the existing app style; no
- * approved mockup yet.
+ * Snow Mode Dashboard (Owner): the active storm's overall progress, then each crew's progress, then Needs Attention
+ * and any other storms. Data comes from useSnowDashboard (src/data/snowDashboard.ts); the numbers shown are the
+ * app's own (see src/lib/snowDashboardView.ts, which only picks and shapes them). Nothing here changes a record.
  */
 import { servicesLabel, stormServices } from '@/lib/snowServices';
 import React from 'react';
@@ -18,6 +15,10 @@ import { useSnowDashboard } from '@/hooks/useSnowDashboard';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import { LONG_OPEN_SHIFT_HOURS, type AttentionItem, type StormOverview } from '@/data/snowDashboard';
 import { snowDashboardHref } from '@/lib/snowLinks';
+import {
+  crewRows, dispatchedLabel, otherStorms, pickActiveStorm, stormHeadline, type CrewRow, type CrewStatus, type StormHeadline,
+} from '@/lib/snowDashboardView';
+import { snowStatus } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -29,6 +30,24 @@ const ATTENTION_ICON: Record<AttentionItem['kind'], React.ComponentProps<typeof 
   open_shift: 'clock',
 };
 
+/** Restrained status colours from the Snow palette: neutral until work starts, blue while working, green when done. */
+const STATUS_TONE: Record<CrewStatus, { fg: string; bg: string }> = {
+  planned: snowStatus.scheduled,
+  not_started: snowStatus.scheduled,
+  in_progress: snowStatus.dispatched,
+  completed: snowStatus.completed,
+  empty: snowStatus.scheduled,
+};
+
+function Pill({ label, tone, onDark }: { label: string; tone: { fg: string; bg: string }; onDark?: boolean }) {
+  return (
+    <View style={[styles.pill, { backgroundColor: onDark ? 'rgba(255,255,255,0.18)' : tone.bg }]}>
+      <View style={[styles.pillDot, { backgroundColor: onDark ? '#FFFFFF' : tone.fg }]} />
+      <Text style={[typeScale.labelSmall, { color: onDark ? '#FFFFFF' : tone.fg }]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
+
 export function SnowDashboardScreen() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -36,13 +55,23 @@ export function SnowDashboardScreen() {
   const tabBarClearance = useTabBarClearance();
   const { state, storms, needsAttention, shiftsChecked, clockedInCount, refreshing, onRefresh, reload } = useSnowDashboard();
 
+  const active = pickActiveStorm(storms);
+  const headline = active ? stormHeadline(active) : undefined;
+  const others = otherStorms(storms, active);
+
   const header = (
     <>
-      <View style={styles.modeChip}>
-        <Icon name="cloud-snow" size={13} color={colors.primary} />
-        <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Snow Mode</Text>
+      <View style={styles.topRow}>
+        <View style={styles.modeChip}>
+          <Icon name="cloud-snow" size={15} color={colors.primary} />
+          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Snow Mode</Text>
+        </View>
+        {headline ? <Pill label={headline.badgeLabel} tone={headline.dispatched ? snowStatus.dispatched : snowStatus.scheduled} /> : null}
       </View>
-      <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Dashboard</Text>
+      <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.xs }]}>Storm Dashboard</Text>
+      <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>
+        {active ? dispatchedLabel(active.dispatchedAt, headline!.dispatched) : 'Manage and track your storms'}
+      </Text>
     </>
   );
 
@@ -61,6 +90,9 @@ export function SnowDashboardScreen() {
     );
   }
 
+  const openStorm = (stormId: string) => router.push(snowDashboardHref({ kind: 'storm', stormId }));
+  const openRoute = (stormId: string, routeId: string) => router.push(snowDashboardHref({ kind: 'route', stormId, routeId }));
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView
@@ -72,6 +104,19 @@ export function SnowDashboardScreen() {
           <Pressable onPress={reload} accessibilityRole="button" accessibilityLabel="Couldn't refresh. Tap to try again">
             <InlineNotice icon="alert-circle" tone="error" text={`Couldn't refresh: ${state.message}. Tap to try again.`} style={{ marginTop: spacing.md }} />
           </Pressable>
+        )}
+
+        {active && headline ? (
+          <>
+            <ActiveStormCard storm={active} headline={headline} onOpen={() => openStorm(active.id)} />
+            <CrewsSection storm={active} headline={headline} onOpenStorm={() => openStorm(active.id)} onOpenRoute={(routeId) => openRoute(active.id, routeId)} />
+          </>
+        ) : (
+          <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }]}>
+            <Icon name="cloud-snow" size={22} color={colors.textTertiary} />
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>No storm is planned or dispatched right now.</Text>
+            <Button title="Storm plan" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
+          </View>
         )}
 
         <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>
@@ -122,23 +167,164 @@ export function SnowDashboardScreen() {
           </Pressable>
         )}
 
-        <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>Storm overview</Text>
-        {storms.length ? storms.map((s) => (
-          <StormCard key={s.id} storm={s} onOpenStorm={() => router.push(snowDashboardHref({ kind: 'storm', stormId: s.id }))}
-            onOpenRoute={(routeId) => router.push(snowDashboardHref({ kind: 'route', stormId: s.id, routeId }))} />
-        )) : (
-          <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm }]}>
-            <Icon name="cloud-snow" size={22} color={colors.textTertiary} />
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>No storm is planned or dispatched right now.</Text>
-            <Button title="Storm plan" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
-          </View>
+        {others.length > 0 && (
+          <>
+            <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>
+              {active ? 'Other storms' : 'Storm overview'}
+            </Text>
+            {others.map((s) => (
+              <OtherStormCard key={s.id} storm={s} onOpenStorm={() => openStorm(s.id)} onOpenRoute={(routeId) => openRoute(s.id, routeId)} />
+            ))}
+          </>
         )}
       </ScrollView>
     </View>
   );
 }
 
-function StormCard({ storm, onOpenStorm, onOpenRoute }: { storm: StormOverview; onOpenStorm: () => void; onOpenRoute: (routeId: string) => void }) {
+/** The whole-storm picture: name, services, status, the four numbers, one bar and a sentence. */
+function ActiveStormCard({ storm, headline, onOpen }: { storm: StormOverview; headline: StormHeadline; onOpen: () => void }) {
+  const { colors } = useTheme();
+  const services = servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x]);
+  const crews = `${headline.routeCount} ${headline.routeCount === 1 ? 'Crew' : 'Crews'}`;
+  const stateTone = headline.stateLabel === 'Completed' ? snowStatus.completed : headline.stateLabel === 'In Progress' ? snowStatus.dispatched : snowStatus.scheduled;
+  const stats: { icon: React.ComponentProps<typeof Icon>['name']; color: string; value: string; label: string }[] = [
+    { icon: 'check-circle', color: colors.success, value: String(headline.completed), label: 'Completed' },
+    { icon: 'clock', color: colors.textSecondary, value: String(headline.remaining), label: 'Remaining' },
+    { icon: 'percent', color: colors.primary, value: `${headline.percent}%`, label: 'Complete' },
+    { icon: 'map-pin', color: colors.primary, value: String(headline.routeCount), label: 'Routes / Crews' },
+  ];
+  return (
+    <View style={[styles.heroCard, { backgroundColor: colors.surface }]}>
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${storm.name}`}
+        style={[styles.heroBand, { backgroundColor: colors.primaryDark }]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[typeScale.headingLarge, { color: '#FFFFFF' }]} numberOfLines={2}>{storm.name}</Text>
+          <Text style={[typeScale.bodyMedium, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]} numberOfLines={1}>
+            {services}{headline.routeCount ? ` · ${crews}` : ''}
+            {storm.reopenedCount > 0 ? ` · Reopened${storm.reopenedCount > 1 ? ` ${storm.reopenedCount}×` : ''}` : ''}
+          </Text>
+        </View>
+        <Pill label={headline.stateLabel} tone={stateTone} onDark />
+      </Pressable>
+      <View style={styles.heroBody}>
+        <View style={styles.statRow}>
+          {stats.map((s) => (
+            <View key={s.label} style={[styles.stat, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]} accessible accessibilityLabel={`${s.value} ${s.label}`}>
+              <Icon name={s.icon} size={18} color={s.color} />
+              <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: 2 }]}>{s.value}</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary, textAlign: 'center' }]} numberOfLines={1}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
+        <ProgressBar progress={headline.percent} height={8} style={{ marginTop: spacing.md }} />
+        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>{headline.summary}</Text>
+        {storm.attentionCount > 0 ? (
+          <Text style={[typeScale.caption, { color: colors.warning, marginTop: 2 }]}>
+            {storm.attentionCount} need{storm.attentionCount === 1 ? 's' : ''} attention
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function CrewsSection({ storm, headline, onOpenStorm, onOpenRoute }: {
+  storm: StormOverview; headline: StormHeadline; onOpenStorm: () => void; onOpenRoute: (routeId: string) => void;
+}) {
+  const { colors } = useTheme();
+  const rows = crewRows(storm);
+  return (
+    <>
+      <View style={styles.sectionHead}>
+        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Crews</Text>
+        {rows.length > 0 ? (
+          <Pressable onPress={onOpenStorm} hitSlop={8} accessibilityRole="button" accessibilityLabel="View all routes" style={styles.viewAll}>
+            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>View all</Text>
+            <Icon name="chevron-right" size={16} color={colors.primary} />
+          </Pressable>
+        ) : null}
+      </View>
+      {rows.length === 0 ? (
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>
+            No routes in this storm yet. Open the storm to add routes and crews.
+          </Text>
+          <Button title="Open storm" icon="chevron-right" size="sm" variant="secondary" onPress={onOpenStorm} style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }} />
+        </View>
+      ) : (
+        <>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
+            View each crew's progress and open their routes.
+          </Text>
+          <View style={{ gap: spacing.sm }}>
+            {rows.map((r) => <CrewRowView key={r.id} row={r} onPress={() => onOpenRoute(r.id)} />)}
+          </View>
+          {headline.cancelledRoutes > 0 ? (
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs, marginLeft: spacing.sm }]}>
+              {headline.cancelledRoutes} cancelled route{headline.cancelledRoutes === 1 ? ' isn’t' : 's aren’t'} counted.
+            </Text>
+          ) : null}
+          <Pressable
+            onPress={onOpenStorm}
+            accessibilityRole="button"
+            accessibilityLabel="View all routes. See the full route list and details"
+            style={({ pressed }) => [styles.allRoutes, { backgroundColor: colors.surface, borderColor: colors.borderLight }, pressed && { opacity: 0.7 }]}
+          >
+            <View style={[styles.allRoutesIcon, { backgroundColor: colors.primarySurface }]}>
+              <Icon name="map-pin" size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>View all routes</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>See the full route list and details</Text>
+            </View>
+            <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+          </Pressable>
+        </>
+      )}
+    </>
+  );
+}
+
+function CrewRowView({ row, onPress }: { row: CrewRow; onPress: () => void }) {
+  const { colors } = useTheme();
+  const tone = STATUS_TONE[row.status];
+  const count = row.total ? `${row.completed} / ${row.total}` : '0 stops';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${row.name}. ${row.leadLabel}. ${row.completed} of ${row.total} stops, ${row.percent} percent. ${row.statusLabel}`}
+      style={({ pressed }) => [styles.crewRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }, pressed && { opacity: 0.7 }]}
+    >
+      <View style={[styles.avatar, { backgroundColor: colors.primarySurface }]}>
+        <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{row.initials}</Text>
+      </View>
+      <View style={{ flex: 1, gap: 4 }}>
+        <View style={styles.crewTop}>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', flex: 1 }]} numberOfLines={1}>{row.name}</Text>
+          <Pill label={row.statusLabel} tone={tone} />
+        </View>
+        <View style={styles.crewTop}>
+          <Text style={[typeScale.caption, { color: colors.textSecondary, flex: 1 }]} numberOfLines={1}>{row.leadLabel}</Text>
+          <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{count}{row.total ? `  ·  ${row.percent}%` : ''}</Text>
+        </View>
+        <ProgressBar progress={row.percent} height={6} />
+        {row.skipped > 0 ? (
+          <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{row.skipped} skipped</Text>
+        ) : null}
+      </View>
+      <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+    </Pressable>
+  );
+}
+
+/** Any storm besides the active one: the existing compact card, with its routes. */
+function OtherStormCard({ storm, onOpenStorm, onOpenRoute }: { storm: StormOverview; onOpenStorm: () => void; onOpenRoute: (routeId: string) => void }) {
   const { colors } = useTheme();
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, marginBottom: spacing.md }]}>
@@ -195,11 +381,26 @@ function StormCard({ storm, onOpenStorm, onOpenRoute }: { storm: StormOverview; 
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  modeChip: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: spacing.xs },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  modeChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },
   card: { borderRadius: radius.lg, padding: spacing.lg },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, minHeight: 44 },
   clockedIn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm, marginLeft: spacing.sm, minHeight: 32 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.full, alignSelf: 'flex-start' },
+  pillDot: { width: 6, height: 6, borderRadius: 3 },
+  heroCard: { borderRadius: radius.xl, overflow: 'hidden', marginTop: spacing.lg },
+  heroBand: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.xl },
+  heroBody: { padding: spacing.md, marginTop: -spacing.md, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, backgroundColor: 'transparent' },
+  statRow: { flexDirection: 'row', gap: spacing.sm },
+  stat: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: 4, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginBottom: 2 },
+  viewAll: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 32 },
+  crewRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
+  crewTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  allRoutes: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, marginTop: spacing.md },
+  allRoutesIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   stormHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   routeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, marginTop: spacing.md, paddingTop: spacing.md, minHeight: 44 },
   routeTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

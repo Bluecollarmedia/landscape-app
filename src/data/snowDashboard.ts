@@ -28,7 +28,7 @@ export type DashboardRoute = Pick<
 export type DashboardStorm = Pick<
   SnowStorm,
   'id' | 'name' | 'service' | 'status' | 'dispatchedAt' | 'reopenedCount' | 'createdAt'
->;
+> & Partial<Pick<SnowStorm, 'services'>>;
 
 export type DashboardSkipRequest = Pick<
   SnowSkipRequest,
@@ -95,6 +95,8 @@ export interface StormOverview {
   id: string;
   name: string;
   service: SnowService;
+  /** Every service the storm covers (update 40); missing on older databases, then `service` is the only one. */
+  services?: SnowService[];
   status: Exclude<StormStatus, 'ended'>;
   dispatchedAt?: string;
   reopenedCount: number;
@@ -320,6 +322,7 @@ export function buildStormOverview(input: SnowDashboardInput, attention: Attenti
         id: storm.id,
         name: storm.name,
         service: storm.service,
+        services: storm.services,
         status: storm.status,
         dispatchedAt: storm.dispatchedAt,
         reopenedCount: storm.reopenedCount,

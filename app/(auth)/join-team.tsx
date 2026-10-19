@@ -4,7 +4,6 @@ import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Alert, Keyboar
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -20,7 +19,7 @@ import { lookupSnowCode, requestSnowAccess } from '@/hooks/useSnowOnboarding';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/media';
 import { saveBirthdayForCurrentUser } from '@/data/birthday';
-import { squareAvatarUri } from '@/lib/avatarCrop';
+import { chooseProfilePhoto } from '@/lib/profilePhoto';
 import { parseBirthday, birthdayProblem } from '@/lib/birthday';
 
 type Step = 'code' | 'account' | 'profile';
@@ -101,14 +100,11 @@ export default function JoinTeamScreen() {
 
   async function handlePickPhoto() {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets[0]) {
-        const a = result.assets[0];
-        setPhotoUri(await squareAvatarUri(a.uri, a.width, a.height));
+      const res = await chooseProfilePhoto('library');
+      if (res.status === 'picked') setPhotoUri(res.uri);
+      else if (res.status === 'error') {
+        if (Platform.OS === 'web') throw new Error(res.message);
+        setError(res.message);
       }
     } catch {
       // On web, ImagePicker may not be fully supported — use a fallback

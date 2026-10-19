@@ -5,7 +5,6 @@ import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { Avatar, Button, Input } from '@/components/ui';
@@ -13,7 +12,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { uploadImage } from '@/lib/media';
-import { squareAvatarUri } from '@/lib/avatarCrop';
+import { chooseProfilePhoto, PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePhoto';
 import { loadMyBirthday, saveMyBirthday } from '@/data/birthday';
 import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
 
@@ -105,41 +104,15 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
     }
   }
 
-  async function handleTakePhoto() {
+  async function pickPhoto(source: ProfilePhotoSource) {
     setPhotoSheetOpen(false);
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      setPermissionError('Camera access is needed to take a profile photo. You can enable it in your device Settings.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets?.[0]) {
-      const a = result.assets[0];
-      setAvatarUrl(await squareAvatarUri(a.uri, a.width, a.height));
-    }
+    // Wait for the sheet to be fully gone first: iOS won't show the picker while it is still closing.
+    const res = await chooseProfilePhoto(source, { afterSheetMs: PICKER_AFTER_SHEET_MS });
+    if (res.status === 'picked') setAvatarUrl(res.uri);
+    else if (res.status === 'error') setPermissionError(res.message);
   }
-
-  async function handleChooseFromGallery() {
-    setPhotoSheetOpen(false);
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      setPermissionError('Photo library access is needed to choose a profile photo. You can enable it in your device Settings.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets?.[0]) {
-      const a = result.assets[0];
-      setAvatarUrl(await squareAvatarUri(a.uri, a.width, a.height));
-    }
-  }
+  const handleTakePhoto = () => pickPhoto('camera');
+  const handleChooseFromGallery = () => pickPhoto('library');
 
   function handleRemovePhoto() {
     setPhotoSheetOpen(false);
@@ -282,7 +255,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
       <Modal visible={!!permissionError} transparent animationType="fade" onRequestClose={() => setPermissionError(null)}>
         <View style={styles.confirmBackdrop}>
           <View style={[styles.confirmCard, { backgroundColor: colors.surface }]}>
-            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>Permission Needed</Text>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>Couldn't add the photo</Text>
             <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }]}>
               {permissionError}
             </Text>

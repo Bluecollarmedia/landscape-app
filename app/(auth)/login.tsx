@@ -128,6 +128,10 @@ export default function LoginScreen() {
           icon="lock"
         />
 
+        <Pressable onPress={() => router.push('/(auth)/forgot-password' as any)} hitSlop={8} style={{ alignSelf: 'flex-end' }} accessibilityRole="button" accessibilityLabel="Forgot password">
+          <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>Forgot password?</Text>
+        </Pressable>
+
         <Button
           title="Sign In"
           onPress={handleLogin}

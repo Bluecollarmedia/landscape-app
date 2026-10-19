@@ -195,6 +195,13 @@ export const SUPPORT: LegalDoc = {
       ],
     },
     {
+      heading: 'Forgot your password?',
+      bullets: [
+        'On the Sign In screen tap Forgot password, enter your email, and open the link we send you.',
+        'If the email does not arrive, contact us using the details above and we will help you get back in.',
+      ],
+    },
+    {
       heading: 'Delete your account',
       bullets: [
         'In the app: Settings, then Delete Account, and type DELETE to confirm.',

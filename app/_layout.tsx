@@ -27,9 +27,9 @@ function RootNavigator() {
   const segments = useSegments();
   const router = useRouter();
   const [splashDone, setSplashDone] = useState(false);
-  // The approval page (/approve/<token>) and the legal pages (/legal/privacy, terms, support) are public:
+  // The approval page (/approve/<token>), the legal pages (/legal/privacy, terms, support) and the password reset page are public:
   // no sign-in, no redirects.
-  const isPublicPage = ['approve', 'legal'].includes((segments as string[])[0]);
+  const isPublicPage = ['approve', 'legal', 'reset-password'].includes((segments as string[])[0]);
   const { shell } = useModeAccess(user?.role);
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);

@@ -31,3 +31,23 @@ export async function squareAvatarUri(uri: string, width?: number, height?: numb
     return uri;
   }
 }
+
+/**
+ * Crops a picture to the square the person chose on the crop screen and shrinks it. Same safety as squareAvatarUri: if anything
+ * goes wrong the caller gets null and uses the automatic centred square instead.
+ */
+export async function cropAvatarToBox(uri: string, box: { originX: number; originY: number; size: number }): Promise<string | null> {
+  try {
+    if (!(box.size > 0)) return null;
+    const { ImageManipulator, SaveFormat } = require('expo-image-manipulator') as typeof import('expo-image-manipulator');
+    const context = ImageManipulator.manipulate(uri)
+      .crop({ originX: box.originX, originY: box.originY, width: box.size, height: box.size })
+      .resize({ width: Math.min(box.size, AVATAR_PIXELS) });
+    const rendered = await context.renderAsync();
+    const saved = await rendered.saveAsync({ compress: 0.8, format: SaveFormat.JPEG });
+    return saved.uri || null;
+  } catch (err) {
+    console.warn('[avatar] crop failed', err);
+    return null;
+  }
+}

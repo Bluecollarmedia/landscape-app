@@ -1,49 +1,38 @@
 // Run: node scripts/checks/avatarCrop.check.cjs <path to typescript package>
+// The profile photo crop: the maths (which part of the picture is under the circle) and the wiring on every screen.
 const ts = require(process.argv[2] || 'typescript');
 const fs = require('fs');
 const path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '../../src/lib/avatarCrop.ts'), 'utf8');
+const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8');
 const m = { exports: {} };
-let manipulatorCalls = [];
-let failManipulator = false;
-const req = (n) => {
-  if (n === 'expo-image-manipulator') {
-    return {
-      SaveFormat: { JPEG: 'jpeg' },
-      ImageManipulator: {
-        manipulate: (uri) => {
-          if (failManipulator) throw new Error('native failure');
-          const ctx = { crop: (c) => { manipulatorCalls.push(['crop', c]); return ctx; }, resize: (r) => { manipulatorCalls.push(['resize', r]); return ctx; }, renderAsync: async () => ({ saveAsync: async (o) => { manipulatorCalls.push(['save', o]); return { uri: 'file:///cropped.jpg' }; } }) };
-          return ctx;
-        },
-      },
-    };
-  }
-  return {};
-};
-new Function('module', 'exports', 'require', ts.transpileModule(src, { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports, req);
-const { centerSquare, squareAvatarUri, AVATAR_PIXELS } = m.exports;
-
+new Function('module', 'exports', ts.transpileModule(read('src/lib/avatarCropMath.ts'), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports);
+const c = m.exports;
 let bad = 0;
-const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  — ' + detail}`); };
+const check = (n, ok, d) => { if (!ok) bad++; console.log((ok ? 'PASS' : 'FAIL') + '  ' + n + (ok ? '' : ' - ' + (d || ''))); };
 
-(async () => {
-  const wide = centerSquare(4000, 3000); const tall = centerSquare(3000, 4000); const sq = centerSquare(1000, 1000);
-  check('1 a wide picture is cut to a centred square', wide.size === 3000 && wide.originX === 500 && wide.originY === 0, JSON.stringify(wide));
-  check('2 a tall picture is cut to a centred square', tall.size === 3000 && tall.originX === 0 && tall.originY === 500, JSON.stringify(tall));
-  check('3 a square picture is kept whole', sq.size === 1000 && sq.originX === 0 && sq.originY === 0);
-  check('4 bad sizes give nothing to crop', centerSquare(0, 100) === null && centerSquare(undefined, 100) === null && centerSquare(NaN, NaN) === null);
-  let out = await squareAvatarUri('file:///big.jpg', 4000, 3000);
-  const crop = manipulatorCalls.find((c) => c[0] === 'crop')[1];
-  check('5 crops the centre square, shrinks it to the avatar size, saves a JPEG', out === 'file:///cropped.jpg' && crop.width === 3000 && crop.originX === 500 && manipulatorCalls.find((c) => c[0] === 'resize')[1].width === AVATAR_PIXELS && manipulatorCalls.find((c) => c[0] === 'save')[1].format === 'jpeg');
-  manipulatorCalls = [];
-  out = await squareAvatarUri('file:///small.jpg', 300, 200);
-  check('6 a small picture is not blown up', manipulatorCalls.find((c) => c[0] === 'resize')[1].width === 200);
-  out = await squareAvatarUri('file:///unknown.jpg');
-  check('7 unknown size: the original picture is used (still works)', out === 'file:///unknown.jpg');
-  failManipulator = true;
-  out = await squareAvatarUri('file:///x.jpg', 100, 100);
-  check('8 if the phone fails to crop, the original picture is used (never throws)', out === 'file:///x.jpg');
-  console.log(bad ? `\n${bad} failed` : '\nall passed');
-  process.exit(bad ? 1 : 0);
-})();
+const sq = { width: 1000, height: 1000, frame: 300 };
+check('1 zoom 1 on a square picture crops the whole picture', JSON.stringify(c.cropBox({ ...sq, zoom: 1 }, 0, 0)) === JSON.stringify({ originX: 0, originY: 0, size: 1000 }));
+check('2 zoom 2 crops the middle half', JSON.stringify(c.cropBox({ ...sq, zoom: 2 }, 0, 0)) === JSON.stringify({ originX: 250, originY: 250, size: 500 }));
+const wide = { width: 2000, height: 1000, frame: 300 };
+check('3 a wide picture centred shows its middle square; dragged left it shows the right edge; dragged right, the left edge',
+  c.cropBox({ ...wide, zoom: 1 }, 0, 0).originX === 500
+  && c.cropBox({ ...wide, zoom: 1 }, -150, 0).originX === 1000
+  && c.cropBox({ ...wide, zoom: 1 }, 150, 0).originX === 0);
+check('4 dragging past the edge is held at the edge (the crop never leaves the picture)',
+  c.cropBox({ ...wide, zoom: 1 }, -9999, 9999).originX === 1000 && c.cropBox({ ...wide, zoom: 1 }, -9999, 9999).originY === 0
+  && c.clampOffset({ ...sq, zoom: 1 }, 50, 50).tx === 0);
+check('5 zoom is kept between 1 and 4', c.clampZoom(0.2) === 1 && c.clampZoom(9) === 4 && c.clampZoom(NaN) === 1 && c.fractionToZoom(0) === 1 && c.fractionToZoom(1) === 4 && Math.abs(c.zoomToFraction(2.5) - 0.5) < 1e-9);
+const big = c.cropBox({ ...wide, zoom: 4 }, 0, 0);
+check('6 the crop box is always inside the picture and square', big.originX >= 0 && big.originY >= 0 && big.originX + big.size <= 2000 && big.originY + big.size <= 1000 && big.size === 250);
+
+const cropper = read('src/components/account/AvatarCropper.tsx');
+check('7 the crop screen is a circle over the picture with a slider; the website also gets wheel zoom, the phone does not pinch',
+  /borderRadius: frame \/ 2/.test(cropper) && /accessibilityLabel="Zoom"/.test(cropper) && /Platform\.OS === 'web'\s*\? \{ onWheel/.test(cropper) && !/PinchGesture|onTouchMove|scale: .*gesture/i.test(cropper));
+check('8 Done crops the chosen square; if the crop fails the caller still gets a picture (automatic square)', /cropAvatarToBox\(uri, box\)/.test(cropper) && /onPicked\(cropped \?\? p\.fallback\)/.test(read('src/hooks/useProfilePhoto.tsx')));
+const hook = read('src/hooks/useProfilePhoto.tsx');
+check('9 the crop screen opens after the picker (camera or library) has closed', /AFTER_PICKER_MS/.test(hook) && /await sleep\(AFTER_PICKER_MS\)/.test(hook));
+const screens = ['src/components/account/EditProfileScreen.tsx', 'src/components/account/SignupPhotoPicker.tsx', 'app/(auth)/join-team.tsx'];
+check('10 every place that picks a profile photo uses the crop flow', screens.every((f) => /useProfilePhoto\(/.test(read(f)) && /\{photo\.cropper\}/.test(read(f)) && !/chooseProfilePhoto\(/.test(read(f))));
+check('11 the account-creation screens get it through the shared picker', ['app/(auth)/signup.tsx', 'app/(auth)/create-company.tsx', 'app/(auth)/customer-access.tsx'].every((f) => /<SignupPhotoPicker /.test(read(f))));
+console.log(bad ? '\n' + bad + ' failed' : '\nall passed');
+process.exit(bad ? 1 : 0);

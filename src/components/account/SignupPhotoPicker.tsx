@@ -8,7 +8,8 @@ import { View, Text, Pressable, StyleSheet, Platform, Alert } from 'react-native
 import { Avatar } from '@/components/ui';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { chooseProfilePhoto, PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePhoto';
+import { PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePhoto';
+import { useProfilePhoto } from '@/hooks/useProfilePhoto';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 
@@ -23,12 +24,9 @@ interface Props {
 export function SignupPhotoPicker({ uri, onChange, onError, firstName, lastName }: Props) {
   const { colors } = useTheme();
 
-  async function pick(source: ProfilePhotoSource) {
-    // The action sheet has to be gone before iOS will show the picker.
-    const res = await chooseProfilePhoto(source, { afterSheetMs: PICKER_AFTER_SHEET_MS });
-    if (res.status === 'picked') onChange(res.uri);
-    else if (res.status === 'error') onError(res.message);
-  }
+  const photo = useProfilePhoto(onChange, onError);
+  // The action sheet has to be gone before iOS will show the picker.
+  const pick = (source: ProfilePhotoSource) => photo.pick(source, { afterSheetMs: PICKER_AFTER_SHEET_MS });
 
   function choose() {
     if (Platform.OS === 'web') { pick('library'); return; }
@@ -56,6 +54,7 @@ export function SignupPhotoPicker({ uri, onChange, onError, firstName, lastName 
       <Text style={[typeScale.labelLarge, { color: colors.primary, marginTop: spacing.sm }]}>
         {uri ? 'Change photo' : 'Add a photo (optional)'}
       </Text>
+      {photo.cropper}
     </Pressable>
   );
 }

@@ -95,6 +95,8 @@ export interface Quote extends FinancialDocBase {
   approvedBy?: string;
   /** Name typed by the customer (approval link) or the customer's own name (app). */
   approvedName?: string;
+  /** The customer's drawn signature as SVG path text, saved with an approval made on the approval page. */
+  approvedSignature?: string;
   /** Private token for the approval link (…/approve/<token>). */
   shareToken?: string;
   declinedAt?: string;
@@ -113,6 +115,8 @@ export interface ChangeOrder extends FinancialDocBase {
   approvedBy?: string;
   /** Name typed by the customer (approval link) or the customer's own name (app). */
   approvedName?: string;
+  /** The customer's drawn signature as SVG path text, saved with an approval made on the approval page. */
+  approvedSignature?: string;
   /** Private token for the approval link (…/approve/<token>). */
   shareToken?: string;
   declinedAt?: string;

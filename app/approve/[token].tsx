@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Button, Input, EmptyState, LoadingSpinner, StatusBadge } from '@/components/ui';
 import { DocumentPreview } from '@/components/financials/DocumentPreview';
+import { SignaturePad } from '@/components/financials/SignaturePad';
 import { useTheme } from '@/providers/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { renderDocumentHtml, formatDocDateTime } from '@/lib/documentHtml';
@@ -60,6 +61,7 @@ const RESPONSE_ERRORS: Record<string, string> = {
   not_open: 'This was already answered.',
   expired: 'This quote has expired. Please contact us for an updated quote.',
   name_required: 'Please type your full name to approve.',
+  bad_signature: 'That signature could not be saved. Clear it and sign again.',
 };
 
 export default function ApprovePage() {
@@ -70,6 +72,7 @@ export default function ApprovePage() {
   const [shared, setShared] = useState<Shared | null>(null);
   const [name, setName] = useState('');
   const [agreed, setAgreed] = useState(false);
+  const [signature, setSignature] = useState('');
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState<'approve' | 'decline' | null>(null);
@@ -130,6 +133,7 @@ export default function ApprovePage() {
   const answer = [...shared.events].reverse().find((e) => e.eventType === 'approved' || e.eventType === 'declined');
   const answeredBy = answer?.actor?.firstName;
   const nameOk = name.trim().length >= 2;
+  const signed = signature.length > 0;
 
   const respond = async (approve: boolean) => {
     setError(null);
@@ -139,6 +143,7 @@ export default function ApprovePage() {
       p_approve: approve,
       p_name: name.trim(),
       p_note: approve ? null : reason.trim() || null,
+      p_signature: approve ? signature || null : null,
     });
     setSaving(null);
     const res = data as { success?: boolean; error?: string } | null;
@@ -195,6 +200,10 @@ export default function ApprovePage() {
               autoCapitalize="words"
               returnKeyType="done"
             />
+            <View>
+              <Text style={[typeScale.labelLarge, { color: colors.textSecondary, marginBottom: spacing.xs }]}>Your signature</Text>
+              <SignaturePad onChange={setSignature} />
+            </View>
             <Pressable
               onPress={() => setAgreed((a) => !a)}
               style={styles.agree}
@@ -210,32 +219,36 @@ export default function ApprovePage() {
             </Pressable>
             {!!error && <Text style={[typeScale.bodySmall, { color: colors.error }]}>{error}</Text>}
             <View style={styles.row}>
-              <Button title="Decline" variant="ghost" onPress={() => { setError(null); setDeclining(true); }} disabled={!!saving} style={{ flex: 1 }} />
+              <Button title="Request Changes" variant="ghost" onPress={() => { setError(null); setDeclining(true); }} disabled={!!saving} style={{ flex: 1 }} />
               <Button
                 title="Approve"
                 icon="check"
                 onPress={() => respond(true)}
                 loading={saving === 'approve'}
-                disabled={!nameOk || !agreed || !!saving}
+                disabled={!nameOk || !signed || !agreed || !!saving}
                 style={{ flex: 2 }}
               />
             </View>
             <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
-              Your name, the date and time are recorded with your answer.
+              Your name, signature, the date and time are recorded with your answer.
             </Text>
+            <Button title="Download PDF" icon="download" variant="secondary" onPress={savePdf} loading={pdfBusy} fullWidth />
           </>
         )}
 
         {canAnswer && declining && (
           <>
-            <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Decline {label.toLowerCase()} {doc.number}?</Text>
+            <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Request changes to {label.toLowerCase()} {doc.number}</Text>
             <Input label="Your name (optional)" value={name} onChangeText={setName} autoComplete="name" autoCapitalize="words" />
-            <Input label="Reason (optional)" value={reason} onChangeText={setReason} placeholder="Let us know what to change" multiline />
+            <Input label="What would you like changed?" value={reason} onChangeText={setReason} placeholder="For example: please add the back yard" multiline />
             {!!error && <Text style={[typeScale.bodySmall, { color: colors.error }]}>{error}</Text>}
             <View style={styles.row}>
               <Button title="Back" variant="ghost" onPress={() => setDeclining(false)} disabled={!!saving} style={{ flex: 1 }} />
-              <Button title="Decline" variant="danger" onPress={() => respond(false)} loading={saving === 'decline'} disabled={!!saving} style={{ flex: 2 }} />
+              <Button title="Send Request" icon="send" onPress={() => respond(false)} loading={saving === 'decline'} disabled={!!saving || reason.trim().length < 3} style={{ flex: 2 }} />
             </View>
+            <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
+              We'll review your request and send you an updated quote.
+            </Text>
           </>
         )}
 
@@ -245,7 +258,7 @@ export default function ApprovePage() {
               <View style={[styles.answer, { backgroundColor: answer.eventType === 'approved' ? colors.primarySurface : colors.surfacePressed }]}>
                 <Icon name={answer.eventType === 'approved' ? 'check-circle' : 'x-circle'} size={18} color={answer.eventType === 'approved' ? colors.primaryDark : colors.textSecondary} />
                 <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]}>
-                  {answer.eventType === 'approved' ? 'Approved' : 'Declined'}{answeredBy ? ` by ${answeredBy}` : ''} on {formatDocDateTime(answer.createdAt)}.
+                  {answer.eventType === 'approved' ? 'Approved' : 'Changes requested'}{answeredBy ? ` by ${answeredBy}` : ''} on {formatDocDateTime(answer.createdAt)}.
                   {answer.eventType === 'approved' ? ` Thank you! ${company.name} has been notified.` : ''}
                 </Text>
               </View>

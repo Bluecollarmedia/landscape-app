@@ -1,68 +1,157 @@
-import { LegalSection } from '@/components/legal/LegalSection';
-import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
-import { ListSection } from '@/components/ui';
+/**
+ * Snow Mode More (Owner). The header is one bundled picture (snow-mode-more-header.png: the green leaf, the blue "Snow Mode"
+ * wordmark, the "More" title and the snowy evergreens). Everything under it is real, working controls in grouped white cards.
+ * Destinations, the alert switch, the mode switch, legal pages, Sign Out and Delete Account are the same ones as before.
+ */
 import React from 'react';
-import { SnowPlaceholder } from '@/components/snow/SnowPlaceholder';
-import { SettingsGroup, SettingsRow } from '@/components/settings/SettingsList';
-import { ModeSwitchRow } from '@/components/snow/ModeSwitchRow';
+import { View, Text, ScrollView, Pressable, Image, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/providers/AuthProvider';
-import { db, useDb } from '@/data/store';
+import { Icon } from '@/components/ui/Icon';
+import { ListSection } from '@/components/ui';
+import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
+import { useModeSwitch } from '@/components/snow/ModeSwitchRow';
 import { OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
+import { useTheme } from '@/providers/ThemeProvider';
+import { useAuth } from '@/providers/AuthProvider';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
+import { db, useDb } from '@/data/store';
+import { typeScale } from '@/theme/typography';
+import { spacing, radius } from '@/theme/spacing';
+
+/** The bundled header picture (made by scripts/make-snow-more-header.py). 941 x 500 pixels. */
+const HEADER_IMAGE = require('../../../../assets/images/snow-mode-more-header.png');
+const HEADER_RATIO = 941 / 500;
+/** How much of the picture's height sits behind the first card (the snowy slope fades out there). */
+const HEADER_OVERLAP = 0.33;
+
+type IconName = React.ComponentProps<typeof Icon>['name'];
 
 export default function SnowOwnerMoreScreen() {
   useDb();
+  const { colors } = useTheme();
   const { signOut } = useAuth();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const tabBarClearance = useTabBarClearance();
+  const mode = useModeSwitch();
+
+  const headerHeight = width / HEADER_RATIO;
+
   return (
-    <SnowPlaceholder
-      title="More"
-      icon="menu"
-      purpose="Activity log, time corrections, customer media review and Snow Mode settings."
-    >
-      <SettingsGroup title="Settings">
-        <SettingsRow
-          icon="settings"
-          title="Snow settings"
-          subtitle="Stop rule, alerts, team and customers"
-          onPress={() => router.push('/snow/owner/settings')}
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: tabBarClearance + spacing.lg }}
+      >
+        {/* Decorative branding only: no controls live in the picture. It runs under the status bar. */}
+        <Image
+          source={HEADER_IMAGE}
+          style={{ position: 'absolute', top: 0, left: 0, width, height: headerHeight }}
+          resizeMode="cover"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel="Snow Mode, More"
         />
-      </SettingsGroup>
-      <SettingsGroup title="Records">
-        <SettingsRow
-          icon="activity"
-          title="Activity log"
-          subtitle="Everything that happened, by storm, route and person"
-          onPress={() => router.push('/snow/owner/activity')}
-        />
-        <SettingsRow
-          icon="clock"
-          title="Snow hours"
-          subtitle="Who clocked in this week, and fix a missed clock-out"
-          onPress={() => router.push('/snow/owner/hours')}
-        />
-        <SettingsRow
-          icon="camera"
-          title="Photo review"
-          subtitle="Approve photos and send updates to customers"
-          onPress={() => router.push('/snow/owner/review')}
-        />
-      </SettingsGroup>
-      {db.companyId ? (
-        <SettingsGroup title="Alerts">
-          <OwnerStopAlertsToggle companyId={db.companyId} />
-        </SettingsGroup>
-      ) : null}
-      <SettingsGroup title="Mode">
-        <ModeSwitchRow />
-      </SettingsGroup>
-      <LegalSection />
-      <SettingsGroup>
-        <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
-      </SettingsGroup>
-      <ListSection>
-        <DeleteAccountRow />
-      </ListSection>
-    </SnowPlaceholder>
+
+        <View style={{ paddingTop: headerHeight * (1 - HEADER_OVERLAP), paddingHorizontal: spacing.lg }}>
+          <Group title="Settings">
+            <Row icon="settings" title="Snow settings" subtitle="Stop rule, alerts, team and customers" onPress={() => router.push('/snow/owner/settings')} />
+          </Group>
+
+          <Group title="Records">
+            <Row icon="activity" title="Activity log" subtitle="Everything that happened, by storm, route and person" onPress={() => router.push('/snow/owner/activity')} />
+            <Row icon="clock" title="Snow hours" subtitle="Who clocked in this week, and fix a missed clock-out" onPress={() => router.push('/snow/owner/hours')} />
+            <Row icon="camera" title="Photo review" subtitle="Approve photos and send updates to customers" onPress={() => router.push('/snow/owner/review')} />
+          </Group>
+
+          {db.companyId ? (
+            <Group title="Alerts">
+              <OwnerStopAlertsToggle companyId={db.companyId} bare />
+            </Group>
+          ) : null}
+
+          {mode.canSwitch ? (
+            <Group title="Mode">
+              <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} />
+            </Group>
+          ) : null}
+
+          <Group title="Legal & Support">
+            <Row compact icon="shield" title="Privacy Policy" onPress={() => router.push('/legal/privacy' as any)} />
+            <Row compact icon="file-text" title="Terms of Use" onPress={() => router.push('/legal/terms' as any)} />
+            <Row compact icon="help-circle" title="Help & Support" onPress={() => router.push('/legal/support' as any)} />
+          </Group>
+
+          <Group title="Account">
+            <Row icon="log-out" title="Sign Out" destructive onPress={signOut} single />
+          </Group>
+          <ListSection>
+            <DeleteAccountRow />
+          </ListSection>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
+
+/** A small heading and one white card holding related rows, with thin dividers between them. */
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const rows = React.Children.toArray(children).filter(Boolean);
+  return (
+    <View style={styles.group}>
+      <Text style={[typeScale.overline, styles.groupTitle, { color: colors.textSecondary }]} accessibilityRole="header">{title.toUpperCase()}</Text>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {rows.map((r, i) => (
+          <React.Fragment key={i}>
+            {i > 0 ? <View style={[styles.divider, { backgroundColor: colors.border }]} /> : null}
+            {r}
+          </React.Fragment>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function Row({ icon, title, subtitle, onPress, destructive, compact, single }: {
+  icon: IconName; title: string; subtitle?: string; onPress: () => void; destructive?: boolean; compact?: boolean; single?: boolean;
+}) {
+  const { colors } = useTheme();
+  const tint = destructive ? colors.error : colors.primary;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={subtitle ? `${title}. ${subtitle}` : title}
+      style={({ pressed }) => [styles.row, compact && styles.rowCompact, pressed && { backgroundColor: colors.surfacePressed }]}
+    >
+      {compact ? (
+        <View style={[styles.iconCircle, { backgroundColor: colors.primarySurface }]}>
+          <Icon name={icon} size={18} color={tint} />
+        </View>
+      ) : (
+        <View style={styles.iconSlot}>
+          <Icon name={icon} size={24} color={tint} />
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={[typeScale.bodyLarge, { color: destructive ? colors.error : colors.textPrimary, fontWeight: '700' }]}>{title}</Text>
+        {subtitle ? <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 1 }]}>{subtitle}</Text> : null}
+      </View>
+      <Icon name="chevron-right" size={20} color={destructive ? colors.error : colors.textTertiary} />
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  group: { marginBottom: spacing.md },
+  groupTitle: { marginLeft: spacing.xs, marginBottom: spacing.xs, letterSpacing: 0.6 },
+  card: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', shadowColor: '#0F2A44', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  divider: { height: StyleSheet.hairlineWidth, marginLeft: spacing.lg + 40 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 52 },
+  rowCompact: { paddingVertical: spacing.sm, minHeight: 48 },
+  iconSlot: { width: 28, alignItems: 'center' },
+  iconCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+});

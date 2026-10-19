@@ -8,10 +8,9 @@ import { useCompanyMode } from '@/hooks/useModeAccess';
  * row. Shown in Landscaping Settings and in the Snow Mode More tab. Nothing
  * is deleted or merged when switching; each mode keeps its own records.
  */
-export function ModeSwitchRow() {
+/** The switch's wording and confirmation, for screens that draw the row themselves (the Snow More screen). */
+export function useModeSwitch() {
   const { mode, canSwitch, setMode } = useCompanyMode();
-  if (!canSwitch) return null;
-
   const toSnow = mode === 'landscaping';
   const title = toSnow ? 'Switch to Snow Mode' : 'Switch to Landscaping Mode';
   const subtitle = toSnow
@@ -29,13 +28,19 @@ export function ModeSwitchRow() {
     );
   }
 
+  return { canSwitch, toSnow, title, subtitle, icon: (toSnow ? 'cloud-snow' : 'sun') as 'cloud-snow' | 'sun', confirm };
+}
+
+export function ModeSwitchRow() {
+  const m = useModeSwitch();
+  if (!m.canSwitch) return null;
   return (
     <SettingsRow
-      icon={toSnow ? 'cloud-snow' : 'sun'}
-      tint={toSnow ? tileColors.blue : tileColors.green}
-      title={title}
-      subtitle={subtitle}
-      onPress={confirm}
+      icon={m.icon}
+      tint={m.toSnow ? tileColors.blue : tileColors.green}
+      title={m.title}
+      subtitle={m.subtitle}
+      onPress={m.confirm}
     />
   );
 }

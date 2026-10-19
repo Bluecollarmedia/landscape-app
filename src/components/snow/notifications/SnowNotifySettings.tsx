@@ -14,7 +14,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { InlineNotice, LoadingSpinner, Switch } from '@/components/ui';
+import { Icon, InlineNotice, LoadingSpinner, Switch } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import {
   describeDelivery, loadAllNotifyPrefs, loadMySnowProperties, loadNotifyPrefs, loadOwnerStopAlerts,
@@ -167,7 +167,8 @@ function StatusLine({ title, on }: { title: string; on: boolean }) {
 
 // ── Owner: own alerts ───────────────────────────────────────────────────────
 
-export function OwnerStopAlertsToggle({ companyId }: { companyId: string }) {
+/** `bare`: just the row (bell icon, no card of its own) for a screen that draws its own card around it. */
+export function OwnerStopAlertsToggle({ companyId, bare }: { companyId: string; bare?: boolean }) {
   const { colors } = useTheme();
   const [on, setOn] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -192,7 +193,7 @@ export function OwnerStopAlertsToggle({ companyId }: { companyId: string }) {
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+    <View style={bare ? styles.bare : [styles.card, { backgroundColor: colors.surface }]}>
       {error ? <InlineNotice icon="alert-circle" tone="error" text={error} /> : null}
       <ToggleRow
         title="Alert me when a stop is finished"
@@ -200,6 +201,7 @@ export function OwnerStopAlertsToggle({ companyId }: { companyId: string }) {
         value={!!on}
         disabled={on === null || saving}
         onChange={change}
+        icon={bare ? 'bell' : undefined}
       />
     </View>
   );
@@ -207,12 +209,14 @@ export function OwnerStopAlertsToggle({ companyId }: { companyId: string }) {
 
 // ── Shared ──────────────────────────────────────────────────────────────────
 
-function ToggleRow({ title, subtitle, value, disabled, onChange }: {
+function ToggleRow({ title, subtitle, value, disabled, onChange, icon }: {
   title: string; subtitle: string; value: boolean; disabled?: boolean; onChange: (on: boolean) => void;
+  icon?: React.ComponentProps<typeof Icon>['name'];
 }) {
   const { colors } = useTheme();
   return (
     <View style={styles.toggleRow}>
+      {icon ? <Icon name={icon} size={24} color={colors.primary} /> : null}
       <View style={{ flex: 1 }}>
         <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{title}</Text>
         <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{subtitle}</Text>
@@ -225,6 +229,7 @@ function ToggleRow({ title, subtitle, value, disabled, onChange }: {
 const styles = StyleSheet.create({
   label: { marginLeft: spacing.sm, marginTop: spacing.md },
   card: { borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
+  bare: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.xs },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingTop: spacing.sm },
   statusLine: { flexDirection: 'row', alignItems: 'center' },
 });

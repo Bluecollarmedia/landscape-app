@@ -206,7 +206,7 @@ export function useOwnerDashboard() {
           icon: 'truck',
           severity: 'critical',
           actionLabel: 'Fix Assignment',
-          route: '/(owner)/more/schedule',
+          route: '/(owner)/schedule',
         });
       }
     }

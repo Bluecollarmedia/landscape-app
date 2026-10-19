@@ -91,7 +91,7 @@ export function StormsListScreen() {
       >
         <View style={styles.header}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]} accessibilityRole="header">Storms</Text>
-          <Button title="Storm plan" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
+          <Button title="Add Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
         </View>
 
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.lg }} /> : null}
@@ -101,7 +101,7 @@ export function StormsListScreen() {
             icon="cloud-snow"
             title="No storms yet"
             description="Create a storm for a service, plan its routes, then dispatch it when you're ready."
-            actionTitle="Storm plan"
+            actionTitle="Add Crew"
             onAction={() => router.push('/snow/owner/storm-new')}
           />
         ) : null}

@@ -115,7 +115,7 @@ export function SnowDashboardScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }]}>
             <Icon name="cloud-snow" size={22} color={colors.textTertiary} />
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>No storm is planned or dispatched right now.</Text>
-            <Button title="Storm plan" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
+            <Button title="Add Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
           </View>
         )}
 
@@ -252,7 +252,7 @@ function CrewsSection({ storm, headline, onOpenStorm, onOpenRoute }: {
       {rows.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>
-            No routes in this storm yet. Open the storm to add routes and crews.
+            No properties in this storm yet. Open the storm to add properties and crews.
           </Text>
           <Button title="Open storm" icon="chevron-right" size="sm" variant="secondary" onPress={onOpenStorm} style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }} />
         </View>

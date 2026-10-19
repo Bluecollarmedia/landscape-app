@@ -297,7 +297,7 @@ export function StormDetailScreen() {
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
               <Icon name="map" size={22} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
-                No routes yet. Add routes and stops, give each route a lead, then dispatch.
+                No properties yet. Add properties and stops, give each one a lead, then dispatch. Each becomes a route when you dispatch.
               </Text>
             </View>
           )}
@@ -314,7 +314,7 @@ export function StormDetailScreen() {
                   <Button title="Cancel" variant="ghost" onPress={() => setChoosingService(false)} fullWidth />
                 </View>
               ) : (
-                <Button title="Add Route" icon="plus" onPress={() => onAddRoute()} disabled={busy} fullWidth size="lg" />
+                <Button title="Add Property" icon="plus" onPress={() => onAddRoute()} disabled={busy} fullWidth size="lg" />
               )}
               {templates.map((t) => (
                 <Pressable

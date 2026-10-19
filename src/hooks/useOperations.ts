@@ -14,7 +14,7 @@ import type {
 } from '@/types/operations';
 import type { Assignment } from '@/types/schedule';
 import type { PersonSummary } from '@/types/company';
-import { db, useDb, updateRow, insertRow, upsertRow } from '@/data/store';
+import { db, useDb, updateRow, insertRow, upsertRow, deleteRow } from '@/data/store';
 import { todayKey, localDateKey, isoToLocalDateKey, localDateTime } from '@/lib/ids';
 import { computeTargetPay, type TargetPayBreakdown } from '@/lib/targetPay';
 
@@ -462,6 +462,11 @@ export function useNotifications() {
     }
   }, []);
 
+  /** Removes this person's notifications from their notification center (read and unread). Only the notification records go. */
+  const clearAll = useCallback(() => {
+    for (const n of [...db.notifications]) deleteRow('app_notifications', n.id);
+  }, []);
+
   const getCompanyDefault = useCallback(
     (eventType: NotificationEventType) =>
       preferences.find((p) => !p.personId && p.eventType === eventType),
@@ -506,6 +511,7 @@ export function useNotifications() {
     preferences,
     markRead,
     markAllRead,
+    clearAll,
     getCompanyDefault,
     getWorkerOverride,
     isEnabledForWorker,

@@ -17,7 +17,7 @@ type Tab = 'defaults' | 'overrides';
 export default function NotificationPreferencesScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { preferences, getCompanyDefault, getWorkerOverride, updatePreference, setWorkerOverride } = useNotifications();
+  const { unreadCount, preferences, getCompanyDefault, getWorkerOverride, updatePreference, setWorkerOverride } = useNotifications();
 
   const [tab, setTab] = useState<Tab>('defaults');
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
@@ -35,6 +35,7 @@ export default function NotificationPreferencesScreen() {
             icon="bell"
             onPress={() => router.push('/(owner)/notification-center' as any)}
             accessibilityLabel="Notification history"
+            badge={unreadCount}
           />
         }
       />

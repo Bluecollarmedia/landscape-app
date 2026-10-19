@@ -9,6 +9,7 @@ import { useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { registerForPush, type PushData } from '@/lib/push';
 import { findRow, updateRow } from '@/data/store';
+import { ownerNotificationTarget } from '@/lib/notificationTarget';
 import type { UserRole } from '@/types';
 
 const DOC_TYPES = new Set(['quote', 'change_order', 'invoice']);
@@ -17,10 +18,8 @@ function targetFor(role: UserRole, d: PushData): string | { pathname: string; pa
   const type = d.linkedEntityType ?? '';
   const id = d.linkedEntityId ?? '';
   if (role === 'owner' || role === 'admin') {
-    if (DOC_TYPES.has(type) && id) return { pathname: '/(owner)/document', params: { kind: type, id } };
-    if (type === 'issue' && id) return { pathname: '/(owner)/issue-detail', params: { id } };
-    if (type === 'project' && id) return `/(owner)/projects/${id}`;
-    if (type === 'materials' && id) return `/(owner)/projects/${id}?section=materials`;
+    const target = ownerNotificationTarget({ eventType: d.eventType, linkedEntityType: type, linkedEntityId: id });
+    if (target) return target;
     return '/(owner)/notification-center';
   }
   if (role === 'customer') {

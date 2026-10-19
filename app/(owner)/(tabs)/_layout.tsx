@@ -4,6 +4,8 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { sizing } from '@/theme/spacing';
+import { useNotifications } from '@/hooks/useOperations';
+import { badgeText } from '@/components/ui/UnreadBadge';
 
 // Native tabs for iOS Liquid Glass — falls back to JS tabs on web/Android-if-needed
 let NativeTabs: any = null;
@@ -13,6 +15,7 @@ try {
 
 function OwnerNativeTabs() {
   const { colors } = useTheme();
+  const { unreadCount } = useNotifications();
 
   return (
     <NativeTabs
@@ -26,6 +29,8 @@ function OwnerNativeTabs() {
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="home" />}
         />
         <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
+        {/* Unread notifications, visible from every owner screen; gone when there are none. */}
+        <NativeTabs.Trigger.Badge hidden={unreadCount <= 0}>{badgeText(unreadCount)}</NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="projects">
@@ -65,6 +70,7 @@ function OwnerNativeTabs() {
 
 function OwnerJSTabs() {
   const { colors } = useTheme();
+  const { unreadCount } = useNotifications();
 
   return (
     <Tabs
@@ -93,6 +99,7 @@ function OwnerJSTabs() {
         name="index"
         options={{
           title: 'Dashboard',
+          tabBarBadge: unreadCount > 0 ? badgeText(unreadCount) : undefined,
           tabBarIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),

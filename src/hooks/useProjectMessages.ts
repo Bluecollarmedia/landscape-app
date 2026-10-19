@@ -2,6 +2,7 @@ import { useMemo, useCallback } from 'react';
 import type { ProjectMessage } from '@/types/project';
 import { db, useDb, insertRow, deleteRow } from '@/data/store';
 import { notifyStaff, notifyPeople } from '@/data/actions';
+import { customerMessageBody, customerMessageTitle } from '@/lib/notificationTarget';
 
 /** The customer ↔ owner conversation on one project. */
 export function useProjectMessages(projectId: string | undefined) {
@@ -25,7 +26,7 @@ export function useProjectMessages(projectId: string | undefined) {
         notifyPeople([project.customerId], 'customer_message', `New message from ${db.company?.name ?? 'your landscaper'}`, preview, link);
       }
     } else {
-      notifyStaff('customer_message', `Message from ${myName}`, `${project?.name ? `${project.name}: ` : ''}${preview}`, link);
+      notifyStaff('customer_message', customerMessageTitle(myName), customerMessageBody(project?.name, body), link, { customerId: db.personId, projectId });
     }
   }, [projectId]);
 

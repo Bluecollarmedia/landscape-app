@@ -16,6 +16,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Icon } from './Icon';
 import { PressableScale } from './PressableScale';
+import { UnreadBadge } from './UnreadBadge';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
@@ -28,10 +29,12 @@ interface GlassIconButtonProps {
   onPress: () => void;
   accessibilityLabel: string;
   style?: StyleProp<ViewStyle>;
+  /** Unread count shown as a small red badge (nothing when 0 or missing). */
+  badge?: number;
 }
 
 /** Round glass button. Real Liquid Glass on iOS 26, a frosted chip elsewhere. */
-export function GlassIconButton({ icon, onPress, accessibilityLabel, style }: GlassIconButtonProps) {
+export function GlassIconButton({ icon, onPress, accessibilityLabel, style, badge }: GlassIconButtonProps) {
   const { colors } = useTheme();
   const glyph = <Icon name={icon as any} size={22} color={colors.textPrimary} />;
   return (
@@ -43,6 +46,7 @@ export function GlassIconButton({ icon, onPress, accessibilityLabel, style }: Gl
       accessibilityLabel={accessibilityLabel}
       style={style}
     >
+      <View>
       {HAS_LIQUID_GLASS ? (
         <GlassView glassEffectStyle="regular" isInteractive style={styles.glassButton}>
           {glyph}
@@ -58,6 +62,8 @@ export function GlassIconButton({ icon, onPress, accessibilityLabel, style }: Gl
           {glyph}
         </View>
       )}
+        {badge ? <UnreadBadge count={badge} /> : null}
+      </View>
     </PressableScale>
   );
 }

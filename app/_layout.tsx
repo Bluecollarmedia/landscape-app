@@ -106,18 +106,17 @@ function RootNavigator() {
     setSplashDone(true);
   }, []);
 
-  if (isPublicPage) {
-    return <Slot />;
-  }
-
-  if (isLoading || !splashDone) {
+  if (!isPublicPage && (isLoading || !splashDone)) {
     return <SplashScreen onFinish={handleSplashFinish} />;
   }
 
+  // Same element tree for public and normal pages. If a public page (Privacy, Terms, Support) returned a different
+  // tree, opening it would rebuild the whole navigator and Back would land on the Dashboard instead of the
+  // screen you came from.
   return (
     <>
       <Slot />
-      <SignInWelcome />
+      {isPublicPage ? null : <SignInWelcome />}
     </>
   );
 }

@@ -26,6 +26,8 @@ export interface SnowActivityFilters {
   action?: string;
   /** Only entries from this period (the feed is read newest first until the period's start). */
   range?: DateRange;
+  /** Show the archived entries (moved to history, update 51) instead of the live ones. */
+  archived?: boolean;
 }
 
 export type SnowFilterKind = 'storm' | 'route' | 'property' | 'worker' | 'action';
@@ -105,6 +107,8 @@ function feedArgs(f: SnowActivityFilters, before?: SnowActivityEntry) {
     p_before_at: before?.occurredAt ?? null,
     p_before_id: before?.id ?? null,
     p_limit: PAGE,
+    // Only sent when asked for, so a database without update 51 keeps working for the normal view.
+    ...(f.archived ? { p_archived: true } : {}),
   };
 }
 

@@ -16,6 +16,9 @@ import { SectionTabs, StatusBadge, ProgressBar, Card, EmptyState, Divider, Avata
 import { useProject } from '@/hooks/useProject';
 import { useAuth } from '@/providers/AuthProvider';
 import { attachImage } from '@/data/actions';
+import { ClearLogSheet } from '@/components/logs/ClearLogSheet';
+import { previewProjectClear, runProjectClear } from '@/data/activityClear';
+import { refresh as refreshStore } from '@/data/store';
 import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
 import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
 import { MessageThread } from '@/components/messages/MessageThread';
@@ -245,6 +248,9 @@ export default function ProjectDetailScreen() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [accessVersion, setAccessVersion] = useState(0);
   const [activityExpanded, setActivityExpanded] = useState<Record<string, boolean>>({});
+  // Clear this project's activity for a period (update 51, owner/admin)
+  const [clearingActivity, setClearingActivity] = useState(false);
+  const [activityClearedNote, setActivityClearedNote] = useState<string | null>(null);
   const [showRadiusPicker, setShowRadiusPicker] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
@@ -2018,6 +2024,20 @@ export default function ProjectDetailScreen() {
           </View>
         </View>
 
+        {activityClearedNote ? (
+          <Text style={[typeScale.bodySmall, { color: semantic.success, marginBottom: spacing.sm }]}>{activityClearedNote}</Text>
+        ) : null}
+        <ClearLogSheet
+          visible={clearingActivity}
+          onClose={() => setClearingActivity(false)}
+          title="Clear this project's activity"
+          what="activity"
+          modes={['delete']}
+          years={[]}
+          preview={(range) => previewProjectClear(p.id, range)}
+          run={(range) => runProjectClear(p.id, range)}
+          onDone={(msg) => { setActivityClearedNote(msg); refreshStore('project_history'); }}
+        />
         {history.length === 0 ? (
           <EmptyState icon="activity" title="No activity" description="Project history will appear here as things happen." />
         ) : (
@@ -2031,6 +2051,15 @@ export default function ProjectDetailScreen() {
                 <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
                   {allExpanded ? 'Collapse All' : 'Expand All'}
                 </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.expandAllBtn, { backgroundColor: colors.backgroundTertiary, marginLeft: spacing.sm }]}
+                onPress={() => { setActivityClearedNote(null); setClearingActivity(true); }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear this project's activity"
+              >
+                <Icon name="trash-2" size={13} color={colors.textSecondary} />
+                <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>Clear</Text>
               </Pressable>
             </View>
 

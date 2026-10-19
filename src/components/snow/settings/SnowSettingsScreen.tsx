@@ -116,6 +116,10 @@ export function SnowSettingsScreen() {
           <SettingsRow icon="clock" title="Snow hours" subtitle="Hours by worker and storm; fix a missed clock-out" onPress={() => router.push('/snow/owner/hours')} />
         </SettingsGroup>
 
+        <SettingsGroup title="Storms" footer="Delete a storm you made by mistake, or one that is finished and no longer wanted. Not shown on the dashboard.">
+          <SettingsRow icon="trash-2" title="Manage storms" subtitle="Delete any storm, even an ended one" onPress={() => router.push('/snow/owner/manage-storms' as any)} />
+        </SettingsGroup>
+
         <SettingsGroup title="You">
           <SettingsRow icon="user" title="Your profile and photo" onPress={() => router.push('/snow/owner/edit-profile' as any)} />
           <ModeSwitchRow />

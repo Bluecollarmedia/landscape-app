@@ -13,6 +13,7 @@
  * skipped, and no customer notification or media share is repeated.
  */
 import { defaultStormNameFor } from '@/lib/snowServices';
+import { NEEDS_UPDATE_50, isMissingFunction, type StormCounts } from '@/lib/snowStormDelete';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { uuid } from '@/lib/ids';
 import type { SnowService, SnowStorm } from '@/types/snow';
@@ -234,6 +235,40 @@ export async function renameStorm(stormId: string, patch: { name?: string; notes
   const { error } = await supabase.from('snow_storms').update(values).eq('id', stormId);
   if (error) return fail(message(error, 'Couldn\'t save the storm.'));
   return ok(undefined);
+}
+
+/** How much work hangs off a storm, for the "delete for good" confirmation. */
+export async function loadStormCounts(stormId: string): Promise<Result<StormCounts>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const head = { count: 'exact' as const, head: true };
+  const [routes, stops, done, media] = await Promise.all([
+    supabase.from('snow_routes').select('id', head).eq('storm_id', stormId),
+    supabase.from('snow_visits').select('id', head).eq('storm_id', stormId),
+    supabase.from('snow_visits').select('id', head).eq('storm_id', stormId).eq('status', 'completed'),
+    supabase.from('snow_completion_media').select('id', head).eq('storm_id', stormId),
+  ]);
+  const err = routes.error ?? stops.error ?? done.error;
+  if (err) return fail(message(err, 'Couldn\'t check the storm.'));
+  return ok({ routes: routes.count ?? 0, stops: stops.count ?? 0, completedStops: done.count ?? 0, media: media.error ? 0 : media.count ?? 0 });
+}
+
+/**
+ * Deletes a storm of ANY status, with its routes, stops, skip requests and photo records (update 50, owner/admin
+ * only). On a database without update 50 only a draft can still be deleted, the old way.
+ */
+export async function deleteStormForGood(stormId: string, status?: string): Promise<Result<{ routes: number; stops: number }>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data, error } = await supabase.rpc('snow_delete_storm', { p_storm_id: stormId });
+  if (!error) {
+    const d = (data ?? {}) as { routes?: number; stops?: number };
+    return ok({ routes: d.routes ?? 0, stops: d.stops ?? 0 });
+  }
+  if (isMissingFunction(error.message)) {
+    if (status !== 'draft') return fail(NEEDS_UPDATE_50);
+    const old = await deleteDraftStorm(stormId);
+    return old.ok ? ok({ routes: 0, stops: 0 }) : old;
+  }
+  return fail(message(error, 'Couldn\'t delete the storm.'));
 }
 
 /** Only drafts can be deleted; a dispatched storm is ended instead. */

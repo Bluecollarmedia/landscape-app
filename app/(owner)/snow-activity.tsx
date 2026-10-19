@@ -23,9 +23,12 @@ import {
   useSnowActivity, type SnowActivityEntry, type SnowActivityFilters, type SnowFilterKind, type SnowFilterOption,
 } from '@/hooks/useSnowActivity';
 import { actionIcon, actionLabel, entityLabel, fieldChanges } from '@/lib/snowActivity';
+import { ClearLogSheet } from '@/components/logs/ClearLogSheet';
+import { loadSnowLogYears, previewSnowClear, runSnowClear } from '@/data/activityClear';
+import type { ClearMode } from '@/lib/logClear';
 import { DATE_RANGES, buildView, entryServices, runSpan, servicesText, type ViewItem } from '@/lib/snowActivityView';
 
-const FILTERS: { kind: SnowFilterKind; label: string; field: keyof SnowActivityFilters }[] = [
+const FILTERS: { kind: SnowFilterKind; label: string; field: Exclude<keyof SnowActivityFilters, 'range' | 'archived'> }[] = [
   { kind: 'storm', label: 'Storm', field: 'stormId' },
   { kind: 'route', label: 'Route', field: 'routeId' },
   { kind: 'worker', label: 'Worker', field: 'personId' },
@@ -64,6 +67,13 @@ export default function SnowActivityScreen() {
   const [grouped, setGrouped] = useState(true);
   const [openRuns, setOpenRuns] = useState<Record<string, boolean>>({});
   const { events, options, loading, loadingMore, hasMore, error, reload, loadMore } = useSnowActivity(filters);
+  // Clear / archive the log (update 51)
+  const [clearing, setClearing] = useState(false);
+  const [years, setYears] = useState<number[]>([]);
+  const [clearedNote, setClearedNote] = useState<string | null>(null);
+  const archivedView = !!filters.archived;
+  const clearModes: ClearMode[] = archivedView ? ['restore', 'delete'] : ['archive', 'delete'];
+  function openClear() { loadSnowLogYears().then(setYears); setClearing(true); }
 
   const labelOf = useMemo(() => {
     const map = new Map<string, string>();
@@ -215,7 +225,16 @@ export default function SnowActivityScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Snow Activity" subtitle="Everything that happened, newest first" />
+      <ScreenHeader
+        title={archivedView ? 'Archived activity' : 'Snow Activity'}
+        subtitle={archivedView ? 'Entries you moved to history' : 'Everything that happened, newest first'}
+        right={
+          <Pressable onPress={openClear} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear or archive the log" style={styles.clearBtn}>
+            <Icon name="trash-2" size={18} color={colors.textSecondary} />
+          </Pressable>
+        }
+      />
+      {clearedNote ? <Text style={[typeScale.bodySmall, styles.error, { color: colors.success }]}>{clearedNote}</Text> : null}
 
       <View style={styles.filterBar}>
         {DATE_RANGES.map((r) => {
@@ -233,6 +252,16 @@ export default function SnowActivityScreen() {
             </Pressable>
           );
         })}
+        <Pressable
+          onPress={() => { setFilters((prev) => ({ ...prev, archived: archivedView ? undefined : true })); setExpandedId(null); setClearedNote(null); }}
+          style={[styles.chip, { backgroundColor: archivedView ? colors.primarySurface : colors.backgroundTertiary, borderColor: archivedView ? colors.primary : colors.borderLight }]}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: archivedView }}
+          accessibilityLabel="Show archived entries"
+        >
+          <Icon name="archive" size={14} color={archivedView ? colors.primary : colors.textSecondary} />
+          <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Archived</Text>
+        </Pressable>
         <Pressable
           onPress={() => setGrouped(!grouped)}
           style={[styles.chip, { backgroundColor: grouped ? colors.primarySurface : colors.backgroundTertiary, borderColor: grouped ? colors.primary : colors.borderLight }]}
@@ -311,6 +340,17 @@ export default function SnowActivityScreen() {
         />
       )}
 
+      <ClearLogSheet
+        visible={clearing}
+        onClose={() => setClearing(false)}
+        title={archivedView ? 'Archived entries' : 'Clear the activity log'}
+        modes={clearModes}
+        years={years}
+        preview={(range, mode) => previewSnowClear(range, mode)}
+        run={(range, mode) => runSnowClear(range, mode)}
+        onDone={(msg) => { setClearedNote(msg); reload(); }}
+      />
+
       <BottomSheetModal visible={!!picking} onRequestClose={() => setPicking(null)}>
         <Pressable style={styles.overlay} onPress={() => setPicking(null)}>
           <Pressable
@@ -364,6 +404,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, minHeight: 36, borderRadius: radius.full, borderWidth: 1,
   },
   clear: { paddingHorizontal: spacing.sm, minHeight: 36, justifyContent: 'center' },
+  clearBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   error: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth },

@@ -1,4 +1,5 @@
 import { openDirections, findCoords, distanceMeters, formatDistance, DEFAULT_CHECKIN_RADIUS_M, type Place } from '@/lib/maps';
+import { evaluateCheckIn, checkInRefusal } from '@/lib/checkInRadius';
 import { getCurrentGps } from '@/lib/location';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
@@ -27,8 +28,6 @@ export type CheckInLocation =
 /** Demo mode has no real phone location; pretend the worker is on site. */
 const DEMO_GPS: GPSCoordinates = { latitude: 41.4756, longitude: -81.5558, accuracy: 10, distanceFromSite: 20 };
 
-/** GPS readings near trees and buildings drift; never count more than this much of the phone's error margin. */
-const MAX_ACCURACY_ALLOWANCE_M = 75;
 
 type JobState = 'not_started' | 'confirmed' | 'en_route' | 'checked_in' | 'working' | 'completed';
 
@@ -232,20 +231,15 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     const gps = here.gps;
     const radius = db.settings[job.projectId]?.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M;
     const site = job.project ? await findCoords(job.project) : null;
-    // If the job's address can't be found on the map there's nothing to compare against, so allow it.
-    if (!site) return { ok: true, gps };
 
-    const distance = Math.round(distanceMeters(gps, site));
-    const withDistance = { ...gps, distanceFromSite: distance };
-
-    const allowance = Math.min(gps.accuracy || 0, MAX_ACCURACY_ALLOWANCE_M);
-    if (distance - allowance <= radius) return { ok: true, gps: withDistance };
-
-    return {
-      ok: false,
-      title: 'You’re not at the job site yet',
-      message: `You’re about ${formatDistance(distance)} from ${job.project?.name ?? 'the job site'}. Check in once you get there.`,
-    };
+    // The real check: the phone's actual position against the project's coordinates and its saved distance.
+    // A job with no findable location, or a GPS fix too vague to trust, is refused with a clear reason (never waved through).
+    const verdict = evaluateCheckIn({ gps, site, radiusM: radius });
+    if (!verdict.ok) {
+      const say = checkInRefusal(verdict, job.project?.name ?? 'the job site', formatDistance);
+      return { ok: false, title: say.title, message: say.message };
+    }
+    return { ok: true, gps: { ...gps, distanceFromSite: verdict.distance } };
   }, [resolveCheckInJob]);
 
   const locateForCheckOut = useCallback(async (): Promise<GPSCoordinates | null> => {

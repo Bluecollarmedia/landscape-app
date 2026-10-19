@@ -12,6 +12,10 @@ export interface RadiusMapProps {
   fraction: number;
   height?: number;
   style?: ViewStyle;
+  /** The project's resolved coordinates (the sheet resolves them once and hands them down). */
+  coords?: { latitude: number; longitude: number } | null;
+  /** False until the sheet has finished opening; the native map isn't created before then. */
+  ready?: boolean;
 }
 
 const MAP_TINT = '#E4EAF0';

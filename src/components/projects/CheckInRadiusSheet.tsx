@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/ThemeProvider';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { RadiusMap } from '@/components/maps/RadiusMap';
-import { CHECKIN_RADIUS_STOPS_FT, feetToMeters, nearestRadiusStop, describeRadius, formatDistance, type Place } from '@/lib/maps';
+import { CHECKIN_RADIUS_STOPS_FT, feetToMeters, nearestRadiusStop, describeRadius, formatDistance, findCoords, type Place } from '@/lib/maps';
+import { validCoords, type LatLng } from '@/lib/checkInRadius';
 import { haptics } from '@/lib/haptics';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -14,7 +15,8 @@ interface CheckInRadiusSheetProps {
   place: Place;
   radiusMeters: number;
   onClose: () => void;
-  onSave: (meters: number) => void;
+  /** Called once with the chosen distance and the project's resolved coordinates. */
+  onSave: (meters: number, coords: LatLng) => void;
 }
 
 const LAST = CHECKIN_RADIUS_STOPS_FT.length - 1;
@@ -41,6 +43,31 @@ export function CheckInRadiusSheet({ visible, place, radiusMeters, onClose, onSa
   useEffect(() => {
     if (visible) setIndex(nearestRadiusStop(radiusMeters));
   }, [visible, radiusMeters]);
+
+  // The project's real location (saved coordinates, else its address looked up on the map). undefined = still looking,
+  // null = can't be found. Never the phone's own location, and never a guessed default.
+  const [coords, setCoords] = useState<LatLng | null | undefined>(undefined);
+  const [mapReady, setMapReady] = useState(false);
+  const savingRef = useRef(false);
+  useEffect(() => {
+    if (!visible) { setMapReady(false); setCoords(undefined); savingRef.current = false; return; }
+    let live = true;
+    findCoords(place)
+      .then((c) => { if (live) setCoords(validCoords(c) ? c : null); })
+      .catch(() => { if (live) setCoords(null); });
+    // Create the native map only once the sheet has finished sliding in.
+    const t = setTimeout(() => { if (live) setMapReady(true); }, 450);
+    return () => { live = false; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, place.latitude, place.longitude, place.address, place.city, place.state, place.zip]);
+
+  const canSave = !!coords;
+  function save() {
+    if (!coords || savingRef.current) return;
+    savingRef.current = true;
+    haptics.success();
+    onSave(meters, coords);
+  }
 
   const feet = CHECKIN_RADIUS_STOPS_FT[index];
   const meters = feetToMeters(feet);
@@ -96,7 +123,16 @@ export function CheckInRadiusSheet({ visible, place, radiusMeters, onClose, onSa
             </Pressable>
           </View>
 
-          <RadiusMap place={place} radiusMeters={meters} fraction={index / LAST} height={190} style={styles.map} />
+          {coords === null ? (
+            <View style={[styles.map, styles.mapError, { backgroundColor: colors.backgroundTertiary }]}>
+              <Text style={[typeScale.bodySmall, { color: colors.error, textAlign: 'center', fontWeight: '700' }]}>This project's location can't be found</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>
+                Fix the project's address, then set the check-in distance. A distance can't be saved without a location.
+              </Text>
+            </View>
+          ) : (
+            <RadiusMap place={place} coords={coords} ready={mapReady} radiusMeters={meters} fraction={index / LAST} height={190} style={styles.map} />
+          )}
 
           <View style={styles.readout}>
             <Text style={[styles.value, { color: colors.textPrimary }]}>{value}</Text>
@@ -131,8 +167,11 @@ export function CheckInRadiusSheet({ visible, place, radiusMeters, onClose, onSa
           </Text>
 
           <Pressable
-            onPress={() => { haptics.success(); onSave(meters); }}
-            style={({ pressed }) => [styles.save, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+            onPress={save}
+            disabled={!canSave}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canSave }}
+            style={({ pressed }) => [styles.save, { backgroundColor: colors.primary, opacity: !canSave ? 0.4 : pressed ? 0.85 : 1 }]}
           >
             <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Save distance</Text>
           </Pressable>
@@ -148,6 +187,7 @@ const styles = StyleSheet.create({
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: spacing.md },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   map: { borderRadius: radius.lg, overflow: 'hidden' },
+  mapError: { height: 190, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   readout: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.lg },
   value: { fontSize: 36, fontWeight: '800', letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
   sliderTouch: { paddingVertical: spacing.lg, paddingHorizontal: THUMB / 2, marginHorizontal: -THUMB / 2, marginTop: spacing.xs },

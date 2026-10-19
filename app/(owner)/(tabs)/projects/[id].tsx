@@ -2183,8 +2183,16 @@ ${message}`)) run();
     );
   }
 
-  function handleSetRadius(meters: number) {
+  /** One tap opens the sheet once (extra taps while it is opening are ignored). */
+  function openRadiusPicker() {
+    setShowRadiusPicker((open) => (open ? open : true));
+  }
+
+  function handleSetRadius(meters: number, coords: { latitude: number; longitude: number }) {
+    // This project's own setting. When the project has no saved map spot yet, save the one the sheet just resolved, so the worker's
+    // check-in (and the database) measure from exactly the spot the owner saw on the map.
     updateSettings({ checkinRadiusMeters: meters });
+    if (p.latitude == null || p.longitude == null) updateProject({ latitude: coords.latitude, longitude: coords.longitude });
     setShowRadiusPicker(false);
   }
 
@@ -2364,7 +2372,7 @@ ${message}`)) run();
           {(
             <>
               <Divider style={{ marginVertical: spacing.xs }} />
-              <Pressable style={styles.settingsDetailRow} onPress={() => setShowRadiusPicker(true)}>
+              <Pressable style={styles.settingsDetailRow} onPress={openRadiusPicker}>
                 <View style={{ flex: 1, marginRight: spacing.sm }}>
                   <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Check-in distance</Text>
                   <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Workers can only tap I'm here within this distance of the address.</Text>

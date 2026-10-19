@@ -15,6 +15,7 @@
 import { db, insertRow, insertRows, updateRow, deleteRow, rowsOf, rpc, refresh, isDemo, saveDeferredRow, discardLocalRow, type TableName } from './store';
 import { uploadImage } from '@/lib/media';
 import { localDateKey, todayKey } from '@/lib/ids';
+import { cleanDates } from '@/lib/serviceDates';
 import type { GpsResult } from '@/lib/location';
 import type { PersonSummary } from '@/types/company';
 import type {
@@ -184,6 +185,11 @@ export function ruleProblem(r: Partial<ServiceRuleInput>): string | undefined {
   if (r.frequency === 'seasonal_window') {
     if (!r.windowStart || !r.windowEnd) return 'Pick when this service is due (start and end).';
     if (r.windowEnd < r.windowStart) return 'The end date is before the start date.';
+  }
+  if (r.frequency === 'fixed_dates') {
+    const dates = cleanDates(r.scheduledDates);
+    if (dates.length === 0) return 'Add at least one visit date, or spread the visits across the season.';
+    if (dates.length !== (r.scheduledDates ?? []).length) return 'Some visit dates are repeated or not real dates.';
   }
   if (r.seasonQuantity != null && !(r.seasonQuantity >= 1 && r.seasonQuantity <= 365)) return 'Visits per season must be 1–365.';
   return undefined;

@@ -34,6 +34,7 @@ import { frequencyLabel } from '@/lib/maintenanceSchedule';
 import { todayKey } from '@/lib/ids';
 import { haptics } from '@/lib/haptics';
 import type { AddressParts } from '@/lib/address';
+import { spreadDates, cleanDates } from '@/lib/serviceDates';
 import { SERVICE_TYPES, type MaintenanceServiceRule, type ServiceFrequency } from '@/types/maintenance';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -56,6 +57,10 @@ interface ServiceDraft {
   startsOn?: string;
   windowStart?: string;
   windowEnd?: string;
+  /** For "Set number of visits": the exact dates, and the span they were spread across. */
+  scheduledDates: string[];
+  spreadFrom?: string;
+  spreadTo?: string;
   seasonQuantity: string;
   priorCompletedCount: string;
   lastCompletedOn?: string;
@@ -70,6 +75,7 @@ const FREQUENCIES: { key: ServiceFrequency; label: string }[] = [
   { key: 'weekly', label: 'Every week' },
   { key: 'biweekly', label: 'Every 2 weeks' },
   { key: 'every_n_days', label: 'Every N days' },
+  { key: 'fixed_dates', label: 'Set number of visits' },
   { key: 'seasonal_window', label: 'Once, in a date range' },
   { key: 'as_needed', label: 'As needed' },
 ];
@@ -101,6 +107,7 @@ function newDraft(type: string, year: string): ServiceDraft {
     label: t && type !== 'other' ? t.label : '',
     frequency: 'weekly',
     intervalDays: '',
+    scheduledDates: [],
     seasonQuantity: '',
     priorCompletedCount: '',
     requiresPhotos: false,
@@ -122,6 +129,9 @@ function draftFromRule(r: MaintenanceServiceRule): ServiceDraft {
     startsOn: r.startsOn,
     windowStart: r.windowStart,
     windowEnd: r.windowEnd,
+    scheduledDates: cleanDates(r.scheduledDates),
+    spreadFrom: cleanDates(r.scheduledDates)[0],
+    spreadTo: cleanDates(r.scheduledDates).slice(-1)[0],
     seasonQuantity: r.seasonQuantity != null ? String(r.seasonQuantity) : '',
     priorCompletedCount: r.priorCompletedCount ? String(r.priorCompletedCount) : '',
     lastCompletedOn: r.lastCompletedOn,
@@ -139,6 +149,8 @@ const toInt = (s: string): number | undefined => {
 
 function draftToInput(d: ServiceDraft, sortOrder: number): ServiceRuleInput {
   const window = d.frequency === 'seasonal_window';
+  const fixed = d.frequency === 'fixed_dates';
+  const fixedDates = fixed ? cleanDates(d.scheduledDates) : [];
   const repeating = d.frequency === 'weekly' || d.frequency === 'biweekly' || d.frequency === 'every_n_days';
   return {
     serviceType: d.serviceType,
@@ -150,7 +162,9 @@ function draftToInput(d: ServiceDraft, sortOrder: number): ServiceRuleInput {
     startsOn: repeating ? d.startsOn : undefined,
     windowStart: window ? d.windowStart : undefined,
     windowEnd: window ? d.windowEnd : undefined,
-    seasonQuantity: d.frequency === 'as_needed' ? undefined : toInt(d.seasonQuantity),
+    scheduledDates: fixed ? fixedDates : undefined,
+    // For a set number of visits the count is always the number of saved dates.
+    seasonQuantity: d.frequency === 'as_needed' ? undefined : fixed ? fixedDates.length : toInt(d.seasonQuantity),
     priorCompletedCount: toInt(d.priorCompletedCount) ?? 0,
     lastCompletedOn: d.lastCompletedOn,
     requiresPhotos: d.requiresPhotos,
@@ -451,6 +465,8 @@ export default function MaintenancePropertyEditScreen() {
               {openKey === s.key && (
                 <ServiceEditor
                   draft={s}
+                  seasonStart={seasonStart}
+                  seasonEnd={seasonEnd}
                   onChange={(patch) => patchService(s.key, patch)}
                   onRemove={s.id ? undefined : () => removeDraft(s.key)}
                 />
@@ -496,14 +512,28 @@ export default function MaintenancePropertyEditScreen() {
 
 // ── One service's settings ──────────────────────────────────────────────────
 
-function ServiceEditor({ draft: d, onChange, onRemove }: {
+function ServiceEditor({ draft: d, onChange, onRemove, seasonStart, seasonEnd }: {
   draft: ServiceDraft;
+  /** The contract's season: where "Set number of visits" spreads the visits by default. */
+  seasonStart?: string;
+  seasonEnd?: string;
   onChange: (patch: Partial<ServiceDraft>) => void;
   onRemove?: () => void;
 }) {
   const { colors } = useTheme();
   const repeating = d.frequency === 'weekly' || d.frequency === 'biweekly' || d.frequency === 'every_n_days';
   const window = d.frequency === 'seasonal_window';
+  const fixed = d.frequency === 'fixed_dates';
+
+  /** Changing the number of visits or the first/last date works out the dates again, evenly. */
+  function respread(patch: Partial<ServiceDraft>) {
+    const next = { ...d, ...patch };
+    const dates = spreadDates(next.spreadFrom ?? seasonStart, next.spreadTo ?? seasonEnd, toInt(next.seasonQuantity) ?? 0);
+    onChange({ ...patch, ...(dates.length ? { scheduledDates: dates } : {}) });
+  }
+  function setDates(dates: string[]) {
+    onChange({ scheduledDates: dates, seasonQuantity: String(dates.length) });
+  }
 
   return (
     <View style={[styles.editor, { backgroundColor: colors.backgroundSecondary, borderColor: colors.separator }]}>
@@ -517,7 +547,11 @@ function ServiceEditor({ draft: d, onChange, onRemove }: {
             return (
               <Pressable
                 key={f.key}
-                onPress={() => { haptics.select(); onChange({ frequency: f.key }); }}
+                onPress={() => {
+                  haptics.select();
+                  if (f.key === 'fixed_dates') respread({ frequency: f.key, spreadFrom: d.spreadFrom ?? seasonStart, spreadTo: d.spreadTo ?? seasonEnd });
+                  else onChange({ frequency: f.key });
+                }}
                 style={[styles.chip, { backgroundColor: on ? colors.primary : colors.surface, borderColor: on ? colors.primary : colors.border }]}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: on }}
@@ -538,13 +572,41 @@ function ServiceEditor({ draft: d, onChange, onRemove }: {
           <DateRow label="Due by" value={d.windowEnd} onChange={(k) => onChange({ windowEnd: k })} minimumDate={d.windowStart} />
         </>
       )}
+      {fixed && (
+        <>
+          <InputRow label="Number of visits" value={d.seasonQuantity} onChangeText={(t) => respread({ seasonQuantity: t })} keyboardType="number-pad" placeholder="6" suffix="visits" />
+          <DateRow label="First visit" value={d.spreadFrom ?? seasonStart} onChange={(k) => respread({ spreadFrom: k })} />
+          <DateRow label="Last visit" value={d.spreadTo ?? seasonEnd} onChange={(k) => respread({ spreadTo: k })} minimumDate={d.spreadFrom ?? seasonStart} />
+          <Text style={[typeScale.caption, { color: colors.textTertiary, paddingHorizontal: spacing.md, paddingBottom: spacing.xs }]}>
+            The visits are spread evenly from the first to the last date (they start from the Season dates above unless you change them). Change the number or either date and they are worked out again. You can also change any single date below, or add your own.
+          </Text>
+          {d.scheduledDates.map((date, i) => (
+            <View key={`${i}-${date}`} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <DateRow label={`Visit ${i + 1}`} value={date} onChange={(k) => setDates(d.scheduledDates.map((x, j) => (j === i ? k : x)))} />
+              </View>
+              <Pressable onPress={() => setDates(d.scheduledDates.filter((_, j) => j !== i))} hitSlop={10} style={{ paddingHorizontal: spacing.md }} accessibilityRole="button" accessibilityLabel={`Remove visit ${i + 1}`}>
+                <Icon name="x" size={18} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+          ))}
+          <Pressable
+            onPress={() => setDates([...d.scheduledDates, d.scheduledDates.slice(-1)[0] ?? d.spreadTo ?? seasonEnd ?? d.spreadFrom ?? seasonStart ?? todayKey()])}
+            style={styles.removeRow}
+            accessibilityRole="button"
+          >
+            <Icon name="plus" size={16} color={colors.primary} />
+            <Text style={[typeScale.bodyLarge, { color: colors.primary }]}>Add a date</Text>
+          </Pressable>
+        </>
+      )}
       {repeating && (
         <DateRow label="First service" value={d.startsOn} onChange={(k) => onChange({ startsOn: k })} optional onClear={() => onChange({ startsOn: undefined })} />
       )}
-      {d.frequency !== 'as_needed' && (
+      {d.frequency !== 'as_needed' && !fixed && (
         <InputRow label="Visits this season" value={d.seasonQuantity} onChangeText={(t) => onChange({ seasonQuantity: t })} keyboardType="number-pad" placeholder="No limit" />
       )}
-      <DateRow label="Last done" value={d.lastCompletedOn} onChange={(k) => onChange({ lastCompletedOn: k })} optional onClear={() => onChange({ lastCompletedOn: undefined })} />
+      {!fixed && <DateRow label="Last done" value={d.lastCompletedOn} onChange={(k) => onChange({ lastCompletedOn: k })} optional onClear={() => onChange({ lastCompletedOn: undefined })} />}
       {!!d.seasonQuantity && (
         <InputRow label="Already done this season" value={d.priorCompletedCount} onChangeText={(t) => onChange({ priorCompletedCount: t })} keyboardType="number-pad" placeholder="0" />
       )}

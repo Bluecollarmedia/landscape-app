@@ -26,6 +26,7 @@ function frequencyLabel(r: MaintenanceServiceRule): string {
     case 'seasonal_window': return r.windowStart && r.windowEnd
       ? `Once, ${formatServiceDate(r.windowStart)} – ${formatServiceDate(r.windowEnd)}`
       : 'Once a season';
+    case 'fixed_dates': return r.scheduledDates?.length ? `${r.scheduledDates.length} visits on set dates` : 'Visit dates not set';
     case 'as_needed': return 'As needed';
   }
 }

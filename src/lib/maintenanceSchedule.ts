@@ -5,6 +5,7 @@
  */
 import { addDaysKey } from './recurrence';
 import { isoToLocalDateKey } from './ids';
+import { cleanDates, datesSummary } from './serviceDates';
 import type {
   DueStatus, MaintenanceContract, MaintenanceProperty, MaintenanceServiceRule,
   MaintenanceStopService, PropertyDueInfo, ServiceDueInfo,
@@ -85,6 +86,18 @@ export function serviceDue(
     if (onDate < rule.windowStart) return { ...base, status: 'upcoming', dueDate: rule.windowStart };
     if (onDate <= rule.windowEnd) return { ...base, status: 'due', dueDate: rule.windowEnd };
     return { ...base, status: 'overdue', dueDate: rule.windowEnd, daysOverdue: daysBetween(rule.windowEnd, onDate) };
+  }
+
+  if (rule.frequency === 'fixed_dates') {
+    // A set number of visits on saved dates: due on the next saved date not yet covered by a completed visit.
+    const dates = cleanDates(rule.scheduledDates);
+    if (dates.length === 0) return { ...base, status: 'not_configured' };
+    if (completedCount >= dates.length) return { ...base, status: 'done_for_season', remainingCount: 0 };
+    const dueDate = dates[completedCount];
+    const late = daysBetween(dueDate, onDate);
+    if (late > 0) return { ...base, status: 'overdue', dueDate, daysOverdue: late };
+    if (late >= -lookAheadDays) return { ...base, status: 'due', dueDate };
+    return { ...base, status: 'upcoming', dueDate };
   }
 
   if ((contract.seasonStart && onDate < contract.seasonStart) || (contract.seasonEnd && onDate > contract.seasonEnd)) {
@@ -175,13 +188,17 @@ export function shortDate(key?: string): string {
 }
 
 /** How often a service happens, e.g. "Every 2 weeks · 26 this season", "Once, Jul 1 – Jul 31". */
-export function frequencyLabel(rule: Pick<MaintenanceServiceRule, 'frequency' | 'intervalDays' | 'seasonQuantity' | 'windowStart' | 'windowEnd'>): string {
+export function frequencyLabel(rule: Pick<MaintenanceServiceRule, 'frequency' | 'intervalDays' | 'seasonQuantity' | 'windowStart' | 'windowEnd'> & { scheduledDates?: string[] }): string {
   let text: string;
   switch (rule.frequency) {
     case 'weekly': text = 'Every week'; break;
     case 'biweekly': text = 'Every 2 weeks'; break;
     case 'every_n_days': text = rule.intervalDays ? `Every ${rule.intervalDays} day${rule.intervalDays === 1 ? '' : 's'}` : 'Days between visits not set'; break;
     case 'seasonal_window': text = rule.windowStart && rule.windowEnd ? `Once, ${shortDate(rule.windowStart)} – ${shortDate(rule.windowEnd)}` : 'Dates not set'; break;
+    case 'fixed_dates': {
+      const dates = cleanDates(rule.scheduledDates);
+      return dates.length ? `${dates.length} visit${dates.length === 1 ? '' : 's'} · ${datesSummary(dates)}` : 'Visit dates not set';
+    }
     case 'as_needed': text = 'As needed'; break;
   }
   return rule.seasonQuantity != null ? `${text} · ${rule.seasonQuantity} this season` : text;

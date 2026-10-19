@@ -68,9 +68,10 @@ export interface MaintenanceContract {
  *  weekly / biweekly   every 7 / 14 days
  *  every_n_days        every `intervalDays`
  *  seasonal_window     once between windowStart and windowEnd (spring cleanup, July shrub trim…)
+ *  fixed_dates         a set number of visits on saved dates (spread evenly across the season, or typed in)
  *  as_needed           never recommended automatically
  */
-export type ServiceFrequency = 'weekly' | 'biweekly' | 'every_n_days' | 'seasonal_window' | 'as_needed';
+export type ServiceFrequency = 'weekly' | 'biweekly' | 'every_n_days' | 'seasonal_window' | 'as_needed' | 'fixed_dates';
 
 /** Suggested service types. Any other text is allowed too. */
 export const SERVICE_TYPES = [
@@ -98,6 +99,8 @@ export interface MaintenanceServiceRule {
   startsOn?: string;
   windowStart?: string;
   windowEnd?: string;
+  /** For fixed_dates: the saved visit dates ('YYYY-MM-DD', oldest first). */
+  scheduledDates?: string[];
   /** e.g. 26 cuts this season. */
   seasonQuantity?: number;
   /** Done before the app started tracking. */

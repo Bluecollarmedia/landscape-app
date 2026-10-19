@@ -23,6 +23,9 @@ import { useProfilePhoto } from '@/hooks/useProfilePhoto';
 import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
 import { DateField } from '@/components/ui/DateField';
 import { localDateKey } from '@/lib/ids';
+import { WorkerExtrasFields } from '@/components/account/WorkerExtras';
+import { saveDetailsForCurrentUser } from '@/data/workerDetails';
+import type { HoodieSize } from '@/lib/workerDetails';
 
 type Step = 'code' | 'account' | 'profile';
 
@@ -58,6 +61,8 @@ export default function JoinTeamScreen() {
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [birthday, setBirthday] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [hoodie, setHoodie] = useState<HoodieSize | null>(null);
+  const [idUri, setIdUri] = useState<string | null>(null);
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -172,6 +177,16 @@ export default function JoinTeamScreen() {
       // Birthday is optional. Saved now when we are signed in; when an email confirmation comes first it can be added later in Edit Profile.
       const birthdayIso = parseBirthday(birthday);
       if (birthdayIso) await saveBirthdayForCurrentUser(birthdayIso);
+
+      // Hoodie size and ID photo are optional. Workers only (not the Snow request). Saved now while signed in; the worker can add them later in Settings → Edit Profile.
+      if (!isSnow) {
+        const extrasNote = await saveDetailsForCurrentUser({ hoodieSize: hoodie, idUri });
+        if (extrasNote) {
+          const note = `Your request was sent, but ${extrasNote} You can add your hoodie size and ID later in Settings → Edit Profile.`;
+          if (Platform.OS === 'web') alert(note);
+          else Alert.alert('Not saved', note);
+        }
+      }
 
       // Profile photo is optional; upload it if one was picked.
       if (photoUri) {
@@ -364,6 +379,10 @@ export default function JoinTeamScreen() {
             </View>
             <Input label="Phone *" placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
             <DateField label="Birthday (optional)" icon="gift" placeholder="Select your birthday" value={parseBirthday(birthday) ?? ''} onChange={(k) => setBirthday(birthdayInputText(k))} onClear={() => setBirthday('')} maximumDate={localDateKey(new Date())} initialPickerDate="1990-01-01" />
+
+            {!isSnow ? (
+              <WorkerExtrasFields hoodie={hoodie} onHoodie={setHoodie} newIdUri={idUri} onNewIdUri={setIdUri} onError={setError} />
+            ) : null}
 
             <View style={[styles.infoBox, { backgroundColor: semantic.warningLight, borderColor: semantic.warning }]}>
               <Icon name="info" size={14} color={semantic.warning} />

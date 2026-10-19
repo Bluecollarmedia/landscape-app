@@ -17,6 +17,9 @@ import { PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePho
 import { useProfilePhoto } from '@/hooks/useProfilePhoto';
 import { loadMyBirthday, saveMyBirthday } from '@/data/birthday';
 import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
+import { WorkerExtrasFields } from '@/components/account/WorkerExtras';
+import { loadMyDetails, saveMyHoodie, saveMyId, removeMyId } from '@/data/workerDetails';
+import type { HoodieSize } from '@/lib/workerDetails';
 
 interface EditProfileScreenProps {
   /** Workers must fill in every field (photo and phone included); owners only need a name. */
@@ -55,7 +58,25 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
     return () => { live = false; };
   }, [user?.id]);
 
-  const hasChanges = birthday.trim() !== savedBirthday || firstName !== user?.firstName || lastName !== user?.lastName || phone !== (user?.phone ?? '') || avatarUrl !== user?.avatarUrl;
+  // Hoodie size and ID photo (workers only). The ID is private: only this worker and the owner can see it.
+  const [hoodie, setHoodie] = useState<HoodieSize | null>(null);
+  const [savedHoodie, setSavedHoodie] = useState<HoodieSize | null>(null);
+  const [savedIdKey, setSavedIdKey] = useState<string | null>(null);
+  const [newIdUri, setNewIdUri] = useState<string | null>(null);
+  const [removeId, setRemoveId] = useState(false);
+  useEffect(() => {
+    if (!user || !requireAll) return;
+    let live = true;
+    loadMyDetails(user.id).then((d) => {
+      if (!live) return;
+      setSavedHoodie(d.hoodieSize);
+      setHoodie((cur) => cur ?? d.hoodieSize);
+      setSavedIdKey(d.idKey);
+    });
+    return () => { live = false; };
+  }, [user?.id, requireAll]);
+
+  const hasChanges = (requireAll && (hoodie !== savedHoodie || !!newIdUri || removeId)) || birthday.trim() !== savedBirthday || firstName !== user?.firstName || lastName !== user?.lastName || phone !== (user?.phone ?? '') || avatarUrl !== user?.avatarUrl;
 
   const todayKey = () => localDateKey(new Date());
   const phoneDigits = phone.replace(/\D/g, '').length;
@@ -86,6 +107,20 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
         const res = await saveMyBirthday(user.id, parseBirthday(birthday));
         if (!res.ok) birthdayNote = res.error;
       }
+      const extraNotes: string[] = [];
+      if (requireAll) {
+        if (hoodie !== savedHoodie) {
+          const r = await saveMyHoodie(user.id, hoodie);
+          if (r.ok) setSavedHoodie(hoodie); else extraNotes.push(r.error);
+        }
+        if (newIdUri) {
+          const r = await saveMyId(user.id, newIdUri, savedIdKey);
+          if (r.ok) { setNewIdUri(null); setRemoveId(false); } else extraNotes.push(r.error);
+        } else if (removeId && savedIdKey) {
+          const r = await removeMyId(user.id, savedIdKey);
+          if (r.ok) { setSavedIdKey(null); setRemoveId(false); } else extraNotes.push(r.error);
+        }
+      }
       updateProfile({
         ...user,
         firstName: firstName.trim(),
@@ -94,9 +129,8 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
         avatarUrl: savedAvatarUrl,
         updatedAt: new Date().toISOString(),
       });
-      if (birthdayNote) {
-        setSavedBirthday(savedBirthday);
-        setSaveError(birthdayNote);
+      if (birthdayNote || extraNotes.length) {
+        setSaveError([birthdayNote, ...extraNotes].filter(Boolean).join(' '));
         return;
       }
       router.back();
@@ -203,6 +237,17 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
             icon="mail"
             hint="Your email is your login and can't be changed here."
           />
+          {requireAll ? (
+            <WorkerExtrasFields
+              hoodie={hoodie}
+              onHoodie={setHoodie}
+              newIdUri={newIdUri}
+              onNewIdUri={(u) => { setNewIdUri(u); if (u) setRemoveId(false); }}
+              savedIdKey={removeId ? null : savedIdKey}
+              onRemoveSaved={() => setRemoveId(true)}
+              onError={setSaveError}
+            />
+          ) : null}
         </View>
 
         <Button

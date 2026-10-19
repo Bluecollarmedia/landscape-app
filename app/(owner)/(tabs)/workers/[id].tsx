@@ -16,6 +16,7 @@ import { semantic } from '@/theme/colors';
 import { haptics } from '@/lib/haptics';
 import { todayKey, localDateKey } from '@/lib/ids';
 import { loadBirthdays } from '@/data/birthday';
+import { OwnerWorkerExtras } from '@/components/account/WorkerExtras';
 import { formatBirthday, birthdaySoon } from '@/lib/birthday';
 
 const today = todayKey();
@@ -204,6 +205,7 @@ export default function WorkerDetailScreen() {
                 Birthday: {formatBirthday(birthday)}{birthdaySoon(birthday) ? ` · ${birthdaySoon(birthday)}` : ''}
               </Text>
             ) : null}
+            {personId ? <OwnerWorkerExtras personId={personId} /> : null}
           </View>
 
           {/* Worker type */}

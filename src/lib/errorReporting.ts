@@ -1,0 +1,39 @@
+// A safety net for errors nobody caught. Without it, one uncaught error closes the whole app instantly and
+// leaves no trace of what went wrong (a TestFlight crash report shows no message). With it, the person sees a
+// short note with the real error text, the app stays open, and the text can be sent to us.
+import { Alert, Platform } from 'react-native';
+
+export const ERROR_ALERT_COOLDOWN_MS = 15000;
+
+/** A short, readable description of whatever was thrown. */
+export function describeError(error: unknown): { message: string; where: string } {
+  const e = error as { message?: unknown; stack?: unknown } | string | null | undefined;
+  const message = typeof e === 'string' ? e : typeof e?.message === 'string' && e.message ? e.message : 'Unknown error';
+  const stack = typeof e === 'object' && e && typeof e.stack === 'string' ? e.stack : '';
+  // First couple of stack lines that name a place; the rest is noise for a person.
+  const where = stack.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith(message)).slice(0, 3).join('\n');
+  return { message: message.slice(0, 300), where: where.slice(0, 400) };
+}
+
+let installed = false;
+let lastShown = 0;
+
+export function installGlobalErrorHandler(now: () => number = Date.now): void {
+  const utils = (globalThis as { ErrorUtils?: { getGlobalHandler?: () => unknown; setGlobalHandler?: (h: (e: unknown, fatal?: boolean) => void) => void } }).ErrorUtils;
+  if (installed || !utils?.setGlobalHandler) return;
+  installed = true;
+  const previous = utils.getGlobalHandler?.() as ((e: unknown, fatal?: boolean) => void) | undefined;
+  utils.setGlobalHandler((error, isFatal) => {
+    if (!isFatal) { previous?.(error, isFatal); return; }
+    const { message, where } = describeError(error);
+    console.warn('[error] caught instead of crashing:', message, where);
+    if (now() - lastShown < ERROR_ALERT_COOLDOWN_MS) return;
+    lastShown = now();
+    const text = `${message}${where ? `\n\n${where}` : ''}\n\nTell support what you were doing. You can keep using the app; if something looks wrong, close and reopen it.`;
+    if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(`Something went wrong\n\n${text}`);
+    else Alert.alert('Something went wrong', text);
+  });
+}
+
+/** For tests. */
+export function _resetErrorHandlerForTests() { installed = false; lastShown = 0; }

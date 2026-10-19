@@ -19,8 +19,10 @@ import { SplashScreen } from '@/components/branding/SplashScreen';
 import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useModeAccess } from '@/hooks/useModeAccess';
+import { installGlobalErrorHandler } from '@/lib/errorReporting';
 
 ExpoSplashScreen.preventAutoHideAsync();
+installGlobalErrorHandler();
 
 function RootNavigator() {
   const { isLoading, isAuthenticated, user, appState, onboardingStep } = useAuth();
@@ -106,18 +108,17 @@ function RootNavigator() {
     setSplashDone(true);
   }, []);
 
-  if (isPublicPage) {
-    return <Slot />;
-  }
-
-  if (isLoading || !splashDone) {
+  if (!isPublicPage && (isLoading || !splashDone)) {
     return <SplashScreen onFinish={handleSplashFinish} />;
   }
 
+  // Same element tree for public and normal pages. If a public page (Privacy, Terms, Support) returned a different
+  // tree, opening it would rebuild the whole navigator and Back would land on the Dashboard instead of the
+  // screen you came from.
   return (
     <>
       <Slot />
-      <SignInWelcome />
+      {isPublicPage ? null : <SignInWelcome />}
     </>
   );
 }

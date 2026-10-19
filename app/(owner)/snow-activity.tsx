@@ -217,7 +217,7 @@ export default function SnowActivityScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Snow Activity" subtitle="Everything that happened, newest first" />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar} style={styles.filterScroll}>
+      <View style={styles.filterBar}>
         {DATE_RANGES.map((r) => {
           const on = (filters.range ?? 'all') === r.key;
           return (
@@ -243,9 +243,9 @@ export default function SnowActivityScreen() {
           <Icon name={grouped ? 'check-square' : 'square'} size={14} color={grouped ? colors.primary : colors.textSecondary} />
           <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Group by day</Text>
         </Pressable>
-      </ScrollView>
+      </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar} style={styles.filterScroll}>
+      <View style={styles.filterBar}>
         {FILTERS.map((f) => {
           const value = filters[f.field];
           const on = !!value;
@@ -272,7 +272,7 @@ export default function SnowActivityScreen() {
             <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Clear</Text>
           </Pressable>
         )}
-      </ScrollView>
+      </View>
 
       {error ? (
         <Text style={[typeScale.bodySmall, styles.error, { color: semantic.error }]}>{error}</Text>
@@ -357,9 +357,8 @@ export default function SnowActivityScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.md },
-  filterScroll: { flexGrow: 0 },
   dayHeader: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xs },
-  filterBar: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm, alignItems: 'center' },
+  filterBar: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm, alignItems: 'center' },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 200,
     paddingHorizontal: spacing.md, minHeight: 36, borderRadius: radius.full, borderWidth: 1,

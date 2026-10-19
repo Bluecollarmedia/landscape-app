@@ -7,14 +7,13 @@
 
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, Platform, Alert, ActivityIndicator } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { Icon, PressableScale } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { db } from '@/data/store';
-import { addStopPhoto, removeStopPhoto } from '@/data/maintenance';
+import { removeStopPhoto } from '@/data/maintenance';
+import { pickStopPhotos } from '@/lib/stopPhotoPicker';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import { haptics } from '@/lib/haptics';
 import type { MaintenancePhoto } from '@/types/maintenance';
 
 interface Props {
@@ -53,26 +52,7 @@ export function StopPhotos({ stopId, photos, requiresPhotos, minPhotos, locked }
   async function pick(source: 'camera' | 'library') {
     setBusy(true);
     try {
-      if (Platform.OS !== 'web') {
-        const permission = source === 'camera'
-          ? await ImagePicker.requestCameraPermissionsAsync()
-          : await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert(
-            source === 'camera' ? 'Camera access needed' : 'Photo access needed',
-            'Turn it on for Brighton Lawn in the Settings app to add stop photos.',
-          );
-          return;
-        }
-      }
-      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7, allowsMultipleSelection: source === 'library', selectionLimit: 6 };
-      const result = source === 'camera'
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
-      if (!result.canceled) {
-        for (const a of result.assets) addStopPhoto(stopId, a.uri);
-        if (result.assets.length) haptics.success();
-      }
+      await pickStopPhotos(stopId, source);
     } finally {
       setBusy(false);
     }

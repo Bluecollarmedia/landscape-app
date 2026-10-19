@@ -9,7 +9,8 @@
  * supabase/updates/023_snow_onboarding.sql (owner/admin only).
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { SERVICE_LABEL } from '@/data/snowStorms';
 import { View, Text, ScrollView, StyleSheet, Platform, Alert, Pressable, Share, RefreshControl } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -150,7 +151,7 @@ function ExistingWorkerCard({ first, last, email, phone, onGrant }: {
       <ServicePicker value={services} onChange={setServices} />
       <View style={styles.actionsRow}>
         <Button
-          title="Give Snow access"
+          title="Save Snow access"
           size="sm"
           icon="check"
           disabled={services.length === 0}
@@ -162,7 +163,7 @@ function ExistingWorkerCard({ first, last, email, phone, onGrant }: {
         />
       </View>
       {services.length === 0 && (
-        <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>Pick at least one service.</Text>
+        <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>Pick at least one service, then tap Save.</Text>
       )}
     </View>
   );
@@ -229,6 +230,14 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
   const [showCodeTools, setShowCodeTools] = useState(false);
   const [showAddWorkers, setShowAddWorkers] = useState(false);
   const [historyPages, setHistoryPages] = useState(1);
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** A green note at the top so it is clear the change went through (the card itself moves away). */
+  function flashSaved(message: string) {
+    setSavedNote(message);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSavedNote(null), 5000);
+  }
   const dbVersion = useDb();
 
   const history = admin.requests.filter((r) => r.status === 'declined' || r.status === 'removed' || r.status === 'approved');
@@ -321,6 +330,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
         contentContainerStyle={[styles.content, asTab && { paddingBottom: tabBarClearance + spacing.lg }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await admin.reload(); setRefreshing(false); }} />}
       >
+        {savedNote ? <InlineNotice icon="check-circle" tone="success" text={savedNote} style={{ marginBottom: spacing.md }} /> : null}
         {admin.loading ? (
           <LoadingSpinner />
         ) : admin.loadError ? (
@@ -341,7 +351,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
                 <RequestCard
                   key={r.id}
                   req={r}
-                  onApprove={(s) => run(admin.approve(r, s), () => haptics.success())}
+                  onApprove={(s) => run(admin.approve(r, s), () => { haptics.success(); flashSaved(`Saved. ${r.firstName} ${r.lastName} was approved for Snow.`); })}
                   onDecline={() => handleDecline(r)}
                   onRemove={() => handleRemove(r)}
                 />
@@ -356,7 +366,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
               <Text style={[typeScale.bodySmall, styles.empty, { color: colors.textSecondary }]}>Nobody has snow access yet.</Text>
             ) : (
               active.map((m) => (
-                <MemberCard key={m.personId} member={m} onSave={(s) => run(admin.setServices(m, s))} onRevoke={() => handleRevoke(m)} />
+                <MemberCard key={m.personId} member={m} onSave={(s) => run(admin.setServices(m, s), () => { haptics.success(); flashSaved(`Saved. ${m.firstName}'s Snow services were updated.`); })} onRevoke={() => handleRevoke(m)} />
               ))
             )}
             {revoked.map((m) => (
@@ -377,7 +387,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
                     last={w.person!.lastName}
                     email={w.person!.email}
                     phone={w.person!.phone}
-                    onGrant={(svc) => run(admin.grantAccess({ personId: w.personId, firstName: w.person!.firstName, lastName: w.person!.lastName, email: w.person!.email, phone: w.person!.phone }, svc), () => haptics.success())}
+                    onGrant={(svc) => run(admin.grantAccess({ personId: w.personId, firstName: w.person!.firstName, lastName: w.person!.lastName, email: w.person!.email, phone: w.person!.phone }, svc), () => { haptics.success(); flashSaved(`Saved. ${w.person!.firstName} ${w.person!.lastName} now has Snow access (${svc.map((s) => SERVICE_LABEL[s] ?? s).join(', ')}).`); })}
                   />
                 ))}
                 {!showAddWorkers && (

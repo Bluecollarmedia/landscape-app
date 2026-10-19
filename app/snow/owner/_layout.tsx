@@ -13,6 +13,7 @@ export default function SnowOwnerLayout() {
       <Stack.Screen name="hours" />
       <Stack.Screen name="review" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="edit-profile" />
       <Stack.Screen name="properties-list" />
       <Stack.Screen name="team-list" />
     </Stack>

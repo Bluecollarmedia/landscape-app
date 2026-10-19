@@ -117,7 +117,7 @@ export function SnowSettingsScreen() {
         </SettingsGroup>
 
         <SettingsGroup title="You">
-          <SettingsRow icon="user" title="Your profile and photo" onPress={() => router.push('/(owner)/edit-profile' as any)} />
+          <SettingsRow icon="user" title="Your profile and photo" onPress={() => router.push('/snow/owner/edit-profile' as any)} />
           <ModeSwitchRow />
         </SettingsGroup>
 

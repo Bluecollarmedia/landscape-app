@@ -93,7 +93,7 @@ export function StormNewScreen() {
         </Text>
 
         <Input
-          label="Storm name"
+          label="Route name"
           value={name}
           onChangeText={(t) => { setName(t); setNameEdited(true); }}
           placeholder="e.g. Jan 12 Plowing"

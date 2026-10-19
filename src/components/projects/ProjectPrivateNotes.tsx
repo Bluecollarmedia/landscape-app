@@ -1,6 +1,6 @@
 /**
  * "My Notes" for a project, owner only: private notes (what to order, measurements, what material to use), the owner's own pictures
- * of the site, and a materials list the AI sorts out of the notes to print for a vendor. It belongs to the project, so what is
+ * of the site, and a materials list sorted out of the notes to print for a vendor. It belongs to the project, so what is
  * written while quoting is still here once the quote is approved. Shown inside the quote editor and in the project's More menu.
  */
 import React, { useState } from 'react';
@@ -224,7 +224,7 @@ export function ProjectPrivateNotes({ projectId, projectName, address }: Props) 
                 {shown.otherNotes.map((n, i) => <Text key={i} style={[typeScale.bodyLarge, { color: colors.textPrimary, marginBottom: 4 }]}>• {n}</Text>)}
               </View>
             ) : null}
-            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Sorted by AI from your notes. Check it over before you print: it only uses what you wrote.</Text>
+            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Sorted from your notes on this phone. Check it over before you print: it only uses what you wrote, and anything it could not place is under Other notes.</Text>
           </ScrollView>
           <Button title="Print / Share as PDF" icon="share" onPress={() => shown && print(shown)} fullWidth size="lg" />
         </View>

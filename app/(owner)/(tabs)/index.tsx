@@ -299,7 +299,6 @@ export default function OwnerDashboard() {
                 {renderHeroStat(<Icon name="users" size={14} color="#FFFFFF" />, todayStats.workersScheduled, 'Workers scheduled')}
                 {renderHeroStat(<View style={styles.onSiteDot} />, todayStats.onSite, 'On site')}
                 {renderHeroStat(<Icon name="clock" size={14} color="#FFFFFF" />, todayStats.upcoming, 'Upcoming')}
-                {renderHeroStat(<Icon name="alert-circle" size={14} color="#FF6B6B" />, attentionTotalCount, 'Needs attention')}
               </View>
               <Pressable
                 style={styles.heroButton}

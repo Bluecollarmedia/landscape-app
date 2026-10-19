@@ -212,3 +212,40 @@ export interface ProjectHistoryEntry {
   actor?: PersonSummary;
 }
 
+
+/** The owner's private note on a project (written while quoting or later). Owner only. */
+export interface OwnerProjectNote {
+  id: string;
+  companyId: string;
+  projectId: string;
+  body: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The owner's own picture of the site. Owner only (separate from the customer-visible project photos). */
+export interface OwnerProjectPhoto {
+  id: string;
+  companyId: string;
+  projectId: string;
+  fileUrl: string;
+  fileKey?: string;
+  caption?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A vendor-ready materials list sorted out from the owner's notes. Owner only. */
+export interface OwnerMaterialList {
+  id: string;
+  companyId: string;
+  projectId: string;
+  title: string;
+  items: { category: string; item: string; quantity: number | null; unit: string; notes: string }[];
+  sourceText?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}

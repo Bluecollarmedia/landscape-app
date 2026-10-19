@@ -13,6 +13,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { uploadImage } from '@/lib/media';
+import { squareAvatarUri } from '@/lib/avatarCrop';
 import { loadMyBirthday, saveMyBirthday } from '@/data/birthday';
 import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
 
@@ -113,12 +114,12 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
+      allowsEditing: false,
+      quality: 0.8,
     });
     if (!result.canceled && result.assets?.[0]) {
-      setAvatarUrl(result.assets[0].uri);
+      const a = result.assets[0];
+      setAvatarUrl(await squareAvatarUri(a.uri, a.width, a.height));
     }
   }
 
@@ -131,12 +132,12 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
+      allowsEditing: false,
+      quality: 0.8,
     });
     if (!result.canceled && result.assets?.[0]) {
-      setAvatarUrl(result.assets[0].uri);
+      const a = result.assets[0];
+      setAvatarUrl(await squareAvatarUri(a.uri, a.width, a.height));
     }
   }
 

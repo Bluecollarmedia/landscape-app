@@ -103,11 +103,11 @@ export function SnowSettingsScreen() {
         ) : null}
 
         <SettingsGroup title="Team and access" footer="Give existing workers snow access, approve new ones, and share the Snow signup code.">
-          <SettingsRow icon="users" title="Snow team" subtitle="Members, requests and the signup code" onPress={() => router.navigate('/snow/owner/team' as any)} />
+          <SettingsRow icon="users" title="Snow team" subtitle="Members, requests and the signup code" onPress={() => router.push('/snow/owner/team-list' as any)} />
         </SettingsGroup>
 
         <SettingsGroup title="Customers and properties" footer="Add an existing customer's property from Properties → From a customer. Customers see snow updates only for properties linked to them.">
-          <SettingsRow icon="home" title="Properties" subtitle="Services, contacts and instructions" onPress={() => router.navigate('/snow/owner/properties' as any)} />
+          <SettingsRow icon="home" title="Properties" subtitle="Services, contacts and instructions" onPress={() => router.push('/snow/owner/properties-list' as any)} />
           <SettingsRow icon="camera" title="Customer photo updates" subtitle="Approve photos before customers see them" onPress={() => router.push('/snow/owner/review')} />
         </SettingsGroup>
 

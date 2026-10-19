@@ -20,6 +20,7 @@ import { lookupSnowCode, requestSnowAccess } from '@/hooks/useSnowOnboarding';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/media';
 import { saveBirthdayForCurrentUser } from '@/data/birthday';
+import { squareAvatarUri } from '@/lib/avatarCrop';
 import { parseBirthday, birthdayProblem } from '@/lib/birthday';
 
 type Step = 'code' | 'account' | 'profile';
@@ -102,12 +103,12 @@ export default function JoinTeamScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: false,
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
-        setPhotoUri(result.assets[0].uri);
+        const a = result.assets[0];
+        setPhotoUri(await squareAvatarUri(a.uri, a.width, a.height));
       }
     } catch {
       // On web, ImagePicker may not be fully supported — use a fallback

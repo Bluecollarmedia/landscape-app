@@ -10,7 +10,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, SearchBar } from '@/components/ui';
+import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, SearchBar } from '@/components/ui';
 import { showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -25,7 +25,8 @@ interface Row { id: string; name: string; address: string; street: string; zip?:
 
 const EMPTY = { name: '', address: '', city: '', state: '', zip: '' };
 
-export function SnowPropertiesScreen() {
+/** `asTab` (default): the Properties tab. Otherwise a stand-alone screen with a Back button (opened from Snow settings). */
+export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {}) {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -96,11 +97,12 @@ export function SnowPropertiesScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: tabBarClearance + spacing.lg }}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: (asTab ? tabBarClearance : insets.bottom) + spacing.lg }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.titleRow}>
+        {asTab ? null : <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back" />}
+        <View style={[styles.titleRow, !asTab && { marginTop: spacing.lg }]}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]}>Properties</Text>
           {!adding && !fromCustomer ? <Button title="From a customer" icon="user-plus" size="sm" variant="secondary" onPress={() => setFromCustomer(true)} /> : null}
           {!adding && !fromCustomer ? <Button title="Add" icon="plus" size="sm" onPress={() => setAdding(true)} /> : null}

@@ -13,7 +13,8 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { uploadImage } from '@/lib/media';
-import { chooseProfilePhoto, PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePhoto';
+import { PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePhoto';
+import { useProfilePhoto } from '@/hooks/useProfilePhoto';
 import { loadMyBirthday, saveMyBirthday } from '@/data/birthday';
 import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
 
@@ -106,12 +107,11 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
     }
   }
 
+  const photo = useProfilePhoto(setAvatarUrl, setPermissionError);
   async function pickPhoto(source: ProfilePhotoSource) {
     setPhotoSheetOpen(false);
     // Wait for the sheet to be fully gone first: iOS won't show the picker while it is still closing.
-    const res = await chooseProfilePhoto(source, { afterSheetMs: PICKER_AFTER_SHEET_MS });
-    if (res.status === 'picked') setAvatarUrl(res.uri);
-    else if (res.status === 'error') setPermissionError(res.message);
+    await photo.pick(source, { afterSheetMs: PICKER_AFTER_SHEET_MS });
   }
   const handleTakePhoto = () => pickPhoto('camera');
   const handleChooseFromGallery = () => pickPhoto('library');
@@ -218,6 +218,8 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
           <Text style={[typeScale.caption, { color: colors.error, marginTop: spacing.sm, textAlign: 'center' }]}>{saveError}</Text>
         ) : null}
       </KeyboardAwareScrollView>
+
+      {photo.cropper}
 
       {/* Change Profile Photo sheet */}
       <BottomSheetModal visible={photoSheetOpen} onRequestClose={() => setPhotoSheetOpen(false)}>

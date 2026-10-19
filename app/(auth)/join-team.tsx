@@ -19,7 +19,7 @@ import { lookupSnowCode, requestSnowAccess } from '@/hooks/useSnowOnboarding';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/media';
 import { saveBirthdayForCurrentUser } from '@/data/birthday';
-import { chooseProfilePhoto } from '@/lib/profilePhoto';
+import { useProfilePhoto } from '@/hooks/useProfilePhoto';
 import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
 import { DateField } from '@/components/ui/DateField';
 import { localDateKey } from '@/lib/ids';
@@ -100,31 +100,8 @@ export default function JoinTeamScreen() {
     setStep('profile');
   }
 
-  async function handlePickPhoto() {
-    try {
-      const res = await chooseProfilePhoto('library');
-      if (res.status === 'picked') setPhotoUri(res.uri);
-      else if (res.status === 'error') {
-        if (Platform.OS === 'web') throw new Error(res.message);
-        setError(res.message);
-      }
-    } catch {
-      // On web, ImagePicker may not be fully supported — use a fallback
-      if (Platform.OS === 'web') {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = (e: any) => {
-          const file = e.target?.files?.[0];
-          if (file) {
-            const url = URL.createObjectURL(file);
-            setPhotoUri(url);
-          }
-        };
-        input.click();
-      }
-    }
-  }
+  const photo = useProfilePhoto(setPhotoUri, setError);
+  const handlePickPhoto = () => photo.pick('library');
 
   const [agreed, setAgreed] = useState(false);
 
@@ -401,6 +378,7 @@ export default function JoinTeamScreen() {
           </View>
         )}
       </KeyboardAwareScrollView>
+      {photo.cropper}
     </View>
   );
 }

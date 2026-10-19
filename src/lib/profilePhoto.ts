@@ -13,7 +13,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { squareAvatarUri } from '@/lib/avatarCrop';
 
 export type ProfilePhotoSource = 'camera' | 'library';
-export type ProfilePhotoResult = { status: 'picked'; uri: string } | { status: 'cancelled' } | { status: 'error'; message: string };
+export type ProfilePhotoResult = { status: 'picked'; uri: string; raw: { uri: string; width: number; height: number } } | { status: 'cancelled' } | { status: 'error'; message: string };
 
 /** How long to wait after closing a sheet before opening the picker. */
 export const PICKER_AFTER_SHEET_MS = 650;
@@ -36,7 +36,8 @@ export async function chooseProfilePhoto(source: ProfilePhotoSource, opts: { aft
     if (result.canceled || !result.assets?.[0]) return { status: 'cancelled' };
 
     const a = result.assets[0];
-    return { status: 'picked', uri: await squareAvatarUri(a.uri, a.width, a.height) };
+    // `uri` is the automatic centred square (the fallback); `raw` is the untouched picture for the crop screen.
+    return { status: 'picked', uri: await squareAvatarUri(a.uri, a.width, a.height), raw: { uri: a.uri, width: a.width, height: a.height } };
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err ?? '');
     console.warn('[profile photo] could not pick', err);

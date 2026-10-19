@@ -9,6 +9,8 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { ScreenContainer } from '@/components/layout';
 import { Button, Input, Card, LoadingSpinner } from '@/components/ui';
+import { SignupPhotoPicker } from '@/components/account/SignupPhotoPicker';
+import { saveSignupPhoto } from '@/data/signupPhoto';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic, brand } from '@/theme/colors';
@@ -34,6 +36,7 @@ export default function CustomerAccessScreen() {
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup'>('signup');
   const [firstName, setFirstName] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
   const [agreed, setAgreed] = useState(false);
@@ -131,6 +134,15 @@ export default function CustomerAccessScreen() {
         }
         // The database claims the project as part of creating the account.
         const result = await signUp(email.trim(), password, { firstName: firstName.trim(), lastName: lastName.trim() }, { projectCode: code.trim() });
+        // The photo is optional and can only be saved once signed in. A problem with it never undoes the account.
+        if (photoUri && !result.needsEmailConfirmation) {
+          const saved = await saveSignupPhoto(photoUri);
+          if (!saved.ok) {
+            const note = `Your account is ready, but your profile photo wasn't saved. ${saved.error} You can add it in Edit Profile.`;
+            if (Platform.OS === 'web') alert(note);
+            else Alert.alert('Photo not saved', note);
+          }
+        }
         if (result.needsEmailConfirmation) {
           const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in to see ${projectName}.`;
           if (Platform.OS === 'web') alert(msg);
@@ -283,6 +295,10 @@ export default function CustomerAccessScreen() {
               </Text>
             </View>
           ) : null}
+
+          {mode === 'signup' && (
+            <SignupPhotoPicker uri={photoUri} onChange={setPhotoUri} onError={setError} firstName={firstName} lastName={lastName} />
+          )}
 
           {mode === 'signup' && (
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>

@@ -2,7 +2,8 @@
 // Customer home: adapts to the data (one/many properties, many projects per property, active/completed), nothing invented.
 const ts = require(process.argv[2] || 'typescript'); const fs = require('fs'); const path = require('path');
 const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8');
-const m = { exports: {} }; new Function('module', 'exports', ts.transpileModule(read('src/lib/customerHome.ts'), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports);
+const names = { exports: {} }; new Function('module', 'exports', ts.transpileModule(read('src/lib/names.ts'), { compilerOptions: { module: 'commonjs' } }).outputText)(names, names.exports);
+const m = { exports: {} }; new Function('module', 'exports', 'require', ts.transpileModule(read('src/lib/customerHome.ts'), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports, () => names.exports);
 const h = m.exports;
 let bad = 0; const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${ok ? '' : ' — ' + d}`); };
 const proj = (id, name, status, extra = {}) => ({ id, name, status, progress: 40, address: '1 Edward Dr', city: 'Lakewood', state: 'NJ', zip: '08701', ...extra });
@@ -22,6 +23,6 @@ const many = Array.from({ length: 5 }, (_, i) => ({ key: String(i) }));
 check('7 completed preview is 3 with a View all that shows everything', h.completedToShow(many, false).length === 3 && h.completedToShow(many, true).length === 5 && h.COMPLETED_PREVIEW === 3);
 check('8 type labels and status words', same.map((i) => i.typeLabel).join() === 'Project,Maintenance,Snow' && h.statusLabel(same[0]) === 'In progress' && h.statusLabel(same[1]) === 'Active' && h.statusLabel({ status: 'on_hold', kind: 'project' }) === 'On hold');
 const s = read('app/(customer)/(tabs)/index.tsx');
-check('9 screen: compact greeting, Active Projects before Completed, empty states, no project creation, project opens its own page', /Welcome back/.test(s) && s.indexOf('Active Projects') < s.indexOf('Completed Projects') && /No active projects right now\./.test(s) && /emptyPortalText\(\)/.test(s) && /\/\(customer\)\/project\?id=/.test(s) && !/Create|New Project/.test(s));
+check('9 screen: compact greeting, Active Projects before Completed, empty states, no project creation, project opens its own page', /Welcome Back/.test(s) && s.indexOf('Active Projects') < s.indexOf('Completed Projects') && /No active projects right now\./.test(s) && /emptyPortalText\(\)/.test(s) && /\/\(customer\)\/project\?id=/.test(s) && !/Create|New Project/.test(s));
 check('10 completed section only when there are completed projects; filter only with 2+ properties', /completed\.length > 0 && \(/.test(s) && /options\.length > 0 && \(/.test(s));
 console.log(bad ? `\n${bad} failed` : '\nall passed'); process.exit(bad ? 1 : 0);

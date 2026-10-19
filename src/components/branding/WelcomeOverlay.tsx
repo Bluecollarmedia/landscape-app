@@ -9,6 +9,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { properName } from '@/lib/names';
 import { Image, StyleSheet, Text } from 'react-native';
 import Animated, {
   Easing,
@@ -164,11 +165,11 @@ export function WelcomeOverlay({ ready, name }: { ready: boolean; name?: string 
         </Animated.View>
         <Animated.View style={[styles.textWrap, textStyle]}>
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, textAlign: 'center' }]}>
-            Welcome back{greetName ? ',' : ''}
+            Welcome Back{greetName ? ',' : ''}
           </Text>
           {greetName ? (
             <Text style={[typeScale.displaySmall, { color: brand.accent, textAlign: 'center', marginTop: 2 }]}>
-              {greetName}
+              {properName(greetName)}
             </Text>
           ) : null}
         </Animated.View>

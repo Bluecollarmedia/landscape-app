@@ -83,7 +83,7 @@ export default function LoginScreen() {
       {/* Welcome text */}
       <View style={styles.header}>
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>
-          Welcome back
+          Welcome Back
         </Text>
         <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs }]}>
           Sign in to your account

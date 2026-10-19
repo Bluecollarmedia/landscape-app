@@ -17,6 +17,7 @@
  */
 
 import { useSyncExternalStore } from 'react';
+import { properName } from '@/lib/names';
 import { Alert, AppState, Platform } from 'react-native';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -335,8 +336,8 @@ const byCreated = (a: Row, b: Row) => String(a.createdAt ?? '').localeCompare(St
 function personSummary(p: Row): PersonSummary {
   return {
     id: p.id,
-    firstName: p.firstName ?? '',
-    lastName: p.lastName ?? '',
+    firstName: properName(p.firstName ?? ''),
+    lastName: properName(p.lastName ?? ''),
     email: p.email ?? '',
     phone: p.phone,
     avatarUrl: p.avatarUrl,
@@ -419,6 +420,7 @@ function derive() {
       const pt = tasks[p.id] ?? [];
       return {
         ...p,
+        name: properName(p.name),
         progress: p.progress ?? 0,
         customer: person(p.customerId),
         teamCount: (team[p.id] ?? []).length,

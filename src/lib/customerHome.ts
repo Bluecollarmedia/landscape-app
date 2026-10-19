@@ -1,3 +1,5 @@
+import { properName } from './names';
+
 // What the customer's home (Projects) screen lists, built only from what the customer is actually linked to: their landscaping
 // projects, maintenance properties and snow properties. Pure, no network. Nothing is invented: no placeholder rows, no made-up
 // percentages, and a property is only "a property" when an address says so.
@@ -58,7 +60,7 @@ export function buildHomeItems(input: {
   for (const p of input.projects) {
     if (p.status !== 'active' && p.status !== 'on_hold' && p.status !== 'completed') continue; // quotes/archived aren't shown
     out.push({
-      key: `project:${p.id}`, kind: 'project', typeLabel: TYPE_LABEL.project, name: p.name,
+      key: `project:${p.id}`, kind: 'project', typeLabel: TYPE_LABEL.project, name: properName(p.name),
       address: addressLine(p), propertyKey: propertyKeyOf(p.address),
       status: p.status === 'completed' ? 'completed' : p.status === 'on_hold' ? 'on_hold' : 'active',
       progress: p.status === 'active' ? p.progress : undefined,
@@ -68,13 +70,13 @@ export function buildHomeItems(input: {
   }
   for (const m of input.maintenance) {
     out.push({
-      key: `maintenance:${m.id}`, kind: 'maintenance', typeLabel: TYPE_LABEL.maintenance, name: m.name,
+      key: `maintenance:${m.id}`, kind: 'maintenance', typeLabel: TYPE_LABEL.maintenance, name: properName(m.name),
       address: (m.address ?? '').trim(), propertyKey: propertyKeyOf(m.address), status: 'active', note: input.maintenanceNote ?? 'Visits and photos',
     });
   }
   for (const s of input.snow) {
     out.push({
-      key: `snow:${s.id}`, kind: 'snow', typeLabel: TYPE_LABEL.snow, name: s.name,
+      key: `snow:${s.id}`, kind: 'snow', typeLabel: TYPE_LABEL.snow, name: properName(s.name),
       address: (s.address ?? '').trim(), propertyKey: propertyKeyOf(s.address), status: 'active', note: input.snowNote?.(s.address) ?? 'Plowing, shoveling and salting updates',
     });
   }

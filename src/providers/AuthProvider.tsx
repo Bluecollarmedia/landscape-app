@@ -16,6 +16,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useCallback, useRef } from 'react';
+import { properName } from '@/lib/names';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { startSession, endSession, startDemoSession, updateRow } from '@/data/store';
 import { unregisterForPush } from '@/lib/push';
@@ -247,8 +248,8 @@ async function resolveContext(): Promise<Resolution | null> {
     id: p.id,
     email: p.email,
     role: routeRole,
-    firstName: p.first_name ?? '',
-    lastName: p.last_name ?? '',
+    firstName: properName(p.first_name ?? ''),
+    lastName: properName(p.last_name ?? ''),
     avatarUrl: p.avatar_url ?? undefined,
     phone: p.phone ?? undefined,
     activeCompanyId: membership?.company_id,

@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -10,11 +10,12 @@ import { localDateKey } from '@/lib/ids';
 import { ScreenContainer } from '@/components/layout';
 import { EmptyState } from '@/components/ui';
 import { formatClock } from '@/components/maintenance/format';
+import { daySummary, groupByMonth, isCurrentMonth, monthHeading, monthSummary, todayKey, type FoldDay } from '@/lib/activityFold';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import type { MaintenanceEvent, MaintenanceEventType } from '@/types/maintenance';
 
-const HISTORY_LIMIT = 200;
+const HISTORY_LIMIT = 5000;
 
 const EVENT_META: Partial<Record<MaintenanceEventType, { icon: keyof typeof Feather.glyphMap; verb: string }>> = {
   day_started: { icon: 'sunrise', verb: 'started the day' },
@@ -62,6 +63,31 @@ export default function MaintenanceActivityScreen() {
     return groups;
   }, [m]);
 
+  // Today is open. Earlier days fold to one line, and earlier months fold to one line each. Tap to open any of them.
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const toggle = (key: string) => setOpen((o) => ({ ...o, [key]: !o[key] }));
+  const today = todayKey();
+  const months = useMemo(() => groupByMonth(days), [days]);
+
+  function DayBlock({ day }: { day: FoldDay<MaintenanceEvent> }) {
+    const isToday = day.key === today;
+    const expanded = isToday || !!open[day.key];
+    return (
+      <View style={{ marginBottom: spacing.md }}>
+        {isToday ? (
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.sm }]}>{dayHeading(day.key)}</Text>
+        ) : (
+          <FoldHeader title={dayHeading(day.key)} subtitle={daySummary(day.events)} open={expanded} onPress={() => toggle(day.key)} />
+        )}
+        {expanded && (
+          <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm, !isToday && { marginTop: spacing.sm }]}>
+            {day.events.map((e, i) => <EventRow key={e.id} event={e} first={i === 0} />)}
+          </View>
+        )}
+      </View>
+    );
+  }
+
   return (
     <ScreenContainer scrollable padded variant="grouped">
       <View style={{ paddingTop: insets.top + spacing.md, marginBottom: spacing.lg }}>
@@ -72,16 +98,37 @@ export default function MaintenanceActivityScreen() {
       {days.length === 0 ? (
         <EmptyState icon="activity" title="No activity yet" description="Day starts, arrivals and finished stops show up here." />
       ) : (
-        days.map(day => (
-          <View key={day.key} style={{ marginBottom: spacing.lg }}>
-            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.sm }]}>{dayHeading(day.key)}</Text>
-            <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
-              {day.events.map((e, i) => <EventRow key={e.id} event={e} first={i === 0} />)}
+        months.map(month => {
+          if (isCurrentMonth(month.key)) return month.days.map(day => <DayBlock key={day.key} day={day} />);
+          const expanded = !!open[month.key];
+          return (
+            <View key={month.key} style={{ marginBottom: spacing.md }}>
+              <FoldHeader big title={monthHeading(month.key)} subtitle={monthSummary(month)} open={expanded} onPress={() => toggle(month.key)} />
+              {expanded && <View style={{ marginTop: spacing.sm, paddingLeft: spacing.sm }}>{month.days.map(day => <DayBlock key={day.key} day={day} />)}</View>}
             </View>
-          </View>
-        ))
+          );
+        })
       )}
     </ScreenContainer>
+  );
+}
+
+function FoldHeader({ title, subtitle, open, onPress, big }: { title: string; subtitle: string; open: boolean; onPress: () => void; big?: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel={`${title}. ${subtitle}. ${open ? 'Tap to fold' : 'Tap to open'}`}
+      style={[styles.fold, { backgroundColor: colors.surface, borderColor: colors.border }]}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={[big ? typeScale.headingSmall : typeScale.labelLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{title}</Text>
+        <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 2 }]}>{subtitle}</Text>
+      </View>
+      <Feather name={open ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textTertiary} />
+    </Pressable>
   );
 }
 
@@ -116,6 +163,7 @@ function EventRow({ event, first }: { event: MaintenanceEvent; first: boolean })
 }
 
 const styles = StyleSheet.create({
+  fold: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 52 },
   card: { borderRadius: radius.xl, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   icon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },

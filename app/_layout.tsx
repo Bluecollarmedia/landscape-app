@@ -19,8 +19,10 @@ import { SplashScreen } from '@/components/branding/SplashScreen';
 import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useModeAccess } from '@/hooks/useModeAccess';
+import { installGlobalErrorHandler } from '@/lib/errorReporting';
 
 ExpoSplashScreen.preventAutoHideAsync();
+installGlobalErrorHandler();
 
 function RootNavigator() {
   const { isLoading, isAuthenticated, user, appState, onboardingStep } = useAuth();

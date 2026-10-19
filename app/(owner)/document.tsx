@@ -9,7 +9,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Share } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Share, TextInput } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,10 +22,11 @@ import { useFinancialDoc } from '@/hooks/useFinancials';
 import { usePdfShare } from '@/hooks/usePdfShare';
 import { renderDocumentHtml, formatDocDateTime } from '@/lib/documentHtml';
 import { formatMoney } from '@/lib/money';
+import { looksLikeEmail, recipientFor } from '@/lib/documentEmail';
 import {
   DOC_LABEL, STATUS_LABEL, STATUS_TONE, displayStatus, snapshotFor, templateOptionsFor,
   getDoc, markSent, issueInvoice, recordResponse, markExpired, voidInvoice, deleteDraft, duplicateAsDraft, readinessProblems,
-  approvalLinksEnabled, approvalLink, approvalMessage, canStartProject, startProjectFromQuote,
+  approvalLinksEnabled, approvalLink, approvalMessage, canStartProject, startProjectFromQuote, emailDocumentToCustomer,
 } from '@/data/financials';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -48,7 +49,9 @@ export default function DocumentScreen() {
   const insets = useSafeAreaInsets();
   const { doc, events, project, ready } = useFinancialDoc(kind, id);
   const { share, busy } = usePdfShare();
-  const [menu, setMenu] = useState<'more' | 'respond' | 'history' | 'send' | null>(null);
+  const [menu, setMenu] = useState<'more' | 'respond' | 'history' | 'send' | 'email' | null>(null);
+  const [emailText, setEmailText] = useState('');
+  const [emailing, setEmailing] = useState(false);
 
   const html = useMemo(
     () => (doc ? renderDocumentHtml(doc, snapshotFor(doc), { mode: 'preview', ...templateOptionsFor(doc) }) : ''),
@@ -105,6 +108,24 @@ export default function DocumentScreen() {
     showMessage('Link copied', 'Paste it into a text or email to the customer.');
   });
 
+  /** Emails the customer automatically (a short message with a View button). Asks for an address when none is on file. */
+  const emailCustomer = (typed?: string) => {
+    const to = recipientFor(doc.customer?.email, typed);
+    if (!to) { setEmailText(typed ?? ''); setMenu('email'); return; }
+    confirmAction(
+      `Email ${label.toLowerCase()} ${doc.number}?`,
+      `${to} gets a short message with a View ${label.toLowerCase()} button. They can approve it, request changes, or download the PDF from there.`,
+      'Send Email',
+      async () => {
+        setEmailing(true);
+        const res = await emailDocumentToCustomer(getDoc(doc.kind, doc.id) ?? doc, typed);
+        setEmailing(false);
+        if (res.ok) showMessage('Email sent', `${label} ${doc.number} was emailed to ${res.to}.`);
+        else showMessage("Couldn't send the email", res.error);
+      },
+    );
+  };
+
   const send = (thenShare: boolean) => {
     if (!checkReady()) return;
     const doIt = () => {
@@ -155,7 +176,8 @@ export default function DocumentScreen() {
   const shareOrSend = () => (canSendLink ? setMenu('send') : shareTapped());
 
   const sendActions: SheetAction[] = [
-    { key: 'link', label: 'Text or Email Approval Link', icon: 'send', onPress: sendLink },
+    { key: 'email', label: 'Email to Customer', icon: 'mail', onPress: () => emailCustomer() },
+    { key: 'link', label: 'Text Approval Link', icon: 'message-square', onPress: sendLink },
     { key: 'copy', label: 'Copy Approval Link', icon: 'link', onPress: copyLink },
     { key: 'pdf', label: 'Share PDF', icon: 'share-2', onPress: shareTapped },
   ];
@@ -280,10 +302,43 @@ export default function DocumentScreen() {
       <ActionSheet
         visible={menu === 'send'}
         title={`Send ${label.toLowerCase()} ${doc.number}`}
-        message="The link opens the document in any browser. The customer types their name to approve, and you're notified right away."
+        message="Email sends them a short message with a View button. The link opens the document in any browser, where they can approve, request changes, or download the PDF, and you're notified right away."
         actions={sendActions}
         onClose={() => setMenu(null)}
       />
+
+      <ActionSheet
+        visible={menu === 'email'}
+        title="Customer's email"
+        message="There's no email address on file for this customer. Type the one to send it to."
+        actions={[]}
+        onClose={() => setMenu(null)}
+      >
+        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.md }}>
+          <TextInput
+            value={emailText}
+            onChangeText={setEmailText}
+            placeholder="name@example.com"
+            placeholderTextColor={colors.textTertiary}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[typeScale.bodyLarge, styles.emailInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+            accessibilityLabel="Customer's email address"
+          />
+          <Button
+            title="Email It"
+            icon="mail"
+            loading={emailing}
+            onPress={() => {
+              const typed = emailText.trim();
+              if (!looksLikeEmail(typed)) { showMessage('Check the address', "That doesn't look like an email address."); return; }
+              setMenu(null);
+              setTimeout(() => emailCustomer(typed), 300);
+            }}
+          />
+        </View>
+      </ActionSheet>
 
       <ActionSheet visible={menu === 'history'} title="History" actions={[]} onClose={() => setMenu(null)}>
         <ScrollView style={{ maxHeight: 360 }} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
@@ -322,6 +377,7 @@ function TopBar({ title, onBack, right }: { title: string; onBack: () => void; r
 }
 
 const styles = StyleSheet.create({
+  emailInput: { minHeight: 48, borderWidth: 1.5, borderRadius: radius.lg, paddingHorizontal: spacing.md },
   screen: { flex: 1 },
   flex: { flex: 1 },
   flex2: { flex: 1.6 },

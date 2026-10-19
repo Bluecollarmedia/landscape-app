@@ -12,6 +12,7 @@
  */
 
 import { BRAND_LOGO_DATA_URI } from './brandLogo';
+import { isValidSignaturePath } from '@/lib/signature';
 import { formatMoney, formatQuantity, formatPercent, sumMoney } from './money';
 import { brand } from '@/theme/colors';
 import type { FinancialDoc, DocumentSnapshot, FinancialEvent, LineItem, LineItemCategory } from '@/types/financial';
@@ -158,7 +159,11 @@ function approvalBlock(doc: FinancialDoc, s: DocumentSnapshot, opts: DocumentHtm
   };
   if (doc.status === 'approved' && doc.approvedAt) {
     const by = doc.approvedName || who(doc.approvedBy);
-    return `<div class="block approval"><div class="label">Approval</div><div class="prose">Approved${by ? ` by ${escapeHtml(by)}` : ''} on ${escapeHtml(formatDocDateTime(doc.approvedAt))}.</div></div>`;
+    // The drawn signature is only ever plain path text (the database refuses anything else), re-checked here before it is drawn.
+    const sig = isValidSignaturePath(doc.approvedSignature)
+      ? `<div style="margin-top:8px"><svg viewBox="0 0 300 120" width="180" height="72" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Signature"><path d="${doc.approvedSignature}" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`
+      : '';
+    return `<div class="block approval"><div class="label">Approval</div><div class="prose">Approved${by ? ` by ${escapeHtml(by)}` : ''} on ${escapeHtml(formatDocDateTime(doc.approvedAt))}.</div>${sig}</div>`;
   }
   if (doc.status === 'sent' && !opts.hideApprovalHint) {
     const contact = s.company.phone ? ` or call us at ${escapeHtml(s.company.phone)}` : '';

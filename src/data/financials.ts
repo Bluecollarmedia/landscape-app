@@ -17,6 +17,7 @@ import { generateProjectCode } from '@/hooks/useCustomerAccess';
 import { DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
 import { supabase } from '@/lib/supabase';
 import { config } from '@/lib/config';
+import { describeEmailError } from '@/lib/documentEmail';
 import { uuid, todayKey, localDateKey } from '@/lib/ids';
 import { calcTotals, lineAmount, sumMoney, formatMoney } from '@/lib/money';
 import type {
@@ -588,6 +589,34 @@ export async function approvalLink(doc: FinancialDoc): Promise<string | null> {
     token = (data as { share_token?: string } | null)?.share_token ?? undefined;
   }
   return token ? `${config.webUrl}/approve/${token}` : null;
+}
+
+export type EmailResult = { ok: true; to: string } | { ok: false; error: string; code?: string };
+
+/**
+ * Emails the customer a short message with a "View quote" button (the approval link). The server function does the sending
+ * (it checks the caller is the owner or an admin, and that the document isn't a draft). `typedEmail` is used when the
+ * customer has no address on file, or when the owner wants it to go somewhere else.
+ */
+export async function emailDocumentToCustomer(doc: FinancialDoc, typedEmail?: string): Promise<EmailResult> {
+  if (doc.kind === 'invoice') return { ok: false, error: 'Invoices are not emailed from here yet.' };
+  if (isDemo()) return { ok: false, error: 'Emailing needs the live app (not demo mode).' };
+  try {
+    const { data, error } = await supabase.functions.invoke('send-document-email', {
+      body: { kind: doc.kind, id: doc.id, ...(typedEmail ? { email: typedEmail } : {}) },
+    });
+    if (error) {
+      let code: string | undefined;
+      try { code = (await (error as { context?: Response }).context?.json())?.error; } catch { /* not a JSON answer */ }
+      code = code ?? error.message;
+      return { ok: false, code, error: describeEmailError(code) };
+    }
+    if (data?.ok) return { ok: true, to: String(data.to ?? typedEmail ?? '') };
+    return { ok: false, code: data?.error, error: describeEmailError(data?.error) };
+  } catch (err) {
+    const code = err instanceof Error ? err.message : undefined;
+    return { ok: false, code, error: describeEmailError(code) };
+  }
 }
 
 /** Text for the message the owner sends with the link. */

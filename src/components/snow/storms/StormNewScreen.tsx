@@ -110,7 +110,7 @@ export function StormNewScreen() {
         />
 
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.lg }} /> : null}
-        <Button title="Create draft storm" onPress={save} loading={saving} disabled={services.length === 0} fullWidth style={{ marginTop: spacing.xl }} />
+        <Button title="Create Route" onPress={save} loading={saving} disabled={services.length === 0} fullWidth style={{ marginTop: spacing.xl }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

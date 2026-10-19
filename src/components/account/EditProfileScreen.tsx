@@ -7,7 +7,8 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import { Avatar, Button, Input } from '@/components/ui';
+import { Avatar, Button, Input, DateField } from '@/components/ui';
+import { localDateKey } from '@/lib/ids';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
@@ -55,6 +56,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
 
   const hasChanges = birthday.trim() !== savedBirthday || firstName !== user?.firstName || lastName !== user?.lastName || phone !== (user?.phone ?? '') || avatarUrl !== user?.avatarUrl;
 
+  const todayKey = () => localDateKey(new Date());
   const phoneDigits = phone.replace(/\D/g, '').length;
   const errors = {
     photo: !requireAll || avatarUrl ? '' : 'Add a profile photo',
@@ -182,13 +184,15 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
             icon="phone"
             error={show('phone')}
           />
-          <Input
+          <DateField
             label="Birthday (optional)"
-            value={birthday}
-            onChangeText={setBirthday}
-            placeholder="MM/DD/YYYY"
-            keyboardType="numbers-and-punctuation"
             icon="gift"
+            value={parseBirthday(birthday) ?? ''}
+            onChange={(k) => setBirthday(birthdayInputText(k))}
+            onClear={() => setBirthday('')}
+            maximumDate={todayKey()}
+            initialPickerDate="1990-01-01"
+            placeholder="Select your birthday"
             error={show('birthday')}
             hint="Only you and your managers can see this."
           />

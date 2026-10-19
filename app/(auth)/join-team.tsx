@@ -20,7 +20,9 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/media';
 import { saveBirthdayForCurrentUser } from '@/data/birthday';
 import { chooseProfilePhoto } from '@/lib/profilePhoto';
-import { parseBirthday, birthdayProblem } from '@/lib/birthday';
+import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
+import { DateField } from '@/components/ui/DateField';
+import { localDateKey } from '@/lib/ids';
 
 type Step = 'code' | 'account' | 'profile';
 
@@ -384,7 +386,7 @@ export default function JoinTeamScreen() {
               <Input label="Last Name *" placeholder="Smith" value={lastName} onChangeText={setLastName} containerStyle={{ flex: 1 }} />
             </View>
             <Input label="Phone *" placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
-            <Input label="Birthday (optional)" placeholder="MM/DD/YYYY" value={birthday} onChangeText={setBirthday} keyboardType="numbers-and-punctuation" icon="gift" />
+            <DateField label="Birthday (optional)" icon="gift" placeholder="Select your birthday" value={parseBirthday(birthday) ?? ''} onChange={(k) => setBirthday(birthdayInputText(k))} onClear={() => setBirthday('')} maximumDate={localDateKey(new Date())} initialPickerDate="1990-01-01" />
 
             <View style={[styles.infoBox, { backgroundColor: semantic.warningLight, borderColor: semantic.warning }]}>
               <Icon name="info" size={14} color={semantic.warning} />

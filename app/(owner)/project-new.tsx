@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { Button, Input, Card } from '@/components/ui';
+import { Button, Input, Card, DateField } from '@/components/ui';
 import { useCustomers } from '@/hooks/useCustomers';
 import { generateProjectCode } from '@/hooks/useCustomerAccess';
 import { useProject } from '@/hooks/useProject';
@@ -261,23 +261,22 @@ export default function NewProjectScreen() {
               onCheckChange={setAddressCheck}
             />
             <View style={styles.row}>
-              <Input
+              <DateField
                 label="Start Date"
-                placeholder="2026-05-01"
+                placeholder="Select date"
                 value={startDate}
-                onChangeText={setStartDate}
+                onChange={(k) => { setStartDate(k); if (endDate && endDate < k) setEndDate(''); }}
+                onClear={() => setStartDate('')}
                 containerStyle={{ ...styles.fieldGap, flex: 1 }}
-                maxLength={10}
-                autoCapitalize="none"
               />
-              <Input
+              <DateField
                 label="Est. End Date"
-                placeholder="2026-06-15"
+                placeholder="Select date"
                 value={endDate}
-                onChangeText={setEndDate}
+                onChange={setEndDate}
+                onClear={() => setEndDate('')}
+                minimumDate={startDate || undefined}
                 containerStyle={{ ...styles.fieldGap, flex: 1 }}
-                maxLength={10}
-                autoCapitalize="none"
               />
             </View>
           </Card>

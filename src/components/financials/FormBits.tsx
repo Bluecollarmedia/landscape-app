@@ -11,6 +11,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, sizing } from '@/theme/spacing';
 import { localDateKey } from '@/lib/ids';
+import { IosDateSheet, openAndroidDatePicker } from '@/components/ui/DateField';
 import { formatDocDate } from '@/lib/documentHtml';
 
 function keyToDate(key?: string): Date {
@@ -29,7 +30,7 @@ export function DateRow({ label, value, onChange, minimumDate, optional, onClear
   onClear?: () => void;
 }) {
   const { colors } = useTheme();
-  const [showAndroid, setShowAndroid] = useState(false);
+  const [showSheet, setShowSheet] = useState(false);
 
   let control: React.ReactNode;
   if (Platform.OS === 'web') {
@@ -54,7 +55,12 @@ export function DateRow({ label, value, onChange, minimumDate, optional, onClear
     );
   } else {
     control = (
-      <Pressable onPress={() => (Platform.OS === 'ios' ? onChange(localDateKey(new Date())) : setShowAndroid(true))} hitSlop={8}>
+      <Pressable
+        onPress={() => (Platform.OS === 'ios' ? setShowSheet(true) : openAndroidDatePicker({ value, minimumDate, onPick: onChange }))}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={`${label}. ${value ? formatDocDate(value) : 'Not set'}. Opens the date picker`}
+      >
         <Text style={[typeScale.bodyLarge, { color: value ? colors.textPrimary : colors.primary }]}>
           {value ? formatDocDate(value) : 'Add'}
         </Text>
@@ -71,14 +77,8 @@ export function DateRow({ label, value, onChange, minimumDate, optional, onClear
           <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginLeft: spacing.sm }]}>Clear</Text>
         </Pressable>
       )}
-      {Platform.OS === 'android' && showAndroid && (
-        <DateTimePicker
-          value={keyToDate(value)}
-          mode="date"
-          display="default"
-          minimumDate={minimumDate ? keyToDate(minimumDate) : undefined}
-          onChange={(_e: DateTimePickerEvent, d?: Date) => { setShowAndroid(false); if (d) onChange(localDateKey(d)); }}
-        />
+      {Platform.OS === 'ios' && (
+        <IosDateSheet visible={showSheet} onClose={() => setShowSheet(false)} onPick={onChange} title={label} value={value} minimumDate={minimumDate} />
       )}
     </View>
   );

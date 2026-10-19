@@ -1,5 +1,6 @@
 export { Button } from './Button';
 export { Input } from './Input';
+export { DateField } from './DateField';
 export { Card } from './Card';
 export { StatusBadge } from './StatusBadge';
 export { LoadingSpinner } from './LoadingSpinner';

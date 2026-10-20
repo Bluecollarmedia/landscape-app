@@ -14,6 +14,7 @@ import { useDb, db } from '@/data/store';
 import { locationLabel } from '@/data/maintenance';
 import { missingRequirements, finishStopAndAdvance, useFinishingStop } from '@/data/maintenanceFinish';
 import { haptics } from '@/lib/haptics';
+import { crewStopMessage, isCrewLeader } from '@/lib/maintenanceLeader';
 import { EmptyState } from '@/components/ui';
 import { BrandCover } from '@/components/branding/BrandCover';
 import { JobMap } from '@/components/maps/JobMap';
@@ -80,6 +81,11 @@ export default function MaintenanceTodayScreen() {
   const next = route?.nextStop;
   const upcoming = stops.filter(s => s.status === 'pending' || s.status === 'arrived');
   const allDone = !!route && stops.length > 0 && !next;
+  // Who checks the crew in at each property: the route's crew leader (owner/admin may too). Everyone else sees status, not a button.
+  const leader = isCrewLeader({ leadId: route?.lead?.id, personId: db.personId, role: db.role });
+  const leaderName = route?.lead ? `${route.lead.firstName} ${route.lead.lastName}`.trim() : undefined;
+  // The route is only shown once the worker's own workday has started (and only if they are scheduled at all).
+  const showRoute = !!route && (!timeOn || clockedIn);
 
   // Shared with the stop screen, so a tap in either place can't finish twice.
   const finishing = useFinishingStop(next?.id);
@@ -119,9 +125,11 @@ export default function MaintenanceTodayScreen() {
 
   // ── Bottom action: one primary button for where the worker is in the day ──
   let action: { title: string; subtitle: string; icon: keyof typeof Feather.glyphMap; onPress: () => void; muted?: boolean } | null = null;
+  // With the workday clock on, I'M HERE and FINISH STOP live on the property's own card (leader only); there is no floating button.
+  const cardMode = timeOn;
   // Each worker checks in at each stop themselves, even when a crewmate got there first.
   const iCheckedIn = next ? !!checkIn.arrivalFor(next.id)?.mine : false;
-  if (timeOn && !clockedIn) {
+  if (cardMode) {
     action = null;
   } else if (!timeOn && !dayStart.started && !skippedYard && !allDone) {
     action = {
@@ -174,7 +182,23 @@ export default function MaintenanceTodayScreen() {
         </View>
 
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
-          {timeOn ? <WorkdayCard /> : (
+          {timeOn ? (
+            !route && !workday.active ? (
+              <View style={[styles.notScheduled, { backgroundColor: colors.backgroundSecondary }]}>
+                <Feather name="calendar" size={22} color={colors.textSecondary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>You're not scheduled today</Text>
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Clock In appears when the owner puts you on a route for the day.</Text>
+                </View>
+              </View>
+            ) : (
+              <WorkdayCard
+                compact={clockedIn}
+                preShiftTitle="Ready to start your day"
+                preShiftText={`Clocking in starts your workday and unlocks today's route${stops.length ? ` (${stops.length} stop${stops.length === 1 ? '' : 's'})` : ''}.`}
+              />
+            )
+          ) : (
             <YardStartCard
               dayStart={dayStart}
               yard={yard}
@@ -184,12 +208,14 @@ export default function MaintenanceTodayScreen() {
           )}
 
           {!route ? (
-            <EmptyState
-              icon="map"
-              title="No route today"
-              description="When the owner puts you on a maintenance route, its stops show up here."
-            />
-          ) : (
+            timeOn ? null : (
+              <EmptyState
+                icon="map"
+                title="No route today"
+                description="When the owner puts you on a maintenance route, its stops show up here."
+              />
+            )
+          ) : !showRoute ? null : (
             <View>
               <View style={styles.routeHeader}>
                 <MaterialCommunityIcons name="map-marker-path" size={30} color={colors.primary} />
@@ -225,6 +251,14 @@ export default function MaintenanceTodayScreen() {
               {next && (
                 <NextStopCard
                   stop={next}
+                  crewMode={cardMode}
+                  leader={leader}
+                  leaderName={leaderName}
+                  busy={busy}
+                  starting={checkIn.busy === next.id}
+                  finishing={finishing}
+                  onArrive={() => handleArrive(next)}
+                  onFinish={() => handleFinish(next)}
                   onOpen={() => openStop(next)}
                   onDirections={next.property ? () => { haptics.select(); openMapsNavigation(next.property!); } : undefined}
                 />
@@ -244,7 +278,7 @@ export default function MaintenanceTodayScreen() {
             </View>
           )}
 
-          {stops.length > 0 && (
+          {showRoute && stops.length > 0 && (
             <View>
               <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginBottom: spacing.sm }]}>
                 {upcoming.length > 0 ? 'Stops' : 'Stops today'}
@@ -311,8 +345,12 @@ export default function MaintenanceTodayScreen() {
   );
 }
 
-function NextStopCard({ stop, onOpen, onDirections }: { stop: MaintenanceStopDetail; onOpen: () => void; onDirections?: () => void }) {
+function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName, busy, starting, finishing, onArrive, onFinish }: {
+  stop: MaintenanceStopDetail; onOpen: () => void; onDirections?: () => void;
+  crewMode?: boolean; leader?: boolean; leaderName?: string; busy?: boolean; starting?: boolean; finishing?: boolean; onArrive?: () => void; onFinish?: () => void;
+}) {
   const { colors } = useTheme();
+  const blockers = missingRequirements(stop);
   const status = displayStatus(stop, stop.id);
   const requiredTasks = stop.tasks.filter(t => t.isRequired);
   const tasksDone = requiredTasks.filter(t => t.completedAt).length;
@@ -390,6 +428,32 @@ function NextStopCard({ stop, onOpen, onDirections }: { stop: MaintenanceStopDet
         </Pressable>
       )}
 
+      {crewMode ? (
+        <View style={[styles.cardAction, { borderTopColor: colors.border }]}>
+          {leader ? (
+            stop.status === 'pending' ? (
+              <Pressable onPress={onArrive} disabled={!!busy} accessibilityRole="button" accessibilityLabel={`I'm here at ${stop.property?.name ?? 'this property'}`}
+                style={({ pressed }) => [styles.cardButton, { backgroundColor: colors.primaryDark, opacity: busy ? 0.6 : pressed ? 0.9 : 1 }]}>
+                <Feather name="map-pin" size={18} color="#FFFFFF" />
+                <Text style={[typeScale.labelLarge, styles.cardButtonText]}>{starting ? 'Finding your location…' : "I'M HERE"}</Text>
+              </Pressable>
+            ) : stop.status === 'arrived' ? (
+              <Pressable onPress={onFinish} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Finish stop"
+                style={({ pressed }) => [styles.cardButton, { backgroundColor: blockers.length ? colors.primary : colors.primaryDark, opacity: busy ? 0.6 : pressed ? 0.9 : 1 }]}>
+                <Feather name="check-circle" size={18} color="#FFFFFF" />
+                <Text style={[typeScale.labelLarge, styles.cardButtonText]}>
+                  {finishing ? 'Saving…' : blockers.length ? `FINISH STOP · ${blockers[0]}${blockers.length > 1 ? ` +${blockers.length - 1}` : ''}` : 'FINISH STOP'}
+                </Text>
+              </Pressable>
+            ) : null
+          ) : (
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+              {crewStopMessage(stop.status, leaderName, stop.arrivedAt ? formatClock(stop.arrivedAt) : null, arrivedBy)}
+            </Text>
+          )}
+        </View>
+      ) : null}
+
       {onDirections && (
         <Pressable
           onPress={onDirections}
@@ -439,6 +503,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', marginTop: spacing.md,
     paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderTopWidth: StyleSheet.hairlineWidth,
   },
+  notScheduled: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg },
+  cardAction: { marginTop: spacing.md, paddingTop: spacing.md, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
+  cardButton: { height: 52, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  cardButtonText: { color: '#FFFFFF', fontWeight: '700', letterSpacing: 0.4 },
   doneBox: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg },
   listCard: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
   actionArea: { position: 'absolute', left: spacing.lg, right: spacing.lg, alignItems: 'stretch' },

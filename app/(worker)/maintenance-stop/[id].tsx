@@ -18,6 +18,7 @@ import { StopPhotos } from '@/components/maintenance/StopPhotos';
 import { FinishStopButton } from '@/components/maintenance/FinishStopButton';
 import { db, useDb } from '@/data/store';
 import { markArrived, locationLabel } from '@/data/maintenance';
+import { crewStopMessage, isCrewLeader } from '@/lib/maintenanceLeader';
 import { finishStopAndAdvance, missingRequirements, nextStopAfter, uploadingPhotoCount } from '@/data/maintenanceFinish';
 import { getCurrentGps } from '@/lib/location';
 import { useWorkerContext } from '@/providers/WorkerProvider';
@@ -79,6 +80,9 @@ export default function MaintenanceStopScreen() {
   const blockedBy = !isStaff && stop.status === 'pending' ? route.stops.find((s) => s.number < stop.number && (s.status === 'pending' || s.status === 'arrived')) : undefined;
   const mySkip = skips.find((s) => s.refId === stop.id && s.status === 'pending');
   const clockedIn = !timeOn || !!workday.active;
+  // Only the crew leader (or owner/admin) checks the crew in and finishes the stop; everyone else sees the status.
+  const leader = isCrewLeader({ leadId: route.lead?.id, personId: db.personId, role: db.role });
+  const leaderName = route.lead ? `${route.lead.firstName} ${route.lead.lastName}`.trim() : undefined;
 
   async function sendSkip(reason: string) {
     const r = await requestSkip('maintenance_stop', stop!.id, reason);
@@ -249,21 +253,24 @@ export default function MaintenanceStopScreen() {
         }]}
       >
         {!!error && <InlineNotice icon="alert-triangle" tone="error" text={error} style={{ marginBottom: spacing.sm }} />}
-        {stop.status === 'pending' && !blockedBy && clockedIn && (
+        {!leader && !locked && (
+          <InlineNotice icon="users" tone="neutral" text={crewStopMessage(stop.status, leaderName, stop.arrivedAt ? clockTime(stop.arrivedAt) : null, stop.arrivedBy ? nameOf(stop.arrivedBy) : null)} />
+        )}
+        {leader && stop.status === 'pending' && !blockedBy && clockedIn && (
           <PrimaryButton
-            label={arriving ? 'RECORDING…' : timeOn ? 'START PROPERTY' : "I'M HERE"}
+            label={arriving ? 'RECORDING…' : "I'M HERE"}
             icon="map-pin"
             busy={arriving}
             onPress={handleArrive}
           />
         )}
-        {stop.status === 'pending' && blockedBy && (
+        {leader && stop.status === 'pending' && blockedBy && (
           <InlineNotice icon="lock" tone="neutral" text={`Finish ${blockedBy.property?.name ?? `stop ${blockedBy.number}`} first. Stops are worked in order.`} />
         )}
-        {stop.status === 'pending' && !blockedBy && !clockedIn && (
+        {leader && stop.status === 'pending' && !blockedBy && !clockedIn && (
           <InlineNotice icon="clock" tone="neutral" text="Clock in for the day first. The Clock In button is on the Today screen." />
         )}
-        {stop.status === 'arrived' && (
+        {leader && stop.status === 'arrived' && (
           <FinishStopButton stopId={stop.id} missing={missing} uploading={uploadingPhotoCount(stop)} onPress={handleFinish} />
         )}
         {locked && (

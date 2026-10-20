@@ -94,27 +94,30 @@ check('11 but a crew mate on the same route can share the same truck', r.ok && r
 await asDb();
 await db.query(`delete from public.time_workdays where person_id = $1`, [w2.pid]);
 
-// ── maintenance route order ─────────────────────────────────────────────────
-r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [stops[1]]);
+// ── maintenance route order (update 68: the crew leader checks the crew in; no per-worker property timers) ──
+await db.query(`update public.maintenance_routes set lead_person_id = $2 where id = $1`, [route, m1.pid]);
+const arrive = (u, stop) => rpc(u, `select public.maintenance_leader_arrive($1::uuid) as x`, [stop]);
+const finish = (u, stop) => rpc(u, `select public.maintenance_leader_complete($1::uuid) as x`, [stop]);
+r = await arrive(m1.u, stops[1]);
 check('12 a later stop stays locked while an earlier one is not done', !r.ok && /Finish Chase first/.test(r.msg), r.msg);
-r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [stops[0]]);
-check('13 the first stop can be started; the workday timer keeps running', r.ok && r.v.current && r.v.days[0].clock_out_at === null, r.msg);
+r = await arrive(m1.u, stops[0]);
+check('13 the leader checks the crew in at the first stop; the workday timer keeps running and ONE visit is saved', r.ok && r.v.visit_id && (await one(`select count(*)::int c from public.time_visits where maintenance_stop_id = $1 and crew_level and started_at is not null`, [stops[0]])).c === 1, r.msg);
 const visit1 = (await one(`select id from public.time_visits where maintenance_stop_id = $1`, [stops[0]])).id;
-r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [stops[0]]);
-check('14 tapping Start twice changes nothing (still one interval)', r.ok && (await one(`select count(*)::int c from public.time_intervals where person_id = $1`, [m1.pid])).c === 1, r.msg);
-r = await rpc(m1.u, `select public.time_clock_out() as x`);
-check('15 clocking out while a property is open is refused (not silently closed)', !r.ok && /still working at Chase/.test(r.msg), r.msg);
+r = await arrive(m1.u, stops[0]);
+check('14 tapping I\'m Here twice changes nothing (still one visit)', r.ok && r.v.already_arrived === true && (await one(`select count(*)::int c from public.time_visits where maintenance_stop_id = $1`, [stops[0]])).c === 1, r.msg);
+r = await arrive(m2.u, stops[0]);
+check('15 a crew member who is not the leader cannot check the crew in', !r.ok && /Only the crew leader/.test(r.msg), r.msg);
 r = await rpc(m2.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [stops[0]]);
-check('16 a second employee starts the same property with their own interval', r.ok && (await one(`select count(*)::int c from public.time_intervals where visit_id = $1`, [visit1])).c === 2, r.msg);
-r = await rpc(m1.u, `select public.time_complete_visit($1::uuid) as x`, [visit1]);
-check('17 completing ends only that employee\'s interval', r.ok && r.v.current === null && (await one(`select count(*)::int c from public.time_intervals where visit_id = $1 and ended_at is null`, [visit1])).c === 1, r.msg);
-check('18 the visit stays in progress while the other employee is still working', (await one(`select status from public.time_visits where id = $1`, [visit1])).status === 'in_progress');
-r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [stops[1]]);
-check('19 finishing Chase unlocks the next stop (Focus) for that employee', r.ok, r.msg);
-r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [stops[2]]);
-check('20 Sesame stays locked until Focus is done; one property at a time', !r.ok, r.msg);
+check('16 the old per-worker property timer is refused for maintenance stops', !r.ok, r.msg);
+r = await finish(m2.u, stops[0]);
+const r16b = await finish(m1.u, stops[0]);
+check('17 only the leader finishes the stop; finishing saves the completion time and the visit is completed', !r.ok && r16b.ok && (await one(`select status, ended_at is not null as done from public.time_visits where id = $1`, [visit1])).done === true, r.msg + (r16b.msg ?? ''));
+check('18 a crew visit has no per-person intervals (each person\'s workday is separate)', (await one(`select count(*)::int c from public.time_intervals where visit_id = $1`, [visit1])).c === 0);
+r = await arrive(m1.u, stops[1]);
+check('19 finishing Chase unlocks the next stop (Focus) for the leader', r.ok, r.msg);
+r = await arrive(m1.u, stops[2]);
+check('20 Sesame stays locked until Focus is done', !r.ok, r.msg);
 await asDb();
-await db.query(`update public.time_intervals set ended_at = started_at + interval '1 millisecond' where person_id = $1 and visit_id = (select id from public.time_visits where maintenance_stop_id = $2)`, [m1.pid, stops[1]]);
 
 // ── breaks ──────────────────────────────────────────────────────────────────
 r = await rpc(w1.u, `select public.time_break_start() as x`);
@@ -169,7 +172,7 @@ await db.query(`update public.maintenance_stops set status = 'completed', comple
 r = await rpc(m1.u, `select public.time_request_skip('maintenance_stop', $1::uuid, 'Gate locked') as x`, [stops[2]]);
 check('36 the request is saved as pending (not skipped yet)', r.ok && (await one(`select status from public.maintenance_stops where id = $1`, [stops[2]])).status === 'pending', r.msg);
 await db.query(`insert into public.maintenance_photos (company_id, route_id, stop_id, property_id, uploaded_by, file_url, file_key, time_phase) values ($1,$2,$3,$4,$5,'https://x/s.jpg','m/s.jpg','start')`, [co, route, stops[2], mp[2], m1.pid]);
-r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [stops[2]]);
+r = await rpc(m1.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [stops[2]]);
 check('37 a pending request does not skip the stop (the worker can still work it)', r.ok, r.msg);
 r = await rpc(m1.u, `select public.time_decide_skip((select id from public.time_skip_requests limit 1), true) as x`);
 check('38 a worker cannot approve their own skip', !r.ok, r.msg);
@@ -202,10 +205,10 @@ f = await call(w1.u, `insert into public.time_workdays (company_id, person_id, w
 check('44 workers cannot insert workday rows directly', f.raised, f.msg);
 
 // ── rates and targets ───────────────────────────────────────────────────────
-const rateRow = await one(`select r.hourly_rate from public.time_interval_rates r join public.time_intervals i on i.id = r.interval_id where i.person_id = $1 limit 1`, [m1.pid]);
+const rateRow = await one(`select r.hourly_rate from public.time_workday_rates r join public.time_workdays w on w.id = r.workday_id where w.person_id = $1 limit 1`, [m1.pid]);
 check('45 the hourly rate in force was saved with the work (m1 earned 25)', Number(rateRow.hourly_rate) === 25, JSON.stringify(rateRow));
 await db.query(`update public.worker_hourly_rates set hourly_rate = 40 where person_id = $1`, [m1.pid]);
-const rateAfter = await one(`select r.hourly_rate from public.time_interval_rates r join public.time_intervals i on i.id = r.interval_id where i.person_id = $1 limit 1`, [m1.pid]);
+const rateAfter = await one(`select r.hourly_rate from public.time_workday_rates r join public.time_workdays w on w.id = r.workday_id where w.person_id = $1 limit 1`, [m1.pid]);
 check('46 changing the rate later does not rewrite the saved rate on past work', Number(rateAfter.hourly_rate) === 25, JSON.stringify(rateAfter));
 await db.query(`insert into public.time_property_targets (company_id, maintenance_property_id, target_minutes) values ($1, $2, 120)`, [co, mp[0]]);
 f = await fails(`insert into public.time_property_targets (company_id, maintenance_property_id, project_id, target_minutes) values ($1, $2, $3, 60)`, [co, mp[1], projects[0]]);

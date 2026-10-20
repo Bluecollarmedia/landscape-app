@@ -14,7 +14,7 @@
  */
 import { db, insertRow, insertRows, updateRow, deleteRow, rowsOf, rpc, refresh, isDemo, saveDeferredRow, discardLocalRow, type TableName } from './store';
 import { uploadImage } from '@/lib/media';
-import { isTimeTrackingOn, lastMyDay, timeRpc } from './timeTracking';
+import { emitTimeChanged, isTimeTrackingOn, lastMyDay, timeRpc } from './timeTracking';
 import { localDateKey, todayKey } from '@/lib/ids';
 import { cleanDates } from '@/lib/serviceDates';
 import type { GpsResult } from '@/lib/location';
@@ -494,7 +494,14 @@ export function markArrived(stopId: string, gps?: GpsResult): Promise<Result<Mai
       return ok(db.maintenance.stopById[stopId] ?? stop);
     }
     if (isTimeTrackingOn()) {
-      // Workday time tracking is on: starting the property also starts this worker's own timer (and checks route order and photos).
+      // Workday time tracking is on: the CREW LEADER checks the crew in (update 68). The database saves one visit with the real arrival time.
+      const lead = await rpc('maintenance_leader_arrive', { p_stop_id: stopId, ...gpsArgs(gps) });
+      if (!lead.error || !/could not find the function|schema cache/i.test(lead.error.message)) {
+        await refresh(...MAINT_TABLES);
+        emitTimeChanged();
+        return lead.error ? fail(lead.error.message) : ok(db.maintenance.stopById[stopId]);
+      }
+      // An older database (before update 68): the earlier per-worker start.
       const r = await timeRpc('time_start_visit', { p_source: 'maintenance_stop', p_ref: stopId, ...gpsArgs(gps), p_gps: null }, "Couldn't start this property.");
       await refresh(...MAINT_TABLES);
       return r.ok ? ok(db.maintenance.stopById[stopId]) : fail(r.error);
@@ -607,6 +614,15 @@ export function finishStop(stopId: string, opts: { note?: string; gps?: GpsResul
       logLocal('completed', { routeId: stop.routeId, stopId, locationStatus: loc.status, distanceM: loc.distanceM, note, ...gpsFields(opts.gps), metadata: { recorded_by_staff_without_arrival: asStaff && !stop.arrivedAt } });
       settleRouteLocal(stop.routeId);
       return ok(db.maintenance.stopById[stopId] ?? stop);
+    }
+    if (isTimeTrackingOn()) {
+      // The crew leader finishes the stop; the visit's completion time and elapsed time are saved (update 68).
+      const lead = await rpc('maintenance_leader_complete', { p_stop_id: stopId, p_note: opts.note?.trim() || null, ...gpsArgs(opts.gps) });
+      if (!lead.error || !/could not find the function|schema cache/i.test(lead.error.message)) {
+        await refresh(...MAINT_TABLES);
+        emitTimeChanged();
+        return lead.error ? fail(lead.error.message) : ok(db.maintenance.stopById[stopId]);
+      }
     }
     const timed = lastMyDay()?.current;
     if (isTimeTrackingOn() && timed?.stopId === stopId) {

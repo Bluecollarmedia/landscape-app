@@ -4,6 +4,7 @@ import { useSchedule } from '@/hooks/useSchedule';
 import { useAttendance } from '@/hooks/useOperations';
 import { db, useDb } from '@/data/store';
 import { todayKey } from '@/lib/ids';
+import { maintenanceToday } from '@/data/maintenanceToday';
 import type { Project } from '@/types/project';
 import type { Assignment } from '@/types/schedule';
 import type { PersonSummary } from '@/types/company';
@@ -105,9 +106,17 @@ export function useOwnerDashboard() {
     return map;
   }, [attendance]);
 
-  const workerIds = useMemo(
+  // Maintenance routes count too: the crew and leader of today's routes are scheduled, the crew at a property they checked in at is on
+  // site, and a person on both a job and a route is counted once.
+  const maint = useMemo(() => maintenanceToday(db.maintenance.routes, today), [v, today]);
+
+  const jobWorkerIds = useMemo(
     () => [...new Set(todayAssignments.map(a => a.personId))],
     [todayAssignments],
+  );
+  const workerIds = useMemo(
+    () => [...new Set([...jobWorkerIds, ...maint.scheduled])],
+    [jobWorkerIds, maint],
   );
 
   const onSiteWorkerIds = useMemo(() => {
@@ -119,14 +128,17 @@ export function useOwnerDashboard() {
     return set;
   }, [todayAssignments, attendanceByAssignment]);
 
+  const allOnSiteIds = useMemo(() => new Set([...onSiteWorkerIds, ...maint.onSite]), [onSiteWorkerIds, maint]);
+
+  // Upcoming = scheduled and not on site yet. Someone whose only work today is routes that are all finished is not upcoming.
   const upcomingWorkerCount = useMemo(
-    () => workerIds.filter(id => !onSiteWorkerIds.has(id)).length,
-    [workerIds, onSiteWorkerIds],
+    () => workerIds.filter(id => !allOnSiteIds.has(id) && !(maint.finished.has(id) && !jobWorkerIds.includes(id))).length,
+    [workerIds, allOnSiteIds, maint, jobWorkerIds],
   );
 
   const jobsInProgress = useMemo(
-    () => new Set(todayAssignments.map(a => a.projectId)).size,
-    [todayAssignments],
+    () => new Set(todayAssignments.map(a => a.projectId)).size + maint.propertyIds.size,
+    [todayAssignments, maint],
   );
 
   // ── Needs Attention: actionable exceptions only ─────────────────
@@ -311,7 +323,7 @@ export function useOwnerDashboard() {
     todayStats: {
       jobsInProgress,
       workersScheduled: workerIds.length,
-      onSite: onSiteWorkerIds.size,
+      onSite: allOnSiteIds.size,
       upcoming: upcomingWorkerCount,
     },
     attentionItems: attentionItems.slice(0, 3),

@@ -1,12 +1,15 @@
 import { useMemo, useCallback } from 'react';
 import type { CompanyMember, PersonSummary } from '@/types/company';
 import type { Project } from '@/types/project';
+import type { MaintenanceProperty } from '@/types/maintenance';
 import { db, useDb, insertRow, rowsOf } from '@/data/store';
 
 export interface CustomerWithProjects {
   member: CompanyMember;
   person: PersonSummary;
   projects: Project[];
+  /** Maintenance properties linked to this customer (maintenance_properties.customer_id), the same link Maintenance uses. */
+  maintenanceProperties: MaintenanceProperty[];
   activeProjectCount: number;
   totalProjectCount: number;
 }
@@ -25,10 +28,12 @@ export function useCustomers(options: UseCustomersOptions = {}) {
       .map((m) => {
         const person = m.person!;
         const customerProjects = db.projects.filter((p) => p.customerId === m.personId);
+        const maintenanceProperties = db.maintenance.properties.filter((p) => p.customerId === m.personId);
         return {
           member: m,
           person,
           projects: customerProjects,
+          maintenanceProperties,
           activeProjectCount: customerProjects.filter((p) => p.status === 'active').length,
           totalProjectCount: customerProjects.length,
         };
@@ -44,7 +49,8 @@ export function useCustomers(options: UseCustomersOptions = {}) {
         c.person.lastName.toLowerCase().includes(q) ||
         c.person.email.toLowerCase().includes(q) ||
         c.person.phone?.includes(q) ||
-        c.projects.some((p) => p.name.toLowerCase().includes(q)),
+        c.projects.some((p) => p.name.toLowerCase().includes(q)) ||
+        c.maintenanceProperties.some((p) => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q)),
     );
   }, [customers, search]);
 

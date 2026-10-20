@@ -19,6 +19,7 @@ import { SplashScreen } from '@/components/branding/SplashScreen';
 import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useModeAccess } from '@/hooks/useModeAccess';
+import { WorkerModeToggle } from '@/components/snow/WorkerModeToggle';
 import { installGlobalErrorHandler } from '@/lib/errorReporting';
 
 ExpoSplashScreen.preventAutoHideAsync();
@@ -118,6 +119,7 @@ function RootNavigator() {
   return (
     <>
       <Slot />
+      {isPublicPage ? null : <WorkerModeToggle />}
       {isPublicPage ? null : <SignInWelcome />}
     </>
   );

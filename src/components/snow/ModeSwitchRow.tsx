@@ -21,7 +21,7 @@ export function useModeSwitch() {
     confirmAction(
       title,
       toSnow
-        ? 'You and every worker with snow access will switch to Snow Mode. Workers without snow access see a "Snow Mode is on" screen until you switch back. Landscaping records stay as they are.'
+        ? 'You and your workers switch to Snow Mode. Every worker gets snow access automatically (no sign-up) and sees a small Snow / Landscaping switch at the top right of their phone. You can still remove snow access from any worker in the Snow team; they then see a "Snow Mode is on" screen. Landscaping records stay as they are.'
         : 'You and your workers will switch back to the landscaping app. Snow-only workers stay in Snow Mode. Snow records stay as they are.',
       'Switch',
       () => setMode(toSnow ? 'snow' : 'landscaping'),

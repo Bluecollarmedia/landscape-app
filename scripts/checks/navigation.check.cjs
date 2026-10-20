@@ -11,7 +11,7 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
 
 const layout = read('app/_layout.tsx');
 check('1 the root layout never returns a bare <Slot /> for public pages (that rebuilt the navigator)', !/if \(isPublicPage\) \{\s*return <Slot \/>;/.test(layout));
-check('2 the same tree is returned for public and normal pages: <Slot /> then an optional welcome overlay', /<>\s*<Slot \/>\s*\{isPublicPage \? null : <SignInWelcome \/>\}\s*<\/>/.test(layout));
+check('2 the same tree is returned for public and normal pages: <Slot /> then optional overlays (the worker mode toggle, the welcome)', /<>\s*<Slot \/>\s*\{isPublicPage \? null : <WorkerModeToggle \/>\}\s*\{isPublicPage \? null : <SignInWelcome \/>\}\s*<\/>/.test(layout));
 check('3 the splash still shows for normal pages while loading, but not for public pages', /!isPublicPage && \(isLoading \|\| !splashDone\)/.test(layout));
 const settings = read('src/components/snow/settings/SnowSettingsScreen.tsx');
 check('4 Snow settings opens Properties and Snow team as their own screens (no hopping to the tab bar)', /router\.push\('\/snow\/owner\/properties-list'/.test(settings) && /router\.push\('\/snow\/owner\/team-list'/.test(settings) && !/router\.(push|navigate)\('\/snow\/owner\/(properties|team)'/.test(settings));

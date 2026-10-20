@@ -36,6 +36,10 @@ export interface RouteStop {
   completedAt?: string;
   completionNote?: string;
   mediaCount: number;
+  /** The owner's note for this property (update 60). */
+  ownerNote?: string;
+  /** Photos required at this property: true / false, or undefined to follow the route's rule (update 60). */
+  photosRequired?: boolean;
 }
 
 export interface RouteDetail {
@@ -69,12 +73,15 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
     .maybeSingle();
   if (error) return fail(message(error, 'Couldn\'t load the route.'));
   if (!r) return fail('This route isn\'t available.');
-  const [visits, media] = await Promise.all([
-    supabase.from('snow_visits')
-      .select('id, property_id, position, status, property_name, property_address, arrived_at, completed_at, completion_note')
-      .eq('route_id', routeId).order('position'),
+  const visitCols = 'id, property_id, position, status, property_name, property_address, arrived_at, completed_at, completion_note';
+  const [first, media] = await Promise.all([
+    supabase.from('snow_visits').select(`${visitCols}, owner_note, photos_required`).eq('route_id', routeId).order('position'),
     supabase.from('snow_completion_media').select('visit_id').eq('route_id', routeId),
   ]);
+  // A database without update 60 has no note / photo columns yet: load the stops without them rather than failing.
+  const visits = first.error && /owner_note|photos_required/i.test(first.error.message)
+    ? await supabase.from('snow_visits').select(visitCols).eq('route_id', routeId).order('position')
+    : first;
   if (visits.error) return fail(message(visits.error, 'Couldn\'t load the stops.'));
   const counts = new Map<string, number>();
   for (const m of media.data ?? []) counts.set(m.visit_id, (counts.get(m.visit_id) ?? 0) + 1);
@@ -103,8 +110,29 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
       completedAt: v.completed_at ?? undefined,
       completionNote: v.completion_note ?? undefined,
       mediaCount: counts.get(v.id) ?? 0,
+      ownerNote: (v as { owner_note?: string | null }).owner_note?.trim() || undefined,
+      photosRequired: typeof (v as { photos_required?: boolean | null }).photos_required === 'boolean' ? (v as unknown as { photos_required: boolean }).photos_required : undefined,
     })),
   });
+}
+
+/** Whether photos are required at this stop: its own setting, else the route's rule. */
+export const stopNeedsPhotos = (stop: Pick<RouteStop, 'photosRequired'>, route: Pick<RouteDetail, 'mediaRequired'>): boolean =>
+  stop.photosRequired ?? route.mediaRequired;
+
+/** The owner's settings for one property on a route (update 60): a note, and whether photos are required there. */
+export async function updateStop(visitId: string, patch: { ownerNote?: string; photosRequired?: boolean | null }): Promise<Result> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const row: Record<string, unknown> = {};
+  if (patch.ownerNote !== undefined) row.owner_note = patch.ownerNote.trim() || null;
+  if (patch.photosRequired !== undefined) row.photos_required = patch.photosRequired;
+  const { error } = await supabase.from('snow_visits').update(row).eq('id', visitId);
+  if (error) {
+    return fail(/owner_note|photos_required/i.test(error.message)
+      ? 'Notes and photo settings for a property need database update 60, which has not been installed yet.'
+      : message(error, "Couldn't save the property settings."));
+  }
+  return ok(undefined);
 }
 
 /** Snow team members (plus owners/admins) who can lead a route for this service. */

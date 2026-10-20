@@ -6,7 +6,7 @@
  */
 import { crewChoices, crewCountLabel, nextCrew } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, PressableScale, ScreenHeader, StatusBadge, Switch } from '@/components/ui';
@@ -14,8 +14,8 @@ import { confirmAction, showMessage } from '@/components/financials/ActionSheet'
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
 import {
-  addStops, cancelRoute, loadLeadLoad, loadRoute, loadRouteCrew, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, updateRoute,
-  type RouteCrewMember,
+  addStops, cancelRoute, loadLeadLoad, loadRoute, loadRouteCrew, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, stopNeedsPhotos, updateRoute, updateStop,
+  type RouteCrewMember, type RouteStop,
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
 import { OwnerSkipRequests } from './SkipRequests';
@@ -27,6 +27,14 @@ export const STOP_TONE = { pending: 'neutral', arrived: 'info', completed: 'succ
 
 export function RouteEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  return <RouteEditor routeId={id} />;
+}
+
+/**
+ * The route's settings and stops. On its own screen it has a header and a Done button; `embedded` (inside the storm screen) shows
+ * just the content: the storm is the route, so there is no route name, template or cancel here.
+ */
+export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { routeId?: string; embedded?: boolean; onDragActive?: (active: boolean) => void }) {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -45,6 +53,12 @@ export function RouteEditScreen() {
   const [leadLoad, setLeadLoad] = useState<Record<string, string[]>>({});
   const [crew, setCrew] = useState<RouteCrewMember[]>([]);
   const [pickCrew, setPickCrew] = useState(false);
+  // The property whose notes and photo setting are being edited.
+  const [detailStop, setDetailStop] = useState<RouteStop | null>(null);
+  const [stopNote, setStopNote] = useState('');
+  const [stopPhotos, setStopPhotos] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameText, setRenameText] = useState('');
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -175,7 +189,27 @@ export function RouteEditScreen() {
     }, true);
   }
 
+  function openStop(stop: RouteStop) {
+    setDetailStop(stop);
+    setStopNote(stop.ownerNote ?? '');
+    setStopPhotos(route ? stopNeedsPhotos(stop, route) : false);
+  }
+
+  async function saveStop() {
+    if (!detailStop || !route) return;
+    setBusy(true);
+    const patch: Parameters<typeof updateStop>[1] = {};
+    if (stopNote.trim() !== (detailStop.ownerNote ?? '')) patch.ownerNote = stopNote;
+    if (stopPhotos !== stopNeedsPhotos(detailStop, route)) patch.photosRequired = stopPhotos;
+    const res = Object.keys(patch).length ? await updateStop(detailStop.id, patch) : { ok: true as const };
+    setBusy(false);
+    if (!res.ok) return showMessage("Couldn't save", res.error);
+    setDetailStop(null);
+    reload();
+  }
+
   if (loading) {
+    if (embedded) return <LoadingSpinner />;
     return (
       <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
         <ScreenHeader title="Route" />
@@ -184,6 +218,7 @@ export function RouteEditScreen() {
     );
   }
   if (!route) {
+    if (embedded) return <InlineNotice icon="alert-circle" tone="error" text={error ?? 'This route is not available.'} />;
     return (
       <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
         <ScreenHeader title="Route" />
@@ -202,33 +237,19 @@ export function RouteEditScreen() {
   const firstPending = route.stops.findIndex((s) => s.status === 'pending');
   const sep = { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight };
 
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader
-        title={route.name}
-        subtitle={`${route.stormName} · ${SERVICE_LABEL[route.service]}`}
-        right={
-          <PressableScale
-            onPress={done}
-            disabled={busy}
-            scaleTo={0.92}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Done"
-            style={[styles.done, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}
-          >
-            <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary }]}>Done</Text>
-          </PressableScale>
-        }
-      />
-      <ScrollView
-        scrollEnabled={!dragging}
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
-        keyboardShouldPersistTaps="handled"
-      >
+  const openCount = route.stops.filter((x) => x.status === 'pending' || x.status === 'arrived').length;
+
+  const body = (
+    <>
+        {embedded ? (
+          <Pressable onPress={() => { setRenameText(route.name); setRenaming(true); }} style={[styles.inline, { marginBottom: spacing.sm }]} accessibilityRole="button" accessibilityLabel="Rename route">
+            <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]} numberOfLines={1}>{route.name}</Text>
+            <Icon name="edit-2" size={13} color={colors.textTertiary} />
+          </Pressable>
+        ) : null}
+
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
-        {!route.cancelled ? (
+        {!route.cancelled && !embedded ? (
           <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
             Changes save as you make them. Tap Done when you are finished.
           </Text>
@@ -242,20 +263,10 @@ export function RouteEditScreen() {
         ) : null}
 
         <View style={[styles.card, { backgroundColor: colors.surface, gap: spacing.md }]}>
-          <Input
-            label="Route name"
-            value={name}
-            onChangeText={setName}
-            editable={editable}
-            onEndEditing={() => { if (name.trim() && name.trim() !== route.name) save({ name }); }}
-          />
           <Pressable onPress={() => editable && setPickLead(!pickLead)} style={styles.inline} accessibilityRole="button">
             <View style={{ flex: 1 }}>
               <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew lead</Text>
               <Text style={[typeScale.bodyLarge, { color: leadName ? colors.textPrimary : colors.warning }]}>{leadName ?? 'Assign a crew lead'}</Text>
-              <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-                Needed before you can dispatch a route that has stops. The lead marks arrivals, finishes stops and adds photos.
-              </Text>
               {route.leadPersonId && leadLoad[route.leadPersonId] ? (
                 <Text style={[typeScale.caption, { color: colors.warning }]}>
                   Also leads {leadLoad[route.leadPersonId].join(', ')}. That's allowed; check the timing.
@@ -292,10 +303,10 @@ export function RouteEditScreen() {
           <View>
             <View style={styles.inline}>
               <View style={{ flex: 1 }}>
-                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew (optional)</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew · optional</Text>
                 <Text style={[typeScale.bodyLarge, { color: crew.length ? colors.textPrimary : colors.textTertiary }]}>{crewCountLabel(crew.length)}</Text>
               </View>
-              {editable ? <Button title={pickCrew ? 'Close' : 'Add crew'} size="sm" variant="secondary" icon={pickCrew ? 'x' : 'plus'} disabled={busy} onPress={() => setPickCrew(!pickCrew)} /> : null}
+              {editable ? <Button title={pickCrew ? 'Close' : 'Add Crew'} size="sm" variant="secondary" icon={pickCrew ? 'x' : 'plus'} disabled={busy} onPress={() => setPickCrew(!pickCrew)} /> : null}
             </View>
             {crew.map((c) => (
               <View key={c.personId} style={[styles.inline, { paddingVertical: spacing.xs }]}>
@@ -319,30 +330,18 @@ export function RouteEditScreen() {
                 </Text>
               )
             ) : null}
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
-              Crew can see this route, its stops and instructions. Only the lead can mark arrival, finish stops and add photos.
-            </Text>
           </View>
-          <View style={styles.inline}>
-            <View style={{ flex: 1 }}>
-              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Photos required</Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                {route.mediaRequired ? `At least ${route.minMedia} per stop before Finish Stop` : 'Optional at each stop'}
-              </Text>
-            </View>
-            <Switch value={route.mediaRequired} disabled={!editable || busy} onValueChange={(v) => save({ mediaRequired: v })} accessibilityLabel="Photos required" />
-          </View>
-          {route.mediaRequired && editable ? (
-            <View style={styles.inline}>
-              <Text style={[typeScale.bodySmall, { flex: 1, color: colors.textSecondary }]}>Photos per stop</Text>
-              <Button title="−" size="sm" variant="secondary" disabled={busy || route.minMedia <= 1} onPress={() => save({ minMedia: route.minMedia - 1 })} />
-              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, minWidth: 28, textAlign: 'center' }]}>{route.minMedia}</Text>
-              <Button title="+" size="sm" variant="secondary" disabled={busy || route.minMedia >= 20} onPress={() => save({ minMedia: route.minMedia + 1 })} />
-            </View>
-          ) : null}
         </View>
 
-        <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>Stops</Text>
+        <View style={[styles.inline, styles.label]}>
+          <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>Properties</Text>
+          {route.stops.length ? (
+            <>
+              <StatusBadge label={`Open ${openCount}`} status="info" />
+              <StatusBadge label={`Closed ${route.stops.length - openCount}`} status="success" />
+            </>
+          ) : null}
+        </View>
         {route.stops.length ? (
           <View style={[styles.group, { backgroundColor: colors.surface, borderColor: 'transparent' }]}>
             <ReorderableList
@@ -351,17 +350,27 @@ export function RouteEditScreen() {
               rowHeight={STOP_ROW_HEIGHT}
               canDrag={(s) => editable && s.status === 'pending'}
               onReorder={applyOrder}
-              onDragActive={setDragging}
+              onDragActive={(a) => { setDragging(a); onDragActive?.(a); }}
               renderRow={(s, i, handle) => {
                 const movable = editable && s.status === 'pending';
                 return (
                   <View style={[styles.row, { flex: 1 }, i > 0 && sep]}>
                     {handle ?? <View style={{ width: 32 }} />}
                     <Text style={[typeScale.labelLarge, { color: colors.textTertiary, width: 18 }]}>{i + 1}</Text>
-                    <View style={{ flex: 1, gap: 2 }}>
+                    <Pressable
+                      style={{ flex: 1, gap: 2 }}
+                      onPress={() => openStop(s)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${s.propertyName}: photos and notes`}
+                    >
                       <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{s.propertyName}</Text>
                       <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
-                    </View>
+                      <View style={styles.inline}>
+                        <Icon name="camera" size={12} color={stopNeedsPhotos(s, route) ? colors.primary : colors.textTertiary} />
+                        <Text style={[typeScale.caption, { color: stopNeedsPhotos(s, route) ? colors.primary : colors.textTertiary }]}>{stopNeedsPhotos(s, route) ? 'Photos required' : 'No photos required'}</Text>
+                        {s.ownerNote ? <><Icon name="file-text" size={12} color={colors.primary} /><Text style={[typeScale.caption, { color: colors.primary }]} numberOfLines={1}>Note</Text></> : null}
+                      </View>
+                    </Pressable>
                     {movable ? (
                       <View style={styles.inline}>
                         <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} />
@@ -378,7 +387,7 @@ export function RouteEditScreen() {
             />
           </View>
         ) : (
-          <Text style={[typeScale.bodySmall, styles.help, { color: colors.textSecondary }]}>No stops yet.</Text>
+          <Text style={[typeScale.bodySmall, styles.help, { color: colors.textSecondary }]}>No properties yet. Tap Add Property below.</Text>
         )}
 
         {editable ? (
@@ -426,16 +435,89 @@ export function RouteEditScreen() {
               </View>
             </View>
           ) : (
-            <Button title="Add stops" icon="plus" variant="secondary" onPress={() => setPickStops(true)} style={{ marginTop: spacing.md }} fullWidth />
+            <Button title="Add Property" icon="plus" variant={embedded ? 'primary' : 'secondary'} onPress={() => setPickStops(true)} style={{ marginTop: spacing.md }} fullWidth size={embedded ? 'lg' : undefined} />
           )
         ) : null}
 
+        {!embedded ? (
         <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
           {route.stops.length ? (
             <Button title="Save as template" icon="copy" variant="secondary" onPress={onSaveTemplate} disabled={busy} fullWidth />
           ) : null}
           {editable ? <Button title="Cancel route" variant="ghost" onPress={onCancelRoute} disabled={busy} fullWidth /> : null}
         </View>
+        ) : null}
+
+        {embedded && route.stops.length ? (
+          <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary, marginTop: spacing.xs }]}>Tap a property to set photos and add a note for it.</Text>
+        ) : null}
+
+        <Modal visible={renaming} transparent animationType="fade" onRequestClose={() => setRenaming(false)}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalBackdrop}>
+            <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+              <Input label="Route name" value={renameText} onChangeText={setRenameText} autoFocus />
+              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+                <Button title="Cancel" variant="ghost" onPress={() => setRenaming(false)} />
+                <Button title="Save" icon="check" disabled={!renameText.trim()} onPress={() => { setRenaming(false); if (renameText.trim() && renameText.trim() !== route.name) save({ name: renameText }); }} />
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        <Modal visible={!!detailStop} transparent animationType="fade" onRequestClose={() => setDetailStop(null)}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalBackdrop}>
+            <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{detailStop?.propertyName}</Text>
+              {detailStop?.propertyAddress ? <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{detailStop.propertyAddress}</Text> : null}
+              <View style={[styles.inline, { marginTop: spacing.lg }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Photos required here</Text>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>The crew must add a photo before finishing this property.</Text>
+                </View>
+                <Switch value={stopPhotos} disabled={!editable || busy || detailStop?.status === 'completed' || detailStop?.status === 'skipped'} onValueChange={setStopPhotos} accessibilityLabel="Photos required at this property" />
+              </View>
+              <Input label="Notes for this property" value={stopNote} onChangeText={setStopNote} editable={editable} multiline numberOfLines={4} placeholder="Gate code, where to pile snow, what to watch for" containerStyle={{ marginTop: spacing.lg }} />
+              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+                <Button title="Cancel" variant="ghost" onPress={() => setDetailStop(null)} />
+                {editable ? <Button title="Save" icon="check" loading={busy} onPress={saveStop} /> : null}
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+    </>
+  );
+
+  if (embedded) return <View>{body}</View>;
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+      <ScreenHeader
+        title={route.name}
+        subtitle={`${route.stormName} · ${SERVICE_LABEL[route.service]}`}
+        right={
+          <View style={styles.inline}>
+            <IconTap icon="edit-2" label="Rename route" onPress={() => { setRenameText(route.name); setRenaming(true); }} color={colors.textSecondary} />
+          <PressableScale
+            onPress={done}
+            disabled={busy}
+            scaleTo={0.92}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Done"
+            style={[styles.done, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}
+          >
+            <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary }]}>Done</Text>
+          </PressableScale>
+          </View>
+        }
+      />
+      <ScrollView
+        scrollEnabled={!dragging}
+        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
+        keyboardShouldPersistTaps="handled"
+      >
+      {body}
       </ScrollView>
     </View>
   );
@@ -461,4 +543,6 @@ const styles = StyleSheet.create({
   group: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 52 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  modalCard: { width: '100%', maxWidth: 420, borderRadius: radius.xl, padding: spacing.xl },
 });

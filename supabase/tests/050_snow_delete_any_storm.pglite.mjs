@@ -13,6 +13,8 @@ check('0 the full schema and all updates (including 050) load', failures.length 
 let again2 = true;
 try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/050_snow_delete_any_storm.sql`, 'utf8')); } catch (e) { again2 = false; }
 check('0b update 50 can be run a second time', again2);
+// Update 61 (later) replaces snow_delete_storm, so put it back after re-running 50 (the real order).
+try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/061_snow_combined_routes.sql`, 'utf8')); } catch (e) { check('0c update 61 re-applies after 50', false, e.message); }
 const fails = async (sql, p) => { try { await db.query(sql, p); return { raised: false, msg: '' }; } catch (e) { return { raised: true, msg: String(e.message) }; } };
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 

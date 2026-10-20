@@ -70,9 +70,13 @@ export function StormDetailScreen() {
     if (r.ok && s.data.storm.status !== 'ended' && r.data.filter((x) => !x.cancelled).length === 0 && ensured.current !== s.data.storm.id) {
       ensured.current = s.data.storm.id;
       const services = stormServices(s.data.storm);
-      for (const sv of services) {
-        const name = services.length > 1 ? `${s.data.storm.name} · ${SERVICE_LABEL[sv]}` : s.data.storm.name;
-        await createRoute(s.data.storm.id, { name, service: sv, mediaRequired: false, minMedia: 1 });
+      // One route does every service of the storm together (for example plowing + salting on one truck).
+      const combined = await createRoute(s.data.storm.id, { name: s.data.storm.name, service: services[0], services, mediaRequired: false, minMedia: 1 });
+      // A database without update 61 can't have one route do several services: fall back to one route per service.
+      if (!combined.ok && services.length > 1 && /services/i.test(combined.error)) {
+        for (const sv of services) {
+          await createRoute(s.data.storm.id, { name: `${s.data.storm.name} · ${SERVICE_LABEL[sv]}`, service: sv, mediaRequired: false, minMedia: 1 });
+        }
       }
       const again = await loadStormRoutes(id);
       if (ticket === latest.current && again.ok) setRoutes(again.data);

@@ -24,7 +24,16 @@
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0';
 import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.20';
-import { isPrivateKey } from '../_shared/privateKeys.ts';
+/**
+ * Which stored files are private (kept in the private bucket). Written out here, identical to supabase/functions/_shared/privateKeys.ts
+ * and src/lib/privateMedia.ts (a check keeps the three the same), so this one file can be pasted into the Supabase dashboard as it is.
+ */
+const PRIVATE_FOLDERS = new Set(['maintenance', 'reference', 'completion']);
+function isPrivateKey(key: string): boolean {
+  const parts = key.split('/');
+  if (parts[0] === 'ids') return true;
+  return parts.length >= 3 && PRIVATE_FOLDERS.has(parts[1]);
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

@@ -21,6 +21,9 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
     const grab = (f) => fs.readFileSync(f, 'utf8').match(/PRIVATE_FOLDERS = new Set\(\[([^\]]*)\]\)/)[1].replace(/\s/g, '');
     const a = grab(path.join(root, 'supabase/functions/_shared/privateKeys.ts')), b = grab(path.join(root, 'src/lib/privateMedia.ts'));
     check('the app and the server list the same private folders', a === b, a + ' vs ' + b);
+    const c = grab(path.join(root, 'supabase/functions/media/index.ts'));
+    check('the media function lists the same private folders (it is a single file so it can be pasted into the dashboard)', a === c, a + ' vs ' + c);
+    check('the media function has no relative imports (so it can be pasted into the dashboard as one file)', !/from '\.\.?\//.test(fs.readFileSync(path.join(root, 'supabase/functions/media/index.ts'), 'utf8')));
   }
   const fs = require('node:fs');
   const fn = fs.readFileSync(path.join(root, 'supabase/functions/media/index.ts'), 'utf8');

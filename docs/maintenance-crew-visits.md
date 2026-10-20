@@ -36,3 +36,7 @@ deletion and file deletion are not atomic**. The files are removed afterwards by
 (`storage_cleanup_finish`). A failure is retried after 2^attempts minutes (max 6 hours) and marked `failed` after 8 attempts;
 `storage_cleanup_status()` reports pending / done / failed so nobody is told the files are gone while any remain. The function needs the
 `CLEANUP_SECRET` secret, the existing R2 secrets, a deploy and a schedule (for example every 15 minutes); none of that has been done.
+
+Deleting a company also deletes the accounts (person record and sign-in login) of everyone who belonged only to it, the owner included, in the
+same all-or-nothing step; anyone who also belongs to, or has Snow access in, another company keeps their account. The count is kept in the
+closure record (`accounts_deleted`). Customer-portal logins are not members and are not covered.

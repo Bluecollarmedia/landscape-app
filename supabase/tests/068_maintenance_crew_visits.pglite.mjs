@@ -245,6 +245,9 @@ const cd = (await one(`insert into public.companies (name) values ('Closing Co')
 await db.exec(`set session_replication_role = origin`);
 const ownerD = await mk('ownerd@x.test', 'OwnerD');
 await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1,$2,'owner','active')`, [cd, ownerD.pid]);
+const wOnly = await mk('wonly@x.test', 'OnlyHere');
+const wBoth = await mk('wboth@x.test', 'InTwoCompanies');
+await db.query(`insert into public.company_members (company_id, person_id, role, status, worker_type) values ($1,$2,'worker','active','maintenance'),($1,$3,'worker','active','maintenance'),($4,$3,'worker','active','maintenance')`, [cd, wOnly.pid, wBoth.pid, co]);
 const projD = (await one(`insert into public.projects (company_id, name, status) values ($1,'P','active') returning id`, [cd])).id;
 await db.query(`insert into public.project_photos (company_id, project_id, uploaded_by, file_url, file_key) values ($1,$2,$3,'https://x/a.jpg','cd/projects/a.jpg'),($1,$2,$3,'https://x/b.jpg','cd/projects/b.jpg')`, [cd, projD, ownerD.pid]);
 await db.query(`insert into public.project_photos (company_id, project_id, uploaded_by, file_url, file_key) values ($1,$2,$3,'https://x/c.jpg','keep/other.jpg')`, [co, (await one(`insert into public.projects (company_id, name, status) values ($1,'Keep','active') returning id`, [co])).id, owner.pid]);
@@ -279,6 +282,14 @@ const st = await one(`select public.storage_cleanup_status() as x`);
 check('41 after 8 failed attempts it is marked failed (not processed), and the status counts it so nobody is told the files are gone', row.status === 'failed' && row.processed_at === null && st.x.failed === 1 && st.x.done === 1 && st.x.pending === 0, JSON.stringify(st.x));
 await db.query(`update public.storage_cleanup_queue set next_attempt_at = now() - interval '1 minute', locked_until = now() - interval '1 minute' where status = 'pending'`);
 check('42 a crashed run (lock expired) is picked up again', true);
+
+// ── deleting a company deletes the accounts that belonged only to it ──
+const acct = async (x) => ({ p: (await one(`select count(*)::int c from public.people where id = $1`, [x.pid])).c, u: (await one(`select count(*)::int c from auth.users where id = $1`, [x.u])).c });
+const aO = await acct(ownerD), aW = await acct(wOnly), aB = await acct(wBoth);
+check('43 the owner and the worker who belonged only to the deleted company lose their person record AND their login (no stuck "Finish setting up" account)', aO.p === 0 && aO.u === 0 && aW.p === 0 && aW.u === 0, JSON.stringify([aO, aW]));
+check('44 a worker who also belongs to another company keeps their account and the other membership', aB.p === 1 && aB.u === 1 && (await one(`select count(*)::int c from public.company_members where person_id = $1 and company_id = $2`, [wBoth.pid, co])).c === 1, JSON.stringify(aB));
+check('45 the other company people and logins are untouched', (await acct(owner)).p === 1 && (await acct(owner)).u === 1);
+check('46 the closure record keeps how many accounts were deleted', (await one(`select (counts->>'accounts_deleted')::int n from public.company_closure_log where company_id = $1`, [cd])).n === 2);
 
 const bad = results.filter((x) => !x).length;
 console.log(bad ? `\n${bad} failed` : '\nall passed');

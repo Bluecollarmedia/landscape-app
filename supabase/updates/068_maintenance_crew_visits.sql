@@ -710,6 +710,8 @@ declare
   t text;
   prev jsonb;
   who text;
+  gone_people uuid[];
+  gone_users uuid[];
 begin
   if pid is null then raise exception 'not signed in'; end if;
 
@@ -748,6 +750,15 @@ begin
   -- are deleted, in this same all-or-nothing step, so nothing is left unlisted. A separate job must delete the files from storage.
   perform public._enqueue_company_files(cid);
 
+  -- Deleting a company deletes everything inside it, including the accounts of the people who belonged ONLY to it (owner included), so
+  -- nobody is left with a login that opens onto "Finish setting up". Anyone who also belongs to (or has Snow access in) another company
+  -- keeps their account. Decided now, before the memberships disappear.
+  select coalesce(array_agg(distinct m.person_id), '{}') into gone_people
+    from public.company_members m
+   where m.company_id = cid
+     and not exists (select 1 from public.company_members m2 where m2.person_id = m.person_id and m2.company_id <> cid)
+     and not exists (select 1 from public.snow_staff s where s.person_id = m.person_id and s.company_id <> cid);
+
   for t in
     select c.relname from pg_class c
       join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
@@ -775,6 +786,14 @@ begin
   if exists (select 1 from public.companies where id = cid) then
     raise exception 'The company could not be deleted.';
   end if;
+
+  -- Same all-or-nothing step: remove those people and their logins. If any of this fails, the company is NOT deleted either.
+  select coalesce(array_agg(user_id) filter (where user_id is not null), '{}') into gone_users from public.people where id = any(gone_people);
+  delete from public.people where id = any(gone_people);
+  delete from auth.users where id = any(gone_users);
+  update public.company_closure_log
+     set counts = coalesce(counts, '{}'::jsonb) || jsonb_build_object('accounts_deleted', coalesce(array_length(gone_people, 1), 0))
+   where company_id = cid;
 end;
 $$;
 revoke execute on function public.delete_my_company(text) from public, anon;

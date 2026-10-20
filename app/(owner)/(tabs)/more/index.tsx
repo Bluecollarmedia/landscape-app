@@ -85,9 +85,16 @@ export default function MoreScreen() {
         <MenuGroup title="OPERATIONS">
           <MenuRow icon="calendar" label="Schedule" subtitle="Daily and weekly planning" onPress={() => go('/(owner)/more/schedule')} />
           <MenuRow icon="truck" label="Trucks" subtitle="Vehicles and equipment" onPress={() => go('/(owner)/more/trucks')} />
-          <MenuRow icon="user-check" label="Attendance" subtitle="Check-ins and status" onPress={() => go('/(owner)/more/attendance')} />
-          <MenuRow icon="clock" label="Hours" subtitle="Worker hours and time tracking" onPress={() => go('/(owner)/more/hours')} />
-          <MenuRow icon="dollar-sign" label="Payroll Estimate" subtitle="Weekly pay estimates" onPress={() => go('/(owner)/more/payroll')} />
+        </MenuGroup>
+
+        <MenuGroup title="HOURS & LABOR">
+          <MenuRow icon="clock" label="Hours & Labor" subtitle="Who is clocked in, property times and alerts" onPress={() => go('/(owner)/more/labor')} />
+          <MenuRow icon="check-square" label="Payroll Review" subtitle="Approve each employee's day" onPress={() => go('/(owner)/more/labor-review')} />
+          <MenuRow icon="calendar" label="Weekly Summary" subtitle="Hours, overtime and cost by employee" onPress={() => go('/(owner)/more/labor-week')} />
+          <MenuRow icon="map-pin" label="Property & Project History" subtitle="Every visit, averages and labor cost" onPress={() => go('/(owner)/more/labor-properties')} />
+          <MenuRow icon="user-check" label="Attendance" subtitle="Job check-ins and status" onPress={() => go('/(owner)/more/attendance')} />
+          <MenuRow icon="dollar-sign" label="Payroll Estimate" subtitle="Weekly pay estimates and pay settings" onPress={() => go('/(owner)/more/payroll')} />
+          <MenuRow icon="sliders" label="Hours & Labor Settings" subtitle="Breaks, photos, alerts and pay rates" onPress={() => go('/(owner)/more/labor-settings')} />
         </MenuGroup>
 
         <MenuGroup title="ACCOUNT">

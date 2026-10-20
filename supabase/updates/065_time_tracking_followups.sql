@@ -51,3 +51,18 @@ $$;
 drop trigger if exists time_workdays_attendance on public.time_workdays;
 create trigger time_workdays_attendance after insert on public.time_workdays
   for each row execute function public._time_attendance_sync();
+
+-- ── Project labor estimates (for "estimated vs actual") ─────────────────────
+-- An estimate in LABOR-HOURS (the total person-hours a project is expected to take) and, optionally, the labor cost estimate.
+-- It is compared with the project's actual crew labor-hours (never with a visit's elapsed time). Owner only.
+create table if not exists public.time_project_estimates (
+  project_id uuid primary key references public.projects(id) on delete cascade,
+  company_id uuid not null references public.companies(id) on delete cascade,
+  labor_hours numeric(8,2) not null check (labor_hours > 0 and labor_hours <= 100000),
+  labor_cost numeric(10,2) check (labor_cost is null or labor_cost >= 0),
+  updated_by uuid references public.people(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+alter table public.time_project_estimates enable row level security;
+drop policy if exists time_project_estimates_staff on public.time_project_estimates;
+create policy time_project_estimates_staff on public.time_project_estimates for all using (public.is_staff(company_id)) with check (public.is_staff(company_id));

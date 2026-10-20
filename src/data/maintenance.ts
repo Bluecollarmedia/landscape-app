@@ -216,6 +216,8 @@ export interface NewRouteInput {
   name?: string;
   notes?: string;
   leadPersonId?: string;
+  /** A truck for the whole route (workers then don't have to pick one when they clock in). */
+  truckId?: string;
   /** In the owner's order. */
   stops: NewStopInput[];
   /** People to put on the route. Use eligibleMaintenanceCrew() for "Assign Maintenance Crew". */
@@ -270,6 +272,8 @@ export function createRoute(input: NewRouteInput): Result<MaintenanceRoute> {
     name: input.name?.trim() || undefined,
     notes: input.notes?.trim() || undefined,
     leadPersonId: input.leadPersonId,
+    // Only sent when set, so a database without update 63 keeps taking routes.
+    ...(input.truckId ? { truckId: input.truckId } : {}),
     status: 'planned',
     createdBy: db.personId || undefined,
   }) as unknown as MaintenanceRoute;

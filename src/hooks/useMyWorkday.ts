@@ -19,15 +19,14 @@ export interface Workday {
   busy: boolean;
   /** The last problem, in plain words. Cleared by the next action. */
   error: string | null;
-  /** Server time in ms (the phone clock plus the server offset), ticking every second while this hook is in use. */
-  now: number;
+  /** Add this to Date.now() to get server time (a wrong phone clock can't skew the timers). */
+  clockOffsetMs: number;
   active?: MyWorkday;
   /** The workday that counts for "today" (the open one, else the latest closed one today). */
   today?: MyWorkday;
   onBreak: boolean;
-  /** Workday total for the day: net payable time across today's workdays (live while clocked in). */
-  todayNetMs: number;
-  todayGrossMs: number;
+  /** Net payable time across today's workdays at a moment (live while clocked in). */
+  netMsAt: (nowMs: number) => number;
   refresh: () => Promise<void>;
   loadTrucks: () => Promise<Result<TruckOptions>>;
   clockIn: (truckId?: string) => Promise<Result<MyDay>>;
@@ -40,8 +39,9 @@ export interface Workday {
 
 /**
  * The signed-in worker's workday: clock in/out, breaks, and the property they are working at. Everything comes from the database;
- * a tap shows as done only after the database says so. While a property or workday is open the screen refreshes every minute
- * (which is also when the database looks for alerts).
+ * a tap shows as done only after the database says so. The screen refreshes every minute (which is also when the database looks for
+ * alerts). This hook does not tick every second: the card that shows a running timer does that itself, so the rest of the app is not
+ * re-drawn every second.
  */
 export function useMyWorkday(enabled: boolean): Workday {
   const [day, setDay] = useState<MyDay | null>(null);
@@ -49,21 +49,12 @@ export function useMyWorkday(enabled: boolean): Workday {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
-  const offset = useRef(0);
   const inFlight = useRef(false);
 
   const apply = useCallback((r: Result<MyDay>) => {
-    if (r.ok) {
-      offset.current = r.data.clockOffsetMs;
-      setDay(r.data);
-      setInstalled(true);
-      setError(null);
-    } else if (r.notInstalled) {
-      setInstalled(false);
-    } else {
-      setError(r.error);
-    }
+    if (r.ok) { setDay(r.data); setInstalled(true); setError(null); }
+    else if (r.notInstalled) setInstalled(false);
+    else setError(r.error);
     return r;
   }, []);
 
@@ -73,9 +64,7 @@ export function useMyWorkday(enabled: boolean): Workday {
     const r = await loadMyDay(todayKey());
     inFlight.current = false;
     setLoading(false);
-    if (r.ok) apply(r);
-    else if (r.notInstalled) setInstalled(false);
-    else setError(r.error);
+    apply(r);
   }, [enabled, apply]);
 
   useEffect(() => {
@@ -89,47 +78,35 @@ export function useMyWorkday(enabled: boolean): Workday {
   // Something else (a maintenance stop screen, for example) started or finished a property: pick the new state up now.
   useEffect(() => (enabled ? onTimeChanged(() => { refresh(); }) : undefined), [enabled, refresh]);
 
-  useEffect(() => {
-    if (!enabled || installed !== true) return;
-    const id = setInterval(() => setTick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, [enabled, installed]);
-
   const act = useCallback(async <T,>(run: () => Promise<Result<T>>): Promise<Result<T>> => {
     setBusy(true);
     setError(null);
     const r = await run();
     setBusy(false);
-    if (!r.ok) {
-      if (r.notInstalled) setInstalled(false);
-      else setError(r.error);
-    }
+    if (!r.ok) { if (r.notInstalled) setInstalled(false); else setError(r.error); }
     return r;
   }, []);
-
   const doApply = useCallback((r: Result<MyDay>) => (r.ok ? apply(r) : r), [apply]);
-
-  const now = Date.now() + offset.current;
-  void tick;
 
   const active = day?.days.find((d) => !d.clockOutAt);
   const todays = useMemo(() => (day?.days ?? []).filter((d) => d.workDate === day?.workDate || !d.clockOutAt), [day]);
   const today = active ?? todays[todays.length - 1];
-  const asBreaks = (b: MyWorkday['breaks']): TimeBreak[] => b.map((x) => ({ startedAt: x.startedAt, endedAt: x.endedAt ?? null, paid: x.paid }));
-  const todayNet = todays.reduce((t, d) => t + netMs({ clockInAt: d.clockInAt, clockOutAt: d.clockOutAt ?? null }, asBreaks(d.breaks), now), 0);
-  const todayGross = todays.reduce((t, d) => t + grossMs({ clockInAt: d.clockInAt, clockOutAt: d.clockOutAt ?? null }, now), 0);
+  const netMsAt = useCallback((nowMs: number) => todays.reduce((t, d) => {
+    const breaks: TimeBreak[] = d.breaks.map((b) => ({ startedAt: b.startedAt, endedAt: b.endedAt ?? null, paid: b.paid }));
+    return t + netMs({ clockInAt: d.clockInAt, clockOutAt: d.clockOutAt ?? null }, breaks, nowMs);
+  }, 0), [todays]);
+  void grossMs;
 
-  return {
-    installed, day, loading, busy, error, now, active, today,
-    onBreak: !!active?.breaks.some((b) => !b.endedAt),
-    todayNetMs: todayNet, todayGrossMs: todayGross,
-    refresh,
-    loadTrucks: () => loadTruckOptions(todayKey()),
-    clockIn: (truckId) => act(() => apiClockIn(todayKey(), truckId).then(doApply)),
-    clockOut: () => act(() => apiClockOut().then(doApply)),
-    startBreak: () => act(() => apiStartBreak().then(doApply)),
-    endBreak: () => act(() => apiEndBreak().then(doApply)),
-    startVisit: (source, refId, gps) => act(() => apiStartVisit(source, refId, gps).then(doApply)),
-    completeVisit: (visitId, note, gps) => act(() => apiCompleteVisit(visitId, note, gps).then(doApply)),
-  };
+  const clockIn = useCallback((truckId?: string) => act(() => apiClockIn(todayKey(), truckId).then(doApply)), [act, doApply]);
+  const clockOut = useCallback(() => act(() => apiClockOut().then(doApply)), [act, doApply]);
+  const startBreak = useCallback(() => act(() => apiStartBreak().then(doApply)), [act, doApply]);
+  const endBreak = useCallback(() => act(() => apiEndBreak().then(doApply)), [act, doApply]);
+  const startVisit = useCallback((source: 'maintenance_stop' | 'assignment', refId: string, gps?: Gps) => act(() => apiStartVisit(source, refId, gps).then(doApply)), [act, doApply]);
+  const completeVisit = useCallback((visitId: string, note?: string, gps?: Gps) => act(() => apiCompleteVisit(visitId, note, gps).then(doApply)), [act, doApply]);
+  const loadTrucks = useCallback(() => loadTruckOptions(todayKey()), []);
+
+  return useMemo<Workday>(() => ({
+    installed, day, loading, busy, error, clockOffsetMs: day?.clockOffsetMs ?? 0, active, today,
+    onBreak: !!active?.breaks.some((b) => !b.endedAt), netMsAt, refresh, loadTrucks, clockIn, clockOut, startBreak, endBreak, startVisit, completeVisit,
+  }), [installed, day, loading, busy, error, active, today, netMsAt, refresh, loadTrucks, clockIn, clockOut, startBreak, endBreak, startVisit, completeVisit]);
 }

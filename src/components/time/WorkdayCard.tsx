@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert, Platform, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -26,6 +26,16 @@ export function WorkdayCard() {
   const { workday: w } = useWorkerContext();
   const [pickTruck, setPickTruck] = useState<TruckOptions | null>(null);
   const [loadingTrucks, setLoadingTrucks] = useState(false);
+  // Only this card ticks every second (the timer); nothing else in the app is redrawn.
+  const [, setTick] = useState(0);
+  const running = !!w.active;
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+  const nowMs = Date.now() + w.clockOffsetMs;
+  const todayNetMs = w.netMsAt(nowMs);
 
   if (w.installed !== true) return null;
   const active = w.active;
@@ -49,7 +59,7 @@ export function WorkdayCard() {
   }
   function onClockOut() {
     haptics.select();
-    const total = durationText(w.todayNetMs);
+    const total = durationText(todayNetMs);
     const go = async () => { const r = await w.clockOut(); if (r.ok) haptics.success(); else say("Can't clock out yet", r.error); };
     if (Platform.OS === 'web') { if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`Clock out? Your total for today is ${total}.`)) go(); return; }
     Alert.alert('Clock out?', `Your total for today is ${total}.`, [{ text: 'Not yet', style: 'cancel' }, { text: 'Clock Out', style: 'destructive', onPress: go }]);
@@ -84,7 +94,7 @@ export function WorkdayCard() {
             <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>{w.onBreak ? 'ON BREAK' : 'WORKDAY'}</Text>
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>since {timeOfDay(active.clockInAt)}</Text>
           </View>
-          <Text style={[styles.timer, { color: colors.textPrimary }]} accessibilityLabel={`Workday total ${durationText(w.todayNetMs)}`}>{clockText(w.todayNetMs)}</Text>
+          <Text style={[styles.timer, { color: colors.textPrimary }]} accessibilityLabel={`Workday total ${durationText(todayNetMs)}`}>{clockText(todayNetMs)}</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Workday total</Text>
 
           {active.truck ? (
@@ -97,7 +107,7 @@ export function WorkdayCard() {
             <View style={[styles.row, { marginTop: spacing.xs }]}>
               <Feather name="map-pin" size={14} color={colors.primary} />
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
-                At {current.label ?? 'a property'} · {durationText(intervalMs({ startedAt: current.startedAt, status: 'active' }, w.now))}
+                At {current.label ?? 'a property'} · {durationText(intervalMs({ startedAt: current.startedAt, status: 'active' }, nowMs))}
               </Text>
             </View>
           ) : null}
@@ -127,7 +137,7 @@ export function WorkdayCard() {
             <View style={{ flex: 1 }}>
               <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Workday complete</Text>
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                Total {durationText(w.todayNetMs)} · {timeOfDay(closedToday.clockInAt)} to {closedToday.clockOutAt ? timeOfDay(closedToday.clockOutAt) : ''}
+                Total {durationText(todayNetMs)} · {timeOfDay(closedToday.clockInAt)} to {closedToday.clockOutAt ? timeOfDay(closedToday.clockOutAt) : ''}
               </Text>
             </View>
           </View>

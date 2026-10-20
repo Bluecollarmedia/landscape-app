@@ -1,3 +1,4 @@
+import { db } from '@/data/store';
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, Platform, ScrollView } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -164,6 +165,7 @@ export default function NewRouteScreen() {
   const [notes, setNotes] = useState('');
   const [crewAssigned, setCrewAssigned] = useState(false);
   const [leadPersonId, setLeadPersonId] = useState<string | null>(null);
+  const [truckId, setTruckId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [step, setStep] = useState<'build' | 'review'>('build');
   const [saving, setSaving] = useState(false);
@@ -257,6 +259,7 @@ export default function NewRouteScreen() {
         })),
         crewIds: crewAssigned ? crewMembers.map(p => p.id) : [],
         leadPersonId: crewAssigned && leadPersonId ? leadPersonId : undefined,
+        truckId: truckId ?? undefined,
       });
       if (!result.ok) {
         setSaving(false);
@@ -563,6 +566,32 @@ export default function NewRouteScreen() {
                 </>
               )}
             </View>
+
+            {/* Truck for the day (optional): workers use it automatically when they clock in. */}
+            {db.trucks.length > 0 && (
+              <View style={card}>
+                <Text style={sectionTitle}>Truck (optional)</Text>
+                <View style={styles.chipWrap}>
+                  {[{ id: null as string | null, label: 'No truck' }, ...db.trucks.filter(t => t.status === 'available' || t.status === 'assigned').map(t => ({ id: t.id as string | null, label: t.name }))].map(o => {
+                    const on = truckId === o.id;
+                    return (
+                      <Pressable
+                        key={o.id ?? 'none'}
+                        onPress={() => { haptics.select(); setTruckId(o.id); }}
+                        style={[styles.chip, { backgroundColor: on ? colors.primarySurface : colors.backgroundTertiary, borderColor: on ? colors.primary : 'transparent' }]}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: on }}
+                      >
+                        <Text style={[typeScale.bodySmall, { color: on ? colors.primaryDark : colors.textSecondary, fontWeight: '600' }]}>{o.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                  If you pick a truck, the crew doesn't have to choose one when they clock in. Leave it empty to let them pick.
+                </Text>
+              </View>
+            )}
           </>
         ) : (
           <>

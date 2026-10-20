@@ -22,6 +22,10 @@ export function ownerNotificationTarget(n: NotificationLike): OwnerTarget | null
   if (!id) return null;
   if (DOC_TYPES.has(type)) return { pathname: '/(owner)/document', params: { kind: type, id } };
   if (type === 'issue') return { pathname: '/(owner)/issue-detail', params: { id } };
+  // Hours & Labor (update 64): open the workday or visit behind the alert; a skip request opens the overview, where it is decided.
+  if (type === 'time_workday') return { pathname: '/(owner)/more/labor-day', params: { id } };
+  if (type === 'time_visit') return { pathname: '/(owner)/more/labor-visit', params: { id } };
+  if (type === 'time_skip') return '/(owner)/more/labor';
   if (type === 'project') {
     if (n.eventType === 'customer_message') return `/(owner)/projects/${id}?section=messages`;
     if (n.eventType === 'customer_request_submitted') return `/(owner)/projects/${id}?section=requests`;

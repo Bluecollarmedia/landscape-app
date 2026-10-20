@@ -9,5 +9,5 @@ check('1 action area is rendered after the ScrollView closes (not scrolling cont
 check('2 action area is absolutely positioned', /actionArea: \{ position: 'absolute'/.test(src));
 check('3 bottom offset subtracts the measured gap above the window bottom', /measureInWindow/.test(src) && /bottomOffset = Math\.max\(.*- gapBelow/.test(src) && /\{ bottom: bottomOffset \}/.test(src));
 check('4 scroll content keeps bottom padding for the button', /paddingBottom: scrollPadding/.test(src) && /ACTION_AREA/.test(src));
-check('5 label and handler unchanged', /title: "I'M HERE"/.test(src) && /onPress: \(\) => handleArrive\(next\)/.test(src));
+check('5 label and handler unchanged', /title: timeOn \? 'START PROPERTY' : "I'M HERE"/.test(src) && /onPress: \(\) => handleArrive\(next\)/.test(src));
 console.log(bad ? `\n${bad} failed` : '\nall passed'); process.exit(bad ? 1 : 0);

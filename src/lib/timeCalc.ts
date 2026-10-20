@@ -17,7 +17,7 @@
 //  • Payable cost         = net payable hours × the workday's saved rate, with the overtime premium on the hours past the weekly threshold.
 //  • Voided intervals count for nothing. An approved skip is never work: it has no interval and is not counted as completed.
 
-export interface TimeBreak { startedAt: string; endedAt?: string | null; paid: boolean }
+export interface TimeBreak { id?: string; startedAt: string; endedAt?: string | null; paid: boolean }
 export interface TimeWorkday { id: string; personId: string; workDate: string; clockInAt: string; clockOutAt?: string | null; status: string }
 export interface TimeInterval { id: string; visitId: string; workdayId: string; personId: string; startedAt: string; endedAt?: string | null; status: string; billable: boolean; hourlyRate?: number | null }
 export interface TimeVisitLite { id: string; status: string; billable: boolean; startedAt?: string | null; endedAt?: string | null; targetMinutes?: number | null }
@@ -192,7 +192,7 @@ export function buildTimeline(
     items.push({ s: ms(i.startedAt), e: i.endedAt ? ms(i.endedAt) : null, entry: { kind: i.endedAt ? 'visit' : 'open', startedAt: i.startedAt, endedAt: i.endedAt, label: i.label ?? 'Property visit', refId: i.id, ms: intervalMs(i, now) } });
   }
   for (const b of breaks) {
-    items.push({ s: ms(b.startedAt), e: b.endedAt ? ms(b.endedAt) : null, entry: { kind: 'break', startedAt: b.startedAt, endedAt: b.endedAt, label: b.paid ? 'Break (paid)' : 'Break (unpaid)', ms: Math.max(0, (b.endedAt ? ms(b.endedAt) : now) - ms(b.startedAt)) } });
+    items.push({ s: ms(b.startedAt), e: b.endedAt ? ms(b.endedAt) : null, entry: { kind: 'break', startedAt: b.startedAt, endedAt: b.endedAt, label: b.paid ? 'Break (paid)' : 'Break (unpaid)', refId: b.id, ms: Math.max(0, (b.endedAt ? ms(b.endedAt) : now) - ms(b.startedAt)) } });
   }
   items.sort((a, b) => a.s - b.s);
   const end = w.clockOutAt ? ms(w.clockOutAt) : now;
@@ -282,5 +282,5 @@ function cell(v: string | number | boolean | null | undefined): string {
 export function toCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {
   const head = columns.map((c) => cell(c.header)).join(',');
   const body = rows.map((r) => columns.map((c) => cell(c.value(r))).join(','));
-  return '﻿' + [head, ...body].join('\r\n') + '\r\n';
+  return '\uFEFF' + [head, ...body].join('\r\n') + '\r\n';
 }

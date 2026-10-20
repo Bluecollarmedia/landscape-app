@@ -416,3 +416,44 @@ export const setHourlyRate = (personId: string, rate: number, effective: string,
   rpcDone('time_set_hourly_rate', { p_person: personId, p_rate: rate, p_effective: effective, p_reason: reason ?? null }, "Couldn't change the rate.");
 export const decideSkip = (id: string, approve: boolean, note?: string) => rpcDone('time_decide_skip', { p_request_id: id, p_approve: approve, p_note: note ?? null }, "Couldn't save your decision.");
 export const resolveAlert = (id: string) => rpcDone('time_alert_resolve', { p_alert: id }, "Couldn't close the alert.");
+
+export async function findWorkday(id: string): Promise<Result<{ personId: string; workDate: string }>> {
+  const { data, error } = await supabase.from('time_workdays').select('person_id, work_date').eq('id', id).maybeSingle();
+  if (error) return explainError(error, "Couldn't open that day.");
+  if (!data) return { ok: false, error: 'That workday could not be found.' };
+  return ok({ personId: data.person_id, workDate: data.work_date });
+}
+
+export interface VisitDetail { visit: LaborVisit; intervals: LaborInterval[]; names: Record<string, string> }
+export async function loadVisitDetail(id: string): Promise<Result<VisitDetail>> {
+  const v = await supabase.from('time_visits').select('*').eq('id', id).maybeSingle();
+  if (v.error) return explainError(v.error, "Couldn't load the visit.");
+  if (!v.data) return { ok: false, error: 'That visit could not be found.' };
+  const iv = await supabase.from('time_intervals').select('*, time_interval_rates(hourly_rate)').eq('visit_id', id).order('started_at');
+  if (iv.error) return explainError(iv.error, "Couldn't load the property times.");
+  const intervals = (iv.data ?? []).map((i: Raw): LaborInterval => ({ id: i.id, visitId: i.visit_id, workdayId: i.workday_id, personId: i.person_id, startedAt: i.started_at, endedAt: i.ended_at ?? undefined, status: i.status, billable: !!i.billable, hourlyRate: rateOf(i.time_interval_rates) }));
+  const names: Record<string, string> = {};
+  const ids = [...new Set(intervals.map((i) => i.personId))];
+  if (ids.length) {
+    const p = await supabase.from('people').select('id, first_name, last_name').in('id', ids);
+    for (const r of p.data ?? []) names[r.id] = `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim() || 'Unnamed';
+  }
+  return ok({ visit: toVisit(v.data as Raw), intervals, names });
+}
+
+export interface ProjectEstimate { projectId: string; laborHours: number; laborCost?: number }
+export async function loadProjectEstimate(projectId: string): Promise<Result<ProjectEstimate | null>> {
+  const { data, error } = await supabase.from('time_project_estimates').select('*').eq('project_id', projectId).maybeSingle();
+  if (error) return explainError(error, "Couldn't load the estimate.");
+  return ok(data ? { projectId, laborHours: Number(data.labor_hours), laborCost: data.labor_cost == null ? undefined : Number(data.labor_cost) } : null);
+}
+/** laborHours = null removes the estimate. */
+export async function saveProjectEstimate(companyId: string, projectId: string, laborHours: number | null, laborCost?: number | null, byPersonId?: string): Promise<Result> {
+  if (laborHours == null) {
+    const { error } = await supabase.from('time_project_estimates').delete().eq('project_id', projectId);
+    return error ? explainError(error, "Couldn't remove the estimate.") : ok(undefined);
+  }
+  if (!(laborHours > 0)) return { ok: false, error: 'Enter the estimated labor-hours (more than zero).' };
+  const { error } = await supabase.from('time_project_estimates').upsert({ project_id: projectId, company_id: companyId, labor_hours: laborHours, labor_cost: laborCost ?? null, updated_by: byPersonId ?? null, updated_at: new Date().toISOString() });
+  return error ? explainError(error, "Couldn't save the estimate.") : ok(undefined);
+}

@@ -65,6 +65,17 @@ export async function loadShifts(sinceIso: string, untilIso?: string): Promise<R
   }));
 }
 
+/**
+ * Is there a running storm route for me (update 67)? When not, the Time Clock shows "No active storm assignment" instead of a Clock In
+ * button. The database refuses the clock-in either way. An older database (before update 67) has no such function: allow, as before.
+ */
+export async function canClockIn(): Promise<boolean> {
+  if (!isSupabaseConfigured) return true;
+  const { data, error } = await supabase.rpc('snow_can_clock_in');
+  if (error) return true;
+  return data !== false;
+}
+
 export async function clockIn(): Promise<Result> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { error } = await supabase.rpc('snow_clock_in', { p_client_request_id: uuid() });

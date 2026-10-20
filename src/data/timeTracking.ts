@@ -52,6 +52,8 @@ export interface MyDay {
   /** serverNow − this phone's clock, in ms. Add it to Date.now() to get server time. */
   clockOffsetMs: number;
   workDate: string;
+  /** False when the worker has no route or job today: the phone shows "No work scheduled today" instead of Clock In. (The database refuses it either way.) */
+  canClockIn: boolean;
   settings: { breaksEnabled: boolean; requireStartPhoto: boolean; requireCompletePhoto: boolean };
   /** Today's workdays (usually one) plus any still open. */
   days: MyWorkday[];
@@ -77,6 +79,8 @@ function parseDay(r: Raw): MyDay {
     serverNow: r.server_now,
     clockOffsetMs: Number.isFinite(now) ? now - Date.now() : 0,
     workDate: r.work_date,
+    // An older database (before update 67) doesn't say; keep the old behaviour then.
+    canClockIn: r.can_clock_in !== false,
     settings: {
       breaksEnabled: !!r.settings?.breaks_enabled,
       requireStartPhoto: !!r.settings?.require_start_photo,

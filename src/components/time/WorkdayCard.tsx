@@ -44,6 +44,8 @@ export function WorkdayCard() {
   const active = w.active;
   const closedToday = !active ? w.today : undefined;
   const current = w.day?.current;
+  // No route or job today: no Clock In button at all (the database refuses a clock-in too).
+  const noWork = !active && w.day?.canClockIn === false;
 
   async function onClockIn() {
     haptics.select();
@@ -75,7 +77,19 @@ export function WorkdayCard() {
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
-      {!active && !closedToday ? (
+      {noWork && !closedToday ? (
+        <>
+          <View style={styles.head}>
+            <View style={[styles.icon, { backgroundColor: colors.backgroundTertiary }]}><Feather name="calendar" size={18} color={colors.textSecondary} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>No work scheduled today</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Clock In appears once you are put on a route or a job for the day.</Text>
+            </View>
+          </View>
+        </>
+      ) : null}
+
+      {!active && !closedToday && !noWork ? (
         <>
           <View style={styles.head}>
             <View style={[styles.icon, { backgroundColor: colors.primarySurface }]}><Feather name="sunrise" size={18} color={colors.primaryDark} /></View>
@@ -149,9 +163,11 @@ export function WorkdayCard() {
               </Text>
             </View>
           </View>
-          <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} hitSlop={8} style={{ marginTop: spacing.sm }}>
-            <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Clocked out by mistake? Clock back in</Text>
-          </Pressable>
+          {w.day?.canClockIn !== false ? (
+            <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} hitSlop={8} style={{ marginTop: spacing.sm }}>
+              <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Clocked out by mistake? Clock back in</Text>
+            </Pressable>
+          ) : null}
         </>
       ) : null}
 

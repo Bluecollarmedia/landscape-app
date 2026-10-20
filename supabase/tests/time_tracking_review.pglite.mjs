@@ -461,6 +461,7 @@ check('76 a day the owner adds by hand is recorded as an owner correction, not a
 // 4l. two taps at once never make two workdays
 const w6 = await mk('w6@x.test', 'Double Tap');
 await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1,$2,'worker','active')`, [co, w6.pid]);
+await db.query(`insert into public.assignments (company_id, project_id, person_id, scheduled_date, sort_order, status) values ($1,$2,$3,$4,9,'scheduled')`, [co, jA2.proj, w6.pid, today]);  // clock-in needs work that day (update 67)
 const taps = await Promise.all([1, 2, 3].map(() => rpc(w6.u, `select public.time_clock_in($1::date, null, gen_random_uuid()) as x`, [today])));
 check('77 three quick Clock In taps with different request ids still leave exactly one open workday', taps.every((t) => t.ok) && (await one(`select count(*)::int c from public.time_workdays where person_id = $1 and clock_out_at is null`, [w6.pid])).c === 1, taps.map((t) => t.msg).join('|'));
 

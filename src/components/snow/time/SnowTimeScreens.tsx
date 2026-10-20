@@ -13,7 +13,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
-  clockIn, clockOut, correctShift, formatClock, formatHours, loadShifts, shiftHours, startOfWeekIso, type SnowShift,
+  canClockIn, clockIn, clockOut, correctShift, formatClock, formatHours, loadShifts, shiftHours, startOfWeekIso, type SnowShift,
 } from '@/data/snowShifts';
 import { loadStorms } from '@/data/snowStorms';
 import type { SnowStorm } from '@/types/snow';
@@ -66,7 +66,11 @@ export function SnowTimeClockScreen() {
   const tabBarClearance = useTabBarClearance();
   const { shifts, error, loading, reload } = useShifts();
   const [busy, setBusy] = useState(false);
+  const [allowed, setAllowed] = useState(true);
   const open = shifts.find((s) => !s.originalOut);
+  // Not on a running storm route: no Clock In button (an open shift always keeps its Clock Out).
+  useEffect(() => { canClockIn().then(setAllowed); }, [shifts.length, open?.id]);
+  const blocked = !open && !allowed;
   const week = shifts.reduce((t, s) => t + shiftHours(s), 0);
 
   async function toggle() {
@@ -95,15 +99,24 @@ export function SnowTimeClockScreen() {
               <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
                 {open ? `Since ${formatClock(open.clockInAt)}` : 'This week'}
               </Text>
-              <Button
-                title={open ? 'Clock Out' : 'Clock In'}
-                icon={open ? 'log-out' : 'log-in'}
-                variant={open ? 'danger' : 'primary'}
-                loading={busy}
-                onPress={toggle}
-                fullWidth
-                style={{ marginTop: spacing.sm }}
-              />
+              {blocked ? (
+                <>
+                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm }]}>No active storm assignment</Text>
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>
+                    Clock In appears once the owner puts you on a route for a storm that has been dispatched.
+                  </Text>
+                </>
+              ) : (
+                <Button
+                  title={open ? 'Clock Out' : 'Clock In'}
+                  icon={open ? 'log-out' : 'log-in'}
+                  variant={open ? 'danger' : 'primary'}
+                  loading={busy}
+                  onPress={toggle}
+                  fullWidth
+                  style={{ marginTop: spacing.sm }}
+                />
+              )}
               <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
                 No location is used. Snow hours are kept apart from landscaping hours.
               </Text>

@@ -193,7 +193,7 @@ export async function loadRouteTemplates(service: SnowService | SnowService[]): 
  * Routes the signed-in lead works, newest storm first. The database only
  * shows a lead their own live routes on dispatched or ended storms.
  */
-export interface MyRoute { id: string; name: string; stormName: string; stormStatus: RouteDetail['stormStatus']; service: SnowService; role: RouteRole }
+export interface MyRoute { id: string; name: string; stormName: string; stormStatus: RouteDetail['stormStatus']; service: SnowService; /** Every service it does (update 61). */ services?: SnowService[]; role: RouteRole }
 export async function loadMyRoutes(): Promise<Result<MyRoute[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   // Update 41: the routes I lead AND the routes I'm on the crew of, with my role in each.
@@ -206,18 +206,24 @@ export async function loadMyRoutes(): Promise<Result<MyRoute[]>> {
   } else if (!OLD_DATABASE.test(mine.error.message)) {
     return fail(message(mine.error, 'Couldn\'t load your routes.'));
   }
-  let query = supabase
-    .from('snow_routes')
-    .select('id, name, service, created_at, snow_storms!inner(name, status)')
-    .is('cancelled_at', null)
-    .neq('snow_storms.status', 'draft')
-    .order('created_at', { ascending: false });
-  if (roles) query = query.in('id', [...roles.keys()]);
-  const { data, error } = await query;
+  const build = (cols: string) => {
+    let q = supabase
+      .from('snow_routes')
+      .select(cols)
+      .is('cancelled_at', null)
+      .neq('snow_storms.status', 'draft')
+      .order('created_at', { ascending: false });
+    if (roles) q = q.in('id', [...roles.keys()]);
+    return q;
+  };
+  const base = 'id, name, service, created_at, snow_storms!inner(name, status)';
+  let { data, error } = await build(`${base}, services`);
+  // A database without update 61 has no `services` column: ordinary single-service routes.
+  if (error && /services/i.test(error.message)) ({ data, error } = await build(base));
   if (error) return fail(message(error, 'Couldn\'t load your routes.'));
-  return ok((data ?? []).map((r) => {
+  return ok(((data ?? []) as unknown as Record<string, any>[]).map((r) => {
     const s = (Array.isArray(r.snow_storms) ? r.snow_storms[0] : r.snow_storms) as { name: string; status: RouteDetail['stormStatus'] };
-    return { id: r.id, name: r.name, service: r.service, stormName: s.name, stormStatus: s.status, role: roleFor(roles, r.id) };
+    return { id: r.id, name: r.name, service: r.service, services: Array.isArray(r.services) && r.services.length ? r.services : undefined, stormName: s.name, stormStatus: s.status, role: roleFor(roles, r.id) };
   }));
 }
 

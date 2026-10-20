@@ -75,6 +75,7 @@ export default function MoreScreen() {
         <MenuGroup title="TEAM">
           <MenuRow icon="user-plus" label="Add Worker" subtitle="Invite or share team code" onPress={() => go('/(owner)/worker-new')} />
           <MenuRow icon="inbox" label="Join Requests" subtitle="Approve people asking to join" count={pendingRequests.length} onPress={() => go('/(owner)/more/pending-requests')} />
+          <MenuRow icon="shield" label="Team Access" subtitle="Landscaping and snow access, admins, deactivated workers" onPress={() => go('/(owner)/more/team-access')} />
           {memberRole !== 'admin' && (
             <MenuRow icon="users" label="Accounts" subtitle="Everyone who has signed up" onPress={() => go('/(owner)/more/accounts')} />
           )}

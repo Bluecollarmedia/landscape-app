@@ -175,7 +175,7 @@ export default function AccountsScreen() {
 
             {a.status === 'removed' && (
               <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-                Access removed {formatDate(a.removedAt)}. They can't use the app until you restore them or approve a new join request.
+                Access removed {formatDate(a.removedAt)}. They can't use the app until you reactivate them (Team Access) or approve a new join request.
               </Text>
             )}
 
@@ -189,7 +189,7 @@ export default function AccountsScreen() {
                   <Button title="Remove access" variant="secondary" size="sm" onPress={() => openAction('remove', a)} style={{ flex: 1 }} />
                 )}
                 {canRestore && (
-                  <Button title="Restore access" variant="secondary" size="sm" onPress={() => openAction('restore', a)} style={{ flex: 1 }} />
+                  <Button title="Reactivate…" variant="secondary" size="sm" onPress={() => router.push('/(owner)/more/team-access' as never)} style={{ flex: 1 }} />
                 )}
                 <Button title="Delete account" variant="danger" size="sm" onPress={() => openAction('delete', a)} style={{ flex: 1 }} />
               </View>

@@ -27,12 +27,34 @@ export function DeleteCompanyRow() {
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // What is still going on right now (from the database). Closing is refused while someone is clocked in or a storm is dispatched.
+  const [preview, setPreview] = useState<Record<string, number> | null>(null);
 
   // Only the owner (not an admin) can delete the company; the database checks too.
   if (memberRole !== 'owner') return null;
 
   const companyName = db.company?.name ?? '';
   const ready = !!companyName && typed.trim().toLowerCase() === companyName.trim().toLowerCase();
+
+  async function openSheet() {
+    setOpen(true);
+    setPreview(null);
+    if (!isSupabaseConfigured) return;
+    const { data } = await supabase.rpc('company_closure_preview');
+    if (data) setPreview(data as Record<string, number>);
+  }
+
+  const stillGoing: string[] = [];
+  if (preview) {
+    if (preview.on_the_clock > 0) stillGoing.push(`${preview.on_the_clock} person(s) are clocked in right now. Clock them out first (Hours & Labor).`);
+    if (preview.dispatched_storms > 0) stillGoing.push(`${preview.dispatched_storms} snow storm(s) are still dispatched. End them first.`);
+  }
+  const heads: string[] = [];
+  if (preview) {
+    if (preview.days_awaiting_approval > 0) heads.push(`${preview.days_awaiting_approval} workday(s) still wait for your approval. They will be deleted with the company.`);
+    if (preview.pending_join_requests + preview.pending_snow_requests > 0) heads.push(`${preview.pending_join_requests + preview.pending_snow_requests} join request(s) are waiting. They will be cancelled.`);
+    if (preview.open_codes > 0) heads.push(`${preview.open_codes} invitation code(s) will stop working.`);
+  }
 
   function close() {
     if (busy) return;
@@ -64,7 +86,7 @@ export function DeleteCompanyRow() {
 
   return (
     <>
-      <ListRow icon="trash-2" iconColor={colors.error} title="Delete Company" destructive onPress={() => setOpen(true)} />
+      <ListRow icon="trash-2" iconColor={colors.error} title="Delete Company" destructive onPress={openSheet} />
 
       <BottomSheetModal visible={open} onRequestClose={close}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -82,6 +104,8 @@ export function DeleteCompanyRow() {
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
                 This permanently deletes the company and everything in it: projects, workers' team membership, schedules, hours, photos, quotes, maintenance and snow records. Accounts are kept, but nobody will have a company until a new one is created. This can't be undone.
               </Text>
+              {stillGoing.map((t) => <Text key={t} style={[typeScale.bodySmall, { color: semantic.error, textAlign: 'center', marginTop: spacing.sm }]}>{t}</Text>)}
+              {heads.map((t) => <Text key={t} style={[typeScale.caption, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>{t}</Text>)}
               <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.lg, marginBottom: spacing.xs }]}>
                 Type the company name to confirm
               </Text>
@@ -98,7 +122,7 @@ export function DeleteCompanyRow() {
                 <Text style={[typeScale.caption, { color: semantic.error, marginTop: spacing.xs }]}>{error}</Text>
               ) : null}
               <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
-                <Button title="Delete Company" onPress={handleDelete} variant="danger" fullWidth disabled={!ready} loading={busy} />
+                <Button title="Delete Company" onPress={handleDelete} variant="danger" fullWidth disabled={!ready || stillGoing.length > 0} loading={busy} />
                 <Button title="Cancel" onPress={close} variant="ghost" fullWidth />
               </View>
             </Pressable>

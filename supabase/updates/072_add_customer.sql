@@ -1,5 +1,5 @@
 -- ============================================================================
--- Update 72 — run once in Supabase → SQL Editor, AFTER update 68 (safe to run again). NOT run yet; read it before running.
+-- Update 72 — run once in Supabase → SQL Editor, (safe to run again; does not need the unrun updates). NOT run yet; read it before running.
 --
 -- "Add customer" without duplicates. Before, the owner's phone looked for an existing person by email in the few people it is allowed to
 -- see, so a customer who already had an account (for example at another company) was not found, and a second, unconnected person was

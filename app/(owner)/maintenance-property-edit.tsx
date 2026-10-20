@@ -236,6 +236,8 @@ export default function MaintenancePropertyEditScreen() {
 
   function pickCustomer(id: string | undefined) {
     haptics.select();
+    // A different customer means the old customer's project (the source of a copied address) no longer applies.
+    if (id !== customerId) setSourceProjectId(undefined);
     setCustomerId(id);
     setPicking(false);
     setCustomerSearch('');

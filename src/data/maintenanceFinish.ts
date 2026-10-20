@@ -17,6 +17,7 @@ import { useSyncExternalStore } from 'react';
 import { db } from './store';
 import { finishBlockers, finishStop } from './maintenance';
 import { getCurrentGps, type GpsResult } from '@/lib/location';
+import { withTimedPhoto } from './timePhotos';
 import type { MaintenanceStopDetail } from '@/types/maintenance';
 
 const GPS_WAIT_MS = 6000;
@@ -95,7 +96,7 @@ export function finishStopAndAdvance(stopId: string, note?: string): Promise<Fin
 
   const p = (async (): Promise<FinishOutcome> => {
     const gps = await gpsWithin(GPS_WAIT_MS);
-    const res = await finishStop(stopId, { note, gps });
+    const res = await withTimedPhoto(() => finishStop(stopId, { note, gps }), 'complete', { kind: 'maintenance', stopId });
     if (!res.ok) {
       // The server re-checks the rules; if a crewmate un-ticked something, say what.
       const still = missingRequirements(stopId);

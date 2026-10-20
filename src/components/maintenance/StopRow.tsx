@@ -41,11 +41,13 @@ interface StopRowProps {
   first?: boolean;
   /** Show the visit's instructions inline (Today shows them for the current stop only). */
   showInstructions?: boolean;
+  /** A later stop that can't be started until the one before it is done. */
+  locked?: boolean;
   onPress?: () => void;
 }
 
 /** One numbered stop in route order, as in the "Upcoming Stops" list. */
-export function StopRow({ stop, nextStopId, nameOf, first, showInstructions, onPress }: StopRowProps) {
+export function StopRow({ stop, nextStopId, nameOf, first, showInstructions, locked, onPress }: StopRowProps) {
   const { colors } = useTheme();
   const status = displayStatus(stop, nextStopId);
   const active = status === 'next' || status === 'arrived';
@@ -62,6 +64,7 @@ export function StopRow({ stop, nextStopId, nameOf, first, showInstructions, onP
         styles.row,
         !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
         pressed && { backgroundColor: colors.surfacePressed },
+        muted && { opacity: 0.6 },
       ]}
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={`Stop ${stop.number}, ${property}, ${STATUS_LABEL[status]}`}
@@ -87,6 +90,7 @@ export function StopRow({ stop, nextStopId, nameOf, first, showInstructions, onP
           >
             {property}
           </Text>
+          {locked && status === 'upcoming' ? <Feather name="lock" size={14} color={colors.textTertiary} /> : null}
           <StopStatusPill status={status} />
         </View>
         <View style={styles.meta}>

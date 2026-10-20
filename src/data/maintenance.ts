@@ -14,6 +14,7 @@
  */
 import { db, insertRow, insertRows, updateRow, deleteRow, rowsOf, rpc, refresh, isDemo, saveDeferredRow, discardLocalRow, type TableName } from './store';
 import { uploadImage } from '@/lib/media';
+import { isTimeTrackingOn, lastMyDay, timeRpc } from './timeTracking';
 import { localDateKey, todayKey } from '@/lib/ids';
 import { cleanDates } from '@/lib/serviceDates';
 import type { GpsResult } from '@/lib/location';
@@ -488,6 +489,12 @@ export function markArrived(stopId: string, gps?: GpsResult): Promise<Result<Mai
       }
       return ok(db.maintenance.stopById[stopId] ?? stop);
     }
+    if (isTimeTrackingOn()) {
+      // Workday time tracking is on: starting the property also starts this worker's own timer (and checks route order and photos).
+      const r = await timeRpc('time_start_visit', { p_source: 'maintenance_stop', p_ref: stopId, ...gpsArgs(gps), p_gps: null }, "Couldn't start this property.");
+      await refresh(...MAINT_TABLES);
+      return r.ok ? ok(db.maintenance.stopById[stopId]) : fail(r.error);
+    }
     const { error } = await rpc('maintenance_mark_arrived', { p_stop_id: stopId, ...gpsArgs(gps) });
     await refresh(...MAINT_TABLES);
     if (error) return fail(error.message);
@@ -596,6 +603,13 @@ export function finishStop(stopId: string, opts: { note?: string; gps?: GpsResul
       logLocal('completed', { routeId: stop.routeId, stopId, locationStatus: loc.status, distanceM: loc.distanceM, note, ...gpsFields(opts.gps), metadata: { recorded_by_staff_without_arrival: asStaff && !stop.arrivedAt } });
       settleRouteLocal(stop.routeId);
       return ok(db.maintenance.stopById[stopId] ?? stop);
+    }
+    const timed = lastMyDay()?.current;
+    if (isTimeTrackingOn() && timed?.stopId === stopId) {
+      // This worker is timed at the stop: completing ends their own time and finishes the stop through the same rules.
+      const r = await timeRpc('time_complete_visit', { p_visit_id: timed.visitId, p_note: opts.note?.trim() || null, ...gpsArgs(opts.gps), p_gps: null }, "Couldn't complete this property.");
+      await refresh(...MAINT_TABLES);
+      return r.ok ? ok(db.maintenance.stopById[stopId]) : fail(r.error);
     }
     const { error } = await rpc('maintenance_finish_stop', { p_stop_id: stopId, p_note: opts.note?.trim() || null, ...gpsArgs(opts.gps) });
     await refresh(...MAINT_TABLES);

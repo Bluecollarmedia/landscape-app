@@ -213,6 +213,14 @@ f = await fails(`update public.time_audit set reason = 'edited'`);
 const f2 = await fails(`delete from public.time_audit`);
 check('48 the audit history cannot be edited or deleted', f.raised && f2.raised, f.msg + f2.msg);
 
+// ── update 65 follow-ups ────────────────────────────────────────────────────
+let again65 = true;
+try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/065_time_tracking_followups.sql`, 'utf8')); } catch (e) { again65 = false; console.log(e.message); }
+check('49 update 65 can be run a second time', again65);
+check('50 a maintenance worker clock-in is also their start of day on the route (so the route review still shows it)',
+  (await one(`select count(*)::int c from public.maintenance_day_attendance where person_id = $1 and service_date = $2 and route_id = $3`, [m1.pid, today, route])).c === 1);
+check('51 a landscaping worker clock-in does not create maintenance attendance', (await one(`select count(*)::int c from public.maintenance_day_attendance where person_id = $1`, [w1.pid])).c === 0);
+
 const bad = results.filter((x) => !x).length;
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

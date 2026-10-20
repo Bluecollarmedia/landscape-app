@@ -2,7 +2,7 @@ import { useMemo, useCallback } from 'react';
 import type { CompanyMember, PersonSummary } from '@/types/company';
 import type { Project } from '@/types/project';
 import type { MaintenanceProperty } from '@/types/maintenance';
-import { db, useDb, insertRow, rowsOf } from '@/data/store';
+import { db, useDb, insertRow, rowsOf, rpc, refresh } from '@/data/store';
 
 export interface CustomerWithProjects {
   member: CompanyMember;
@@ -55,11 +55,20 @@ export function useCustomers(options: UseCustomersOptions = {}) {
   }, [customers, search]);
 
   /**
-   * Adds a customer to the company. They show up right away; when they later
-   * create an account with the same email, it links to this record and they
-   * see the projects assigned to them.
+   * Adds a customer to the company and returns their person id. The database decides (add_customer, update 72), so a customer who
+   * already has an account, or is already in this company, is reused and never duplicated; matching is by email only, never by name.
+   * Throws a sentence the screen can show (for example when the email belongs to a team member).
+   * Demo mode (no database) keeps the old local behaviour.
    */
-  const addCustomer = useCallback((input: { firstName: string; lastName: string; email?: string; phone?: string }) => {
+  const addCustomer = useCallback(async (input: { firstName: string; lastName: string; email?: string; phone?: string }): Promise<string> => {
+    if (!db.demo) {
+      const { data, error } = await rpc('add_customer', {
+        p_first: input.firstName, p_last: input.lastName, p_email: input.email ?? '', p_phone: input.phone ?? null,
+      });
+      if (error) throw new Error(error.message);
+      await refresh('people', 'company_members');
+      return (data as { person_id: string }).person_id;
+    }
     const email = (input.email ?? '').trim().toLowerCase();
     // Reuse an existing person with this email (e.g. already a customer elsewhere).
     const existing = email

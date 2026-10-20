@@ -23,7 +23,9 @@ export default function NewCustomerScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
-  function handleCreate() {
+  const [saving, setSaving] = useState(false);
+  async function handleCreate() {
+    if (saving) return;
     if (!firstName.trim() || !lastName.trim()) {
       if (Platform.OS === 'web') {
         alert('Please enter a first and last name.');
@@ -38,8 +40,16 @@ export default function NewCustomerScreen() {
       else Alert.alert('Check the email', 'Please enter a valid email address.');
       return;
     }
-    addCustomer({ firstName, lastName, email: trimmedEmail, phone });
-    router.back();
+    setSaving(true);
+    try {
+      await addCustomer({ firstName, lastName, email: trimmedEmail, phone });
+      router.back();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "The customer couldn't be added.";
+      if (Platform.OS === 'web') alert(msg); else Alert.alert("Couldn't add the customer", msg);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

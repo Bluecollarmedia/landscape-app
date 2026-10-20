@@ -57,3 +57,10 @@ protect a file whose address is public. `maintenance_photos_i_can_open(keys)` an
 check and signer for private access (owner/admin, crew on the route, or the linked customer for a shared photo on a finished stop). Still
 needed, each needing approval: make the maintenance file path private in R2 (a Cloudflare rule on the public address, or a private bucket),
 deploy the function, and switch the screens to ask `maint-sign` for photo links. Until then nothing changes.
+
+## Adding a customer (SQL 72)
+
+"Add customer" now runs in the database (`add_customer`, owner/admin only): no email = a new record; the same email in this company = the same
+person returned; an email that has a login elsewhere = that same person added here as an invited customer (no duplicate); a team member's email
+and a customer the owner removed are refused. Names are never matched. Caveat: an email is only as trustworthy as the sign-up behind it
+while email confirmation is off in Supabase. Owners can learn that an email has an account (and see that person's name once added); accepted for now.

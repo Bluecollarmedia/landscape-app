@@ -16,5 +16,8 @@ check('4 the customer list shows a maintenance property when there is no project
 check('5 revoking clears customer_id unconditionally (no claimed_by requirement)', /if p_revoke then\s+update public\.maintenance_properties set customer_id = null where id = p_property_id;/.test(sql) && !/customer_id = who/.test(sql));
 check('6 the photo control is a labelled pill ("Customer sees" / "Internal") using the existing setStopPhotoShared', /Customer sees/.test(routes) && /sharePill/.test(routes) && /setStopPhotoShared\(ph\.id, !ph\.isCustomerVisible\)/.test(routes));
 check('7 share-all is offered only on a finished stop and uses the same per-photo setting', /stop\.status === 'completed' \? \(/.test(routes) && /Share all photos with the customer/.test(routes));
+const hook2 = read('src/hooks/useCustomers.ts');
+check('8 "Add customer" is decided by the database (add_customer) so existing accounts are reused, with demo mode keeping the local behaviour', /rpc\('add_customer'/.test(hook2) && /if \(!db\.demo\)/.test(hook2));
+check('9 all three places that add a customer wait for the result and show the reason when it is refused', /await addCustomer\(/.test(read('app/(owner)/customers/new.tsx')) && /await addCustomer\(/.test(read('src/components/customers/QuickAddCustomer.tsx')) && /addCustomer\(\{ firstName: first[^]*?\.catch\(/.test(read('src/components/financials/NewProjectForm.tsx')));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

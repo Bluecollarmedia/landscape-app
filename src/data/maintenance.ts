@@ -12,9 +12,8 @@
  *
  * Nothing here marks a service done or counts it until a stop is finished.
  */
-import { db, insertRow, insertRows, updateRow, deleteRow, rowsOf, rpc, refresh, isDemo, saveDeferredRow, discardLocalRow, type TableName } from './store';
-import { uploadImage } from '@/lib/media';
-import { isTimeTrackingOn, lastMyDay, timeRpc } from './timeTracking';
+import { db, insertRow, insertRows, updateRow, deleteRow, rowsOf, rpc, refresh, isDemo, type TableName } from './store';
+import { emitTimeChanged, isTimeTrackingOn, lastMyDay, timeRpc } from './timeTracking';
 import { localDateKey, todayKey } from '@/lib/ids';
 import { cleanDates } from '@/lib/serviceDates';
 import type { GpsResult } from '@/lib/location';
@@ -267,6 +266,9 @@ export function createRoute(input: NewRouteInput): Result<MaintenanceRoute> {
   const crewIds = Array.from(new Set(input.crewIds ?? []));
   if (crewIds.some((id) => !eligible.has(id))) return fail('Only approved maintenance workers can be on a maintenance route.');
   if (input.leadPersonId && !eligible.has(input.leadPersonId)) return fail('The Maintenance Lead must be an approved maintenance worker.');
+  // Every route with a crew needs one explicitly chosen crew leader (nobody becomes leader by default).
+  if (crewIds.length > 0 && !input.leadPersonId) return fail('Choose the crew leader for this route.');
+  if (input.leadPersonId && !crewIds.includes(input.leadPersonId)) return fail('The crew leader has to be on the crew of this route.');
   const route = insertRow('maintenance_routes', {
     serviceDate: input.serviceDate,
     name: input.name?.trim() || undefined,
@@ -286,13 +288,20 @@ export function updateRoute(id: string, patch: Partial<Pick<MaintenanceRoute, 's
   updateRow('maintenance_routes', id, patch);
 }
 
-/** `null` leaves the route without a lead (always allowed). */
-export function setRouteLead(routeId: string, personId: string | null): Result {
-  if (personId && !maintenanceWorkers().some((p) => p.id === personId)) {
-    return fail('The Maintenance Lead must be an approved maintenance worker.');
+/**
+ * Chooses (or changes) a route's crew leader. A route always needs one: there is no way to clear it, and nobody becomes leader
+ * implicitly. The leader has to be an approved maintenance worker who is on the route's crew. The database checks all of it.
+ */
+export async function setRouteLead(routeId: string, personId: string): Promise<Result> {
+  if (!personId) return fail('Choose a crew leader. A route always needs one.');
+  if (!maintenanceWorkers().some((p) => p.id === personId)) return fail('The crew leader must be an approved maintenance worker.');
+  if (isDemo()) {
+    updateRow('maintenance_routes', routeId, { leadPersonId: personId });
+    return ok(undefined);
   }
-  updateRow('maintenance_routes', routeId, { leadPersonId: personId ?? undefined });
-  return ok(undefined);
+  const { error } = await rpc('maintenance_set_route_leader', { p_route: routeId, p_person: personId });
+  await refresh(...MAINT_TABLES);
+  return error ? fail(error.message) : ok(undefined);
 }
 
 /**
@@ -494,7 +503,14 @@ export function markArrived(stopId: string, gps?: GpsResult): Promise<Result<Mai
       return ok(db.maintenance.stopById[stopId] ?? stop);
     }
     if (isTimeTrackingOn()) {
-      // Workday time tracking is on: starting the property also starts this worker's own timer (and checks route order and photos).
+      // Workday time tracking is on: the CREW LEADER checks the crew in (update 68). The database saves one visit with the real arrival time.
+      const lead = await rpc('maintenance_leader_arrive', { p_stop_id: stopId, ...gpsArgs(gps) });
+      if (!lead.error || !/could not find the function|schema cache/i.test(lead.error.message)) {
+        await refresh(...MAINT_TABLES);
+        emitTimeChanged();
+        return lead.error ? fail(lead.error.message) : ok(db.maintenance.stopById[stopId]);
+      }
+      // An older database (before update 68): the earlier per-worker start.
       const r = await timeRpc('time_start_visit', { p_source: 'maintenance_stop', p_ref: stopId, ...gpsArgs(gps), p_gps: null }, "Couldn't start this property.");
       await refresh(...MAINT_TABLES);
       return r.ok ? ok(db.maintenance.stopById[stopId]) : fail(r.error);
@@ -535,16 +551,12 @@ export function addStopPhoto(stopId: string, localUri: string, caption?: string)
   }, { deferSave: needsUpload }) as unknown as MaintenancePhoto;
   if (db.demo) logLocal('photo_added', { routeId: stop.routeId, stopId, metadata: { photo_id: row.id } });
   if (needsUpload) {
-    uploadImage(localUri, `${db.companyId}/maintenance/${stop.propertyId}`)
-      .then(({ url, key }) => saveDeferredRow('maintenance_photos', row.id, { fileUrl: url, fileKey: key }))
-      .catch((err) => {
-        console.warn('[maintenance] photo upload failed', err);
-        discardLocalRow('maintenance_photos', row.id);
-        const { Alert, Platform } = require('react-native');
-        const msg = `The photo couldn't be uploaded. ${err?.message ?? ''}`.trim();
-        if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(msg);
-        else Alert.alert('Photo not saved', msg);
-      });
+    // The shared queue compresses, uploads, and saves the record (always internal) only once the file is stored. A failure stays in the
+    // stop's photo list as "Failed" with Retry, so a required photo is never silently lost.
+    const { fileUrl: _f, fileKey: _k, id: _i, ...payload } = row as unknown as Record<string, unknown>;
+    void _f; void _k; void _i;
+    const { queueMedia } = require('@/lib/mediaQueueRuntime') as typeof import('@/lib/mediaQueueRuntime');
+    queueMedia({ id: row.id, kind: 'image', sourceUri: localUri, folder: `${db.companyId}/maintenance/${stop.propertyId}`, target: { type: 'maintenance_photo', payload } });
   }
   return row;
 }
@@ -607,6 +619,15 @@ export function finishStop(stopId: string, opts: { note?: string; gps?: GpsResul
       logLocal('completed', { routeId: stop.routeId, stopId, locationStatus: loc.status, distanceM: loc.distanceM, note, ...gpsFields(opts.gps), metadata: { recorded_by_staff_without_arrival: asStaff && !stop.arrivedAt } });
       settleRouteLocal(stop.routeId);
       return ok(db.maintenance.stopById[stopId] ?? stop);
+    }
+    if (isTimeTrackingOn()) {
+      // The crew leader finishes the stop; the visit's completion time and elapsed time are saved (update 68).
+      const lead = await rpc('maintenance_leader_complete', { p_stop_id: stopId, p_note: opts.note?.trim() || null, ...gpsArgs(opts.gps) });
+      if (!lead.error || !/could not find the function|schema cache/i.test(lead.error.message)) {
+        await refresh(...MAINT_TABLES);
+        emitTimeChanged();
+        return lead.error ? fail(lead.error.message) : ok(db.maintenance.stopById[stopId]);
+      }
     }
     const timed = lastMyDay()?.current;
     if (isTimeTrackingOn() && timed?.stopId === stopId) {

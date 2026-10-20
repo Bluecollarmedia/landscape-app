@@ -22,7 +22,7 @@ const dayAndTime = (iso: string) => `${new Date(iso).toLocaleDateString('en-US',
  * from the stored clock-in time (server time), so closing and reopening the app never resets it, and walking between properties
  * never restarts it. Shows nothing until the database update is installed (the older check-in screens keep working then).
  */
-export function WorkdayCard() {
+export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { compact?: boolean; preShiftTitle?: string; preShiftText?: string } = {}) {
   const { colors } = useTheme();
   const { workday: w } = useWorkerContext();
   const [pickTruck, setPickTruck] = useState<TruckOptions | null>(null);
@@ -44,6 +44,8 @@ export function WorkdayCard() {
   const active = w.active;
   const closedToday = !active ? w.today : undefined;
   const current = w.day?.current;
+  // No route or job today: no Clock In button at all (the database refuses a clock-in too).
+  const noWork = !active && w.day?.canClockIn === false;
 
   async function onClockIn() {
     haptics.select();
@@ -75,13 +77,25 @@ export function WorkdayCard() {
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
-      {!active && !closedToday ? (
+      {noWork && !closedToday ? (
+        <>
+          <View style={styles.head}>
+            <View style={[styles.icon, { backgroundColor: colors.backgroundTertiary }]}><Feather name="calendar" size={18} color={colors.textSecondary} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>No work scheduled today</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Clock In appears once you are put on a route or a job for the day.</Text>
+            </View>
+          </View>
+        </>
+      ) : null}
+
+      {!active && !closedToday && !noWork ? (
         <>
           <View style={styles.head}>
             <View style={[styles.icon, { backgroundColor: colors.primarySurface }]}><Feather name="sunrise" size={18} color={colors.primaryDark} /></View>
             <View style={{ flex: 1 }}>
-              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Start your workday</Text>
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Clock in when you start work at the yard.</Text>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{preShiftTitle ?? 'Start your workday'}</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{preShiftText ?? 'Clock in when you start work at the yard.'}</Text>
             </View>
           </View>
           <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} style={[styles.primary, { backgroundColor: colors.primary, opacity: w.busy || loadingTrucks ? 0.6 : 1 }]} accessibilityRole="button">
@@ -90,7 +104,34 @@ export function WorkdayCard() {
         </>
       ) : null}
 
-      {active ? (
+      {active && compact ? (
+        <>
+          <View style={styles.head}>
+            <View style={[styles.dot, { backgroundColor: w.onBreak ? colors.warning : colors.success }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{w.onBreak ? 'On break' : 'On the clock'}</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                since {fromEarlier ? dayAndTime(active.clockInAt) : timeOfDay(active.clockInAt)}{active.truck ? ` · ${active.truck.name}` : ''}
+              </Text>
+            </View>
+            {w.day?.settings.breaksEnabled ? (
+              <Pressable onPress={onBreak} disabled={w.busy} hitSlop={8} accessibilityRole="button" style={[styles.secondary, { borderColor: colors.border, opacity: w.busy ? 0.5 : 1 }]}>
+                <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{w.onBreak ? 'End Break' : 'Break'}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={onClockOut} disabled={w.busy} hitSlop={8} accessibilityRole="button" style={[styles.secondary, { borderColor: colors.border, opacity: w.busy ? 0.5 : 1 }]}>
+              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Clock Out</Text>
+            </Pressable>
+          </View>
+          {fromEarlier ? (
+            <Text style={[typeScale.caption, { color: colors.warning, marginTop: spacing.xs }]}>
+              This workday started on an earlier day. If you forgot to clock out, clock out now and tell your boss when you really finished.
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+
+      {active && !compact ? (
         <>
           <View style={styles.head}>
             <View style={[styles.dot, { backgroundColor: w.onBreak ? colors.warning : colors.success }]} />
@@ -149,9 +190,11 @@ export function WorkdayCard() {
               </Text>
             </View>
           </View>
-          <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} hitSlop={8} style={{ marginTop: spacing.sm }}>
-            <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Clocked out by mistake? Clock back in</Text>
-          </Pressable>
+          {w.day?.canClockIn !== false ? (
+            <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} hitSlop={8} style={{ marginTop: spacing.sm }}>
+              <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Clocked out by mistake? Clock back in</Text>
+            </Pressable>
+          ) : null}
         </>
       ) : null}
 

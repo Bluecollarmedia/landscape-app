@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
@@ -8,6 +8,8 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenance, useMaintenanceProperty } from '@/hooks/useMaintenance';
 import { db } from '@/data/store';
+import { loadPropertyVisits } from '@/data/maintenanceLabor';
+import { compareToUsual, hoursText, minutesText, seasonSummary, type VisitRecord } from '@/lib/propertyTrend';
 import { buildRouteReview, formatTime } from '@/data/maintenanceReview';
 import { dueLabel } from '@/lib/maintenanceSchedule';
 import { todayKey } from '@/lib/ids';
@@ -52,6 +54,11 @@ export default function PropertyHistoryScreen() {
   const detail = useMaintenanceProperty(id, today);
   const m = useMaintenance();
   const [showAll, setShowAll] = useState(false);
+  // Saved arrival / completion, elapsed time and ESTIMATED labor-hours per visit (owner only; update 68). Null = not installed yet.
+  const [labor, setLabor] = useState<VisitRecord[] | null>(null);
+  useEffect(() => { if (id) loadPropertyVisits(id).then(setLabor); }, [id, detail?.visits.length]);
+  const laborByStop = useMemo(() => new Map((labor ?? []).map((l) => [l.stopId, l])), [labor]);
+  const season = useMemo(() => (labor ? seasonSummary(labor) : null), [labor]);
 
   const visits = useMemo(() => {
     if (!detail) return [];
@@ -101,6 +108,23 @@ export default function PropertyHistoryScreen() {
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Access: {property.accessNotes}</Text>
           ) : null}
         </View>
+
+        {season && season.visits > 0 ? (
+          <>
+            <SectionTitle>TIME ON SITE</SectionTitle>
+            <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm, { gap: spacing.xs }]}>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>
+                {season.visits} timed visit{season.visits === 1 ? '' : 's'} · usually {minutesText(season.averageElapsedMinutes)} on site
+              </Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                Estimated labor-hours: about {hoursText(season.averageLaborMinutes)} per visit, {hoursText(season.totalLaborMinutes)} so far.
+              </Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                Time on site = the leader's arrival to completion. Estimated labor-hours = each assigned worker's own clocked-in time during the visit, added up. It is an estimate for spotting trends, not payroll.
+              </Text>
+            </View>
+          </>
+        ) : null}
 
         <SectionTitle>SERVICES</SectionTitle>
         <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm, { paddingVertical: spacing.xs }]}>
@@ -174,6 +198,24 @@ export default function PropertyHistoryScreen() {
                 {completion?.at ? ` · Finished ${formatTime(completion.correction?.at ?? completion.at)}${completion.by ? ` (${completion.by.firstName})` : ''}` : ''}
                 {(arrival?.correction || completion?.correction) ? ' · corrected by owner' : ''}
               </Text>
+              {laborByStop.get(stop.id)?.elapsedMinutes != null ? (() => {
+                const l = laborByStop.get(stop.id)!;
+                const cmp = labor ? compareToUsual(labor, stop.id) : null;
+                return (
+                  <View style={{ gap: 2 }}>
+                    <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>
+                      On site {minutesText(l.elapsedMinutes)} · Estimated labor {hoursText(l.estLaborMinutes)}
+                      {l.crew.length ? ` (${l.crew.map((c) => `${c.name.split(' ')[0]} ${minutesText(c.minutes)}`).join(', ')})` : ''}
+                    </Text>
+                    {cmp ? (
+                      <Text style={[typeScale.caption, { color: cmp.unusual ? colors.warning : colors.textSecondary }]}>
+                        {cmp.unusual ? 'Longer than usual: ' : 'Compared with usual: '}
+                        {cmp.differenceMinutes >= 0 ? '+' : '−'}{minutesText(Math.abs(cmp.differenceMinutes))} vs about {minutesText(cmp.usualMinutes)}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })() : null}
               {(stop.tasks.length > 0 || stop.photos.length > 0 || stop.requiresPhotos) && (
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
                   {stop.tasks.length > 0 ? `Checklist ${review?.tasksDone ?? 0}/${stop.tasks.length}` : ''}

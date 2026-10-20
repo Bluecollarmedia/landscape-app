@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { Avatar, EmptyState, OptimizedImage, ProgressBar, ScreenHeader, StatusBadge } from '@/components/ui';
@@ -9,7 +9,9 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenance, useMaintenanceRoute } from '@/hooks/useMaintenance';
 import { db, useDb } from '@/data/store';
-import { correctAttendance, locationLabel, setStopPhotoShared } from '@/data/maintenance';
+import { useWorkdaysOn } from '@/hooks/useClockedInToday';
+import { PrivatePhoto } from '@/components/media/PrivatePhoto';
+import { correctAttendance, locationLabel, setRouteLead, setStopPhotoShared } from '@/data/maintenance';
 import {
   buildRouteReview, correctStopTime, describeEvent, formatTime,
   type AttendanceReview, type RecordedTime, type StopReview, type StopTimeKind,
@@ -44,6 +46,7 @@ export default function RouteDetailScreen() {
   const v = useDb();
   const today = todayKey();
   const [fix, setFix] = useState<Fix | null>(null);
+  const workdays = useWorkdaysOn(route?.serviceDate ?? today);
   const [showAllActivity, setShowAllActivity] = useState(false);
 
   const review = useMemo(
@@ -100,9 +103,45 @@ export default function RouteDetailScreen() {
             </View>
           ) : null}
           <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.md }]}>
-            {route.lead ? `Maintenance Lead: ${fullName(route.lead)}` : 'No Maintenance Lead for this route'}
+            {route.lead ? `Crew leader: ${fullName(route.lead)}` : 'No crew leader chosen yet'}
           </Text>
         </View>
+
+        {/* The crew leader: the only worker who checks the crew in and finishes each stop. Every route needs one, chosen by you. */}
+        {route.status !== 'cancelled' && route.status !== 'completed' ? (
+          <>
+            <SectionTitle>CREW LEADER</SectionTitle>
+            <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm, { gap: spacing.sm }]}>
+              {!route.lead ? (
+                <View style={[styles.noteBox, { backgroundColor: colors.warningLight ?? colors.groupedBackground }]}>
+                  <Icon name="alert-triangle" size={14} color={colors.warning} />
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]}>
+                    This route has no crew leader, so nobody on the crew can check in at its properties yet. Choose one below.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Only the leader (and you) can tap I'M HERE and finish each stop.</Text>
+              )}
+              {route.crewIds.length === 0 ? (
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Put people on the crew first, then choose the leader from them.</Text>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {route.crewIds.map((pid) => {
+                    const p = db.people[pid];
+                    const on = route.lead?.id === pid;
+                    return (
+                      <Pressable key={pid} accessibilityRole="button" accessibilityState={{ selected: on }}
+                        onPress={async () => { const r = await setRouteLead(route.id, pid); if (!r.ok) Alert.alert("Couldn't set the leader", r.error); }}
+                        style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.lg, backgroundColor: on ? colors.primary : colors.backgroundTertiary }}>
+                        <Text style={[typeScale.labelSmall, { color: on ? '#FFFFFF' : colors.textPrimary }]}>{p ? `${p.firstName} ${p.lastName}`.trim() : 'Worker'}{on ? ' · Leader' : ''}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          </>
+        ) : null}
 
         {/* Needs attention */}
         {review.attention.length > 0 && (
@@ -120,13 +159,30 @@ export default function RouteDetailScreen() {
         )}
 
         {/* Crew attendance */}
-        <SectionTitle>CREW · START OF DAY</SectionTitle>
+        <SectionTitle>{workdays.known ? 'CREW · CLOCKED IN' : 'CREW · START OF DAY'}</SectionTitle>
         <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm, { paddingVertical: spacing.xs }]}>
           {review.attendance.length === 0 ? (
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, paddingVertical: spacing.md }]}>
               No crew assigned to this route.
             </Text>
-          ) : review.attendance.map((row, i) => (
+          ) : workdays.known ? review.attendance.map((row, i) => {
+            // With the time clock on, each worker clocks in on their own; this shows that workday (fix times in Hours & Labor).
+            const w = workdays.byPerson.get(row.personId);
+            return (
+              <View key={row.personId} style={[styles.attRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
+                {row.person ? <Avatar firstName={row.person.firstName} lastName={row.person.lastName} uri={row.person.avatarUrl} size={36} /> : <View style={{ width: 36 }} />}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={styles.inline}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{fullName(row.person)}</Text>
+                    {row.isLead && <Pill label="Crew leader" tone="success" />}
+                  </View>
+                  <Text style={[typeScale.bodySmall, { color: w ? colors.textPrimary : colors.textSecondary }]}>
+                    {w ? (w.clockOutAt ? `Clocked in ${formatTime(w.clockInAt)} · out ${formatTime(w.clockOutAt)}` : `Clocked in ${formatTime(w.clockInAt)} · on the clock`) : 'Not clocked in'}
+                  </Text>
+                </View>
+              </View>
+            );
+          }) : review.attendance.map((row, i) => (
             <AttendanceRowView
               key={row.personId}
               row={row}
@@ -392,23 +448,39 @@ function StopCard({ review, canFix, onFix, onOpenProperty }: {
       {(stop.requiresPhotos || stop.photos.length > 0) && (
         <View style={{ gap: spacing.xs, marginTop: stop.tasks.length ? spacing.sm : 0 }}>
           <Text style={[typeScale.caption, { color: stop.requiresPhotos && review.photoCount < stop.minPhotos && stop.status === 'completed' ? colors.warning : colors.textSecondary }]}>
-            Photos · {review.photoCount}{stop.requiresPhotos ? ` of ${stop.minPhotos} required` : ''} · internal only unless you share them
+            Photos · {review.photoCount}{stop.requiresPhotos ? ` of ${stop.minPhotos} required` : ''} · internal only unless you share them (the customer sees shared photos once the stop is finished)
           </Text>
+          {stop.photos.length > 0 && stop.status === 'completed' ? (
+            <Pressable
+              onPress={() => {
+                const shareAll = stop.photos.some((ph) => !ph.isCustomerVisible);
+                for (const ph of stop.photos) if (ph.isCustomerVisible !== shareAll) setStopPhotoShared(ph.id, shareAll);
+              }}
+              hitSlop={6}
+              accessibilityRole="button"
+              style={[styles.shareAll, { borderColor: colors.primary }]}
+            >
+              <Icon name={stop.photos.some((ph) => !ph.isCustomerVisible) ? 'eye' : 'lock'} size={13} color={colors.primary} />
+              <Text style={[typeScale.labelSmall, { color: colors.primary }]}>
+                {stop.photos.some((ph) => !ph.isCustomerVisible) ? 'Share all photos with the customer' : 'Make all photos internal'}
+              </Text>
+            </Pressable>
+          ) : null}
           {stop.photos.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
               {stop.photos.map((ph) => (
                 <View key={ph.id} style={{ alignItems: 'center', gap: 4 }}>
-                  <OptimizedImage source={ph.fileUrl} style={styles.thumb} accessibilityLabel={ph.caption ?? 'Stop photo'} />
+                  <PrivatePhoto fileUrl={ph.fileUrl} fileKey={ph.fileKey} style={styles.thumb as never} accessibilityLabel={ph.caption ?? 'Stop photo'} />
                   <Pressable
                     onPress={() => setStopPhotoShared(ph.id, !ph.isCustomerVisible)}
                     hitSlop={6}
                     accessibilityRole="button"
                     accessibilityLabel={ph.isCustomerVisible ? 'Shared with the customer. Tap to make it internal.' : 'Internal. Tap to share with the customer.'}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                    style={[styles.sharePill, ph.isCustomerVisible ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.border }]}
                   >
-                    <Icon name={ph.isCustomerVisible ? 'eye' : 'lock'} size={11} color={ph.isCustomerVisible ? colors.primary : colors.textTertiary} />
-                    <Text style={[typeScale.caption, { color: ph.isCustomerVisible ? colors.primary : colors.textTertiary, fontWeight: '600' }]}>
-                      {ph.isCustomerVisible ? 'Shared' : 'Internal'}
+                    <Icon name={ph.isCustomerVisible ? 'eye' : 'lock'} size={12} color={ph.isCustomerVisible ? '#FFFFFF' : colors.textSecondary} />
+                    <Text style={[typeScale.caption, { color: ph.isCustomerVisible ? '#FFFFFF' : colors.textSecondary, fontWeight: '700' }]}>
+                      {ph.isCustomerVisible ? 'Customer sees' : 'Internal'}
                     </Text>
                   </Pressable>
                 </View>
@@ -453,6 +525,8 @@ const styles = StyleSheet.create({
   divider: { height: StyleSheet.hairlineWidth },
   timeLine: { flexDirection: 'row', alignItems: 'flex-start' },
   thumb: { width: 64, height: 64, borderRadius: radius.sm },
+  sharePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.full, borderWidth: 1 },
+  shareAll: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.xs },
   activityRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: spacing.sm },
 });

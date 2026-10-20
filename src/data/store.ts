@@ -766,6 +766,8 @@ export async function startSession(next: Session): Promise<void> {
   await reloadAll();
   startRealtime();
   watchAppState();
+  // Resume photos/videos that were still waiting to upload when the app last closed (and show their local previews again).
+  try { void (require('@/lib/mediaQueueRuntime') as typeof import('@/lib/mediaQueueRuntime')).startMediaQueue(); } catch { /* the queue also starts on the next pick */ }
 }
 
 export function endSession(): void {
@@ -921,6 +923,32 @@ export function saveDeferredRow(table: TableName, id: string, patch: Row = {}): 
 }
 
 /** Drops a row that was never saved (deferred insert that failed). */
+/**
+ * Like saveDeferredRow, but WAITS for the database and reports the result, so the media queue can say "uploaded" only once the record is
+ * really saved. If the row is not in the local store (the app was restarted since the photo was picked) it is added from `fallback`.
+ * Saving the same row twice is fine: "already exists" counts as saved (a retry after a dropped connection must not fail or duplicate).
+ */
+export async function confirmDeferredRow(table: TableName, id: string, patch: Row, fallback?: Row): Promise<{ ok: true } | { ok: false; error: string }> {
+  const pk = pkOf(table);
+  let row = raw[table].find((r) => r[pk] === id);
+  if (!row && fallback) {
+    const cols = TABLES[table].cols as string[];
+    const now = new Date().toISOString();
+    const base: Row = { ...fallback, [pk]: id };
+    if (cols.includes('companyId') && !base.companyId) base.companyId = session?.companyId;
+    for (const ts of ['createdAt', 'updatedAt']) if (cols.includes(ts) && !base[ts]) base[ts] = now;
+    raw[table] = [...raw[table], stripUndefined(base)];
+  }
+  raw[table] = raw[table].map((r) => (r[pk] === id ? stripUndefined({ ...r, ...patch }) : r));
+  emitChange();
+  row = raw[table].find((r) => r[pk] === id);
+  if (demoMode) return { ok: true };
+  if (!row) return { ok: false, error: 'The photo record is missing.' };
+  const { error } = await supabase.from(table).insert(toDb(table, row));
+  if (error && (error as { code?: string }).code !== '23505') return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export function discardLocalRow(table: TableName, id: string): void {
   const pk = pkOf(table);
   raw[table] = raw[table].filter((r) => r[pk] !== id);

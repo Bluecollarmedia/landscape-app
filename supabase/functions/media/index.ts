@@ -24,6 +24,16 @@
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0';
 import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.20';
+/**
+ * Which stored files are private (kept in the private bucket). Written out here, identical to supabase/functions/_shared/privateKeys.ts
+ * and src/lib/privateMedia.ts (a check keeps the three the same), so this one file can be pasted into the Supabase dashboard as it is.
+ */
+const PRIVATE_FOLDERS = new Set(['maintenance', 'reference', 'completion']);
+function isPrivateKey(key: string): boolean {
+  const parts = key.split('/');
+  if (parts[0] === 'ids') return true;
+  return parts.length >= 3 && PRIVATE_FOLDERS.has(parts[1]);
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -37,6 +47,8 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const R2_ACCOUNT_ID = Deno.env.get('R2_ACCOUNT_ID') ?? '';
 const R2_BUCKET_NAME = Deno.env.get('R2_BUCKET_NAME') ?? '';
 const R2_PUBLIC_URL = (Deno.env.get('R2_PUBLIC_URL') ?? '').replace(/\/+$/, '');
+/** The private bucket (no public address). When it is not set, everything stays in the one bucket exactly as before. */
+const R2_PRIVATE_BUCKET_NAME = Deno.env.get('R2_PRIVATE_BUCKET_NAME') ?? '';
 
 const r2 = new AwsClient({
   accessKeyId: Deno.env.get('R2_ACCESS_KEY_ID') ?? '',
@@ -45,6 +57,22 @@ const r2 = new AwsClient({
   region: 'auto',
 });
 const BUCKET_URL = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET_NAME}`;
+const PRIVATE_BUCKET_URL = R2_PRIVATE_BUCKET_NAME ? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_PRIVATE_BUCKET_NAME}` : '';
+
+/** Where NEW files for this key are written: the private bucket for private keys (when it is set up), otherwise the normal bucket. */
+const writeBase = (key: string) => (PRIVATE_BUCKET_URL && isPrivateKey(key) ? PRIVATE_BUCKET_URL : BUCKET_URL);
+
+/**
+ * Where an EXISTING file is: the private bucket first, then the normal bucket (files not yet moved across). Used for reading and signing,
+ * so everything keeps working while old files are moved.
+ */
+async function locate(key: string): Promise<string> {
+  if (PRIVATE_BUCKET_URL && isPrivateKey(key)) {
+    const res = await r2.fetch(`${PRIVATE_BUCKET_URL}/${key}`, { method: 'HEAD' });
+    if (res.ok) return PRIVATE_BUCKET_URL;
+  }
+  return BUCKET_URL;
+}
 
 const TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -63,15 +91,25 @@ const SNOW_BUCKET = 'snow-media';
 
 /** A private, short-lived read link for an R2 file. */
 async function presignGet(key: string, seconds: number): Promise<string> {
-  const url = new URL(`${BUCKET_URL}/${key}`);
+  const url = new URL(`${await locate(key)}/${key}`);
   url.searchParams.set('X-Amz-Expires', String(seconds));
   const signed = await r2.sign(new Request(url.toString(), { method: 'GET' }), { aws: { signQuery: true } });
   return signed.url;
 }
 
 async function inR2(key: string): Promise<boolean> {
-  const res = await r2.fetch(`${BUCKET_URL}/${key}`, { method: 'HEAD' });
+  const res = await r2.fetch(`${await locate(key)}/${key}`, { method: 'HEAD' });
   return res.ok;
+}
+
+/** Deletes a file wherever it is (both buckets, so a half-moved file leaves nothing behind). */
+async function deleteEverywhere(key: string): Promise<boolean> {
+  let ok = true;
+  for (const base of [BUCKET_URL, PRIVATE_BUCKET_URL].filter(Boolean)) {
+    const res = await r2.fetch(`${base}/${key}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) ok = false;
+  }
+  return ok;
 }
 
 /** Whether the 1-byte stand-in for this Snow key is in the Supabase bucket. */
@@ -144,7 +182,7 @@ serve(async (req: Request) => {
       }
 
       const key = `${folder}/${crypto.randomUUID()}.${ext}`;
-      const url = new URL(`${BUCKET_URL}/${key}`);
+      const url = new URL(`${writeBase(key)}/${key}`);
       url.searchParams.set('X-Amz-Expires', '600');
       const signed = await r2.sign(
         new Request(url.toString(), { method: 'PUT', headers: { 'Content-Type': body.contentType } }),
@@ -161,8 +199,7 @@ serve(async (req: Request) => {
         ? second === me.personId
         : first in me.roles && CAN_DELETE.has(me.roles[first]);
       if (!allowed) return reply({ error: 'You cannot delete that' }, 403);
-      const res = await r2.fetch(`${BUCKET_URL}/${key}`, { method: 'DELETE' });
-      if (!res.ok && res.status !== 404) return reply({ error: 'Delete failed' }, 502);
+      if (!(await deleteEverywhere(key))) return reply({ error: 'Delete failed' }, 502);
       return reply({ ok: true });
     }
 
@@ -186,6 +223,21 @@ serve(async (req: Request) => {
       return reply({ url: await presignGet(key, 300) });
     }
 
+    // Maintenance photos opened through a short-lived private link. The database decides who may open which file
+    // (maintenance_photos_i_can_open, update 71): owner/admin, the crew on the route, or the linked customer for a shared photo on a
+    // finished stop. Only the keys it allows are signed. NOT used by the app yet; it only protects once the files themselves are private.
+    if (body.action === 'maint-sign') {
+      const keys: string[] = Array.isArray(body.keys) ? body.keys.filter(safePath).slice(0, 100) : [];
+      const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+        global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+      });
+      const { data, error } = await userClient.rpc('maintenance_photos_i_can_open', { p_keys: keys });
+      if (error) return reply({ error: 'Could not check access' }, 502);
+      const urls: Record<string, string> = {};
+      await Promise.all(((data ?? []) as string[]).map(async (k) => { urls[k] = await presignGet(k, 3600); }));
+      return reply({ urls });
+    }
+
     if (body.action === 'snow-put') {
       const key = body.key;
       const ext = TYPES[String(body.contentType ?? '').toLowerCase()];
@@ -193,7 +245,7 @@ serve(async (req: Request) => {
       if (!(key.split('/')[0] in me.roles)) return reply({ error: 'You cannot upload there' }, 403);
       // The database already let this person write the stand-in, so they may write here.
       if (!(await standInExists(key))) return reply({ error: 'Upload not allowed' }, 403);
-      const url = new URL(`${BUCKET_URL}/${key}`);
+      const url = new URL(`${writeBase(key)}/${key}`);
       url.searchParams.set('X-Amz-Expires', '600');
       const signed = await r2.sign(
         new Request(url.toString(), { method: 'PUT', headers: { 'Content-Type': body.contentType } }),
@@ -222,8 +274,7 @@ serve(async (req: Request) => {
       if (!safePath(key)) return reply({ error: 'Bad key' }, 400);
       // Only once the database let the stand-in go (saved media is kept).
       if (await standInExists(key)) return reply({ ok: false, kept: true });
-      const res = await r2.fetch(`${BUCKET_URL}/${key}`, { method: 'DELETE' });
-      return reply({ ok: res.ok || res.status === 404 });
+      return reply({ ok: await deleteEverywhere(key) });
     }
 
     if (body.action === 'usage') {
@@ -232,10 +283,10 @@ serve(async (req: Request) => {
       let bytes = 0;
       let photos = 0;
       let avatars = 0;
-      for (const prefix of prefixes) {
+      for (const base of [BUCKET_URL, PRIVATE_BUCKET_URL].filter(Boolean)) for (const prefix of prefixes) {
         let token = '';
         do {
-          const u = new URL(BUCKET_URL);
+          const u = new URL(base);
           u.searchParams.set('list-type', '2');
           u.searchParams.set('prefix', prefix);
           if (token) u.searchParams.set('continuation-token', token);

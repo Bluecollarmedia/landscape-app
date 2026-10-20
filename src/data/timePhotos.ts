@@ -36,7 +36,7 @@ export async function takeTimedPhoto(target: TimedPhotoTarget, phase: Phase): Pr
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return { ok: false, error: 'Camera access is needed for this photo. Turn it on for Brighton Lawn in the Settings app.' };
   }
-  const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+  const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
   if (shot.canceled || !shot.assets?.[0]) return { ok: false, error: 'No photo was taken.' };
   const uri = shot.assets[0].uri;
   try {

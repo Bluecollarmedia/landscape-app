@@ -87,7 +87,7 @@ export default function TaskDetailScreen() {
         );
         return;
       }
-      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 1 };
       const result = source === 'camera'
         ? await ImagePicker.launchCameraAsync(options)
         : await ImagePicker.launchImageLibraryAsync(options);

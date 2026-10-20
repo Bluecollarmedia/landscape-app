@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
+import { refresh as refreshTables } from '@/data/store';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
@@ -63,6 +64,8 @@ export default function OwnerDashboard() {
   const navigation = useNavigation();
   const toTop = useCallback(() => scrollRef.current?.scrollTo({ y: 0, animated: false }), []);
   useFocusEffect(toTop);
+  // Today's maintenance routes feed the numbers below, so refresh them whenever the Dashboard comes into view.
+  useFocusEffect(useCallback(() => { refreshTables('maintenance_routes', 'maintenance_route_crew', 'maintenance_stops'); }, []));
   useEffect(() => {
     const subs = [navigation, navigation.getParent?.()]
       .filter(Boolean)

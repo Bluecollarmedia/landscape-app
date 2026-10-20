@@ -41,8 +41,12 @@ export interface MaintenanceRouteSummary {
   stopCount: number;
   completedCount: number;
   crewNames: string[];
-  /** Crew who have started the day (checked in at the yard). */
+  /** Crew who tapped the older "Start Day" at the yard (day attendance). Used only when time tracking is not available. */
   checkedInCount: number;
+  /** Everyone on the route (crew and leader), so screens can count who is clocked in from the time clock. */
+  crewIds: string[];
+  /** The property the crew is checked in at right now, if any (a stop in progress). */
+  activeStop?: { propertyName: string; arrivedAt?: string };
 }
 
 export interface MaintenanceHome {
@@ -109,6 +113,8 @@ export function useMaintenanceHome(): MaintenanceHome {
       completedCount: r.completedCount,
       crewNames: r.crew.map((p) => p.firstName),
       checkedInCount: r.crewIds.filter((pid) => m.attendance.some((a) => a.personId === pid && a.serviceDate === today)).length,
+      crewIds: [...new Set([...r.crewIds, ...(r.lead?.id ? [r.lead.id] : [])])],
+      activeStop: (() => { const s = r.stops.find((x) => x.status === 'arrived'); return s ? { propertyName: s.property?.name ?? 'a property', arrivedAt: s.arrivedAt ?? undefined } : undefined; })(),
     })), [m, today]);
 
   const refresh = useCallback(() => refreshTables(

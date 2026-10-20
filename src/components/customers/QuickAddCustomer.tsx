@@ -27,13 +27,22 @@ export function QuickAddCustomer({ onAdded }: { onAdded: (personId: string) => v
     setFirstName(''); setLastName(''); setEmail(''); setPhone(''); setError('');
   }
 
-  function save() {
+  const [saving, setSaving] = useState(false);
+  async function save() {
+    if (saving) return;
     if (!firstName.trim() || !lastName.trim()) { setError('Enter a first and last name.'); return; }
     const mail = email.trim();
     if (mail && !/^\S+@\S+\.\S+$/.test(mail)) { setError('That email address does not look right.'); return; }
-    const id = addCustomer({ firstName: properName(firstName), lastName: properName(lastName), email: mail, phone });
-    reset();
-    onAdded(id);
+    setSaving(true);
+    try {
+      const id = await addCustomer({ firstName: properName(firstName), lastName: properName(lastName), email: mail, phone });
+      reset();
+      onAdded(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The customer couldn't be added.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (!open) {

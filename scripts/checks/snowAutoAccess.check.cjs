@@ -33,7 +33,9 @@ const tog = read('src/components/snow/WorkerModeToggle.tsx');
 check('6 the glass toggle sits at the top right of every screen (mounted once in the root layout), liquid glass on iOS 26 and a frosted pill elsewhere',
   /<WorkerModeToggle \/>/.test(layout) && /GlassView glassEffectStyle="regular"/.test(tog) && /position: 'absolute'/.test(tog) && /right: spacing\.md/.test(tog) && /canToggle/.test(tog));
 const sql = read('supabase/updates/062_snow_auto_enroll_workers.sql');
-check('7 the database update puts workers on the team when Snow Mode is switched on, never re-adds a removed worker, and has a test',
-  /companies_snow_enroll/.test(sql) && /company_members_snow_enroll/.test(sql) && /already on the team, or removed on purpose/.test(sql) && fs.existsSync(path.join(__dirname, '../../supabase/tests/062_snow_auto_enroll_workers.pglite.mjs')));
+const sql66 = fs.readFileSync(path.join(__dirname, '../../supabase/updates/066_account_access_hardening.sql'), 'utf8');
+check('7 snow access is explicit: update 66 switches off the automatic grants of update 62 (both triggers do nothing), and the test proves nobody is added automatically',
+  /_snow_mode_enroll_trigger\(\)\s+returns trigger[\s\S]*?begin\s+return null;/.test(sql66) && /_snow_member_enroll_trigger\(\)\s+returns trigger[\s\S]*?begin\s+return null;/.test(sql66)
+  && /puts NOBODY on the snow team/.test(fs.readFileSync(path.join(__dirname, '../../supabase/tests/062_snow_auto_enroll_workers.pglite.mjs'), 'utf8')));
 console.log(bad ? '\n' + bad + ' failed' : '\nall passed');
 process.exit(bad ? 1 : 0);

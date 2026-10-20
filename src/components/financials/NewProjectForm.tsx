@@ -107,7 +107,10 @@ export function NewProjectForm({ onReady }: { onReady: (projectId: string, creat
       );
       return;
     }
-    finish(addCustomer({ firstName: first, lastName: last, email, phone }));
+    setBusy(true);
+    addCustomer({ firstName: first, lastName: last, email, phone })
+      .then((id) => { setBusy(false); finish(id); })
+      .catch((e) => { setBusy(false); showMessage("Couldn't add the customer", e instanceof Error ? e.message : 'Please try again.'); });
   };
 
   const toggle = (

@@ -42,8 +42,17 @@ export async function uploadImage(localUri: string, folder: string, mimeType?: s
     return { url: localUri, key: localUri };
   }
 
-  const { contentType, ext } = guessContentType(localUri, mimeType);
+  let { contentType, ext } = guessContentType(localUri, mimeType);
   await requireSession();
+  // Every photo is compressed before it leaves the phone (about 50% quality, long side at most 1600 px), whichever screen it came from.
+  // Files the shared media queue already prepared are not touched again, and PDFs/videos pass through (videos: see mediaQueue).
+  if (contentType.startsWith('image/')) {
+    const { prepareImage, isPrepared } = require('./mediaCompress') as typeof import('./mediaCompress');
+    if (!isPrepared(localUri)) {
+      const p = await prepareImage({ sourceUri: localUri, mimeType: contentType } as import('./mediaQueue').MediaJob);
+      if (p.uri !== localUri) { localUri = p.uri; contentType = 'image/jpeg'; ext = 'jpg'; }
+    }
+  }
   try {
     if (r2Enabled) return await uploadToR2(localUri, folder, contentType);
 

@@ -9,8 +9,8 @@
 
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { db, insertRow, saveDeferredRow, discardLocalRow, deleteRow } from './store';
-import { uploadImage, removeMedia } from '@/lib/media';
+import { db, insertRow, deleteRow } from './store';
+import { removeMedia } from '@/lib/media';
 import { getStorageInfo } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { formatBytes } from '@/types/storage';
@@ -77,7 +77,7 @@ export async function pickTaskMedia(alreadyPicked: number): Promise<TaskMediaDra
 
   const options: ImagePicker.ImagePickerOptions = {
     mediaTypes: ['images', 'videos'],
-    quality: 0.7,
+    quality: 1,
     videoMaxDuration: MAX_TASK_VIDEO_SECONDS,
     videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
     allowsMultipleSelection: source === 'library' && room > 1,
@@ -141,8 +141,6 @@ async function storageProblem(bytes: number): Promise<string | null> {
  * is saved for everyone once its upload finishes; a failed upload is removed.
  */
 export function saveTaskMedia(projectId: string, taskId: string, drafts: TaskMediaDraft[]) {
-  const failures: string[] = [];
-  let pending = 0;
   for (const d of drafts) {
     const needsUpload = !db.demo && !/^https?:\/\//i.test(d.uri);
     const row = insertRow('task_attachments', {
@@ -155,22 +153,14 @@ export function saveTaskMedia(projectId: string, taskId: string, drafts: TaskMed
       createdBy: db.personId || undefined,
     }, { deferSave: needsUpload });
     if (!needsUpload) continue;
-    pending++;
-    uploadImage(d.uri, `${db.companyId}/projects/${projectId}`, d.mimeType)
-      .then(({ url, key }) => saveDeferredRow('task_attachments', row.id, { fileUrl: url, fileKey: key }))
-      .catch((err) => {
-        console.warn('[task media] upload failed', err);
-        discardLocalRow('task_attachments', row.id);
-        failures.push(err?.message ?? '');
-      })
-      .finally(() => {
-        if (--pending === 0 && failures.length > 0) {
-          notify(
-            failures.length === 1 ? 'A file wasn\'t saved' : `${failures.length} files weren't saved`,
-            `The task was saved, but ${failures.length === 1 ? 'one photo or video' : 'some photos or videos'} couldn't be uploaded. ${failures[0]}`.trim(),
-          );
-        }
-      });
+    // Photos and videos go through the shared queue (compress -> upload -> save the record). A failure stays on the task as Failed with Retry.
+    const { fileUrl: _f, fileKey: _k, id: _i, createdAt: _c, ...payload } = row as unknown as Record<string, unknown>;
+    void _f; void _k; void _i; void _c;
+    const { queueMedia } = require('@/lib/mediaQueueRuntime') as typeof import('@/lib/mediaQueueRuntime');
+    queueMedia({
+      id: row.id, kind: d.mediaType === 'video' ? 'video' : 'image', sourceUri: d.uri, mimeType: d.mimeType, bytesIn: d.sizeBytes,
+      folder: `${db.companyId}/projects/${projectId}`, target: { type: 'task_attachment', payload },
+    });
   }
 }
 

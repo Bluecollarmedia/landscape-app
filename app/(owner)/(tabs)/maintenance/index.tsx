@@ -9,6 +9,8 @@ import {
 } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
+import { loadRoutesWithoutLeader, type RouteNeedingLeader } from '@/data/maintenanceLabor';
+import { useClockedInToday } from '@/hooks/useClockedInToday';
 import { useMaintenanceHome, type MaintenanceDueItem, type MaintenanceRouteSummary } from '@/hooks/useMaintenanceHome';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -42,7 +44,9 @@ export default function MaintenanceHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const { refresh } = home;
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  // Routes with no crew leader yet (the database blocks property check-in on them until you choose one).
+  const [noLeader, setNoLeader] = useState<RouteNeedingLeader[]>([]);
+  useFocusEffect(useCallback(() => { refresh(); loadRoutesWithoutLeader().then(setNoLeader); }, [refresh]));
 
   const go = (route: string) => router.push(route as any);
 
@@ -162,6 +166,19 @@ export default function MaintenanceHomeScreen() {
           </View>
           <RaisedAddButton onPress={() => go(ROUTES.newRoute)} accessibilityLabel="Create a new route" />
         </Animated.View>
+        {noLeader.length > 0 ? (
+          <View style={[styles.leaderNotice, { backgroundColor: colors.warningLight ?? colors.surface }]}>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{noLeader.length} route{noLeader.length === 1 ? ' has' : 's have'} no crew leader</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+              Workers can't check in at a route's properties until you choose its leader. Open the route and pick one.
+            </Text>
+            {noLeader.slice(0, 4).map((r) => (
+              <PressableScale key={r.routeId} onPress={() => go(`/(owner)/maintenance/routes/${r.routeId}`)} accessibilityRole="button">
+                <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{r.name ?? 'Route'} · {r.serviceDate}</Text>
+              </PressableScale>
+            ))}
+          </View>
+        ) : null}
         {body}
       </ScrollView>
     </View>
@@ -172,6 +189,9 @@ function TodaySection({
   routes, onOpen, onCreate,
 }: { routes: MaintenanceRouteSummary[]; onOpen: (id: string) => void; onCreate: () => void }) {
   const { colors } = useTheme();
+  // "Clocked in" comes from the time clock (the same source as the Dashboard). Only if time tracking can't be reached do we fall back to
+  // the older "Start Day" count, and then the label says so.
+  const clocked = useClockedInToday();
 
   if (routes.length === 0) {
     return (
@@ -220,10 +240,20 @@ function TodaySection({
               </Text>
               {r.crewNames.length > 0 && (
                 <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                  {r.checkedInCount} of {r.crewNames.length} checked in
+                  {clocked.known
+                    ? `${r.crewIds.filter((id) => clocked.ids.has(id)).length} of ${r.crewIds.length} clocked in`
+                    : `${r.checkedInCount} of ${r.crewNames.length} started the day`}
                 </Text>
               )}
             </View>
+            {r.activeStop ? (
+              <View style={styles.crewRow}>
+                <Icon name="map-pin" size={14} color={colors.primary} />
+                <Text style={[typeScale.caption, { color: colors.primary, flex: 1 }]} numberOfLines={1}>
+                  Crew at {r.activeStop.propertyName}{r.activeStop.arrivedAt ? ` since ${new Date(r.activeStop.arrivedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
+                </Text>
+              </View>
+            ) : null}
           </PressableScale>
         );
       })}
@@ -280,6 +310,7 @@ function DueRow({ item, first, onPress }: { item: MaintenanceDueItem; first: boo
 }
 
 const styles = StyleSheet.create({
+  leaderNotice: { marginHorizontal: spacing.lg, marginBottom: spacing.md, padding: spacing.md, borderRadius: radius.md, gap: spacing.xs },
   screen: { flex: 1 },
   header: {
     flexDirection: 'row',

@@ -540,9 +540,9 @@ export default function NewRouteScreen() {
                       {leadPersonId === p.id && <LeadBadge />}
                     </View>
                   ))}
-                  <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>Maintenance Lead (optional)</Text>
+                  <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>Crew Leader (required)</Text>
                   <View style={styles.chipWrap}>
-                    {[{ id: null as string | null, label: 'No lead' }, ...crewMembers.map(p => ({ id: p.id as string | null, label: p.firstName }))].map(o => {
+                    {crewMembers.map(p => ({ id: p.id as string | null, label: p.firstName })).map(o => {
                       const on = leadPersonId === o.id;
                       return (
                         <Pressable
@@ -558,7 +558,7 @@ export default function NewRouteScreen() {
                     })}
                   </View>
                   <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-                    The lead coordinates the day. Everyone on the crew can still check in and finish stops.
+                    The crew leader is the only crew member who checks the crew in at each property and finishes it. Every route needs one.
                   </Text>
                   <Pressable onPress={unassignCrew} style={styles.linkRow} accessibilityRole="button">
                     <Text style={[typeScale.bodySmall, { color: colors.textSecondary, fontWeight: '600' }]}>Unassign crew</Text>

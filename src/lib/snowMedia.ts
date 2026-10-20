@@ -37,8 +37,17 @@ export function snowReferenceFolder(companyId: string, propertyServiceId: string
 /** Uploads a local photo/video to the private bucket and returns its key. */
 export async function uploadSnowMedia(localUri: string, folder: string, mimeType?: string): Promise<string> {
   if (!isSupabaseConfigured) throw new Error('Snow media needs the live database.');
-  const { contentType, ext } = contentTypeOf(localUri, mimeType);
+  let { contentType, ext } = contentTypeOf(localUri, mimeType);
   await requireSession();
+  // Photos are compressed like everywhere else (about 50% quality, long side at most 1600 px). Videos are not compressed here yet
+  // (see mediaCompress.ts: needs the video library added to the app).
+  if (contentType.startsWith('image/')) {
+    const { prepareImage, isPrepared } = require('./mediaCompress') as typeof import('./mediaCompress');
+    if (!isPrepared(localUri)) {
+      const p = await prepareImage({ sourceUri: localUri, mimeType: contentType } as import('./mediaQueue').MediaJob);
+      if (p.uri !== localUri) { localUri = p.uri; contentType = 'image/jpeg'; ext = 'jpg'; }
+    }
+  }
   const key = `${folder}/${uuid()}.${ext}`;
 
   if (r2Enabled) {

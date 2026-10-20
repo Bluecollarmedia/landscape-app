@@ -3,7 +3,7 @@
  * timeline, owner notifications, and photo records (with upload).
  */
 
-import { db, insertRow, insertRows, saveDeferredRow, discardLocalRow, updateRow, type TableName } from './store';
+import { db, insertRow, insertRows, updateRow, type TableName } from './store';
 import { uploadImage } from '@/lib/media';
 import type { HistoryEventType, CustomerTimelineType, ProjectPhoto } from '@/types/project';
 import type { NotificationEventType, AppNotification } from '@/types/operations';
@@ -104,17 +104,12 @@ export function addProjectPhoto(input: NewPhoto): ProjectPhoto {
   }, { deferSave: needsUpload }) as unknown as ProjectPhoto;
 
   if (needsUpload) {
-    // Shown locally right away; saved for everyone once the file is uploaded.
-    uploadImage(localUri, `${db.companyId}/projects/${input.projectId}`)
-      .then(({ url, key }) => saveDeferredRow('project_photos', row.id, { fileUrl: url, fileKey: key }))
-      .catch((err) => {
-        console.warn('[photos] upload failed', err);
-        discardLocalRow('project_photos', row.id);
-        const { Alert, Platform } = require('react-native');
-        const msg = `The photo couldn't be uploaded. ${err?.message ?? ''}`.trim();
-        if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(msg);
-        else Alert.alert('Photo not saved', msg);
-      });
+    // Shown locally right away. The shared queue compresses it, uploads it, and saves the record only once the file is stored; if
+    // anything fails the photo stays in the list as "Failed" with Retry (it is no longer thrown away).
+    const { fileUrl: _f, fileKey: _k, id: _i, createdAt: _c, ...payload } = row as unknown as Record<string, unknown>;
+    void _f; void _k; void _i; void _c;
+    const { queueMedia } = require('@/lib/mediaQueueRuntime') as typeof import('@/lib/mediaQueueRuntime');
+    queueMedia({ id: row.id, kind: 'image', sourceUri: localUri, folder: `${db.companyId}/projects/${input.projectId}`, target: { type: 'project_photo', payload } });
   }
   return row;
 }

@@ -62,6 +62,7 @@ const mkProp = async (company, name) => {
 const mkRoute = async (company, name, crew, n) => {
   const route = (await one(`insert into public.maintenance_routes (company_id, service_date, name) values ($1, $2, $3) returning id`, [company, today, name])).id;
   for (const pid of crew) await db.query(`insert into public.maintenance_route_crew (company_id, route_id, person_id) values ($1,$2,$3)`, [company, route, pid]);
+  if (crew.length) await db.query(`update public.maintenance_routes set lead_person_id = $2 where id = $1`, [route, crew[0]]);  // every route has an explicitly named leader (update 68)
   const stops = [];
   for (let i = 0; i < n; i++) {
     const { p, c } = await mkProp(company, `${name} Prop ${i + 1}`);
@@ -168,7 +169,7 @@ check('14 owner B cannot use any owner function on company A\'s records (all 13 
 check('15 and nothing in company A changed (history, workdays, property times, breaks, skips, rates, alerts all identical)', (await snap()) === before);
 r = await rpc(ownerB.u, `select public.time_scan_alerts() as x`);
 check('16 owner B scanning alerts only touches company B (no company A alert appears for B)', r.ok && (await one(`select count(*)::int c from public.time_alerts where company_id = $1 and status = 'open'`, [co])).c >= 1, r.msg);
-r = await rpc(wB.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [rA.stops[0].id]);
+r = await rpc(wB.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [rA.stops[0].id]);
 const r2 = await rpc(wB.u, `select public.time_start_visit('assignment', $1::uuid) as x`, [jA1.asg]);
 const r3 = await rpc(wB.u, `select public.time_complete_visit($1::uuid) as x`, [visitA1]);
 const r4 = await rpc(wB.u, `select public.time_request_skip('maintenance_stop', $1::uuid, 'nope') as x`, [rA.stops[1].id]);
@@ -281,14 +282,14 @@ r = await rpc(m1.u, `select public.time_clock_in($1::date, null, null) as x`, [t
 check('39 maintenance worker 1 clocks in', r.ok, r.msg);
 r = await rpc(m2.u, `select public.time_clock_in($1::date, null, null) as x`, [today]);
 check('40 maintenance worker 2 clocks in', r.ok, r.msg);
-r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [keepStop]);
+r = await rpc(m1.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [keepStop]);
 check('41 worker 1 starts stop 1', r.ok, r.msg);
 const mv1 = (await one(`select id from public.time_visits where maintenance_stop_id = $1`, [keepStop])).id;
 
 // 4c. skip requests
 r = await rpc(m1.u, `select public.time_request_skip('maintenance_stop', $1::uuid, 'Customer away') as x`, [keepStop]);
-check('42 a worker cannot ask to skip the property they are working at right now', !r.ok && /working at this property/.test(r.msg), r.msg);
-r = await rpc(m1.u, `select public.time_complete_visit($1::uuid) as x`, [mv1]);
+check('42 a worker cannot ask to skip the property the crew is at right now', !r.ok && /crew is at this property|working at this property/.test(r.msg), r.msg);
+r = await rpc(m1.u, `select public.maintenance_leader_complete($1::uuid) as x`, [keepStop]);
 check('43 worker 1 completes stop 1', r.ok, r.msg);
 const stop2 = rA.stops[1].id, stop3 = rA.stops[2].id;
 await db.query(`update public.time_skip_requests set status = 'withdrawn' where id = $1`, [skipA]);
@@ -304,19 +305,19 @@ check('46 and the other request for the same stop is closed by it (not left pend
 // someone timing work at a stop that has a pending request
 r = await rpc(m2.u, `select public.time_request_skip('maintenance_stop', $1::uuid, 'Cannot reach') as x`, [stop3]);
 const q3 = r.v?.request_id;
-r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [stop3]);
+r = await rpc(m1.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [stop3]);
 check('47 a crew mate starts that stop (it was never skipped)', r.ok, r.msg);
 r = await rpc(owner.u, `select public.time_decide_skip($1::uuid, true, 'ok') as x`, [q3]);
-check('48 approving a skip while someone is timing work there is refused (their timer would be stranded)', !r.ok && /timing work/.test(r.msg) && (await one(`select status from public.maintenance_stops where id = $1`, [stop3])).status !== 'skipped', r.msg);
+check('48 when the crew starts the work, a waiting skip request for it is withdrawn, so there is nothing left to approve against a crew that is on site', r.ok && r.v.status === 'withdrawn' && (await one(`select status from public.maintenance_stops where id = $1`, [stop3])).status !== 'skipped', r.msg);
 const mv3 = (await one(`select id from public.time_visits where maintenance_stop_id = $1`, [stop3])).id;
-await rpc(m1.u, `select public.time_complete_visit($1::uuid) as x`, [mv3]);
+await rpc(m1.u, `select public.maintenance_leader_complete($1::uuid) as x`, [stop3]);
 r = await rpc(owner.u, `select public.time_decide_skip($1::uuid, true, 'ok') as x`, [q3]);
 check('49 once the stop is finished, the late request is closed instead of failing', r.ok && r.v.status === 'withdrawn' && (await one(`select status from public.maintenance_stops where id = $1`, [stop3])).status === 'completed', r.msg);
 r = await rpc(m1.u, `select public.time_request_skip('maintenance_stop', $1::uuid, 'Locked gate') as x`, [rA.stops[3].id]);
 const q4 = r.v?.request_id;
-r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [rA.stops[3].id]);
+r = await rpc(m1.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [rA.stops[3].id]);
 check('50 a worker who starts the work withdraws their own pending skip request', r.ok && (await one(`select status from public.time_skip_requests where id = $1`, [q4])).status === 'withdrawn', r.msg);
-await rpc(m1.u, `select public.time_complete_visit((select id from public.time_visits where maintenance_stop_id = $1)) as x`, [rA.stops[3].id]);
+await rpc(m1.u, `select public.maintenance_leader_complete($1::uuid) as x`, [rA.stops[3].id]);
 
 // 4d. deleting a stop / project keeps the visit
 f = await fails(`delete from public.maintenance_stops where id = $1`, [keepStop]);
@@ -328,13 +329,13 @@ check('52 deleting a project that has recorded time works and its visit stays', 
 // 4e. owner working out of order is allowed but written down
 const rO = await mkRoute(co, 'OwnerRoute', [], 2);
 r = await rpc(owner.u, `select public.time_clock_in($1::date, null, null) as x`, [today]);
-r = await rpc(owner.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [rO.stops[1].id]);
+r = await rpc(owner.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [rO.stops[1].id]);
 check('53 the owner can start a later stop out of order', r.ok, r.msg);
 const ov = await all(`select action, field, new_value, actor_id from public.time_audit where action = 'order_override'`);
 check('54 and the out-of-order start is in the history with the property that was skipped over', ov.length === 1 && ov[0].actor_id === owner.pid && /OwnerRoute Prop 1/.test(JSON.stringify(ov[0].new_value)), JSON.stringify(ov));
-r = await rpc(owner.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [rO.stops[1].id]);
+r = await rpc(owner.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [rO.stops[1].id]);
 check('55 a double tap by the owner does not write a second override row', r.ok && (await one(`select count(*)::int c from public.time_audit where action = 'order_override'`)).c === 1, r.msg);
-await rpc(owner.u, `select public.time_complete_visit((select id from public.time_visits where maintenance_stop_id = $1)) as x`, [rO.stops[1].id]);
+await rpc(owner.u, `select public.maintenance_leader_complete($1::uuid) as x`, [rO.stops[1].id]);
 await rpc(owner.u, `select public.time_clock_out() as x`);
 
 // 4f. photos have to be new, stored, and this worker's
@@ -432,16 +433,16 @@ check('75d once the owner sets the clock-out, that alert closes by itself', r.ok
 // 4j2. the checklist rule still applies inside the timed flow, and a refused completion leaves the timer running
 const rT = await mkRoute(co, 'TaskRoute', [m2.pid], 1);
 const taskId = (await one(`insert into public.maintenance_stop_tasks (company_id, route_id, stop_id, title, is_required) values ($1,$2,$3,'Blow off walkways', true) returning id`, [co, rT.route, rT.stops[0].id])).id;
-r = await rpc(m2.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [rT.stops[0].id]);
+r = await rpc(m2.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [rT.stops[0].id]);
 const tv = (await one(`select id from public.time_visits where maintenance_stop_id = $1`, [rT.stops[0].id])).id;
-r = await rpc(m2.u, `select public.time_complete_visit($1::uuid) as x`, [tv]);
+r = await rpc(m2.u, `select public.maintenance_leader_complete($1::uuid) as x`, [rT.stops[0].id]);
 check('88 a required checklist item blocks completing the property, and the timer keeps running (nothing half-saved)', !r.ok && /checklist/.test(r.msg)
-  && (await one(`select count(*)::int c from public.time_intervals where visit_id = $1 and person_id = $2 and ended_at is null and status = 'active'`, [tv, m2.pid])).c === 1
+  && (await one(`select count(*)::int c from public.time_visits where id = $1 and ended_at is null and status = 'in_progress'`, [tv])).c === 1
   && (await one(`select status from public.maintenance_stops where id = $1`, [rT.stops[0].id])).status === 'arrived', r.msg);
 await rpc(m2.u, `select public.maintenance_set_task_done($1::uuid, true) as x`, [taskId]);
-r = await rpc(m2.u, `select public.time_complete_visit($1::uuid) as x`, [tv]);
-check('89 once the item is ticked the property completes, and the timer stops at that moment', r.ok && (await one(`select status from public.maintenance_stops where id = $1`, [rT.stops[0].id])).status === 'completed'
-  && (await one(`select ended_at is not null as e from public.time_intervals where visit_id = $1 and person_id = $2`, [tv, m2.pid])).e === true, r.msg);
+r = await rpc(m2.u, `select public.maintenance_leader_complete($1::uuid) as x`, [rT.stops[0].id]);
+check('89 once the item is ticked the property completes, and the visit gets its completion time at that moment', r.ok && (await one(`select status from public.maintenance_stops where id = $1`, [rT.stops[0].id])).status === 'completed'
+  && (await one(`select ended_at is not null as e from public.time_visits where id = $1`, [tv])).e === true, r.msg);
 
 // 4j3. typo guards on the owner's own entries (the employee's server-stamped times are never refused)
 r = await rpc(owner.u, `select public.time_staff_add_workday($1::uuid, current_date - 12, $2::timestamptz, $3::timestamptz, 'typo: wrong clock-out day') as x`, [w4.pid, iso(12 * 1440 + 480), iso(10 * 1440)]);
@@ -461,6 +462,7 @@ check('76 a day the owner adds by hand is recorded as an owner correction, not a
 // 4l. two taps at once never make two workdays
 const w6 = await mk('w6@x.test', 'Double Tap');
 await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1,$2,'worker','active')`, [co, w6.pid]);
+await db.query(`insert into public.assignments (company_id, project_id, person_id, scheduled_date, sort_order, status) values ($1,$2,$3,$4,9,'scheduled')`, [co, jA2.proj, w6.pid, today]);  // clock-in needs work that day (update 67)
 const taps = await Promise.all([1, 2, 3].map(() => rpc(w6.u, `select public.time_clock_in($1::date, null, gen_random_uuid()) as x`, [today])));
 check('77 three quick Clock In taps with different request ids still leave exactly one open workday', taps.every((t) => t.ok) && (await one(`select count(*)::int c from public.time_workdays where person_id = $1 and clock_out_at is null`, [w6.pid])).c === 1, taps.map((t) => t.msg).join('|'));
 

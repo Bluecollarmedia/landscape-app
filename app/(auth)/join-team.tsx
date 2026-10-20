@@ -4,7 +4,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Alert, Keyboar
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
@@ -14,8 +14,7 @@ import { Input, Button } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
-import { useTeamCode } from '@/hooks/useOnboarding';
-import { lookupSnowCode, requestSnowAccess } from '@/hooks/useSnowOnboarding';
+import { lookupAnyCode } from '@/hooks/useSnowOnboarding';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/media';
 import { saveBirthdayForCurrentUser } from '@/data/birthday';
@@ -29,18 +28,17 @@ import type { HoodieSize } from '@/lib/workerDetails';
 
 type Step = 'code' | 'account' | 'profile';
 
-/** Same screen for the landscaping team code and the separate Snow code
- * (`?kind=snow`). A Snow code only files a Snow access request. */
+/** One "Join a Team" screen for every code. The server works out whether the code is a team code (landscaping / maintenance)
+ * or a Snow code; a Snow code only files a Snow access request, a team code only a team request. Either way the owner approves first. */
 
 export default function JoinTeamScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { setAppState, signUp, isAuthenticated, user, refreshContext } = useAuth();
-  const { validateCode: validateTeamCode } = useTeamCode();
-  const isSnow = useLocalSearchParams<{ kind?: string }>().kind === 'snow';
-  const validateCode = isSnow ? lookupSnowCode : validateTeamCode;
-  const codeLabel = isSnow ? 'Snow Code' : 'Team Code';
+  const [kind, setKind] = useState<'team' | 'snow'>('team');
+  const isSnow = kind === 'snow';
+  const codeLabel = 'Team or Snow Code';
   // Already signed in (came from "Finish setting up"): skip the account step.
   const signedIn = isSupabaseConfigured && isAuthenticated && !!user;
 
@@ -68,15 +66,16 @@ export default function JoinTeamScreen() {
   const [loading, setLoading] = useState(false);
 
   async function handleValidateCode() {
-    const result = await validateCode(teamCode.trim());
+    const result = await lookupAnyCode(teamCode.trim());
     if (result.valid) {
       setCodeValid(true);
       setCodeError('');
+      setKind(result.kind === 'snow' ? 'snow' : 'team');
       setCompanyName(result.companyName ?? '');
-      setJoiningAsMaintenance('workerType' in result && result.workerType === 'maintenance');
+      setJoiningAsMaintenance(result.workerType === 'maintenance');
     } else {
       setCodeValid(false);
-      setCodeError(`Invalid ${codeLabel.toLowerCase()}. Please check and try again.`);
+      setCodeError('That code does not work. Please check it and try again, or ask your manager for a new one.');
     }
   }
 
@@ -147,18 +146,13 @@ export default function JoinTeamScreen() {
 
     try {
       const profile = { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() };
-      if (signedIn && isSnow) {
-        const res = await requestSnowAccess(teamCode);
-        if (!res.ok) throw new Error(res.error);
-        await supabase.from('people').update({
-          first_name: profile.firstName, last_name: profile.lastName, phone: profile.phone,
-        }).eq('id', user!.id);
-      } else if (signedIn) {
-        const { data, error: rpcError } = await supabase.rpc('request_join', { p_code: teamCode.trim() });
+      if (signedIn) {
+        // The database files the right kind of request for this code (team or Snow); the phone never chooses.
+        const { data, error: rpcError } = await supabase.rpc('join_with_code', { p_code: teamCode.trim() });
         if (rpcError) throw rpcError;
         const result = data as { success: boolean; error?: string };
         if (!result?.success) {
-          throw new Error(result?.error === 'already_member' ? "You're already on this team." : 'That team code no longer works. Ask your manager for a new one.');
+          throw new Error(result?.error === 'already_member' ? "You're already on this team." : 'That code no longer works. Ask your manager for a new one.');
         }
         await supabase.from('people').update({
           first_name: profile.firstName, last_name: profile.lastName, phone: profile.phone,
@@ -230,7 +224,7 @@ export default function JoinTeamScreen() {
           <Icon name="arrow-left" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
-          {isSnow ? 'Join the Snow Team' : 'Join a Team'}
+          Join a Team
         </Text>
         <View style={{ width: 24 }} />
       </View>
@@ -255,13 +249,11 @@ export default function JoinTeamScreen() {
         {step === 'code' && (
           <View style={styles.form}>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-              {isSnow
-                ? 'Enter the Snow code from the owner. It sends a request; you get snow access only after the owner approves it.'
-                : "Enter the team code provided by your company. Ask your manager or team lead if you don't have one."}
+              Enter the code your employer gave you (a team code or a Snow code). It sends a request; you get access only after the owner approves it.
             </Text>
             <Input
               label={codeLabel}
-              placeholder={isSnow ? 'e.g. SNOW-7KQ4HM' : 'e.g. BRIGHTON-4821'}
+              placeholder="e.g. BRIGHTON-4821 or SNOW-7KQ4HM"
               value={teamCode}
               onChangeText={(v) => { setTeamCode(v.toUpperCase()); setCodeValid(false); setCodeError(''); }}
               autoCapitalize="characters"

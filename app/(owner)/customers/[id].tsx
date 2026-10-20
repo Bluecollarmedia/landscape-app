@@ -160,10 +160,38 @@ export default function CustomerDetailScreen() {
               })
             ) : (
               <Text style={[typeScale.bodySmall, { color: colors.textTertiary, marginTop: spacing.xs }]}>
-                No projects yet
+                {c.maintenanceProperties.length > 0 ? 'No projects (see maintenance properties below)' : 'No projects yet'}
               </Text>
             )}
           </View>
+
+          {/* Maintenance properties linked to this customer (the same customer link the Maintenance tab uses) */}
+          {c.maintenanceProperties.length > 0 ? (
+            <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700', marginBottom: spacing.sm }]}>
+                Maintenance properties ({c.maintenanceProperties.length})
+              </Text>
+              {c.maintenanceProperties.map((mp, i) => (
+                <Pressable
+                  key={mp.id}
+                  style={[styles.projectRow, i > 0 && { marginTop: spacing.sm }]}
+                  onPress={() => router.push(`/(owner)/maintenance/properties/${mp.id}` as any)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Maintenance property ${mp.name}`}
+                >
+                  <View style={[styles.projectIcon, { backgroundColor: colors.backgroundTertiary }]}>
+                    <Icon name="home" size={18} color={colors.textTertiary} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{mp.name}</Text>
+                    {mp.address ? <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{mp.address}</Text> : null}
+                  </View>
+                  {!mp.isActive ? <StatusBadge label="Inactive" status="neutral" /> : null}
+                  <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
 
           {/* Account */}
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>

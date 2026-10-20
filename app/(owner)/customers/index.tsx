@@ -77,7 +77,19 @@ export default function CustomersListScreen() {
                     />
                   </View>
 
-                  {firstProject ? (
+                  {!firstProject && item.maintenanceProperties.length > 0 ? (
+                    <View style={styles.detailRow}>
+                      <Icon name="home" size={12} color={colors.textTertiary} />
+                      <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, flexShrink: 1 }]} numberOfLines={1}>
+                        {item.maintenanceProperties[0].name} · Maintenance
+                      </Text>
+                      {item.maintenanceProperties.length > 1 && (
+                        <View style={[styles.moreChip, { backgroundColor: colors.backgroundTertiary }]}>
+                          <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>+{item.maintenanceProperties.length - 1} more</Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : firstProject ? (
                     <View style={styles.detailRow}>
                       <Icon name="home" size={12} color={colors.textTertiary} />
                       <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, flexShrink: 1 }]} numberOfLines={1}>

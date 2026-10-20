@@ -41,13 +41,16 @@ begin
   if exists (select 1 from public.company_members m where m.company_id = new.company_id and m.person_id = new.person_id and m.worker_type = 'maintenance') then
     select r.id into rid from public.maintenance_routes r join public.maintenance_route_crew c on c.route_id = r.id
      where c.person_id = new.person_id and r.service_date = new.work_date and r.status <> 'cancelled' order by r.created_at limit 1;
+    -- A day the owner adds by hand (the worker forgot to clock in) is recorded as an owner correction, not as the worker's arrival.
     insert into public.maintenance_day_attendance (company_id, person_id, service_date, route_id, started_at, source, location_status)
-    values (new.company_id, new.person_id, new.work_date, rid, new.clock_in_at, 'worker', 'unavailable')
+    values (new.company_id, new.person_id, new.work_date, rid,
+            new.clock_in_at, case when public.my_person_id() is not distinct from new.person_id then 'worker' else 'owner_correction' end, 'unavailable')
     on conflict (company_id, person_id, service_date) do nothing;
   end if;
   return null;
 end;
 $$;
+revoke all on function public._time_attendance_sync() from public, anon, authenticated;
 drop trigger if exists time_workdays_attendance on public.time_workdays;
 create trigger time_workdays_attendance after insert on public.time_workdays
   for each row execute function public._time_attendance_sync();
@@ -66,3 +69,8 @@ create table if not exists public.time_project_estimates (
 alter table public.time_project_estimates enable row level security;
 drop policy if exists time_project_estimates_staff on public.time_project_estimates;
 create policy time_project_estimates_staff on public.time_project_estimates for all using (public.is_staff(company_id)) with check (public.is_staff(company_id));
+revoke all on public.time_project_estimates from anon;
+-- The project has to be in the same company as the estimate row (the policy only checks the company_id column).
+drop trigger if exists time_project_estimates_same_company on public.time_project_estimates;
+create trigger time_project_estimates_same_company before insert or update on public.time_project_estimates
+  for each row execute function public._time_check_same_company();

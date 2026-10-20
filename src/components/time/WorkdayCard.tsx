@@ -15,6 +15,7 @@ function say(title: string, message: string) {
   else Alert.alert(title, message);
 }
 const timeOfDay = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const dayAndTime = (iso: string) => `${new Date(iso).toLocaleDateString('en-US', { weekday: 'short' })} ${timeOfDay(iso)}`;
 
 /**
  * The employee's workday: Clock In at the yard, the running day total, the truck, an optional break, and Clock Out. The timer runs
@@ -36,6 +37,8 @@ export function WorkdayCard() {
   }, [running]);
   const nowMs = Date.now() + w.clockOffsetMs;
   const todayNetMs = w.netMsAt(nowMs);
+  // Still clocked in from an earlier calendar day: almost always a forgotten clock-out. Said plainly, never hidden or silently closed.
+  const fromEarlier = !!w.active && new Date(w.active.clockInAt).toDateString() !== new Date(nowMs).toDateString();
 
   if (w.installed !== true) return null;
   const active = w.active;
@@ -92,10 +95,15 @@ export function WorkdayCard() {
           <View style={styles.head}>
             <View style={[styles.dot, { backgroundColor: w.onBreak ? colors.warning : colors.success }]} />
             <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>{w.onBreak ? 'ON BREAK' : 'WORKDAY'}</Text>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>since {timeOfDay(active.clockInAt)}</Text>
+            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>since {fromEarlier ? dayAndTime(active.clockInAt) : timeOfDay(active.clockInAt)}</Text>
           </View>
           <Text style={[styles.timer, { color: colors.textPrimary }]} accessibilityLabel={`Workday total ${durationText(todayNetMs)}`}>{clockText(todayNetMs)}</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Workday total</Text>
+          {fromEarlier ? (
+            <Text style={[typeScale.caption, { color: colors.warning, marginTop: spacing.xs }]}>
+              This workday started on an earlier day. If you forgot to clock out, clock out now and tell your boss when you really finished so they can fix the time.
+            </Text>
+          ) : null}
 
           {active.truck ? (
             <View style={styles.row}>

@@ -85,11 +85,20 @@ const est = r.estimateComparison(pt.laborMs, 12);
 check('12 estimate vs actual in the same unit: 12 h estimated, 14.5 h actual = 2.5 h over; no estimate = no comparison', est.over && est.diffHours === 2.5 && r.estimateComparison(pt.laborMs, null) === null);
 
 const dayCsv = r.dailyCsv(rows);
-check('13 the daily CSV has the right columns, ISO times and numeric hours', dayCsv.startsWith('﻿Employee,Work date,Clock in,Clock out,Gross workday hours,Recorded break hours,Break hours deducted,Net payable hours,Property labor hours,Hourly rate,Payable cost (straight time),Status,Approved at,Needs review\r\n')
+check('13 the daily CSV has the right columns, ISO times and numeric hours', dayCsv.startsWith('﻿Employee,Work date,Clock in (UTC),Clock out (UTC),Gross workday hours,Recorded break hours,Break hours deducted,Net payable hours,Property labor hours,Hourly rate,Payable cost (straight time),Status,Approved at (UTC),Needs review\r\n')
   && dayCsv.includes('Ann Adams,2026-10-19,2026-10-19T07:30:00.000Z,2026-10-19T16:00:00.000Z,8.50,0.50,0.50,8.00,3.00,20.00,160.00,ready'), dayCsv.split('\r\n')[1]);
 const wkCsv = r.weeklyCsv(week);
 check('14 the weekly CSV carries regular, overtime, basis and cost', wkCsv.includes('Regular hours') && wkCsv.includes('5.00,3.00,Overtime = net payable hours over 5 in the week at 1.5x'.replace(' in the week at', ' in the week, at')) || /5\.00,3\.00,"?Overtime = net payable hours over 5/.test(wkCsv), wkCsv.split('\r\n')[1]);
 const vCsv = r.visitsCsv(vr);
 check('15 the visit CSV keeps elapsed hours and crew labor hours in separate columns', vCsv.includes('Elapsed visit hours,Crew labor hours') && vCsv.includes('Chase,2026-10-19,completed,true') && /,2\.00,4\.00,120,/.test(vCsv), vCsv.split('\r\n')[1]);
+
+const mixSnap = { workdays: [
+  { id: 'm1', personId: 'c', workDate: '2026-10-19', clockInAt: at(19, 8), clockOutAt: at(19, 16), status: 'closed', hourlyRate: 20 },
+  { id: 'm2', personId: 'c', workDate: '2026-10-20', clockInAt: at(20, 8), clockOutAt: at(20, 16), status: 'closed', hourlyRate: 30 }], breaks: [], visits: [], intervals: [], names: { c: 'Cy Cole' } };
+const mixW = r.weekRows(mixSnap, '2026-10-19', undefined, now)[0];
+check('16 a raise in the middle of the week: each day is priced at its own saved rate (8 x 20 + 8 x 30 = 400, not 16 x 30 = 480) and the row says the rate changed',
+  mixW.payCost === 400 && mixW.rateChanged === true && mixW.rate === 30, JSON.stringify(mixW.payCost));
+const blankSnap = { ...mixSnap, workdays: [mixSnap.workdays[0], { ...mixSnap.workdays[1], hourlyRate: null }] };
+check('17 a day recorded before any rate existed makes the week cost "no rate" (null) instead of pricing it at another day\'s rate', r.weekRows(blankSnap, '2026-10-19', undefined, now)[0].payCost === null);
 console.log(bad ? '\n' + bad + ' failed' : '\nall passed');
 process.exit(bad ? 1 : 0);

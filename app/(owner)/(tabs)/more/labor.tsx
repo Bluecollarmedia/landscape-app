@@ -44,6 +44,8 @@ export default function LaborOverviewScreen() {
   const now = Date.now();
   const rows = useMemo(() => (L.snapshot ? dayRows(L.snapshot, now) : []), [L.snapshot, Math.floor(now / 30000)]);
   const pendingSkips = (L.snapshot?.skips ?? []).filter((s) => s.status === 'pending');
+  // Still clocked in from an earlier day (almost always a forgotten clock-out): never counted in today's totals, but never hidden either.
+  const stale = L.snapshot?.staleOpen ?? [];
   const clockedIn = rows.filter((r) => !r.workday.clockOutAt);
   const onProperty = clockedIn.filter((r) => r.currentLabel);
   const ready = rows.filter((r) => r.state === 'ready');
@@ -80,7 +82,7 @@ export default function LaborOverviewScreen() {
             </View>
           </Card>
 
-          {pendingSkips.length + alerts.length > 0 ? (
+          {pendingSkips.length + alerts.length + stale.length > 0 ? (
             <Card title="NEEDS ATTENTION">
               {pendingSkips.map((s) => (
                 <View key={s.id} style={[styles.alertRow, { borderColor: colors.borderLight }]}>
@@ -94,6 +96,16 @@ export default function LaborOverviewScreen() {
                     </View>
                   </View>
                 </View>
+              ))}
+              {stale.map((w) => (
+                <Pressable key={w.id} onPress={() => openDay(w.id)} style={[styles.alertRow, { borderColor: colors.borderLight }]} accessibilityRole="button">
+                  <Icon name="alert-circle" size={18} color={colors.warning} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Still clocked in: {L.snapshot?.names[w.personId] ?? 'An employee'}</Text>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Clocked in {fmtDayLong(w.workDate)} at {fmtClock(w.clockInAt)} and never clocked out. Open the day to set the clock-out.</Text>
+                  </View>
+                  <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+                </Pressable>
               ))}
               {alerts.filter((a) => a.kind !== 'skip_request').map((a) => (
                 <Pressable key={a.id}

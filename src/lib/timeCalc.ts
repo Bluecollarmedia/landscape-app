@@ -173,6 +173,29 @@ export function weekPayCost(w: Pick<WeekSummary, 'regularMs' | 'overtimeMs'>, ra
   return Math.round((toHours(w.regularMs) * rate + toHours(w.overtimeMs) * rate * multiplier) * 100) / 100;
 }
 
+export interface PayDay { workDate: string; clockInAt: string; netMs: number; rate: number | null | undefined }
+
+/**
+ * The same week cost, but each day is paid at the rate saved with THAT day (so a raise in the middle of a week, or a day recorded before a
+ * rate existed, is never priced at some other day's rate). Hours are taken in order; the ones past the weekly threshold are overtime and
+ * earn the multiplier on top of the rate of the day they were worked. Returns null when any day with time has no rate (the cost is unknown).
+ */
+export function weekPayCostByDay(days: PayDay[], terms: OvertimeTerms = DEFAULT_TERMS): number | null {
+  const threshold = terms.weeklyThresholdHours * HOUR_MS;
+  let cumulative = 0;
+  let cost = 0;
+  const ordered = days.slice().sort((a, b) => a.workDate.localeCompare(b.workDate) || a.clockInAt.localeCompare(b.clockInAt));
+  for (const d of ordered) {
+    if (d.netMs <= 0) continue;
+    if (d.rate == null) return null;
+    const regular = terms.enabled ? Math.max(0, Math.min(d.netMs, threshold - cumulative)) : d.netMs;
+    const overtime = d.netMs - regular;
+    cost += toHours(regular) * d.rate + toHours(overtime) * d.rate * terms.multiplier;
+    cumulative += d.netMs;
+  }
+  return Math.round(cost * 100) / 100;
+}
+
 // ── Timeline ────────────────────────────────────────────────────────────────
 export type TimelineKind = 'clock_in' | 'clock_out' | 'visit' | 'break' | 'gap' | 'open';
 export interface TimelineEntry { kind: TimelineKind; startedAt: string; endedAt?: string | null; label: string; refId?: string; ms: number }

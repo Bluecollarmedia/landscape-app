@@ -78,5 +78,22 @@ const csv = t.toCsv([{ n: 'Ann, "A" Smith', h: 8.5, f: '=SUM(A1)', ok: true, e: 
   { header: 'Name', value: (r) => r.n }, { header: 'Hours', value: (r) => r.h }, { header: 'Note', value: (r) => r.f }, { header: 'OK', value: (r) => r.ok }, { header: 'Empty', value: (r) => r.e }]);
 check('23 CSV: byte-order mark, CRLF, quoted commas and quotes, numbers unquoted, formulas neutralised', csv.startsWith('﻿Name,Hours,Note,OK,Empty\r\n') && csv.includes('"Ann, ""A"" Smith",8.5,\'=SUM(A1),true,') && csv.endsWith('\r\n'), JSON.stringify(csv));
 check('24 durations read well', t.durationText(3 * H + 5 * 60000) === '3h 05m' && t.durationText(45 * 60000) === '45m' && t.clockText(H + 5 * 60000 + 9000) === '1:05:09');
+
+// ── weekly cost: each day at its own saved rate ──
+const mixedDays = [
+  { workDate: '2026-10-19', clockInAt: '2026-10-19T08:00:00Z', netMs: 8 * H, rate: 20 },
+  { workDate: '2026-10-20', clockInAt: '2026-10-20T08:00:00Z', netMs: 8 * H, rate: 20 },
+  { workDate: '2026-10-21', clockInAt: '2026-10-21T08:00:00Z', netMs: 8 * H, rate: 25 },
+  { workDate: '2026-10-22', clockInAt: '2026-10-22T08:00:00Z', netMs: 8 * H, rate: 25 },
+  { workDate: '2026-10-23', clockInAt: '2026-10-23T08:00:00Z', netMs: 8 * H, rate: 25 },
+  { workDate: '2026-10-24', clockInAt: '2026-10-24T08:00:00Z', netMs: 8 * H, rate: 25 },
+];
+const std = { enabled: true, weeklyThresholdHours: 40, multiplier: 1.5 };
+check('25 weekly cost prices each day at its own saved rate: 16 h at 20 + 24 h at 25 = 920, plus the 41st-48th hours as overtime at 25 x 1.5 = 300 (one latest rate would say 1300)',
+  t.weekPayCostByDay(mixedDays, std) === 1220 && t.weekPayCostByDay(mixedDays.slice().reverse(), std) === 1220, String(t.weekPayCostByDay(mixedDays, std)));
+check('26 a day with time but no saved rate makes the week cost unknown (null), never a guess; a day with no time is ignored',
+  t.weekPayCostByDay([{ ...mixedDays[0], rate: null }], std) === null && t.weekPayCostByDay([{ ...mixedDays[0], netMs: 0, rate: null }, mixedDays[1]], std) === 160);
+check('27 overtime off: every hour is straight time at that day\'s rate (16 x 20 + 32 x 25 = 1120)', t.weekPayCostByDay(mixedDays, { ...std, enabled: false }) === 1120);
+check('28 it agrees with the single-rate formula when every day has the same rate', t.weekPayCostByDay(mixedDays.map((d) => ({ ...d, rate: 20 })), std) === t.weekPayCost(t.summarizeWeek('2026-10-19', mixedDays.map((d, i) => ({ workdayId: String(i), workDate: d.workDate, grossMs: d.netMs, recordedBreakMs: 0, deductedBreakMs: 0, netMs: d.netMs, status: 'closed', open: false })), std), 20, 1.5));
 console.log(bad ? '\n' + bad + ' failed' : '\nall passed');
 process.exit(bad ? 1 : 0);

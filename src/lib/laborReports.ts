@@ -1,7 +1,7 @@
 // Owner reports built from the stored time records (src/data/timeTracking.ts LaborSnapshot). Pure functions on top of timeCalc.ts, so the
 // screens and the CSV exports always show the same numbers.
 import {
-  summarizeDay, summarizeWeek, weekStartKey, dayProblems, reviewState, visitElapsedMs, crewLaborMs, intervalMs, costOf, weekPayCost, toCsv, hoursText, round2, toHours,
+  summarizeDay, summarizeWeek, weekStartKey, dayProblems, reviewState, visitElapsedMs, crewLaborMs, intervalMs, costOf, weekPayCostByDay, toCsv, hoursText, round2, toHours,
   DEFAULT_TERMS, HOUR_MS,
   type CsvColumn, type DaySummary, type OvertimeTerms, type Problem, type ReviewState, type WeekSummary, type VisitRecord,
 } from './timeCalc';
@@ -47,7 +47,16 @@ export function dayRows(s: RSnapshot, now: number = Date.now(), openHours = 14):
   }).sort((a, b) => a.personName.localeCompare(b.personName) || a.workday.clockInAt.localeCompare(b.workday.clockInAt));
 }
 
-export interface WeekRow { personId: string; personName: string; week: WeekSummary; rate: number | null; payCost: number | null; propertyLaborMs: number }
+export interface WeekRow {
+  personId: string; personName: string; week: WeekSummary;
+  /** The rate saved with the employee's latest day this week. */
+  rate: number | null;
+  /** True when the days of the week were saved at different rates (a raise mid-week, or a day recorded before a rate existed). */
+  rateChanged: boolean;
+  /** Each day priced at the rate saved with that day; null when a day with time has no rate. */
+  payCost: number | null;
+  propertyLaborMs: number;
+}
 
 /** One row per employee for the week starting on `weekStart` (Monday). */
 export function weekRows(s: RSnapshot, weekStart: string, termsOf: (personId: string) => OvertimeTerms = () => DEFAULT_TERMS, now: number = Date.now()): WeekRow[] {
@@ -58,7 +67,9 @@ export function weekRows(s: RSnapshot, weekStart: string, termsOf: (personId: st
     const terms = termsOf(personId);
     const week = summarizeWeek(weekStart, list.map((r) => r.summary), terms);
     const rate = list[list.length - 1].workday.hourlyRate ?? null;
-    return { personId, personName: list[0].personName, week, rate, payCost: weekPayCost(week, rate, terms.multiplier), propertyLaborMs: list.reduce((t, r) => t + r.propertyLaborMs, 0) };
+    const rateChanged = new Set(list.filter((r) => r.summary.netMs > 0).map((r) => r.workday.hourlyRate ?? null)).size > 1;
+    const payCost = weekPayCostByDay(list.map((r) => ({ workDate: r.workday.workDate, clockInAt: r.workday.clockInAt, netMs: r.summary.netMs, rate: r.workday.hourlyRate })), terms);
+    return { personId, personName: list[0].personName, week, rate, rateChanged, payCost, propertyLaborMs: list.reduce((t, r) => t + r.propertyLaborMs, 0) };
   }).sort((a, b) => a.personName.localeCompare(b.personName));
 }
 
@@ -74,7 +85,8 @@ export interface VisitRow extends VisitRecord {
 
 /** Visits with elapsed time (the visit itself) and crew labor (the sum of each employee's own time) kept apart. */
 export function visitRows(visits: RVisit[], intervals: RInterval[], names: Record<string, string>, now: number = Date.now()): VisitRow[] {
-  return visits.map((v): VisitRow => {
+  // A visit whose every time was removed (void) has nothing to show; its history stays in the audit log.
+  return visits.filter((v) => v.status !== 'void').map((v): VisitRow => {
     const mine = intervals.filter((i) => i.visitId === v.id && i.status !== 'void').map((i) => ({ ...i, endedAt: i.endedAt ?? null }));
     const perPerson = new Map<string, { ms: number; cost: number }>();
     let unknownCost = false;
@@ -149,8 +161,8 @@ const money = (n: number | null | undefined) => (n == null ? '' : n.toFixed(2));
 export const dailyCsv = (rows: DayRow[]) => toCsv<DayRow>(rows, [
   { header: 'Employee', value: (r) => r.personName },
   { header: 'Work date', value: (r) => r.workday.workDate },
-  { header: 'Clock in', value: (r) => dt(r.workday.clockInAt) },
-  { header: 'Clock out', value: (r) => dt(r.workday.clockOutAt) },
+  { header: 'Clock in (UTC)', value: (r) => dt(r.workday.clockInAt) },
+  { header: 'Clock out (UTC)', value: (r) => dt(r.workday.clockOutAt) },
   { header: 'Gross workday hours', value: (r) => hoursText(r.summary.grossMs) },
   { header: 'Recorded break hours', value: (r) => hoursText(r.summary.recordedBreakMs) },
   { header: 'Break hours deducted', value: (r) => hoursText(r.summary.deductedBreakMs) },
@@ -159,7 +171,7 @@ export const dailyCsv = (rows: DayRow[]) => toCsv<DayRow>(rows, [
   { header: 'Hourly rate', value: (r) => money(r.workday.hourlyRate) },
   { header: 'Payable cost (straight time)', value: (r) => money(r.payableCost) },
   { header: 'Status', value: (r) => r.state },
-  { header: 'Approved at', value: (r) => dt(r.workday.approvedAt) },
+  { header: 'Approved at (UTC)', value: (r) => dt(r.workday.approvedAt) },
   { header: 'Needs review', value: (r) => r.problems.map((p) => p.message).join(' | ') },
 ]);
 
@@ -173,8 +185,9 @@ export const weeklyCsv = (rows: WeekRow[]) => toCsv<WeekRow>(rows, [
   { header: 'Regular hours', value: (r) => hoursText(r.week.regularMs) },
   { header: 'Overtime hours', value: (r) => hoursText(r.week.overtimeMs) },
   { header: 'Overtime basis', value: (r) => r.week.basis },
-  { header: 'Hourly rate', value: (r) => money(r.rate) },
-  { header: 'Payable cost', value: (r) => money(r.payCost) },
+  { header: 'Hourly rate (latest day)', value: (r) => money(r.rate) },
+  { header: 'Rate changed during the week', value: (r) => r.rateChanged },
+  { header: 'Payable cost (each day at its own saved rate)', value: (r) => money(r.payCost) },
   { header: 'Property labor hours', value: (r) => hoursText(r.propertyLaborMs) },
   { header: 'All days approved', value: (r) => r.week.approved },
 ]);
@@ -184,8 +197,8 @@ export const visitsCsv = (rows: VisitRow[]) => toCsv<VisitRow>(rows, [
   { header: 'Visit date', value: (r) => r.visit.visitDate },
   { header: 'Status', value: (r) => r.status },
   { header: 'Billable', value: (r) => r.billable },
-  { header: 'Started', value: (r) => dt(r.startedAt) },
-  { header: 'Ended', value: (r) => dt(r.endedAt) },
+  { header: 'Started (UTC)', value: (r) => dt(r.startedAt) },
+  { header: 'Ended (UTC)', value: (r) => dt(r.endedAt) },
   { header: 'Elapsed visit hours', value: (r) => (r.elapsedMs == null ? '' : hoursText(r.elapsedMs)) },
   { header: 'Crew labor hours', value: (r) => hoursText(r.laborMs) },
   { header: 'Target minutes', value: (r) => r.targetMinutes ?? '' },
@@ -197,7 +210,7 @@ export const visitsCsv = (rows: VisitRow[]) => toCsv<VisitRow>(rows, [
 
 export interface AuditCsvRow { createdAt: string; entity: string; action: string; field?: string; oldValue?: unknown; newValue?: unknown; reason?: string; actor?: string; person?: string; wasApproved: boolean }
 export const auditCsv = (rows: AuditCsvRow[]) => toCsv<AuditCsvRow>(rows, ([
-  { header: 'When', value: (r) => dt(r.createdAt) },
+  { header: 'When (UTC)', value: (r) => dt(r.createdAt) },
   { header: 'Employee', value: (r) => r.person },
   { header: 'What', value: (r) => `${r.entity}: ${r.action}` },
   { header: 'Field', value: (r) => r.field },

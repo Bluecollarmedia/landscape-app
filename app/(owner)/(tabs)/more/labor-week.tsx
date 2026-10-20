@@ -78,7 +78,7 @@ export default function LaborWeekScreen() {
               <KV label="Net payable time" value={`${hoursText(r.week.netMs)} h`} bold />
               <KV label="Regular hours" value={`${hoursText(r.week.regularMs)} h`} />
               <KV label="Overtime hours" value={`${hoursText(r.week.overtimeMs)} h`} hint={r.week.basis} />
-              <KV label="Hourly rate" value={money(r.rate)} />
+              <KV label="Hourly rate" value={money(r.rate)} hint={r.rateChanged ? 'Changed during this week. Each day is priced at the rate saved with that day.' : undefined} />
               <KV label="Payable cost" value={r.payCost == null ? 'No rate set' : `$${r.payCost.toFixed(2)}`} bold />
               {open === r.personId ? days.filter((d) => d.workday.personId === r.personId && weekStartKey(d.workday.workDate) === weekStart).map((d) => (
                 <Pressable key={d.workday.id} onPress={() => router.push({ pathname: '/(owner)/more/labor-day', params: { id: d.workday.id } } as never)} accessibilityRole="button"

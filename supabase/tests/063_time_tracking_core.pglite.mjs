@@ -20,7 +20,8 @@ const asUser = async (u) => { await db.exec(`reset role; select set_config('requ
 const asDb = async () => { await db.exec('reset role'); };
 const call = async (u, sql, p) => { await asUser(u); try { return await fails(sql, p); } finally { await asDb(); } };
 const rpc = async (u, sql, p) => { await asUser(u); try { const r = await db.query(sql, p); return { ok: true, v: Object.values(r.rows[0] ?? {})[0] }; } catch (e) { return { ok: false, msg: String(e.message) }; } finally { await asDb(); } };
-const today = new Date().toISOString().slice(0, 10);
+// The database's own idea of today (its time zone can differ from UTC), so the test never straddles a date boundary.
+const today = (await db.query(`select current_date::text as d`)).rows[0].d;
 
 // ── fixtures ────────────────────────────────────────────────────────────────
 const co = (await one(`insert into public.companies (name) values ('Test Co') returning id`)).id;
@@ -134,7 +135,10 @@ check('26 job B is locked until job A is done', !r.ok && /Finish Job A first/.te
 await db.query(`update public.time_settings set require_start_photo = true, require_complete_photo = true where company_id = $1`, [co]);
 r = await rpc(w1.u, `select public.time_start_visit('assignment', $1::uuid) as x`, [asg[0]]);
 check('27 the start photo is required when the owner says so', !r.ok && /start photo/.test(r.msg), r.msg);
-await db.query(`insert into public.project_photos (company_id, project_id, uploaded_by, file_url, time_phase) values ($1,$2,$3,'https://x/y.jpg','start')`, [co, projects[0], w1.pid]);
+await db.query(`insert into public.project_photos (company_id, project_id, uploaded_by, file_url, time_phase) values ($1,$2,$3,'https://x/empty.jpg','start')`, [co, projects[0], w1.pid]);
+r = await rpc(w1.u, `select public.time_start_visit('assignment', $1::uuid) as x`, [asg[0]]);
+check('27b a photo row with no stored file does not count as the start photo', !r.ok && /start photo/.test(r.msg), r.msg);
+await db.query(`update public.project_photos set file_key = 'p/y.jpg' where file_url = 'https://x/empty.jpg'`);
 r = await rpc(w1.u, `select public.time_start_visit('assignment', $1::uuid, null, null, null, 'ok', '{"lat":41.5,"lng":-81.7}'::jsonb) as x`, [asg[0]]);
 check('28 with the photo, the job starts; the older check-in, session and assignment records are written too', r.ok
   && (await one(`select count(*)::int c from public.check_ins where assignment_id = $1`, [asg[0]])).c === 1
@@ -143,7 +147,7 @@ check('28 with the photo, the job starts; the older check-in, session and assign
 const jv = (await one(`select id from public.time_visits where project_id = $1`, [projects[0]])).id;
 r = await rpc(w1.u, `select public.time_complete_visit($1::uuid) as x`, [jv]);
 check('29 the completion photo is required when the owner says so', !r.ok && /completion photo/.test(r.msg), r.msg);
-await db.query(`insert into public.project_photos (company_id, project_id, uploaded_by, file_url, time_phase) values ($1,$2,$3,'https://x/z.jpg','complete')`, [co, projects[0], w1.pid]);
+await db.query(`insert into public.project_photos (company_id, project_id, uploaded_by, file_url, file_key, time_phase) values ($1,$2,$3,'https://x/z.jpg','p/z.jpg','complete')`, [co, projects[0], w1.pid]);
 r = await rpc(w1.u, `select public.time_complete_visit($1::uuid) as x`, [jv]);
 check('30 completing closes the older session with a duration and marks the assignment done', r.ok
   && (await one(`select status from public.work_sessions where assignment_id = $1`, [asg[0]])).status === 'completed'
@@ -164,7 +168,7 @@ await asDb();
 await db.query(`update public.maintenance_stops set status = 'completed', completed_at = now() where id = $1`, [stops[1]]);
 r = await rpc(m1.u, `select public.time_request_skip('maintenance_stop', $1::uuid, 'Gate locked') as x`, [stops[2]]);
 check('36 the request is saved as pending (not skipped yet)', r.ok && (await one(`select status from public.maintenance_stops where id = $1`, [stops[2]])).status === 'pending', r.msg);
-await db.query(`insert into public.maintenance_photos (company_id, stop_id, uploaded_by, file_url, time_phase) values ($1,$2,$3,'https://x/s.jpg','start')`, [co, stops[2], m1.pid]);
+await db.query(`insert into public.maintenance_photos (company_id, route_id, stop_id, property_id, uploaded_by, file_url, file_key, time_phase) values ($1,$2,$3,$4,$5,'https://x/s.jpg','m/s.jpg','start')`, [co, route, stops[2], mp[2], m1.pid]);
 r = await rpc(m1.u, `select public.time_start_visit('maintenance_stop', $1::uuid) as x`, [stops[2]]);
 check('37 a pending request does not skip the stop (the worker can still work it)', r.ok, r.msg);
 r = await rpc(m1.u, `select public.time_decide_skip((select id from public.time_skip_requests limit 1), true) as x`);

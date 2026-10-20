@@ -46,6 +46,6 @@ check('12 clock-out is refused with a property open (never closes it silently) a
 check('13 approved days are locked from ordinary edits: workers have no write access, owner corrections reopen the day and are audited', /time_touch_approval/.test(sql) && /was_approved/.test(sql) && !/create policy [a-z_]+ on public\.time_(workdays|intervals|breaks) for (insert|update|delete)/i.test(sql));
 const exp = read('src/lib/exportCsv.ts') + read('src/lib/timeCalc.ts');
 check('14 exports are real CSV files (byte-order mark, CRLF, shared as .csv), only of the scope on screen', /\\uFEFF/.test(exp) && /text\/csv/.test(exp) && read('app/(owner)/(tabs)/more/labor-week.tsx').includes('weekly-hours-${weekStart}') && /dailyCsv\(\[row\]\)/.test(read('app/(owner)/(tabs)/more/labor-day.tsx')));
-check('15 the tests for the database updates exist', ['063_time_tracking_core', '064_time_corrections_approval_alerts'].every((f) => fs.existsSync(path.join(root, `supabase/tests/${f}.pglite.mjs`))));
+check('15 the tests for the database updates exist', ['063_time_tracking_core', '064_time_corrections_approval_alerts', 'time_tracking_review'].every((f) => fs.existsSync(path.join(root, `supabase/tests/${f}.pglite.mjs`))));
 console.log(bad ? '\n' + bad + ' failed' : '\nall passed');
 process.exit(bad ? 1 : 0);

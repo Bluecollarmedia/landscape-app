@@ -182,6 +182,8 @@ export interface LaborSkip {
 }
 export interface LaborSnapshot {
   workdays: LaborWorkday[]; breaks: LaborBreak[]; visits: LaborVisit[]; intervals: LaborInterval[]; skips: LaborSkip[];
+  /** Workdays that started BEFORE the range and are still open (someone forgot to clock out). Never part of the range's totals. */
+  staleOpen: LaborWorkday[];
   names: Record<string, string>;
 }
 
@@ -208,6 +210,11 @@ export async function loadLabor(fromDate: string, toDate: string, personId?: str
       return q.range(a, b);
     });
     if (wd.error) return explainError(wd.error, "Couldn't load the workdays.");
+    // Still clocked in from an earlier day: shown as a warning, but kept out of the range's totals (they belong to the day they started).
+    let staleQ = supabase.from('time_workdays').select('*, time_workday_rates(hourly_rate)').is('clock_out_at', null).lt('work_date', fromDate).order('clock_in_at').limit(200);
+    if (personId) staleQ = staleQ.eq('person_id', personId);
+    const stale = await staleQ;
+    if (stale.error) return explainError(stale.error, "Couldn't load the open workdays.");
     const wdIds = wd.rows.map((w) => w.id as string);
     const breaks: Raw[] = [];
     const intervals: Raw[] = [];
@@ -231,18 +238,15 @@ export async function loadLabor(fromDate: string, toDate: string, personId?: str
     for (const v of extra.data ?? []) if (!visitIds.includes(v.id)) visits.push(v);
     const skips = await supabase.from('time_skip_requests').select('*').gte('created_at', `${fromDate}T00:00:00`).order('created_at', { ascending: false }).limit(500);
 
-    const people = [...new Set([...wd.rows.map((w) => w.person_id as string), ...(skips.data ?? []).map((s: Raw) => s.requested_by as string)])];
+    const people = [...new Set([...wd.rows.map((w) => w.person_id as string), ...(stale.data ?? []).map((w: Raw) => w.person_id as string), ...(skips.data ?? []).map((s: Raw) => s.requested_by as string)])];
     const names: Record<string, string> = {};
     for (const part of chunks(people)) {
       const p = await supabase.from('people').select('id, first_name, last_name').in('id', part);
       for (const r of p.data ?? []) names[r.id] = `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim() || 'Unnamed';
     }
     return ok({
-      workdays: wd.rows.map((w): LaborWorkday => ({
-        id: w.id, personId: w.person_id, workDate: w.work_date, clockInAt: w.clock_in_at, clockOutAt: w.clock_out_at ?? undefined, status: w.status,
-        truckId: w.truck_id ?? undefined, truckSource: w.truck_source ?? undefined, approvedBy: w.approved_by ?? undefined, approvedAt: w.approved_at ?? undefined,
-        approvalVersion: w.approval_version ?? 0, hourlyRate: rateOf(w.time_workday_rates),
-      })),
+      workdays: wd.rows.map(toWorkday),
+      staleOpen: (stale.data ?? []).map(toWorkday),
       breaks: breaks.map((b): LaborBreak => ({ id: b.id, workdayId: b.workday_id, personId: b.person_id, startedAt: b.started_at, endedAt: b.ended_at ?? undefined, paid: !!b.paid })),
       visits: visits.map(toVisit),
       intervals: intervals.map((i): LaborInterval => ({
@@ -259,6 +263,13 @@ export async function loadLabor(fromDate: string, toDate: string, personId?: str
   }
 }
 
+function toWorkday(w: Raw): LaborWorkday {
+  return {
+    id: w.id, personId: w.person_id, workDate: w.work_date, clockInAt: w.clock_in_at, clockOutAt: w.clock_out_at ?? undefined, status: w.status,
+    truckId: w.truck_id ?? undefined, truckSource: w.truck_source ?? undefined, approvedBy: w.approved_by ?? undefined, approvedAt: w.approved_at ?? undefined,
+    approvalVersion: w.approval_version ?? 0, hourlyRate: rateOf(w.time_workday_rates),
+  };
+}
 function rateOf(v: unknown): number | null {
   const row = Array.isArray(v) ? v[0] : v;
   const n = row && typeof row === 'object' ? (row as Raw).hourly_rate : null;
@@ -371,7 +382,7 @@ export async function saveTarget(companyId: string, kind: 'maintenance_property'
 }
 
 export async function loadAlertHours(): Promise<Result<Record<string, number>>> {
-  const { data, error } = await supabase.from('worker_pay_settings').select('person_id, daily_alert_hours');
+  const { data, error } = await supabase.from('time_person_settings').select('person_id, daily_alert_hours');
   if (error) return explainError(error, "Couldn't load the alert hours.");
   const out: Record<string, number> = {};
   for (const r of data ?? []) if (r.daily_alert_hours != null) out[r.person_id] = Number(r.daily_alert_hours);
@@ -379,7 +390,8 @@ export async function loadAlertHours(): Promise<Result<Record<string, number>>> 
 }
 export async function saveAlertHours(companyId: string, personId: string, hours: number | null): Promise<Result> {
   if (hours != null && !(hours > 0 && hours <= 24)) return { ok: false, error: 'Enter hours between 0 and 24.' };
-  const { error } = await supabase.from('worker_pay_settings').upsert({ person_id: personId, company_id: companyId, daily_alert_hours: hours, updated_at: new Date().toISOString() }, { onConflict: 'person_id' });
+  // Its own table: saving this must never create an overtime-terms row in worker_pay_settings (that would change the Payroll Estimate).
+  const { error } = await supabase.from('time_person_settings').upsert({ person_id: personId, company_id: companyId, daily_alert_hours: hours, updated_at: new Date().toISOString() }, { onConflict: 'person_id' });
   return error ? explainError(error, "Couldn't save the alert hours.") : ok(undefined);
 }
 

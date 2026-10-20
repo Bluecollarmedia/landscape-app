@@ -139,7 +139,7 @@ await db.query(`insert into public.time_workdays (company_id, person_id, work_da
 r = await rpc(owner.u, `select public.time_scan_alerts() as x`);
 check('34 a workday still open after the owner\'s threshold is flagged for review (once)', (await one(`select count(*)::int c from public.time_alerts where kind = 'open_workday'`)).c === 1, r.msg);
 // overtime
-await db.query(`insert into public.worker_pay_settings (person_id, company_id, daily_alert_hours) values ($1, $2, 8)`, [w1.pid, co]);
+await db.query(`insert into public.time_person_settings (person_id, company_id, daily_alert_hours) values ($1, $2, 8)`, [w1.pid, co]);
 await db.query(`delete from public.time_workdays where person_id = $1`, [w1.pid]);
 await db.query(`insert into public.time_workdays (company_id, person_id, work_date, clock_in_at, clock_out_at, status) values ($1,$2,current_date, now() - interval '8 hours 30 minutes', now() - interval '10 minutes', 'closed')`, [co, w1.pid]);
 r = await rpc(owner.u, `select public.time_scan_alerts() as x`);

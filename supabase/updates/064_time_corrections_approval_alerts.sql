@@ -33,6 +33,9 @@ create index if not exists idx_time_alerts_company on public.time_alerts (compan
 alter table public.time_alerts enable row level security;
 drop policy if exists time_alerts_staff_select on public.time_alerts;
 create policy time_alerts_staff_select on public.time_alerts for select using (public.is_staff(company_id));
+-- Read-only for the app roles: alerts are created and closed only by the functions below.
+revoke insert, update, delete, truncate on public.time_alerts from anon, authenticated;
+revoke all on public.time_alerts from anon;
 
 -- ── Small helpers ───────────────────────────────────────────────────────────
 -- Paid-time rule: gross elapsed minus UNPAID breaks (paid breaks are not deducted). Milliseconds.
@@ -60,6 +63,23 @@ begin
   if p_at is not null and p_at > now() + interval '1 minute' then raise exception 'That time is in the future.'; end if;
 end;
 $$;
+
+revoke all on function public._time_no_future(timestamptz) from public, anon, authenticated;
+
+-- A typo guard for the owner's corrections: a workday is at most 24 hours long and sits on (about) the date it is filed under.
+-- (The employee's own clock-out is never refused for being long: the server's times are the truth, and the owner then corrects them.)
+create or replace function public._time_sane_workday(p_work_date date, p_in timestamptz, p_out timestamptz)
+returns void language plpgsql immutable as $$
+begin
+  if p_out is not null and p_out - p_in > interval '24 hours' then
+    raise exception 'A workday can''t be longer than 24 hours. Check the clock-in and clock-out times.';
+  end if;
+  if abs((p_in at time zone 'UTC')::date - p_work_date) > 1 then
+    raise exception 'That clock-in is not on the workday''s date (%). Check the date and the time.', p_work_date;
+  end if;
+end;
+$$;
+revoke all on function public._time_sane_workday(date, timestamptz, timestamptz) from public, anon, authenticated;
 
 -- Tells the owners/admins (an in-app notification; push goes out through the existing notification trigger).
 create or replace function public._time_notify_staff(p_company uuid, p_event text, p_title text, p_body text, p_type text, p_id uuid)
@@ -93,6 +113,11 @@ declare
   st public.time_settings := public._time_settings_row(p_company);
   w record; v record; n integer := 0; name_ text; hrs numeric; thr numeric; mins integer; crew record;
 begin
+  -- A "still clocked in" alert is closed by itself once the workday has a clock-out (the owner fixed it, or the employee clocked out).
+  update public.time_alerts a set status = 'resolved', resolved_at = now()
+   where a.company_id = p_company and a.kind = 'open_workday' and a.status = 'open'
+     and exists (select 1 from public.time_workdays x where x.id = a.workday_id and x.clock_out_at is not null);
+
   -- A workday left open far too long (probably a forgotten clock-out).
   for w in select * from public.time_workdays where company_id = p_company and clock_out_at is null
                  and clock_in_at < now() - make_interval(secs => (st.open_workday_hours * 3600)::integer) loop
@@ -136,7 +161,7 @@ begin
 
   -- Daily overtime alerts (the owner's per-employee alert hours; not the formal overtime rule).
   if st.overtime_alerts_enabled then
-    for w in select ws.*, ps.daily_alert_hours from public.time_workdays ws join public.worker_pay_settings ps on ps.person_id = ws.person_id
+    for w in select ws.*, ps.daily_alert_hours from public.time_workdays ws join public.time_person_settings ps on ps.person_id = ws.person_id and ps.company_id = ws.company_id
               where ws.company_id = p_company and ps.daily_alert_hours is not null and ws.work_date >= current_date - 1 loop
       hrs := public._time_net_ms(w.id) / 3600000.0;
       thr := w.daily_alert_hours;
@@ -208,6 +233,7 @@ begin
   return null;
 end;
 $$;
+revoke all on function public._time_skip_requested() from public, anon, authenticated;
 drop trigger if exists time_skip_requests_notify on public.time_skip_requests;
 create trigger time_skip_requests_notify after insert on public.time_skip_requests
   for each row execute function public._time_skip_requested();
@@ -222,6 +248,7 @@ begin
   return null;
 end;
 $$;
+revoke all on function public._time_skip_decided() from public, anon, authenticated;
 drop trigger if exists time_skip_requests_decided on public.time_skip_requests;
 create trigger time_skip_requests_decided after update on public.time_skip_requests
   for each row execute function public._time_skip_decided();
@@ -248,7 +275,9 @@ begin
   perform public._time_need_staff(w.company_id, p_reason);
   new_in := coalesce(p_clock_in, w.clock_in_at);
   new_out := coalesce(p_clock_out, w.clock_out_at);
+  if new_in is not distinct from w.clock_in_at and new_out is not distinct from w.clock_out_at then return; end if;  -- nothing changed: no reopen, no history row
   perform public._time_no_future(new_in); perform public._time_no_future(new_out);
+  perform public._time_sane_workday(w.work_date, new_in, new_out);
   if p_clock_out is not null and w.clock_out_at is null then
     if exists (select 1 from public.time_intervals where workday_id = w.id and ended_at is null and status = 'active') then
       raise exception 'A property visit is still running. Stop its timer first, then set the clock-out.';
@@ -279,6 +308,7 @@ begin
   perform public._time_need_staff(cid, p_reason);
   if p_clock_in is null or p_work_date is null then raise exception 'Enter the date and the clock-in time.'; end if;
   perform public._time_no_future(p_clock_in); perform public._time_no_future(p_clock_out);
+  perform public._time_sane_workday(p_work_date, p_clock_in, p_clock_out);
   insert into public.time_workdays (company_id, person_id, work_date, clock_in_at, clock_out_at, status, truck_id, truck_source)
   values (cid, p_person, p_work_date, p_clock_in, p_clock_out, case when p_clock_out is null then 'active' else 'closed' end, p_truck, case when p_truck is null then null else 'owner' end)
   returning id into wid;
@@ -296,6 +326,7 @@ begin
   if not found then raise exception 'Break not found.'; end if;
   perform public._time_need_staff(b.company_id, p_reason);
   perform public._time_no_future(p_started); perform public._time_no_future(p_ended);
+  if coalesce(p_started, b.started_at) = b.started_at and coalesce(p_ended, b.ended_at) is not distinct from b.ended_at then return; end if;  -- nothing changed
   was := public._time_touch_approval(b.workday_id);
   update public.time_breaks set started_at = coalesce(p_started, started_at), ended_at = coalesce(p_ended, ended_at) where id = b.id;
   perform public._time_audit(b.company_id, 'break', b.id, b.person_id, b.workday_id, null, 'corrected', 'break',
@@ -327,7 +358,9 @@ begin
   select * into i from public.time_intervals where id = p_interval for update;
   if not found then raise exception 'Property visit time not found.'; end if;
   perform public._time_need_staff(i.company_id, p_reason);
+  if i.status = 'void' then raise exception 'That time was removed. Add a new property time instead.'; end if;
   new_s := coalesce(p_started, i.started_at); new_e := coalesce(p_ended, i.ended_at);
+  if new_s = i.started_at and new_e is not distinct from i.ended_at then return; end if;  -- nothing changed
   perform public._time_no_future(new_s); perform public._time_no_future(new_e);
   was := public._time_touch_approval(i.workday_id);
   update public.time_intervals set started_at = new_s, ended_at = new_e where id = i.id;
@@ -376,8 +409,18 @@ begin
   select * into i from public.time_intervals where id = p_interval for update;
   if not found then raise exception 'Property visit time not found.'; end if;
   perform public._time_need_staff(i.company_id, p_reason);
+  if i.status = 'void' then return; end if;  -- already removed: a repeat changes nothing and adds no history row
   was := public._time_touch_approval(i.workday_id);
   update public.time_intervals set status = 'void' where id = i.id;
+  -- The older Hours / Payroll Estimate read the work session written alongside this time. Zero it (nothing is deleted: the original
+  -- times are kept in the session's correction note and in the history) so the two systems agree.
+  if i.legacy_session_id is not null then
+    update public.work_sessions
+       set correction = coalesce(correction, '{}'::jsonb) || jsonb_build_object('voided_by_time_tracking', true, 'original_check_in', check_in_time,
+                          'original_check_out', check_out_time, 'original_duration_minutes', duration_minutes, 'reason', p_reason),
+           check_out_time = check_in_time, duration_minutes = 0, status = 'corrected'
+     where id = i.legacy_session_id;
+  end if;
   perform public._time_refresh_visit(i.visit_id);
   perform public._time_audit(i.company_id, 'interval', i.id, i.person_id, i.workday_id, i.visit_id, 'voided', 'status', to_jsonb(i.status), to_jsonb('void'::text), p_reason, was);
 end;
@@ -433,10 +476,11 @@ $$;
 -- ── Pay rates: a new effective-dated rate; the old one is ended, never edited ───
 create or replace function public.time_set_hourly_rate(p_person uuid, p_rate numeric, p_effective date, p_reason text default null)
 returns void language plpgsql security definer set search_path = public as $$
-declare cid uuid := public._time_company(p_person); latest date; prev numeric;
+declare cid uuid := public._time_company(p_person); latest date; prev numeric; n_days integer; n_visits integer;
 begin
   if cid is null or not public.is_staff(cid) then raise exception 'Only the owner can do that.'; end if;
   if p_rate is null or p_rate <= 0 or p_rate > 1000 then raise exception 'Enter an hourly rate above zero.'; end if;
+  if p_effective is null then raise exception 'Enter the date the new rate starts.'; end if;
   select max(effective_date) into latest from public.worker_hourly_rates where company_id = cid and person_id = p_person;
   if latest is not null and p_effective <= latest then
     raise exception 'The new rate has to start after the current rate''s start date (%).', latest;
@@ -445,6 +489,23 @@ begin
   update public.worker_hourly_rates set end_date = p_effective - 1 where company_id = cid and person_id = p_person and end_date is null;
   insert into public.worker_hourly_rates (company_id, person_id, hourly_rate, effective_date, set_by) values (cid, p_person, p_rate, p_effective, public.my_person_id());
   perform public._time_audit(cid, 'rate', null, p_person, null, null, 'rate_set', 'hourly_rate', to_jsonb(prev), to_jsonb(p_rate), p_reason, false);
+
+  -- Time recorded while the person had NO rate has a blank rate saved with it (the cost showed as "no rate"). Fill only those
+  -- blanks, from this rate's start date, and never on a day already approved. A rate that was saved is never changed.
+  update public.time_workday_rates r set hourly_rate = p_rate
+    from public.time_workdays w
+   where r.workday_id = w.id and r.hourly_rate is null and w.person_id = p_person and w.company_id = cid
+     and w.work_date >= p_effective and w.status <> 'approved';
+  get diagnostics n_days = row_count;
+  update public.time_interval_rates r set hourly_rate = p_rate
+    from public.time_intervals i join public.time_workdays w on w.id = i.workday_id
+   where r.interval_id = i.id and r.hourly_rate is null and i.person_id = p_person and i.company_id = cid
+     and w.work_date >= p_effective and w.status <> 'approved';
+  get diagnostics n_visits = row_count;
+  if n_days + n_visits > 0 then
+    perform public._time_audit(cid, 'rate', null, p_person, null, null, 'rate_filled', 'hourly_rate', null,
+                               jsonb_build_object('rate', p_rate, 'workdays', n_days, 'property_times', n_visits), 'Filled in the blank rate on time recorded before a rate was set', false);
+  end if;
 end;
 $$;
 
@@ -462,6 +523,7 @@ begin
   return null;
 end;
 $$;
+revoke all on function public._time_settings_audit() from public, anon, authenticated;
 drop trigger if exists time_settings_audit on public.time_settings;
 create trigger time_settings_audit after insert or update on public.time_settings for each row execute function public._time_settings_audit();
 drop trigger if exists time_targets_audit on public.time_property_targets;

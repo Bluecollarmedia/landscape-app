@@ -32,9 +32,16 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
   m = maintenanceToday([route('r1', [], 'x', [stop('p1', 'pending')])], T);
   check('7 a leader who is not in the crew list is still scheduled', m.scheduled.has('x'));
 
+  m = maintenanceToday([route('r1', ['a', 'b'], 'a', [{ propertyId: 'p1', status: 'arrived', arrivedAt: '2026-10-20T13:12:00Z', property: { name: 'Chase Bank' } }, stop('p2', 'pending')], { name: 'Route A' })], T);
+  check('9 Crew Today: each maintenance person shows their route, and the property they are at once checked in', m.where.get('a').routeName === 'Route A' && m.where.get('b').atProperty === 'Chase Bank' && !!m.where.get('b').arrivedAt);
+
   const hook = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'hooks', 'useOwnerDashboard.ts'), 'utf8');
   check('8 the dashboard merges the maintenance sets with the landscaping sets (union, so a person on a job and a route is one)',
     /new Set\(\[\.\.\.jobWorkerIds, \.\.\.maint\.scheduled\]\)/.test(hook) && /new Set\(\[\.\.\.onSiteWorkerIds, \.\.\.maint\.onSite\]\)/.test(hook) && /onSite: allOnSiteIds\.size/.test(hook));
+
+  check('10 Crew Today adds maintenance-only people once and never a second row for someone already on a job', /if \(byWorker\.has\(personId\)\) continue;/.test(hook) && /Maintenance crew who are not on a landscaping job today/.test(hook));
+  const home = fs.readFileSync(path.join(__dirname, '..', '..', 'app', '(owner)', '(tabs)', 'maintenance', 'index.tsx'), 'utf8');
+  check('11 the owner route card counts "clocked in" from the time clock (same source as the dashboard) and says "started the day" only for the older fallback', /clocked in`/.test(home) && /started the day/.test(home) && /useClockedInToday/.test(home));
 
   console.log(bad ? `\n${bad} failed` : '\nall passed');
   process.exit(bad ? 1 : 0);

@@ -9,6 +9,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenance, useMaintenanceRoute } from '@/hooks/useMaintenance';
 import { db, useDb } from '@/data/store';
+import { useWorkdaysOn } from '@/hooks/useClockedInToday';
 import { correctAttendance, locationLabel, setRouteLead, setStopPhotoShared } from '@/data/maintenance';
 import {
   buildRouteReview, correctStopTime, describeEvent, formatTime,
@@ -44,6 +45,7 @@ export default function RouteDetailScreen() {
   const v = useDb();
   const today = todayKey();
   const [fix, setFix] = useState<Fix | null>(null);
+  const workdays = useWorkdaysOn(route?.serviceDate ?? today);
   const [showAllActivity, setShowAllActivity] = useState(false);
 
   const review = useMemo(
@@ -156,13 +158,30 @@ export default function RouteDetailScreen() {
         )}
 
         {/* Crew attendance */}
-        <SectionTitle>CREW · START OF DAY</SectionTitle>
+        <SectionTitle>{workdays.known ? 'CREW · CLOCKED IN' : 'CREW · START OF DAY'}</SectionTitle>
         <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm, { paddingVertical: spacing.xs }]}>
           {review.attendance.length === 0 ? (
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, paddingVertical: spacing.md }]}>
               No crew assigned to this route.
             </Text>
-          ) : review.attendance.map((row, i) => (
+          ) : workdays.known ? review.attendance.map((row, i) => {
+            // With the time clock on, each worker clocks in on their own; this shows that workday (fix times in Hours & Labor).
+            const w = workdays.byPerson.get(row.personId);
+            return (
+              <View key={row.personId} style={[styles.attRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
+                {row.person ? <Avatar firstName={row.person.firstName} lastName={row.person.lastName} uri={row.person.avatarUrl} size={36} /> : <View style={{ width: 36 }} />}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={styles.inline}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{fullName(row.person)}</Text>
+                    {row.isLead && <Pill label="Crew leader" tone="success" />}
+                  </View>
+                  <Text style={[typeScale.bodySmall, { color: w ? colors.textPrimary : colors.textSecondary }]}>
+                    {w ? (w.clockOutAt ? `Clocked in ${formatTime(w.clockInAt)} · out ${formatTime(w.clockOutAt)}` : `Clocked in ${formatTime(w.clockInAt)} · on the clock`) : 'Not clocked in'}
+                  </Text>
+                </View>
+              </View>
+            );
+          }) : review.attendance.map((row, i) => (
             <AttendanceRowView
               key={row.personId}
               row={row}

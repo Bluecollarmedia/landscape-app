@@ -40,3 +40,20 @@ deletion and file deletion are not atomic**. The files are removed afterwards by
 Deleting a company also deletes the accounts (person record and sign-in login) of everyone who belonged only to it, the owner included, in the
 same all-or-nothing step; anyone who also belongs to, or has Snow access in, another company keeps their account. The count is kept in the
 closure record (`accounts_deleted`). Customer-portal logins are not members and are not covered.
+
+## Linking an owner-created customer to the customer's login (SQL 70)
+
+The owner's "Add customer" makes a person with no login. The customer connects by entering the property's code (possession of the code is the
+proof; names and email addresses are never matched). When the property was linked to the owner-created record, the claim moves everything
+of that company that pointed at it (projects, quotes, invoices, the property) to the customer's own person and removes the empty record, so
+there is no duplicate. A record that already has a login, or belongs to another company, is never merged. Caveat: signing up with an email
+that matches an owner-created record still links by email in `handle_new_user`; that is only as trustworthy as the sign-up email, which
+is not verified while email confirmation is off in Supabase. Turning email confirmation on is the fix for that, and is not done here.
+
+## Private maintenance photos (SQL 71, not wired up)
+
+Photos are stored in R2 and the app saves each photo's public address, so the internal/shared switch controls what the app SHOWS; it cannot
+protect a file whose address is public. `maintenance_photos_i_can_open(keys)` and the media function action `maint-sign` are the permission
+check and signer for private access (owner/admin, crew on the route, or the linked customer for a shared photo on a finished stop). Still
+needed, each needing approval: make the maintenance file path private in R2 (a Cloudflare rule on the public address, or a private bucket),
+deploy the function, and switch the screens to ask `maint-sign` for photo links. Until then nothing changes.

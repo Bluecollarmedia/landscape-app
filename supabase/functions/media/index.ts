@@ -186,6 +186,21 @@ serve(async (req: Request) => {
       return reply({ url: await presignGet(key, 300) });
     }
 
+    // Maintenance photos opened through a short-lived private link. The database decides who may open which file
+    // (maintenance_photos_i_can_open, update 71): owner/admin, the crew on the route, or the linked customer for a shared photo on a
+    // finished stop. Only the keys it allows are signed. NOT used by the app yet; it only protects once the files themselves are private.
+    if (body.action === 'maint-sign') {
+      const keys: string[] = Array.isArray(body.keys) ? body.keys.filter(safePath).slice(0, 100) : [];
+      const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+        global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+      });
+      const { data, error } = await userClient.rpc('maintenance_photos_i_can_open', { p_keys: keys });
+      if (error) return reply({ error: 'Could not check access' }, 502);
+      const urls: Record<string, string> = {};
+      await Promise.all(((data ?? []) as string[]).map(async (k) => { urls[k] = await presignGet(k, 3600); }));
+      return reply({ urls });
+    }
+
     if (body.action === 'snow-put') {
       const key = body.key;
       const ext = TYPES[String(body.contentType ?? '').toLowerCase()];

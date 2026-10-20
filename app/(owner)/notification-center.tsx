@@ -33,6 +33,11 @@ const EVENT_ICONS: Record<NotificationEventType, { icon: string; color: string }
   quote_declined: { icon: 'x-circle', color: semantic.error },
   quote_sent: { icon: 'file-text', color: semantic.info },
   invoice_issued: { icon: 'dollar-sign', color: semantic.info },
+  time_skip_request: { icon: 'skip-forward', color: semantic.warning },
+  time_over_target: { icon: 'clock', color: semantic.warning },
+  time_overtime: { icon: 'trending-up', color: semantic.warning },
+  time_unusual: { icon: 'alert-circle', color: semantic.warning },
+  time_progress_check: { icon: 'clock', color: semantic.info },
 };
 const FALLBACK_ICON = { icon: 'bell', color: brand.primary };
 

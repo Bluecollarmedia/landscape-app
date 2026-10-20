@@ -1,3 +1,7 @@
+import { WorkdayCard } from '@/components/time/WorkdayCard';
+import { SkipRequestSheet } from '@/components/time/SkipRequestSheet';
+import { withTimedPhoto } from '@/data/timePhotos';
+import { loadMySkipRequests, requestSkip, type MySkipRequest } from '@/data/timeTracking';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Modal, Alert, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -79,6 +83,7 @@ export default function WorkerTodayScreen() {
   const {
     todayAssignments, currentJob, jobState, checkIns, checkOuts, moveToNextJob,
     scheduleConfirmed, confirmSchedule, checkIn, checkOut, locateForCheckIn, locateForCheckOut, openMapsNavigation,
+    timeOn, checkInTimed, checkOutTimed, workday,
     projectTasks, projectSettings, taskPhotoCaptured, isTaskLead,
   } = useWorkerContext();
 
@@ -136,6 +141,27 @@ export default function WorkerTodayScreen() {
 
   const [locating, setLocating] = useState(false);
 
+  // Asking to skip a job: a request the owner decides. Nothing is skipped (and the day's order stays locked) until they approve.
+  const [skips, setSkips] = useState<MySkipRequest[]>([]);
+  const [skipOpen, setSkipOpen] = useState(false);
+  useEffect(() => {
+    if (!timeOn) return;
+    let live = true;
+    loadMySkipRequests().then((r) => { if (live && r.ok) setSkips(r.data); });
+    return () => { live = false; };
+  }, [timeOn, primaryAssignment?.id]);
+  const pendingSkip = primaryAssignment ? skips.find((s) => s.refId === primaryAssignment.id && s.status === 'pending') : undefined;
+  async function sendSkip(reason: string) {
+    if (!primaryAssignment) return;
+    const r = await requestSkip('assignment', primaryAssignment.id, reason);
+    if (!r.ok) { if (Platform.OS === 'web') alert(r.error); else Alert.alert("Couldn't send the request", r.error); return; }
+    haptics.success();
+    setSkipOpen(false);
+    const again = await loadMySkipRequests();
+    if (again.ok) setSkips(again.data);
+  }
+  const needsClockIn = timeOn && !workday.active;
+
   async function handleCheckIn() {
     if (locating) return;
     haptics.select();
@@ -153,6 +179,19 @@ export default function WorkerTodayScreen() {
       }
       return;
     }
+    if (timeOn) {
+      // The workday is running: the database checks the clock-in, job order and photo rule, then records the property time.
+      const started = primaryAssignment
+        ? await withTimedPhoto(() => checkInTimed(result.gps, primaryAssignment.id), 'start', { kind: 'project', projectId: primaryAssignment.projectId, assignmentId: primaryAssignment.id })
+        : await checkInTimed(result.gps, undefined);
+      if (!started.ok) {
+        haptics.warning();
+        if (Platform.OS === 'web') alert(started.error); else Alert.alert("Can't start this property", started.error);
+        return;
+      }
+      haptics.success();
+      return;
+    }
     haptics.success();
     checkIn(result.gps, primaryAssignment?.id);
   }
@@ -166,7 +205,18 @@ export default function WorkerTodayScreen() {
     setShowCheckoutConfirm(false);
     haptics.success();
     // Location is recorded for the owner's records; it never blocks checking out.
-    checkOut(await locateForCheckOut());
+    const where = await locateForCheckOut();
+    if (timeOn) {
+      const done = primaryAssignment
+        ? await withTimedPhoto(() => checkOutTimed(where), 'complete', { kind: 'project', projectId: primaryAssignment.projectId, assignmentId: primaryAssignment.id })
+        : await checkOutTimed(where);
+      if (!done.ok) {
+        haptics.warning();
+        if (Platform.OS === 'web') alert(done.error); else Alert.alert("Can't finish this property", done.error);
+      }
+      return;
+    }
+    checkOut(where);
   }
 
   function handleBackToToday() {
@@ -303,6 +353,8 @@ export default function WorkerTodayScreen() {
           </View>
         </View>
 
+        <View style={{ width: '100%', marginTop: spacing.lg }}><WorkdayCard /></View>
+
         <Pressable onPress={handleBackToToday} style={{ width: '100%' }}>
           <LinearGradient
             colors={[colors.primary, colors.primary]}
@@ -394,6 +446,7 @@ export default function WorkerTodayScreen() {
         </View>
 
         <View style={[styles.content, { paddingTop: showWorking ? spacing.xl : PILL_OVERHANG + spacing.xl }]}>
+          <WorkdayCard />
           {unreadAnnouncement && (() => {
             const weatherMeta = unreadAnnouncement.weatherAction ? WEATHER_ACTION_META[unreadAnnouncement.weatherAction] : null;
             const isStrong = unreadAnnouncement.priority === 'urgent' || !!weatherMeta;
@@ -498,6 +551,9 @@ export default function WorkerTodayScreen() {
                 </View>
               )}
 
+              {needsClockIn ? (
+                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, textAlign: 'center' }]}>Clock in for the day first. The Clock In button is at the top.</Text>
+              ) : (
               <Pressable onPress={handleCheckIn}>
                 <LinearGradient
                   colors={[colors.primary, colors.primary]}
@@ -508,14 +564,24 @@ export default function WorkerTodayScreen() {
                   <View style={styles.checkInRow}>
                     <Feather name="log-in" size={20} color="#FFFFFF" />
                     <Text style={[typeScale.headingSmall, { color: '#FFFFFF', marginLeft: spacing.sm, fontWeight: '700' }]}>
-                      I'M HERE
+                      {timeOn ? 'START PROPERTY' : "I'M HERE"}
                     </Text>
                   </View>
                   <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]}>
-                    {locating ? 'Finding your location…' : 'Check in to start this job'}
+                    {locating ? 'Finding your location…' : timeOn ? 'Start your time at this property' : 'Check in to start this job'}
                   </Text>
                 </LinearGradient>
               </Pressable>
+              )}
+              {timeOn && primaryAssignment ? (
+                pendingSkip ? (
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>Skip requested. Waiting for the owner. This job stays open until they approve it.</Text>
+                ) : (
+                  <Pressable onPress={() => setSkipOpen(true)} hitSlop={8} accessibilityRole="button">
+                    <Text style={[typeScale.labelLarge, { color: colors.textSecondary, textAlign: 'center' }]}>Can't do this job? Ask to skip it</Text>
+                  </Pressable>
+                )
+              ) : null}
             </>
           )}
 
@@ -751,6 +817,7 @@ export default function WorkerTodayScreen() {
           </Pressable>
         </Pressable>
       </BottomSheetModal>
+      <SkipRequestSheet visible={skipOpen} propertyName={primaryAssignment?.project?.name} onClose={() => setSkipOpen(false)} onSend={sendSkip} />
     </View>
   );
 }

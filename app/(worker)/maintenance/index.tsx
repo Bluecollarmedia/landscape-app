@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui';
 import { BrandCover } from '@/components/branding/BrandCover';
 import { JobMap } from '@/components/maps/JobMap';
 import { YardStartCard } from '@/components/maintenance/YardStartCard';
+import { WorkdayCard } from '@/components/time/WorkdayCard';
 import { RouteProgress } from '@/components/maintenance/RouteProgress';
 import { StopRow, StopStatusPill } from '@/components/maintenance/StopRow';
 import { displayStatus } from '@/components/maintenance/types';
@@ -67,7 +68,9 @@ export default function MaintenanceTodayScreen() {
       setGapBelow((prev) => (prev === gap ? prev : gap));
     });
   }, [windowHeight]);
-  const { openMapsNavigation } = useWorkerContext();
+  const { openMapsNavigation, timeOn, workday } = useWorkerContext();
+  // With the workday clock on, nothing is started before the worker clocks in.
+  const clockedIn = !timeOn || !!workday.active;
   const checkIn = useMaintenanceCheckIn();
   const { yard, yardName, dayStart } = checkIn;
   useDb();
@@ -118,7 +121,9 @@ export default function MaintenanceTodayScreen() {
   let action: { title: string; subtitle: string; icon: keyof typeof Feather.glyphMap; onPress: () => void; muted?: boolean } | null = null;
   // Each worker checks in at each stop themselves, even when a crewmate got there first.
   const iCheckedIn = next ? !!checkIn.arrivalFor(next.id)?.mine : false;
-  if (!dayStart.started && !skippedYard && !allDone) {
+  if (timeOn && !clockedIn) {
+    action = null;
+  } else if (!timeOn && !dayStart.started && !skippedYard && !allDone) {
     action = {
       title: 'START DAY',
       subtitle: checkIn.busy === 'day' ? 'Finding your location…' : `Check in at ${yardName}`,
@@ -127,8 +132,8 @@ export default function MaintenanceTodayScreen() {
     };
   } else if (next && (next.status === 'pending' || !iCheckedIn)) {
     action = {
-      title: "I'M HERE",
-      subtitle: checkIn.busy === next.id ? 'Finding your location…' : 'Check in to start this stop',
+      title: timeOn ? 'START PROPERTY' : "I'M HERE",
+      subtitle: checkIn.busy === next.id ? 'Finding your location…' : timeOn ? 'Start your time at this property' : 'Check in to start this stop',
       icon: 'map-pin',
       onPress: () => handleArrive(next),
     };
@@ -169,12 +174,14 @@ export default function MaintenanceTodayScreen() {
         </View>
 
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
-          <YardStartCard
-            dayStart={dayStart}
-            yard={yard}
-            yardName={yardName}
-            onYardPress={yard ? () => { haptics.select(); openMapsNavigation(yard); } : undefined}
-          />
+          {timeOn ? <WorkdayCard /> : (
+            <YardStartCard
+              dayStart={dayStart}
+              yard={yard}
+              yardName={yardName}
+              onYardPress={yard ? () => { haptics.select(); openMapsNavigation(yard); } : undefined}
+            />
+          )}
 
           {!route ? (
             <EmptyState
@@ -237,19 +244,20 @@ export default function MaintenanceTodayScreen() {
             </View>
           )}
 
-          {upcoming.length > 0 && (
+          {stops.length > 0 && (
             <View>
               <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginBottom: spacing.sm }]}>
-                Upcoming Stops
+                {upcoming.length > 0 ? 'Stops' : 'Stops today'}
               </Text>
               <View style={[styles.listCard, { borderColor: colors.border }]}>
-                {upcoming.map((s, i) => (
+                {stops.map((s, i) => (
                   <StopRow
                     key={s.id}
                     stop={s}
                     nextStopId={next?.id}
                     first={i === 0}
                     showInstructions={s.id === next?.id}
+                    locked={s.status === 'pending' && s.id !== next?.id}
                     onPress={() => openStop(s)}
                   />
                 ))}

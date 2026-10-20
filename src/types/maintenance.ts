@@ -131,6 +131,8 @@ export interface MaintenanceRoute {
   notes?: string;
   /** Optional Maintenance Lead. Nothing requires one. */
   leadPersonId?: string;
+  /** The truck the owner assigned to this route (update 63). */
+  truckId?: string;
   status: RouteStatus;
   createdBy?: string;
   createdAt: string;

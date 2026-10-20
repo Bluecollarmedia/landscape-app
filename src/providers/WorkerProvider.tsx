@@ -5,7 +5,8 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { useAuth } from './AuthProvider';
-import { db, useDb, insertRow, updateRow, upsertRow, findRow } from '@/data/store';
+import { db, useDb, insertRow, updateRow, upsertRow, findRow, refresh as refreshStore } from '@/data/store';
+import { useMyWorkday, type Workday } from '@/hooks/useMyWorkday';
 import { addProjectPhoto, logProjectHistory, notifyStaff } from '@/data/actions';
 import { todayKey, localDateTime } from '@/lib/ids';
 import type { Assignment } from '@/types/schedule';
@@ -52,6 +53,11 @@ interface WorkerContextValue {
   /** Checks in to the given job (or the current/next one). Works again after checking out, to resume a job. */
   checkIn: (gps: GPSCoordinates | null, assignmentId?: string) => void;
   checkOut: (gps: GPSCoordinates | null) => void;
+  /** The workday clock (update 63). `timeOn` is true once the database update is installed; then check-in and check-out go through the workday. */
+  workday: Workday;
+  timeOn: boolean;
+  checkInTimed: (gps: GPSCoordinates | null, assignmentId?: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  checkOutTimed: (gps: GPSCoordinates | null) => Promise<{ ok: true } | { ok: false; error: string }>;
   /** Reads the phone's location and checks it against the job site. Check-in is only allowed when ok. */
   locateForCheckIn: (assignmentId?: string) => Promise<CheckInLocation>;
   /** Reads the phone's location for check-out (never blocks). */
@@ -110,6 +116,8 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
   const [localTaskPhotos, setLocalTaskPhotos] = useState<Record<string, boolean>>({});
   const [taskPhotoUris, setTaskPhotoUris] = useState<Record<string, string>>({});
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const workday = useMyWorkday(!!workerId && isSupabaseConfigured);
+  const timeOn = workday.installed === true;
   const [offlineQueue] = useState<OfflineAction[]>([]);
   const [isOnline] = useState(true);
 
@@ -250,26 +258,10 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     return site ? { ...here.gps, distanceFromSite: Math.round(distanceMeters(here.gps, site)) } : here.gps;
   }, [currentJob]);
 
-  const checkIn = useCallback((gps: GPSCoordinates | null, assignmentId?: string) => {
-    const job = resolveCheckInJob(assignmentId);
-    if (!job) return;
-    const resuming = job.status === 'completed';
-
+  /** What follows a check-in: remember the job, log it, tell the owner. (The records themselves are written by checkIn or by the database.) */
+  const afterCheckIn = useCallback((job: Assignment, resuming: boolean) => {
     const now = new Date();
-    const nowIso = now.toISOString();
-    // locateForCheckIn already refused anyone outside the job's distance.
-    const withinRadius = true;
     const projectName = job.project?.name ?? 'job site';
-
-    insertRow('check_ins', {
-      assignmentId: job.id, personId: workerId, projectId: job.projectId,
-      timestamp: nowIso, gps, withinRadius,
-    });
-    insertRow('work_sessions', {
-      personId: workerId, projectId: job.projectId, assignmentId: job.id,
-      checkInTime: nowIso, checkInGps: gps, status: 'active',
-    });
-    updateRow('assignments', job.id, { status: 'checked_in' });
     setCurrentJobId(job.id);
     logActivity({ assignmentId: job.id, projectId: job.projectId, activityType: 'checked_in', description: `${resuming ? 'Checked back in' : 'Checked in'} at ${projectName}` });
 
@@ -285,7 +277,39 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     } else {
       notifyStaff('worker_checked_in', 'Worker checked in', `${workerName} checked in at ${projectName}.`, link, undefined, workerId);
     }
-  }, [resolveCheckInJob, workerId, logActivity, workerName]);
+  }, [workerId, logActivity, workerName]);
+
+  const checkIn = useCallback((gps: GPSCoordinates | null, assignmentId?: string) => {
+    const job = resolveCheckInJob(assignmentId);
+    if (!job) return;
+    const resuming = job.status === 'completed';
+    const nowIso = new Date().toISOString();
+    // locateForCheckIn already refused anyone outside the job's distance.
+    insertRow('check_ins', {
+      assignmentId: job.id, personId: workerId, projectId: job.projectId,
+      timestamp: nowIso, gps, withinRadius: true,
+    });
+    insertRow('work_sessions', {
+      personId: workerId, projectId: job.projectId, assignmentId: job.id,
+      checkInTime: nowIso, checkInGps: gps, status: 'active',
+    });
+    updateRow('assignments', job.id, { status: 'checked_in' });
+    afterCheckIn(job, resuming);
+  }, [resolveCheckInJob, workerId, afterCheckIn]);
+
+  /** Check-in through the workday: the database checks the clock-in, job order, photo rule and radius, then writes every record. */
+  const checkInTimed = useCallback(async (gps: GPSCoordinates | null, assignmentId?: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+    const job = resolveCheckInJob(assignmentId);
+    if (!job) return { ok: false, error: 'There is no job to check in to.' };
+    if (!workday.active) return { ok: false, error: 'Clock in for the day first. The Clock In button is at the top of Today.' };
+    const resuming = job.status === 'completed';
+    const g = gps ? { lat: gps.latitude, lng: gps.longitude, accuracy: gps.accuracy, raw: gps as unknown as Record<string, unknown> } : {};
+    const r = await workday.startVisit('assignment', job.id, g);
+    if (!r.ok) return { ok: false, error: r.error };
+    await refreshStore();
+    afterCheckIn(job, resuming);
+    return { ok: true };
+  }, [resolveCheckInJob, workday, afterCheckIn]);
 
   const checkOut = useCallback((gps: GPSCoordinates | null) => {
     const job = currentJob;
@@ -308,6 +332,22 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     logActivity({ assignmentId: job.id, projectId: job.projectId, activityType: 'checked_out', description: `Checked out from ${projectName}` });
     notifyStaff('worker_checked_out', 'Worker checked out', `${workerName} checked out from ${projectName}.`, { type: 'assignment', id: job.id }, undefined, workerId);
   }, [currentJob, workerId, logActivity, workerName]);
+
+  /** Check-out through the workday: ends this employee's own time at the property. The workday keeps running. */
+  const checkOutTimed = useCallback(async (gps: GPSCoordinates | null): Promise<{ ok: true } | { ok: false; error: string }> => {
+    const job = currentJob;
+    if (!job) return { ok: false, error: 'There is no job to check out of.' };
+    const cur = workday.day?.current;
+    if (!cur || cur.projectId !== job.projectId) { checkOut(gps); return { ok: true }; }  // started before time tracking was switched on
+    const g = gps ? { lat: gps.latitude, lng: gps.longitude, accuracy: gps.accuracy, raw: gps as unknown as Record<string, unknown> } : {};
+    const r = await workday.completeVisit(cur.visitId, undefined, g);
+    if (!r.ok) return { ok: false, error: r.error };
+    await refreshStore();
+    const projectName = job.project?.name ?? 'job site';
+    logActivity({ assignmentId: job.id, projectId: job.projectId, activityType: 'checked_out', description: `Checked out from ${projectName}` });
+    notifyStaff('worker_checked_out', 'Worker checked out', `${workerName} checked out from ${projectName}.`, { type: 'assignment', id: job.id }, undefined, workerId);
+    return { ok: true };
+  }, [currentJob, workday, checkOut, logActivity, workerName, workerId]);
 
   const moveToNextJob = useCallback(() => {
     setCurrentJobId(nextJob ? nextJob.id : null);
@@ -423,6 +463,10 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     acknowledgeChanges,
     checkIn,
     checkOut,
+    workday,
+    timeOn,
+    checkInTimed,
+    checkOutTimed,
     locateForCheckIn,
     locateForCheckOut,
     checkIns: checkInList,
@@ -447,7 +491,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     todayAssignments, upcomingAssignments, completedAssignments,
     currentJob, nextJob, jobState, scheduleConfirmed, hasScheduleChanges,
     confirmSchedule, acknowledgeChanges,
-    checkIn, checkOut, locateForCheckIn, locateForCheckOut, checkInList, checkOutList,
+    checkIn, checkOut, workday, timeOn, checkInTimed, checkOutTimed, locateForCheckIn, locateForCheckOut, checkInList, checkOutList,
     projectTasksFn, isTaskLead, startTask, completeTask, projectSettingsFn,
     taskPhotos, taskPhotoUris, captureTaskPhoto, activityList, workerSettings,
     updateNavApp, updateNotificationsEnabled, offlineQueue, isOnline, openMapsNavigation, moveToNextJob,

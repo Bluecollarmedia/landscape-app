@@ -6,8 +6,8 @@
  */
 
 import { ReportProblemButton } from '@/components/issues/ReportProblemButton';
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +20,10 @@ import { db, useDb } from '@/data/store';
 import { markArrived, locationLabel } from '@/data/maintenance';
 import { finishStopAndAdvance, missingRequirements, nextStopAfter, uploadingPhotoCount } from '@/data/maintenanceFinish';
 import { getCurrentGps } from '@/lib/location';
+import { useWorkerContext } from '@/providers/WorkerProvider';
+import { withTimedPhoto } from '@/data/timePhotos';
+import { SkipRequestSheet } from '@/components/time/SkipRequestSheet';
+import { loadMySkipRequests, requestSkip, type MySkipRequest } from '@/data/timeTracking';
 import { openDirections } from '@/lib/maps';
 import { haptics } from '@/lib/haptics';
 import { typeScale } from '@/theme/typography';
@@ -38,6 +42,15 @@ export default function MaintenanceStopScreen() {
   const v = useDb();
   const [arriving, setArriving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { timeOn, workday } = useWorkerContext();
+  const [skips, setSkips] = useState<MySkipRequest[]>([]);
+  const [skipOpen, setSkipOpen] = useState(false);
+  useEffect(() => {
+    if (!timeOn) return;
+    let live = true;
+    loadMySkipRequests().then((r) => { if (live && r.ok) setSkips(r.data); });
+    return () => { live = false; };
+  }, [timeOn, id]);
 
   const stop = id ? db.maintenance.stopById[id] : undefined;
   const route = stop ? db.maintenance.routeById[stop.routeId] : undefined;
@@ -61,6 +74,20 @@ export default function MaintenanceStopScreen() {
   const locked = stop.status === 'completed' || stop.status === 'skipped';
   const required = stop.tasks.filter((t) => t.isRequired);
   const addressLine = [p?.address, p?.city, p?.state].filter(Boolean).join(', ');
+  // Stops are worked in order: a later stop stays locked until the one before it is done (the database enforces it too).
+  const isStaff = db.role === 'owner' || db.role === 'admin';
+  const blockedBy = !isStaff && stop.status === 'pending' ? route.stops.find((s) => s.number < stop.number && (s.status === 'pending' || s.status === 'arrived')) : undefined;
+  const mySkip = skips.find((s) => s.refId === stop.id && s.status === 'pending');
+  const clockedIn = !timeOn || !!workday.active;
+
+  async function sendSkip(reason: string) {
+    const r = await requestSkip('maintenance_stop', stop!.id, reason);
+    if (!r.ok) { setError(r.error); return; }
+    haptics.success();
+    setSkipOpen(false);
+    const again = await loadMySkipRequests();
+    if (again.ok) setSkips(again.data);
+  }
 
   async function handleArrive() {
     setError(null);
@@ -68,7 +95,7 @@ export default function MaintenanceStopScreen() {
     haptics.light();
     // Never blocked by GPS: whatever the phone reports (or doesn't) is recorded honestly.
     const gps = await Promise.race([getCurrentGps(), new Promise<undefined>((r) => setTimeout(() => r(undefined), 6000))]);
-    const res = await markArrived(stop!.id, gps);
+    const res = await withTimedPhoto(() => markArrived(stop!.id, gps), 'start', { kind: 'maintenance', stopId: stop!.id });
     setArriving(false);
     if (res.ok) haptics.success();
     else setError(res.error);
@@ -194,10 +221,24 @@ export default function MaintenanceStopScreen() {
           </Section>
         )}
 
+        {timeOn && !locked ? (
+          <View style={{ marginTop: spacing.xl }}>
+            {mySkip ? (
+              <InlineNotice icon="clock" tone="neutral" text="Skip requested. Waiting for the owner. This property is still open until they approve it." />
+            ) : (
+              <Pressable onPress={() => setSkipOpen(true)} accessibilityRole="button" style={{ alignSelf: 'flex-start' }}>
+                <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>Can't service this property? Ask to skip it</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : null}
+
         <View style={{ marginTop: spacing.xl }}>
           <ReportProblemButton where={{ maintenancePropertyId: stop.propertyId }} />
         </View>
       </ScrollView>
+
+      <SkipRequestSheet visible={skipOpen} propertyName={p?.name} onClose={() => setSkipOpen(false)} onSend={sendSkip} />
 
       {/* Fixed bottom action */}
       <View
@@ -208,13 +249,19 @@ export default function MaintenanceStopScreen() {
         }]}
       >
         {!!error && <InlineNotice icon="alert-triangle" tone="error" text={error} style={{ marginBottom: spacing.sm }} />}
-        {stop.status === 'pending' && (
+        {stop.status === 'pending' && !blockedBy && clockedIn && (
           <PrimaryButton
-            label={arriving ? 'RECORDING…' : "I'M HERE"}
+            label={arriving ? 'RECORDING…' : timeOn ? 'START PROPERTY' : "I'M HERE"}
             icon="map-pin"
             busy={arriving}
             onPress={handleArrive}
           />
+        )}
+        {stop.status === 'pending' && blockedBy && (
+          <InlineNotice icon="lock" tone="neutral" text={`Finish ${blockedBy.property?.name ?? `stop ${blockedBy.number}`} first. Stops are worked in order.`} />
+        )}
+        {stop.status === 'pending' && !blockedBy && !clockedIn && (
+          <InlineNotice icon="clock" tone="neutral" text="Clock in for the day first. The Clock In button is on the Today screen." />
         )}
         {stop.status === 'arrived' && (
           <FinishStopButton stopId={stop.id} missing={missing} uploading={uploadingPhotoCount(stop)} onPress={handleFinish} />

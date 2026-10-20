@@ -98,6 +98,12 @@ export type NotificationEventType =
   | 'schedule_changed'
   | 'schedule_conflict'
   | 'announcement_posted'
+  // Hours & Labor (update 64)
+  | 'time_skip_request'
+  | 'time_over_target'
+  | 'time_overtime'
+  | 'time_unusual'
+  | 'time_progress_check'
   | 'quote_approved'
   | 'quote_declined'
   // To the customer
@@ -124,7 +130,7 @@ export interface AppNotification {
   title: string;
   body: string;
   status: NotificationStatus;
-  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement' | 'quote' | 'change_order' | 'invoice' | 'issue';
+  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement' | 'quote' | 'change_order' | 'invoice' | 'issue' | 'time_workday' | 'time_visit' | 'time_skip';
   linkedEntityId?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;

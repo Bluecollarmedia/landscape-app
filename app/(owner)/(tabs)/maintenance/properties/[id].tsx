@@ -64,6 +64,8 @@ export default function MaintenancePropertyScreen() {
   const { property: p, activeContract, contracts, due, visits } = detail;
   const contract = activeContract ?? contracts[0];
   const edit = () => router.push(`/(owner)/maintenance-property-edit?id=${p.id}` as any);
+  // Adding a service opens a short form about the service only (not the whole property form).
+  const addService = () => router.push(`/(owner)/maintenance-service-add?propertyId=${p.id}` as any);
   const address = [p.address, [p.city, p.state].filter(Boolean).join(', '), p.zip].filter(Boolean).join(' ');
   // Rules of the contract on screen (the active one, else the latest).
   const rules = contract ? m.rulesByContract[contract.id] ?? [] : [];
@@ -183,7 +185,7 @@ export default function MaintenancePropertyScreen() {
         {contract && (
           <ListSection title="SERVICES" footer={contractActive ? 'Each service is due on its own schedule. Only finished stops count as done.' : undefined}>
             {onServices.length === 0 ? (
-              <ListRow icon="plus" title="Add Services" subtitle="Lawn cuts, cleanups, trimming…" showChevron onPress={edit} />
+              <ListRow icon="plus" title="Add Service" subtitle="Lawn cuts, cleanups, trimming…" showChevron onPress={addService} />
             ) : onServices.map((s) => (
               <View key={s.rule.id} style={styles.blockPad}>
                 <ServiceDueLine info={s} onDate={today} showRule />
@@ -192,6 +194,7 @@ export default function MaintenancePropertyScreen() {
                 )}
               </View>
             ))}
+            {onServices.length > 0 && <ListRow icon="plus" title="Add Service" showChevron onPress={addService} />}
             {offServices.length > 0 && (
               <ListRow
                 icon={showOff ? 'chevron-up' : 'chevron-down'}

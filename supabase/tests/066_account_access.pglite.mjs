@@ -292,6 +292,15 @@ await db.exec(`set session_replication_role = replica`);
 await db.exec(`set session_replication_role = origin`);
 r = await rpc(owner.u, `select public.delete_my_company('acme lawn') as x`);
 check('40 the owner closes the company', r.ok && (await one(`select count(*)::int c from public.companies where id = $1`, [co])).c === 0, r.msg);
+const leftovers = [];
+for (const row of await all(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public' where c.relkind = 'r' and c.relname <> 'company_closure_log'
+    and exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'company_id' and not a.attisdropped)`)) {
+  const n = (await one(`select count(*)::int c from public.${row.relname} where company_id = $1`, [co])).c;
+  if (n > 0) leftovers.push(`${row.relname}:${n}`);
+}
+check('40a nothing is left behind: no table anywhere still holds a row of the closed company (no orphans, no half-deleted state)', leftovers.length === 0, leftovers.join(','));
+check('40c the permanent delete took the company data with it: projects, hours, history and members are gone', (await one(`select count(*)::int c from public.projects where id = $1`, [proj])).c === 0
+  && (await one(`select count(*)::int c from public.time_workdays where company_id = $1`, [co])).c === 0 && (await one(`select count(*)::int c from public.membership_audit_log where company_id = $1`, [co])).c === 0);
 check('40b every code and pending request of that company is gone with it: the codes no longer work', (await one(`select public.lookup_any_code('LAND1') as x`)).x.valid === false
   && (await one(`select public.lookup_any_code('SNOW1') as x`)).x.valid === false);
 r = await rpc(pBad.u, `select public.join_with_code('LAND1') as x`);

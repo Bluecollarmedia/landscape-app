@@ -12,9 +12,11 @@
 --    refused while they are on the clock or timing a property. Their history is never touched.
 --  • Reactivating is an explicit decision (landscaping and/or which snow services). It never brings back an old admin role.
 --  • Approving a join request now requires it to still be pending (a declined / cancelled / old request can't be replayed).
+--  • Snow access is explicit per person: the automatic "everyone gets snow when Snow Mode is on" of update 62 is switched off.
 --  • One code box: join_with_code() works out whether a code is a team code or a snow code (on the server).
 --  • Closing a company: a preview of what is still happening, a refusal while people are on the clock or a storm is
 --    dispatched, codes and pending requests closed first, and a closure record that survives the company.
+-- If update 62 is ever run again, run 66 again after it (62 would otherwise switch the automatic snow grants back on).
 -- Nothing here deletes or rewrites existing data.
 -- ============================================================================
 
@@ -364,15 +366,19 @@ drop trigger if exists company_members_deactivation_block on public.company_memb
 create trigger company_members_deactivation_block before update of status on public.company_members
   for each row execute function public._member_deactivation_block();
 
--- Snow auto-enrol (update 62) must not run while someone is being reactivated on purpose.
+-- Snow access is EXPLICIT, per person (decision: Snow Mode being switched on grants nobody anything). Update 62 used to put every
+-- worker on the snow team when Snow Mode was switched on, and when a worker joined or was approved during Snow Mode. Both automatic
+-- grants are switched off here. Nobody who already has snow access loses it; nobody new gets it unless the owner (or an admin allowed
+-- "snow access") gives it, or approves their Snow request. (_snow_enroll_person / _snow_enroll_workers are left in place, unused.)
+create or replace function public._snow_mode_enroll_trigger()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  return null;
+end;
+$$;
 create or replace function public._snow_member_enroll_trigger()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  if coalesce(current_setting('brighton.no_snow_enroll', true), '') = 'on' then return null; end if;
-  if new.role = 'worker' and new.status = 'active'
-     and exists (select 1 from public.companies c where c.id = new.company_id and c.active_mode = 'snow') then
-    perform public._snow_enroll_person(new.company_id, new.person_id);
-  end if;
   return null;
 end;
 $$;

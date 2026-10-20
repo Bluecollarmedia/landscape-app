@@ -102,7 +102,7 @@ export function DeleteCompanyRow() {
                 Delete {companyName || 'the company'}?
               </Text>
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
-                This permanently deletes the company and everything in it: projects, workers' team membership, schedules, hours, photos, quotes, maintenance and snow records. Accounts are kept, but nobody will have a company until a new one is created. This can't be undone.
+                This PERMANENTLY deletes the company and everything it owns: projects, hours and payroll records, photos, storm and route history, quotes, maintenance records and every worker's team membership. It cannot be undone and nothing can be recovered. Logins are kept, so people could sign up again, but none of this data comes back.
               </Text>
               {stillGoing.map((t) => <Text key={t} style={[typeScale.bodySmall, { color: semantic.error, textAlign: 'center', marginTop: spacing.sm }]}>{t}</Text>)}
               {heads.map((t) => <Text key={t} style={[typeScale.caption, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>{t}</Text>)}

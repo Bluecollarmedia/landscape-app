@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Icon, PressableScale } from '@/components/ui';
 import { MediaJobOverlay } from '@/components/media/MediaJobOverlay';
+import { PrivatePhoto } from '@/components/media/PrivatePhoto';
 import { useTheme } from '@/providers/ThemeProvider';
 import { db } from '@/data/store';
 import { removeStopPhoto } from '@/data/maintenance';
@@ -79,7 +80,7 @@ export function StopPhotos({ stopId, photos, requiresPhotos, minPhotos, locked }
           const canRemove = !locked && (staff || p.uploadedBy === db.personId);
           return (
             <View key={p.id} style={[styles.tile, { backgroundColor: colors.groupedBackground }]}>
-              <Image source={{ uri: p.fileUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <PrivatePhoto plain fileUrl={p.fileUrl} fileKey={p.fileKey} style={StyleSheet.absoluteFill as never} />
               {uploading && <MediaJobOverlay rowId={p.id} localOnly />}
               {canRemove && !uploading && (
                 <PressableScale

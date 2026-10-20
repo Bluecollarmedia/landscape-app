@@ -10,6 +10,7 @@ import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenance, useMaintenanceRoute } from '@/hooks/useMaintenance';
 import { db, useDb } from '@/data/store';
 import { useWorkdaysOn } from '@/hooks/useClockedInToday';
+import { PrivatePhoto } from '@/components/media/PrivatePhoto';
 import { correctAttendance, locationLabel, setRouteLead, setStopPhotoShared } from '@/data/maintenance';
 import {
   buildRouteReview, correctStopTime, describeEvent, formatTime,
@@ -469,7 +470,7 @@ function StopCard({ review, canFix, onFix, onOpenProperty }: {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
               {stop.photos.map((ph) => (
                 <View key={ph.id} style={{ alignItems: 'center', gap: 4 }}>
-                  <OptimizedImage source={ph.fileUrl} style={styles.thumb} accessibilityLabel={ph.caption ?? 'Stop photo'} />
+                  <PrivatePhoto fileUrl={ph.fileUrl} fileKey={ph.fileKey} style={styles.thumb as never} accessibilityLabel={ph.caption ?? 'Stop photo'} />
                   <Pressable
                     onPress={() => setStopPhotoShared(ph.id, !ph.isCustomerVisible)}
                     hitSlop={6}

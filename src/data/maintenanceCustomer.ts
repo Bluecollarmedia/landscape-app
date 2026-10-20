@@ -13,7 +13,7 @@ export interface CustomerMaintenanceUpdate {
   propertyName: string;
   completedAt: string;
   services?: string;
-  photos: { id: string; url: string }[];
+  photos: { id: string; url: string; key?: string }[];
 }
 
 export async function loadCustomerMaintenanceUpdates(): Promise<Result<CustomerMaintenanceUpdate[]>> {
@@ -29,7 +29,7 @@ export async function loadCustomerMaintenanceUpdates(): Promise<Result<CustomerM
       propertyName: r.property_name,
       completedAt: r.completed_at,
       services: r.services ?? undefined,
-      photos: (r.photos ?? []) as { id: string; url: string }[],
+      photos: (r.photos ?? []) as { id: string; url: string; key?: string }[],
     })),
   };
 }

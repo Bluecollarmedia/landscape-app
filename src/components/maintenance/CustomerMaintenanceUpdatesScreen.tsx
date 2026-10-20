@@ -5,7 +5,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { EmptyState, InlineNotice, LoadingSpinner, OptimizedImage, ScreenHeader } from '@/components/ui';
+import { EmptyState, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
+import { PrivatePhoto } from '@/components/media/PrivatePhoto';
 import { useTheme } from '@/providers/ThemeProvider';
 import {
   loadCustomerMaintenanceUpdates, loadMyMaintenanceProperties,
@@ -65,7 +66,7 @@ export function CustomerMaintenanceUpdatesScreen() {
             {u.photos.length ? (
               <View style={styles.thumbs}>
                 {u.photos.map((p) => (
-                  <OptimizedImage key={p.id} source={p.url} style={styles.thumb} accessibilityLabel="Photo from your visit" />
+                  <PrivatePhoto key={p.id} fileUrl={p.url} fileKey={p.key} style={styles.thumb as never} accessibilityLabel="Photo from your visit" />
                 ))}
               </View>
             ) : null}

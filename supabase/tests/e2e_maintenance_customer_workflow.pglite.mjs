@@ -95,7 +95,7 @@ await asUser(owner.u);
 await db.query(`update public.maintenance_photos set is_customer_visible = true, shared_by = $2, shared_at = now() where file_key = $1`, [KEY, owner.pid]);
 await asDb();
 cu = await rpc(cust.u, `select photos as x from public.maintenance_customer_updates()`);
-check('5 after the owner shares it (stop finished): the customer sees exactly that photo and may open its file', cu.rows[0].x.length === 1 && (await open(cust.u)).v.length === 1, JSON.stringify(cu.rows));
+check('5 after the owner shares it (stop finished): the customer sees exactly that photo, gets its file key for a signed link, and the open-check allows it', cu.rows[0].x.length === 1 && cu.rows[0].x[0].key === KEY && (await open(cust.u)).v.length === 1, JSON.stringify(cu.rows));
 const other = await login('other@x.test', 'OtherCustomer');
 await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1,$2,'customer','active')`, [co, other.pid]);
 check('5b a different customer of the same company cannot open it', (await open(other.u)).v.length === 0 && (await rpc(other.u, `select count(*)::int as x from public.maintenance_customer_updates()`)).v === 0);

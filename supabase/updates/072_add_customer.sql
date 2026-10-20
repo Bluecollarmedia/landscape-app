@@ -15,6 +15,13 @@
 -- Names are never used to match. Caveat: an email address is only as trustworthy as the sign-up behind it, and email confirmation is
 -- off in Supabase for now, so "the account with this email" is the person who registered that address, not a verified identity.
 -- ============================================================================
+-- The owner/admin's company (also defined by update 68, identically; repeated so this update does not depend on it).
+create or replace function public._my_owned_or_staff_company()
+returns uuid language sql stable security definer set search_path = public as $$
+  select company_id from public.company_members where person_id = public.my_person_id() and role in ('owner', 'admin') and status = 'active' order by created_at limit 1
+$$;
+revoke all on function public._my_owned_or_staff_company() from public, anon, authenticated;
+
 create or replace function public.add_customer(p_first text, p_last text, p_email text default '', p_phone text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare

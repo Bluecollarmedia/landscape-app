@@ -1559,7 +1559,7 @@ export default function ProjectDetailScreen() {
       else Alert.alert('Permission Needed', msg);
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (result.canceled || !result.assets?.[0]) return;
     setNewPhotoUri(result.assets[0].uri);
     setNewPhotoType('progress');

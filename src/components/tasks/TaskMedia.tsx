@@ -7,6 +7,9 @@ import { View, Text, Pressable, StyleSheet, Modal, useWindowDimensions } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Icon, OptimizedImage } from '@/components/ui';
+import { MediaJobOverlay } from '@/components/media/MediaJobOverlay';
+import { db } from '@/data/store';
+const isDemoMode = () => !!db.demo;
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -57,6 +60,8 @@ export function TaskMediaStrip({ items, onOpen, onAdd, onRemove }: TaskMediaStri
                 <Icon name="play" size={18} color="#FFFFFF" />
               </View>
             )}
+            {/* Still a local file? Says Preparing / Uploading / Not saved (Retry) so a preview is never mistaken for a saved file. */}
+            <MediaJobOverlay rowId={item.key} localOnly={!/^https?:\/\//i.test(item.uri) && !/^(data|blob):/i.test(item.uri) && !isDemoMode()} />
           </Pressable>
           {onRemove && (
             <Pressable

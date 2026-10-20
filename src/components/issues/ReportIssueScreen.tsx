@@ -50,7 +50,7 @@ export function ReportIssueScreen() {
         return;
       }
     }
-    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7, allowsMultipleSelection: source === 'library', selectionLimit: 6 };
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 1, allowsMultipleSelection: source === 'library', selectionLimit: 6 };
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     if (!result.canceled) setPhotos((cur) => [...cur, ...result.assets.map((a) => a.uri)].slice(0, 8));
   }

@@ -12,8 +12,7 @@
  *
  * Nothing here marks a service done or counts it until a stop is finished.
  */
-import { db, insertRow, insertRows, updateRow, deleteRow, rowsOf, rpc, refresh, isDemo, saveDeferredRow, discardLocalRow, type TableName } from './store';
-import { uploadImage } from '@/lib/media';
+import { db, insertRow, insertRows, updateRow, deleteRow, rowsOf, rpc, refresh, isDemo, type TableName } from './store';
 import { emitTimeChanged, isTimeTrackingOn, lastMyDay, timeRpc } from './timeTracking';
 import { localDateKey, todayKey } from '@/lib/ids';
 import { cleanDates } from '@/lib/serviceDates';
@@ -552,16 +551,12 @@ export function addStopPhoto(stopId: string, localUri: string, caption?: string)
   }, { deferSave: needsUpload }) as unknown as MaintenancePhoto;
   if (db.demo) logLocal('photo_added', { routeId: stop.routeId, stopId, metadata: { photo_id: row.id } });
   if (needsUpload) {
-    uploadImage(localUri, `${db.companyId}/maintenance/${stop.propertyId}`)
-      .then(({ url, key }) => saveDeferredRow('maintenance_photos', row.id, { fileUrl: url, fileKey: key }))
-      .catch((err) => {
-        console.warn('[maintenance] photo upload failed', err);
-        discardLocalRow('maintenance_photos', row.id);
-        const { Alert, Platform } = require('react-native');
-        const msg = `The photo couldn't be uploaded. ${err?.message ?? ''}`.trim();
-        if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(msg);
-        else Alert.alert('Photo not saved', msg);
-      });
+    // The shared queue compresses, uploads, and saves the record (always internal) only once the file is stored. A failure stays in the
+    // stop's photo list as "Failed" with Retry, so a required photo is never silently lost.
+    const { fileUrl: _f, fileKey: _k, id: _i, ...payload } = row as unknown as Record<string, unknown>;
+    void _f; void _k; void _i;
+    const { queueMedia } = require('@/lib/mediaQueueRuntime') as typeof import('@/lib/mediaQueueRuntime');
+    queueMedia({ id: row.id, kind: 'image', sourceUri: localUri, folder: `${db.companyId}/maintenance/${stop.propertyId}`, target: { type: 'maintenance_photo', payload } });
   }
   return row;
 }

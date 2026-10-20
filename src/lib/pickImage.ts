@@ -19,7 +19,7 @@ export async function pickImage(source: 'camera' | 'library', opts: { afterSheet
       const p = await ImagePicker.requestCameraPermissionsAsync();
       if (!p.granted) return { status: 'error', message: "Camera access is needed to take a photo. You can turn it on in your phone's Settings app." };
     }
-    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: false, quality: 0.8 };
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: false, quality: 1 };
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     if (result.canceled || !result.assets?.[0]) return { status: 'cancelled' };
     const a = result.assets[0];

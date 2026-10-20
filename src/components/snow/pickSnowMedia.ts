@@ -45,7 +45,7 @@ export async function pickSnowMedia(): Promise<SnowMediaDraft[]> {
 
   const options: ImagePicker.ImagePickerOptions = {
     mediaTypes: ['images', 'videos'],
-    quality: 0.7,
+    quality: 1,
     videoMaxDuration: MAX_SNOW_VIDEO_SECONDS,
     videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
     allowsMultipleSelection: source === 'library',

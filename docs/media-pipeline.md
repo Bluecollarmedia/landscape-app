@@ -6,11 +6,12 @@ Every photo and video that leaves the phone goes through the same steps. Rules l
 (expo-image-manipulator). A JPEG/WebP that is already small (<= 250 KB, <= 1600 px) is not recompressed; HEIC/PNG is converted. The picker
 hands over the original (quality 1) so there is only one lossy step.
 
-**Videos** are meant to be compressed to at most 854x480 (480x854 portrait), ratio kept, even sizes, 0.6 - 1.5 Mbps, audio kept.
-**This needs a native library that is not in the app yet** (`react-native-compressor`; its 2.x line also needs `react-native-nitro-modules`;
-the app must be rebuilt, which needs the owner's approval). Until then a video fails with a clear message and the person chooses Retry or
-"Original" (uploads the large original). Nothing is skipped silently. The 50 MB / 60 s limits in the pickers still apply BEFORE compression;
-they should be moved after compression once video compression exists.
+**Videos** are compressed to at most 854x480 (480x854 portrait), ratio kept, even sizes, 0.6 - 1.5 Mbps, audio kept, using
+`react-native-compressor` 1.19.4 (added to package.json and the lockfile; the 1.x line, which supports the new architecture and does not need
+Nitro; requires Node 22.11+ to install). It is a native library: **it takes effect only in a new app build** (`npm ci` then an EAS build, which
+needs the owner's go-ahead), and it has not yet been run on any device. A build made without it, or a failed compression, shows a clear message and
+the person chooses Retry or "Original" (uploads the large original); nothing is skipped silently. The 50 MB / 60 s limits in the pickers still
+apply BEFORE compression; move them after compression once video compression has been verified on devices.
 
 **The queue** (`src/lib/mediaQueue.ts`, phone wiring `mediaQueueRuntime.ts`) is used by project progress photos, maintenance stop photos
 and task photos/videos: pick several at once, the local file is shown immediately, and each item moves Preparing -> Uploading -> Uploaded

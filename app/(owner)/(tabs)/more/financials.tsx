@@ -8,10 +8,10 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
-import { ScreenHeader, GlassIconButton, Button, SearchBar, FilterChips, ListSection, EmptyState, LoadingSpinner } from '@/components/ui';
+import { ScreenHeader, GlassIconButton, RaisedAddButton, SearchBar, FilterChips, ListSection, EmptyState, LoadingSpinner } from '@/components/ui';
+import { ActionSheet } from '@/components/financials/ActionSheet';
 import { DocumentRow } from '@/components/financials/DocumentRow';
 import { useTheme } from '@/providers/ThemeProvider';
-import { useFixedBottomOffset } from '@/hooks/useFixedBottomOffset';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useFinancialDocs } from '@/hooks/useFinancials';
 import { db } from '@/data/store';
@@ -39,7 +39,7 @@ export default function FinancialsOverviewScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const clearance = useTabBarClearance();
-  const fab = useFixedBottomOffset();
+  const [createOpen, setCreateOpen] = useState(false);
   const docs = useFinancialDocs();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
@@ -67,22 +67,25 @@ export default function FinancialsOverviewScreen() {
   ];
 
   return (
-    <View ref={fab.ref} onLayout={fab.onLayout} style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader
         title="Quotes & Invoices"
         subtitle="Quotes, change orders and invoices"
         right={
-          <GlassIconButton
-            icon="sliders"
-            onPress={() => router.push('/(owner)/more/document-defaults' as any)}
-            accessibilityLabel="Document defaults"
-          />
+          <View style={styles.headerButtons}>
+            <GlassIconButton
+              icon="sliders"
+              onPress={() => router.push('/(owner)/more/document-defaults' as any)}
+              accessibilityLabel="Document defaults"
+            />
+            <RaisedAddButton onPress={() => setCreateOpen(true)} accessibilityLabel="Create a quote or invoice" />
+          </View>
         }
       />
 
       <KeyboardAwareScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: clearance + spacing['3xl'] + 56 }}
+        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: clearance + spacing['3xl'] }}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.tiles}>
@@ -124,21 +127,15 @@ export default function FinancialsOverviewScreen() {
         )}
       </KeyboardAwareScrollView>
 
-      <View style={[styles.fab, { bottom: fab.bottom }]} pointerEvents="box-none">
-        <Button
-          title="Create Quote"
-          icon="plus"
-          onPress={() => router.push({ pathname: '/(owner)/document-new', params: { kind: 'quote' } } as any)}
-          style={shadow.md}
-        />
-        <Button
-          title="Invoice"
-          icon="dollar-sign"
-          variant="secondary"
-          onPress={() => router.push({ pathname: '/(owner)/document-new', params: { kind: 'invoice' } } as any)}
-          style={shadow.md}
-        />
-      </View>
+      <ActionSheet
+        visible={createOpen}
+        title="Create"
+        onClose={() => setCreateOpen(false)}
+        actions={[
+          { key: 'quote', label: 'Quote', icon: 'file-text', onPress: () => router.push({ pathname: '/(owner)/document-new', params: { kind: 'quote' } } as any) },
+          { key: 'invoice', label: 'Invoice', icon: 'dollar-sign', onPress: () => router.push({ pathname: '/(owner)/document-new', params: { kind: 'invoice' } } as any) },
+        ]}
+      />
     </View>
   );
 }
@@ -148,5 +145,5 @@ const styles = StyleSheet.create({
   tiles: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
   tile: { flex: 1, borderRadius: radius.xl, padding: spacing.md, gap: 2 },
   num: { fontVariant: ['tabular-nums'] },
-  fab: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });

@@ -8,6 +8,7 @@
  * database checks every step (dispatched storm, order, photo minimum).
  */
 import { roleFor, type RouteRole } from '@/lib/snowCrew';
+import { peopleWhoDoAll } from '@/lib/snowStopGroups';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { discardSnowUpload, uploadSnowMedia } from '@/lib/snowMedia';
 import type { SnowService } from '@/types/snow';
@@ -32,6 +33,8 @@ export interface RouteStop {
   status: VisitStatus;
   propertyName: string;
   propertyAddress: string;
+  /** Which service this visit is (a route can do several together, update 61). */
+  service?: SnowService;
   arrivedAt?: string;
   completedAt?: string;
   completionNote?: string;
@@ -49,6 +52,8 @@ export interface RouteDetail {
   stormName: string;
   stormStatus: 'draft' | 'dispatched' | 'ended';
   service: SnowService;
+  /** Every service the route does together (update 61); just `service` for an ordinary route. */
+  services: SnowService[];
   name: string;
   leadPersonId?: string;
   mediaRequired: boolean;
@@ -66,14 +71,15 @@ export interface RouteTemplate { id: string; name: string; stops: number; servic
 /** One route with its storm and stops in order. Works for owner/admin and the route's lead. */
 export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const { data: r, error } = await supabase
-    .from('snow_routes')
-    .select('id, company_id, storm_id, service, name, lead_person_id, media_required, min_media, notes, cancelled_at, snow_storms(name, status)')
-    .eq('id', routeId)
-    .maybeSingle();
+  const routeCols = 'id, company_id, storm_id, service, name, lead_person_id, media_required, min_media, notes, cancelled_at, snow_storms(name, status)';
+  let { data: r, error } = await supabase.from('snow_routes').select(`${routeCols}, services`).eq('id', routeId).maybeSingle();
+  // A database without update 61 has no `services` column yet: an ordinary single-service route.
+  if (error && /services/i.test(error.message)) {
+    ({ data: r, error } = await supabase.from('snow_routes').select(routeCols).eq('id', routeId).maybeSingle());
+  }
   if (error) return fail(message(error, 'Couldn\'t load the route.'));
   if (!r) return fail('This route isn\'t available.');
-  const visitCols = 'id, property_id, position, status, property_name, property_address, arrived_at, completed_at, completion_note';
+  const visitCols = 'id, property_id, position, status, service, property_name, property_address, arrived_at, completed_at, completion_note';
   const [first, media] = await Promise.all([
     supabase.from('snow_visits').select(`${visitCols}, owner_note, photos_required`).eq('route_id', routeId).order('position'),
     supabase.from('snow_completion_media').select('visit_id').eq('route_id', routeId),
@@ -93,6 +99,7 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
     stormName: storm?.name ?? 'Storm',
     stormStatus: storm?.status ?? 'draft',
     service: r.service,
+    services: Array.isArray((r as { services?: unknown }).services) && (r as { services: string[] }).services.length ? (r as { services: SnowService[] }).services : [r.service],
     name: r.name,
     leadPersonId: r.lead_person_id ?? undefined,
     mediaRequired: !!r.media_required,
@@ -106,6 +113,7 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
       status: v.status,
       propertyName: v.property_name ?? 'Property',
       propertyAddress: v.property_address ?? '',
+      service: (v.service as SnowService | undefined) ?? undefined,
       arrivedAt: v.arrived_at ?? undefined,
       completedAt: v.completed_at ?? undefined,
       completionNote: v.completion_note ?? undefined,
@@ -154,6 +162,17 @@ export async function loadSnowLeads(service: SnowService): Promise<Result<SnowLe
   return ok((people ?? [])
     .map((p) => ({ personId: p.id, name: `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unnamed' }))
     .sort((a, b) => a.name.localeCompare(b.name)));
+}
+
+/** People who can lead (or crew) a route that does all of these services together. */
+export async function loadLeadsForServices(services: SnowService[]): Promise<Result<SnowLead[]>> {
+  const lists: SnowLead[][] = [];
+  for (const sv of services) {
+    const res = await loadSnowLeads(sv);
+    if (!res.ok) return res;
+    lists.push(res.data);
+  }
+  return ok(peopleWhoDoAll(lists));
 }
 
 export async function loadRouteTemplates(service: SnowService | SnowService[]): Promise<Result<RouteTemplate[]>> {
@@ -232,13 +251,15 @@ export async function setRouteCrew(routeId: string, personIds: string[]): Promis
 
 // ── Owner: building routes ──────────────────────────────────────────────────
 
-export async function createRoute(stormId: string, input: { name: string; service?: SnowService; leadPersonId?: string; mediaRequired: boolean; minMedia: number }): Promise<Result<string>> {
+export async function createRoute(stormId: string, input: { name: string; service?: SnowService; services?: SnowService[]; leadPersonId?: string; mediaRequired: boolean; minMedia: number }): Promise<Result<string>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { data: last } = await supabase.from('snow_routes').select('position').eq('storm_id', stormId)
     .order('position', { ascending: false }).limit(1).maybeSingle();
   const { data, error } = await supabase.from('snow_routes').insert({
     storm_id: stormId,
     ...(input.service ? { service: input.service } : {}),
+    // Only sent for a route that does several services, so a database without update 61 still takes ordinary routes.
+    ...(input.services && input.services.length > 1 ? { services: input.services } : {}),
     name: input.name.trim(),
     lead_person_id: input.leadPersonId ?? null,
     media_required: input.mediaRequired,
@@ -271,14 +292,19 @@ export async function cancelRoute(routeId: string): Promise<Result> {
  * stop last. The same property can be listed again (or already be on the
  * route): every visit is its own record. Returns the new visit ids.
  */
-export async function addStops(routeId: string, propertyIds: string[]): Promise<Result<string[]>> {
+export async function addStops(routeId: string, items: (string | { propertyId: string; services?: SnowService[] })[]): Promise<Result<string[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const ids: string[] = [];
-  for (const propertyId of propertyIds) {
-    const { data, error } = await supabase.from('snow_visits')
-      .insert({ route_id: routeId, property_id: propertyId }).select('id').single();
-    if (error || !data) return fail(message(error, 'Couldn\'t add the stop.'));
-    ids.push(data.id as string);
+  for (const item of items) {
+    const propertyId = typeof item === 'string' ? item : item.propertyId;
+    // A route that does several services makes one visit per service at the property (update 61); otherwise one visit.
+    const services = typeof item === 'string' || !item.services?.length ? [undefined] : item.services;
+    for (const service of services) {
+      const { data, error } = await supabase.from('snow_visits')
+        .insert({ route_id: routeId, property_id: propertyId, ...(service ? { service } : {}) }).select('id').single();
+      if (error || !data) return fail(message(error, 'Couldn\'t add the stop.'));
+      ids.push(data.id as string);
+    }
   }
   return ok(ids);
 }

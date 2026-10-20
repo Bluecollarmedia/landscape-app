@@ -14,11 +14,13 @@ import { confirmAction, showMessage } from '@/components/financials/ActionSheet'
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
 import {
-  addStops, cancelRoute, loadLeadLoad, loadRoute, loadRouteCrew, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, stopNeedsPhotos, updateRoute, updateStop,
+  addStops, cancelRoute, loadLeadLoad, loadLeadsForServices, loadRoute, loadRouteCrew, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, stopNeedsPhotos, updateRoute, updateStop,
   type RouteCrewMember, type RouteStop,
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
 import { OwnerSkipRequests } from './SkipRequests';
+import { flattenGroups, groupStatus, groupStops, isGroupClosed, isGroupUntouched, servicesText, servicesToAdd } from '@/lib/snowStopGroups';
+import type { SnowService } from '@/types/snow';
 import { typeScale } from '@/theme/typography';
 import { ReorderableList } from '@/components/ui/ReorderableList';
 import { spacing, radius } from '@/theme/spacing';
@@ -54,7 +56,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
   const [crew, setCrew] = useState<RouteCrewMember[]>([]);
   const [pickCrew, setPickCrew] = useState(false);
   // The property whose notes and photo setting are being edited.
-  const [detailStop, setDetailStop] = useState<RouteStop | null>(null);
+  const [detailStop, setDetailStop] = useState<RouteStop[] | null>(null);
   const [stopNote, setStopNote] = useState('');
   const [stopPhotos, setStopPhotos] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -69,7 +71,9 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     setRoute(r.data);
     setName(r.data.name);
     const [l, e, load] = await Promise.all([
-      loadSnowLeads(r.data.service), loadEligibleProperties(r.data.stormId, r.data.service), loadLeadLoad(r.data.id),
+      r.data.services.length > 1 ? loadLeadsForServices(r.data.services) : loadSnowLeads(r.data.service),
+      loadEligibleProperties(r.data.stormId, r.data.services.length > 1 ? undefined : r.data.service),
+      loadLeadLoad(r.data.id),
     ]);
     const c = await loadRouteCrew(r.data.id);
     if (c.ok) setCrew(c.data);
@@ -89,11 +93,18 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     reload();
   }
 
-  /** Saves a new stop order (from a drag): shows it right away, then lets the database have the final word. */
-  async function applyOrder(ids: string[]) {
+  /** Saves a new order (from a drag). A whole stop moves together: the visits for every service at a property stay side by side. */
+  async function applyOrder(keys: string[]) {
     if (!route) return;
-    setRoute({ ...route, stops: ids.map((sid) => route.stops.find((s) => s.id === sid)!) });
-    const res = await reorderStops(route.id, ids);
+    const byKey = new Map(groupStops(route.stops).map((g) => [g[0].id, g]));
+    await saveOrder(flattenGroups(keys.map((k) => byKey.get(k)).filter((g): g is RouteStop[] => !!g)));
+  }
+
+  /** Shows the new order right away, then lets the database have the final word. */
+  async function saveOrder(stops: RouteStop[]) {
+    if (!route) return;
+    setRoute({ ...route, stops });
+    const res = await reorderStops(route.id, stops.map((x) => x.id));
     if (!res.ok) showMessage("Couldn't reorder", res.error);
     reload();
   }
@@ -111,35 +122,30 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
 
   async function move(index: number, delta: -1 | 1) {
     if (!route) return;
-    const ids = route.stops.map((s) => s.id);
+    const groups = groupStops(route.stops);
     const j = index + delta;
-    if (j < 0 || j >= ids.length) return;
-    [ids[index], ids[j]] = [ids[j], ids[index]];
-    // Show the new order right away; the database has the final word.
-    setRoute({ ...route, stops: ids.map((sid) => route.stops.find((s) => s.id === sid)!) });
-    const res = await reorderStops(route.id, ids);
-    if (!res.ok) showMessage('Couldn\'t reorder', res.error);
-    reload();
+    if (j < 0 || j >= groups.length) return;
+    [groups[index], groups[j]] = [groups[j], groups[index]];
+    await saveOrder(flattenGroups(groups));
   }
 
   /** Puts a stop that hasn't started right after the stops already worked or in progress. */
   async function moveToNext(index: number) {
     if (!route) return;
-    const ids = route.stops.map((s) => s.id);
+    const groups = groupStops(route.stops);
     let lastWorked = -1;
-    route.stops.forEach((s, i) => { if (s.status !== 'pending') lastWorked = i; });
-    const [id] = ids.splice(index, 1);
-    ids.splice(lastWorked + 1, 0, id);
-    setRoute({ ...route, stops: ids.map((sid) => route.stops.find((s) => s.id === sid)!) });
-    const res = await reorderStops(route.id, ids);
-    if (!res.ok) showMessage('Couldn\'t reorder', res.error);
-    reload();
+    groups.forEach((g, i) => { if (!isGroupUntouched(g)) lastWorked = i; });
+    const [g] = groups.splice(index, 1);
+    groups.splice(lastWorked + 1, 0, g);
+    await saveOrder(flattenGroups(groups));
   }
 
-  function onRemove(stopId: string, label: string) {
-    confirmAction(`Remove ${label}?`, 'This stop hasn\'t been started, so nothing is lost.', 'Remove', async () => {
-      const res = await removeStop(stopId);
-      if (!res.ok) showMessage('Couldn\'t remove the stop', res.error);
+  function onRemove(group: RouteStop[]) {
+    confirmAction(`Remove ${group[0].propertyName}?`, "This stop hasn't been started, so nothing is lost.", 'Remove', async () => {
+      for (const v of group) {
+        const res = await removeStop(v.id);
+        if (!res.ok) { showMessage("Couldn't remove the stop", res.error); break; }
+      }
       reload();
     }, true);
   }
@@ -147,7 +153,12 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
   async function onAddStops() {
     if (!route || !chosen.length) return;
     setBusy(true);
-    const res = await addStops(route.id, chosen);
+    // A route that does several services makes one visit per service the property offers.
+    const items = chosen.map((pid) => ({
+      propertyId: pid,
+      services: route.services.length > 1 ? (servicesToAdd(route.services, eligible.find((e) => e.propertyId === pid)?.services, route.service) as SnowService[]) : undefined,
+    }));
+    const res = await addStops(route.id, items);
     if (res.ok && doNext) {
       const re = await reorderStops(route.id, orderWithNext(route.stops, res.data));
       if (!re.ok) showMessage('Added, but couldn\'t put them next', re.error);
@@ -189,21 +200,28 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     }, true);
   }
 
-  function openStop(stop: RouteStop) {
-    setDetailStop(stop);
-    setStopNote(stop.ownerNote ?? '');
-    setStopPhotos(route ? stopNeedsPhotos(stop, route) : false);
+  function openStop(group: RouteStop[]) {
+    setDetailStop(group);
+    setStopNote(group[0].ownerNote ?? '');
+    setStopPhotos(route ? stopNeedsPhotos(group[0], route) : false);
   }
 
   async function saveStop() {
     if (!detailStop || !route) return;
     setBusy(true);
-    const patch: Parameters<typeof updateStop>[1] = {};
-    if (stopNote.trim() !== (detailStop.ownerNote ?? '')) patch.ownerNote = stopNote;
-    if (stopPhotos !== stopNeedsPhotos(detailStop, route)) patch.photosRequired = stopPhotos;
-    const res = Object.keys(patch).length ? await updateStop(detailStop.id, patch) : { ok: true as const };
+    let failure: string | null = null;
+    for (const [i, v] of detailStop.entries()) {
+      const patch: Parameters<typeof updateStop>[1] = {};
+      if (stopNote.trim() !== (v.ownerNote ?? '')) patch.ownerNote = stopNote;
+      // The crew adds one set of photos for the whole stop, on its first visit, so only that visit can require photos.
+      const wantPhotos = i === 0 ? stopPhotos : false;
+      if (wantPhotos !== stopNeedsPhotos(v, route)) patch.photosRequired = wantPhotos;
+      if (!Object.keys(patch).length) continue;
+      const res = await updateStop(v.id, patch);
+      if (!res.ok) { failure = res.error; break; }
+    }
     setBusy(false);
-    if (!res.ok) return showMessage("Couldn't save", res.error);
+    if (failure) return showMessage("Couldn't save", failure);
     setDetailStop(null);
     reload();
   }
@@ -233,11 +251,14 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
   // eligible property stays pickable; we just show how many visits it has.
   const visitsOn = new Map<string, number>();
   route.stops.forEach((s) => visitsOn.set(s.propertyId, (visitsOn.get(s.propertyId) ?? 0) + 1));
-  const addable = eligible;
-  const firstPending = route.stops.findIndex((s) => s.status === 'pending');
+  const groups = groupStops(route.stops);
+  const firstPending = groups.findIndex(isGroupUntouched);
+  const several = route.services.length > 1;
+  const svcLabel = (x: string) => SERVICE_LABEL[x as SnowService];
+  const addable = several ? eligible.filter((e) => !e.services || e.services.some((x) => route.services.includes(x))) : eligible;
   const sep = { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight };
 
-  const openCount = route.stops.filter((x) => x.status === 'pending' || x.status === 'arrived').length;
+  const openCount = groups.filter((g) => !isGroupClosed(g)).length;
 
   const body = (
     <>
@@ -296,7 +317,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
               </View>
             ) : (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                Nobody on the snow team does {SERVICE_LABEL[route.service].toLowerCase()} yet.
+                Nobody on the snow team does {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} yet.
               </Text>
             )
           ) : null}
@@ -326,7 +347,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
                 </View>
               ) : (
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-                  No one else on the snow team does {SERVICE_LABEL[route.service].toLowerCase()}.
+                  No one else on the snow team does {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')}.
                 </Text>
               )
             ) : null}
@@ -335,31 +356,33 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
 
         <View style={[styles.inline, styles.label]}>
           <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>Properties</Text>
-          {route.stops.length ? (
+          {groups.length ? (
             <>
               <StatusBadge label={`Open ${openCount}`} status="info" />
-              <StatusBadge label={`Closed ${route.stops.length - openCount}`} status="success" />
+              <StatusBadge label={`Closed ${groups.length - openCount}`} status="success" />
             </>
           ) : null}
         </View>
-        {route.stops.length ? (
+        {groups.length ? (
           <View style={[styles.group, { backgroundColor: colors.surface, borderColor: 'transparent' }]}>
             <ReorderableList
-              items={route.stops}
-              keyOf={(s) => s.id}
+              items={groups}
+              keyOf={(g) => g[0].id}
               rowHeight={STOP_ROW_HEIGHT}
-              canDrag={(s) => editable && s.status === 'pending'}
+              canDrag={(g) => editable && isGroupUntouched(g)}
               onReorder={applyOrder}
               onDragActive={(a) => { setDragging(a); onDragActive?.(a); }}
-              renderRow={(s, i, handle) => {
-                const movable = editable && s.status === 'pending';
+              renderRow={(g, i, handle) => {
+                const s = g[0];
+                const movable = editable && isGroupUntouched(g);
+                const status = groupStatus(g);
                 return (
                   <View style={[styles.row, { flex: 1 }, i > 0 && sep]}>
                     {handle ?? <View style={{ width: 32 }} />}
                     <Text style={[typeScale.labelLarge, { color: colors.textTertiary, width: 18 }]}>{i + 1}</Text>
                     <Pressable
                       style={{ flex: 1, gap: 2 }}
-                      onPress={() => openStop(s)}
+                      onPress={() => openStop(g)}
                       accessibilityRole="button"
                       accessibilityLabel={`${s.propertyName}: photos and notes`}
                     >
@@ -367,7 +390,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
                       <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
                       <View style={styles.inline}>
                         <Icon name="camera" size={12} color={stopNeedsPhotos(s, route) ? colors.primary : colors.textTertiary} />
-                        <Text style={[typeScale.caption, { color: stopNeedsPhotos(s, route) ? colors.primary : colors.textTertiary }]}>{stopNeedsPhotos(s, route) ? 'Photos required' : 'No photos required'}</Text>
+                        <Text style={[typeScale.caption, { color: stopNeedsPhotos(s, route) ? colors.primary : colors.textTertiary }]} numberOfLines={1}>{several ? `${servicesText(g.map((x) => x.service ?? route.service), svcLabel)} · ` : ''}{stopNeedsPhotos(s, route) ? 'Photos required' : 'No photos required'}</Text>
                         {s.ownerNote ? <><Icon name="file-text" size={12} color={colors.primary} /><Text style={[typeScale.caption, { color: colors.primary }]} numberOfLines={1}>Note</Text></> : null}
                       </View>
                     </Pressable>
@@ -375,11 +398,11 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
                       <View style={styles.inline}>
                         <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} />
                         <IconTap icon="arrow-up" label="Move up" disabled={i === 0} onPress={() => move(i, -1)} color={colors.textSecondary} />
-                        <IconTap icon="arrow-down" label="Move down" disabled={i === route.stops.length - 1} onPress={() => move(i, 1)} color={colors.textSecondary} />
-                        <IconTap icon="x" label="Remove stop" onPress={() => onRemove(s.id, s.propertyName)} color={colors.error} />
+                        <IconTap icon="arrow-down" label="Move down" disabled={i === groups.length - 1} onPress={() => move(i, 1)} color={colors.textSecondary} />
+                        <IconTap icon="x" label="Remove stop" onPress={() => onRemove(g)} color={colors.error} />
                       </View>
                     ) : (
-                      <StatusBadge label={STOP_STATUS_LABEL[s.status]} status={STOP_TONE[s.status]} />
+                      <StatusBadge label={STOP_STATUS_LABEL[status]} status={STOP_TONE[status]} />
                     )}
                   </View>
                 );
@@ -415,7 +438,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
                 );
               }) : (
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                  No property offers {SERVICE_LABEL[route.service].toLowerCase()} yet.
+                  No property offers {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} yet.
                 </Text>
               )}
               {route.stormStatus === 'dispatched' && route.stops.length > 0 ? (
@@ -441,7 +464,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
 
         {!embedded ? (
         <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
-          {route.stops.length ? (
+          {route.stops.length && !several ? (
             <Button title="Save as template" icon="copy" variant="secondary" onPress={onSaveTemplate} disabled={busy} fullWidth />
           ) : null}
           {editable ? <Button title="Cancel route" variant="ghost" onPress={onCancelRoute} disabled={busy} fullWidth /> : null}
@@ -467,14 +490,14 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
         <Modal visible={!!detailStop} transparent animationType="fade" onRequestClose={() => setDetailStop(null)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalBackdrop}>
             <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{detailStop?.propertyName}</Text>
-              {detailStop?.propertyAddress ? <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{detailStop.propertyAddress}</Text> : null}
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{detailStop?.[0].propertyName}</Text>
+              {detailStop?.[0].propertyAddress ? <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{detailStop[0].propertyAddress}</Text> : null}
               <View style={[styles.inline, { marginTop: spacing.lg }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Photos required here</Text>
                   <Text style={[typeScale.caption, { color: colors.textSecondary }]}>The crew must add a photo before finishing this property.</Text>
                 </View>
-                <Switch value={stopPhotos} disabled={!editable || busy || detailStop?.status === 'completed' || detailStop?.status === 'skipped'} onValueChange={setStopPhotos} accessibilityLabel="Photos required at this property" />
+                <Switch value={stopPhotos} disabled={!editable || busy || (!!detailStop && isGroupClosed(detailStop))} onValueChange={setStopPhotos} accessibilityLabel="Photos required at this property" />
               </View>
               <Input label="Notes for this property" value={stopNote} onChangeText={setStopNote} editable={editable} multiline numberOfLines={4} placeholder="Gate code, where to pile snow, what to watch for" containerStyle={{ marginTop: spacing.lg }} />
               <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
@@ -493,7 +516,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader
         title={route.name}
-        subtitle={`${route.stormName} · ${SERVICE_LABEL[route.service]}`}
+        subtitle={`${route.stormName} · ${servicesText(route.services, svcLabel)}`}
         right={
           <View style={styles.inline}>
             <IconTap icon="edit-2" label="Rename route" onPress={() => { setRenameText(route.name); setRenaming(true); }} color={colors.textSecondary} />

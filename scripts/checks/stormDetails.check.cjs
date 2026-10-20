@@ -28,9 +28,9 @@ check('7 route counts read "1 route" / "2 routes" / "0 routes"', routeCountLabel
 const src = read('src/components/snow/storms/StormDetailScreen.tsx');
 check('8 the winter picture is bundled in the app and exists (not loaded from the internet)', /require\('\.\.\/\.\.\/\.\.\/\.\.\/assets\/images\/snow-storm-header\.jpg'\)/.test(src) && fs.existsSync(path.join(root, 'assets/images/snow-storm-header.jpg')) && !/uri:\s*['"]http/.test(src));
 check('9 the picture sits behind the header only (an ImageBackground around the back button, badge and title)', /<ImageBackground[\s\S]*GlassIconButton[\s\S]*storm\.name[\s\S]*<\/ImageBackground>/.test(src));
-check('10 every action is still there with its existing handler', ['onAddRoute()', 'onUseTemplate(t)', 'setEditingServices(stormServices(storm))', 'onSaveServices', 'onDispatch', 'onDelete', 'onEnd', 'onReopen', 'openRoute(r.id)'].every((k) => src.includes(k)));
+check('10 the lifecycle actions are still there with their handlers (the route itself is edited right on this screen now)', ['onDispatch', 'onDelete', 'onEnd', 'onReopen', '<RouteEditor'].every((k) => src.includes(k)));
 check('11 the destructive/lifecycle labels are unchanged: End storm, Dispatch storm, Delete draft, Reopen storm', ['title="End storm"', 'title="Dispatch storm"', 'title="Delete draft"', 'title="Reopen storm"'].every((k) => src.includes(k)));
-check('12 the crew lead is never cut off (no line limit on the lead text)', /Crew lead: \$\{r\.leadName\}/.test(src) && !/Crew lead[^\n]*numberOfLines/.test(src));
+check('12 the crew lead is shown on the route editor, never cut off (no line limit on the lead text)', (() => { const e = fs.readFileSync(path.join(root, 'src/components/snow/routes/RouteEditScreen.tsx'), 'utf8'); return /Crew lead/.test(e) && !/Crew lead[^\n]*numberOfLines/.test(e); })());
 check('13 the numbers come from the loaded summary, not fixed values', /s\.completed/.test(src) && /s\.skipped/.test(src) && /s\.pending \+ s\.arrived/.test(src) && /s\.routes/.test(src));
 check('14 the content clears the bottom edge (safe-area padding on the scroll view)', /paddingBottom: insets\.bottom \+ spacing\['4xl'\]/.test(src));
 console.log(bad ? `\n${bad} failed` : '\nall passed');

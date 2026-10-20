@@ -20,6 +20,7 @@ import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
   addCompletionMedia, arriveAtStop, finishStop, loadMyRoutes, loadRoute, STOP_STATUS_LABEL,
   type MyRoute, type RouteDetail,
+  stopNeedsPhotos,
 } from '@/data/snowRoutes';
 import { STOP_TONE } from './RouteEditScreen';
 import { LeadSkipPanel } from './SkipRequests';
@@ -80,7 +81,7 @@ export function MyRouteScreen() {
   const { active: activeRoutes, history: pastRoutes } = splitMyRoutes(routes);
   // Update 41: crew can see the route, its stops and instructions; only the lead can act on it.
   const isLead = canWorkRoute(routes.find((r) => r.id === route?.id)?.role);
-  const needMedia = route && current && route.mediaRequired ? Math.max(0, route.minMedia - current.mediaCount) : 0;
+  const needMedia = route && current && stopNeedsPhotos(current, route) ? Math.max(0, route.minMedia - current.mediaCount) : 0;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -142,6 +143,9 @@ export function MyRouteScreen() {
                   <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{current.propertyName}</Text>
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{current.propertyAddress}</Text>
                 </View>
+                {current.ownerNote ? (
+                  <InlineNotice icon="file-text" tone="info" text={current.ownerNote} />
+                ) : null}
                 <Button title="Directions" icon="navigation" variant="secondary" onPress={() => openDirections({ address: current.propertyAddress })} fullWidth />
                 {!isLead ? (
                   <InlineNotice icon="eye" tone="info" text="You're on this route's crew. The route lead marks arrivals, finishes stops and adds photos." />
@@ -199,6 +203,7 @@ export function MyRouteScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]} numberOfLines={1}>{s.propertyName}</Text>
                     <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
+                    {s.ownerNote ? <Text style={[typeScale.caption, { color: colors.primary }]} numberOfLines={2}>{s.ownerNote}</Text> : null}
                   </View>
                   {s.status === 'completed' ? <Icon name="check-circle" size={18} color={colors.success} /> : (
                     <StatusBadge label={STOP_STATUS_LABEL[s.status]} status={STOP_TONE[s.status]} />

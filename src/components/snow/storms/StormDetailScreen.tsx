@@ -29,7 +29,8 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { SNOW_SERVICES, type SnowService, type SnowStorm } from '@/types/snow';
 import { LOCKED_SERVICE_HELP, lockedServiceNote, removableServices, routeServiceChoice, routesPerService, serviceRouteCount, servicesLabel, stormServices, toggleService } from '@/lib/snowServices';
-import { addRouteFromTemplate, createRoute, loadRouteTemplates, type RouteTemplate } from '@/data/snowRoutes';
+import { createRoute } from '@/data/snowRoutes';
+import { RouteEditor } from '@/components/snow/routes/RouteEditScreen';
 
 /** The winter header picture, bundled with the app (made by scripts/make-storm-header.py from assets/source/snow-panorama.jpg). */
 const STORM_HEADER_IMAGE = require('../../../../assets/images/snow-storm-header.jpg');
@@ -46,9 +47,8 @@ export function StormDetailScreen() {
   const [summary, setSummary] = useState<StormSummary | null>(null);
   const [routes, setRoutes] = useState<StormRouteRow[]>([]);
   const [eligible, setEligible] = useState<number | null>(null);
-  const [templates, setTemplates] = useState<RouteTemplate[]>([]);
-  const [choosingService, setChoosingService] = useState(false);
-  const [editingServices, setEditingServices] = useState<SnowService[] | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const ensured = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -66,9 +66,16 @@ export function StormDetailScreen() {
     setStorm(s.data.storm);
     setSummary(s.data.summary);
     if (r.ok) setRoutes(r.data);
-    if (s.data.storm.status !== 'ended') {
-      const t = await loadRouteTemplates(stormServices(s.data.storm));
-      if (ticket === latest.current && t.ok) setTemplates(t.data);
+    // The storm you create is the route: make it now (one per service) so there is something to add properties to.
+    if (r.ok && s.data.storm.status !== 'ended' && r.data.filter((x) => !x.cancelled).length === 0 && ensured.current !== s.data.storm.id) {
+      ensured.current = s.data.storm.id;
+      const services = stormServices(s.data.storm);
+      for (const sv of services) {
+        const name = services.length > 1 ? `${s.data.storm.name} · ${SERVICE_LABEL[sv]}` : s.data.storm.name;
+        await createRoute(s.data.storm.id, { name, service: sv, mediaRequired: false, minMedia: 1 });
+      }
+      const again = await loadStormRoutes(id);
+      if (ticket === latest.current && again.ok) setRoutes(again.data);
     }
     if (s.data.storm.status === 'draft') {
       const e = await loadEligibleProperties(id);
@@ -145,45 +152,6 @@ export function StormDetailScreen() {
     }, true);
   }
 
-  const openRoute = (routeId: string) => router.push({ pathname: '/snow/owner/route/[id]', params: { id: routeId } });
-
-  /** Adds a route. With several services the owner says which one this route does. */
-  async function onAddRoute(picked?: SnowService) {
-    if (!storm) return;
-    const choice = routeServiceChoice(stormServices(storm), picked);
-    if (choice.error) return showMessage('Couldn\'t add the route', choice.error);
-    if (choice.needsPick) return setChoosingService(true);
-    setChoosingService(false);
-    const service = choice.service!;
-    const several = stormServices(storm).length > 1;
-    const sameService = routes.filter((r) => r.service === service).length;
-    const name = several ? `${SERVICE_LABEL[service]} route ${sameService + 1}` : `Route ${routes.length + 1}`;
-    setBusy(true);
-    const res = await createRoute(storm.id, { name, service, mediaRequired: true, minMedia: 1 });
-    setBusy(false);
-    if (!res.ok) return showMessage('Couldn\'t add the route', res.error);
-    openRoute(res.data);
-  }
-
-  async function onSaveServices() {
-    if (!storm || !editingServices) return;
-    setBusy(true);
-    const res = await setStormServices(storm.id, editingServices);
-    setBusy(false);
-    if (!res.ok) return showMessage('Couldn\'t change the services', res.error);
-    setEditingServices(null);
-    reload();
-  }
-
-  async function onUseTemplate(t: RouteTemplate) {
-    if (!storm) return;
-    setBusy(true);
-    const res = await addRouteFromTemplate(storm.id, t.id);
-    setBusy(false);
-    if (!res.ok) return showMessage('Couldn\'t add the route', res.error);
-    openRoute(res.data);
-  }
-
   if (loading) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -206,12 +174,13 @@ export function StormDetailScreen() {
   const progress = s && s.visits ? Math.round((s.completed / s.visits) * 100) : 0;
   const tone = STORM_PILL[storm.status];
   const servicesText = servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x]);
-  const perService = routesPerService(stormServices(storm), routes.filter((r) => !r.cancelled));
+  const liveRoutes = routes.filter((r) => !r.cancelled);
   const history = historyEvents(storm);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView
+        scrollEnabled={!dragging}
         contentContainerStyle={{ paddingBottom: insets.bottom + spacing['4xl'] }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
@@ -256,151 +225,23 @@ export function StormDetailScreen() {
             </View>
           ) : null}
 
-          <Text style={[typeScale.headingSmall, styles.sectionTitle, { color: colors.textPrimary }]}>Routes</Text>
-          {routes.length ? (
-            <View style={{ gap: spacing.sm }}>
-              {routes.map((r) => {
-                const pct = r.stops ? Math.round((r.completed / r.stops) * 100) : 0;
-                return (
-                  <Pressable
-                    key={r.id}
-                    onPress={() => openRoute(r.id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Open ${r.name}. ${r.leadName ? `Crew lead ${r.leadName}` : 'No crew lead yet'}. ${r.stops ? `${r.completed} of ${r.stops} stops` : 'No stops'}`}
-                    style={({ pressed }) => [styles.routeCard, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.75 }]}
-                  >
-                    <View style={[styles.iconCircle, { backgroundColor: colors.primarySurface }]}>
-                      <Icon name="cloud-snow" size={22} color={colors.primary} />
-                    </View>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <View style={styles.routeTop}>
-                        <Text style={[typeScale.headingSmall, { color: r.cancelled ? colors.textTertiary : colors.textPrimary, flex: 1 }]}>
-                          {r.name}{r.cancelled ? ' (cancelled)' : ''}
-                        </Text>
-                        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{r.stops ? `${r.completed} of ${r.stops} stops` : 'No stops'}</Text>
-                        <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-                      </View>
-                      <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>{SERVICE_LABEL[r.service]}</Text>
-                      <View style={styles.leadRow}>
-                        <Icon name="user" size={14} color={r.leadName ? colors.textSecondary : colors.warning} />
-                        <Text style={[typeScale.bodyMedium, { color: r.leadName ? colors.textSecondary : colors.warning, flex: 1 }]}>
-                          {r.leadName ? `Crew lead: ${r.leadName}` : 'No crew lead yet'}{r.crew > 0 ? ` · ${crewTag(r.crew)}` : ''}
-                        </Text>
-                      </View>
-                      <ProgressBar progress={pct} height={5} style={{ marginTop: spacing.xs }} />
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
-              <Icon name="map" size={22} color={colors.textTertiary} />
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
-                No properties yet. Add properties and stops, give each one a lead, then dispatch. Each becomes a route when you dispatch.
-              </Text>
-            </View>
-          )}
-
-          {storm.status !== 'ended' ? (
-            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
-              {choosingService ? (
-                <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, gap: spacing.sm }]}>
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>What does this route do?</Text>
-                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>A route does one service. Its stops, lead and photos all follow it.</Text>
-                  {stormServices(storm).map((sv) => (
-                    <Button key={sv} title={SERVICE_LABEL[sv]} variant="secondary" onPress={() => onAddRoute(sv)} disabled={busy} fullWidth />
-                  ))}
-                  <Button title="Cancel" variant="ghost" onPress={() => setChoosingService(false)} fullWidth />
-                </View>
-              ) : (
-                <Button title="Add Property" icon="plus" onPress={() => onAddRoute()} disabled={busy} fullWidth size="lg" />
-              )}
-              {templates.map((t) => (
-                <Pressable
-                  key={t.id}
-                  onPress={() => onUseTemplate(t)}
-                  disabled={busy}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add saved route ${t.name}, ${t.stops} ${t.stops === 1 ? 'stop' : 'stops'}`}
-                  style={({ pressed }) => [styles.savedRoute, { backgroundColor: colors.primarySurface, borderColor: colors.border }, (pressed || busy) && { opacity: 0.6 }]}
-                >
-                  <Icon name="copy" size={18} color={colors.primary} />
-                  <Text style={[typeScale.labelLarge, { color: colors.primary, flexShrink: 1 }]}>
-                    {`Add saved route: ${t.name}${stormServices(storm).length > 1 ? ` · ${SERVICE_LABEL[t.service]}` : ''} (${t.stops} ${t.stops === 1 ? 'stop' : 'stops'})`}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-          {storm.status === 'draft' && eligible !== null ? (
-            <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary }]}>
-              {eligible === 0
-                ? `No active properties offer ${servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x].toLowerCase())} yet. Turn the service on for a property first.`
-                : `${eligible} ${eligible === 1 ? 'property offers' : 'properties offer'} ${servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x].toLowerCase())}.`}
-            </Text>
-          ) : null}
-
-          {storm.status !== 'ended' ? (
-            <>
-              <Text style={[typeScale.headingSmall, styles.sectionTitle, { color: colors.textPrimary }]}>Services</Text>
-              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, gap: spacing.sm }]}>
-                {editingServices ? (
-                  <>
-                    {SNOW_SERVICES.map((sv) => {
-                      const on = editingServices.includes(sv);
-                      const locked = on && !removableServices(stormServices(storm), [...new Set(routes.map((r) => r.service))]).includes(sv) && stormServices(storm).includes(sv);
-                      return (
-                        <Pressable
-                          key={sv}
-                          onPress={() => !locked && setEditingServices(toggleService(editingServices, sv))}
-                          style={styles.serviceRow}
-                          accessibilityRole="checkbox"
-                          accessibilityState={{ checked: on, disabled: locked }}
-                        >
-                          <Icon name={on ? 'check-square' : 'square'} size={20} color={on ? colors.primary : colors.textTertiary} />
-                          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{SERVICE_LABEL[sv]}</Text>
-                          {locked ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{lockedServiceNote(serviceRouteCount(sv, routes))}</Text> : null}
-                        </Pressable>
-                      );
-                    })}
-                    {SNOW_SERVICES.some((sv) => editingServices.includes(sv) && routes.some((r) => r.service === sv)) ? (
-                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{LOCKED_SERVICE_HELP}</Text>
-                    ) : null}
-                    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                      <Button title="Save services" size="sm" icon="check" onPress={onSaveServices} loading={busy} disabled={editingServices.length === 0} />
-                      <Button title="Cancel" size="sm" variant="ghost" onPress={() => setEditingServices(null)} />
-                    </View>
-                  </>
-                ) : (
-                  <View style={styles.servicesRow}>
-                    <View style={{ flex: 1, gap: spacing.sm }}>
-                      {stormServices(storm).map((sv) => (
-                        <View key={sv} style={styles.serviceLine}>
-                          <View style={[styles.iconCircle, { backgroundColor: colors.primarySurface }]}>
-                            <Icon name="cloud-snow" size={20} color={colors.primary} />
-                          </View>
-                          <View>
-                            <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{SERVICE_LABEL[sv]}</Text>
-                            <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>{routeCountLabel(perService[sv])}</Text>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                    <Pressable
-                      onPress={() => setEditingServices(stormServices(storm))}
-                      accessibilityRole="button"
-                      accessibilityLabel="Change services"
-                      style={({ pressed }) => [styles.changeServices, { backgroundColor: colors.primarySurface }, pressed && { opacity: 0.6 }]}
-                    >
-                      <Icon name="sliders" size={16} color={colors.primary} />
-                      <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Change Services</Text>
-                    </Pressable>
-                  </View>
-                )}
+          <View style={{ marginTop: spacing.xl }}>
+            {liveRoutes.map((r) => (
+              <View key={r.id} style={{ marginBottom: spacing.lg }}>
+                {liveRoutes.length > 1 ? (
+                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.sm }]}>{SERVICE_LABEL[r.service]}</Text>
+                ) : null}
+                <RouteEditor routeId={r.id} embedded onDragActive={setDragging} />
               </View>
-            </>
-          ) : null}
+            ))}
+            {storm.status === 'draft' && eligible !== null ? (
+              <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary }]}>
+                {eligible === 0
+                  ? `No active properties offer ${servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x].toLowerCase())} yet. Turn the service on for a property first.`
+                  : `${eligible} ${eligible === 1 ? 'property offers' : 'properties offer'} ${servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x].toLowerCase())}.`}
+              </Text>
+            ) : null}
+          </View>
 
           <Text style={[typeScale.headingSmall, styles.sectionTitle, { color: colors.textPrimary }]}>History</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

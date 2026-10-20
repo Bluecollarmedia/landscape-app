@@ -12,7 +12,12 @@ const results = [];
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + String(detail).slice(0, 280)}`); };
 check('0 the full schema and all updates (including 068) load', failures.length === 0, JSON.stringify(failures));
 let again = true;
-try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/068_maintenance_crew_visits.sql`, 'utf8')); } catch (e) { again = false; console.log(e.message); }
+try {
+  // Update 74 later changes the cleanup functions' shape; for a re-run in the original order, put them back first.
+  await db.exec(`drop function if exists public.storage_cleanup_claim(integer); drop function if exists public.storage_cleanup_finish(uuid, boolean, text, boolean);`);
+  await db.exec(fs.readFileSync(`${repo}/supabase/updates/068_maintenance_crew_visits.sql`, 'utf8'));
+  await db.exec(fs.readFileSync(`${repo}/supabase/updates/074_company_delete_sweeps_storage.sql`, 'utf8'));
+} catch (e) { again = false; console.log(e.message); }
 check('0b update 68 can be run a second time', again);
 
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
@@ -252,7 +257,7 @@ const projD = (await one(`insert into public.projects (company_id, name, status)
 await db.query(`insert into public.project_photos (company_id, project_id, uploaded_by, file_url, file_key) values ($1,$2,$3,'https://x/a.jpg','cd/projects/a.jpg'),($1,$2,$3,'https://x/b.jpg','cd/projects/b.jpg')`, [cd, projD, ownerD.pid]);
 await db.query(`insert into public.project_photos (company_id, project_id, uploaded_by, file_url, file_key) values ($1,$2,$3,'https://x/c.jpg','keep/other.jpg')`, [co, (await one(`insert into public.projects (company_id, name, status) values ($1,'Keep','active') returning id`, [co])).id, owner.pid]);
 r = await rpc(ownerD.u, `select public.delete_my_company('closing co') as x`);
-const q = await all(`select file_key, source_table, processed_at from public.storage_cleanup_queue where company_id = $1 order by file_key`, [cd]);
+const q = await all(`select file_key, source_table, processed_at from public.storage_cleanup_queue where company_id = $1 and kind = 'file' order by file_key`, [cd]);
 check('32 permanent company deletion lists every stored file of that company for removal, in the same all-or-nothing step', r.ok && q.length === 2 && q[0].file_key === 'cd/projects/a.jpg' && q.every((x) => x.source_table === 'project_photos' && x.processed_at === null), (r.msg ?? '') + JSON.stringify(q));
 check('33 only the deleted company: the other company files are not listed, its rows are untouched', (await one(`select count(*)::int c from public.storage_cleanup_queue where file_key = 'keep/other.jpg'`)).c === 0 && (await one(`select count(*)::int c from public.project_photos where file_key = 'keep/other.jpg'`)).c === 1);
 check('34 nobody can read or change the cleanup list through the app', !(await rpc(owner.u, `select count(*) as x from public.storage_cleanup_queue`)).ok);
@@ -260,6 +265,7 @@ check('35 the company itself is gone with no leftover rows', (await one(`select 
 
 // ── the cleanup job: claim, retry with delay, give up after 8, done only when storage confirmed ──
 await asDb();
+await db.query(`delete from public.storage_cleanup_queue where kind = 'prefix'`);   // folders are covered by the 74 test
 check('36 the app cannot claim, finish or read the job status', !(await rpc(owner.u, `select count(*) as x from public.storage_cleanup_claim(5)`)).ok
   && !(await rpc(owner.u, `select public.storage_cleanup_finish('${q[0] ? (await one(`select id from public.storage_cleanup_queue limit 1`)).id : ''}'::uuid, true) as x`)).ok
   && !(await rpc(owner.u, `select public.storage_cleanup_status() as x`)).ok);

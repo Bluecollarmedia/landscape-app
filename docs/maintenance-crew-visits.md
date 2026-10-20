@@ -64,3 +64,11 @@ deploy the function, and switch the screens to ask `maint-sign` for photo links.
 person returned; an email that has a login elsewhere = that same person added here as an invited customer (no duplicate); a team member's email
 and a customer the owner removed are refused. Names are never matched. Caveat: an email is only as trustworthy as the sign-up behind it
 while email confirmation is off in Supabase. Owners can learn that an email has an account (and see that person's name once added); accepted for now.
+
+## Deleting a company removes everything stored for it (SQL 74)
+
+Besides the per-file list (update 68), the deletion queues whole folders: `{companyId}/` (everything the company stored), and `ids/{personId}/`
+and `avatars/{personId}/` for the people whose accounts are deleted with it. The `storage-cleanup` function empties them in the public
+bucket, the private bucket and the Snow stand-in bucket, batch by batch, and a folder is marked done only when it is really empty. The app
+calls it right after the delete succeeds (it needs no secret and cannot be told what to delete); it can also be called by hand. Deleting from
+the database and from storage can still not be one atomic step: if storage is unreachable the folders stay queued and are retried.

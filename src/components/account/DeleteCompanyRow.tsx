@@ -19,6 +19,17 @@ import { semantic } from '@/theme/colors';
  * When it works the company's data is gone, accounts stay, and the welcome
  * screen offers "Create a Company" again.
  */
+/** Runs the storage-cleanup function until nothing is left to claim (each run handles a batch). Never throws. */
+async function runStorageCleanup(): Promise<void> {
+  try {
+    for (let i = 0; i < 40; i++) {
+      const { data, error } = await supabase.functions.invoke('storage-cleanup', { body: {} });
+      if (error) return;
+      if (!data?.summary || data.summary.claimed === 0) return;
+    }
+  } catch { /* the queue stays; the function can be run again */ }
+}
+
 export function DeleteCompanyRow() {
   const { colors } = useTheme();
   const { signOut, memberRole } = useAuth();
@@ -79,6 +90,9 @@ export function DeleteCompanyRow() {
       setError(rpcError.message);
       return;
     }
+    // The database has queued every stored file and folder of the company (and of the people deleted with it). Empty them now, right
+    // away, while this sign-in still works. Best effort: anything left is picked up the next time the cleanup runs.
+    await runStorageCleanup();
     setBusy(false);
     setOpen(false);
     await signOut();
@@ -102,7 +116,7 @@ export function DeleteCompanyRow() {
                 Delete {companyName || 'the company'}?
               </Text>
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
-                This PERMANENTLY deletes the company and everything it owns: projects, hours and payroll records, photos, storm and route history, quotes, maintenance records and every worker's team membership and the accounts (including yours) of everyone who belongs only to this company. It cannot be undone and nothing can be recovered. The records are deleted at once; stored photos and documents are removed from file storage shortly afterwards by a background clean-up, so they are not necessarily gone the instant you confirm. People could sign up again as new users, but none of this data comes back. Anyone who also belongs to another company keeps their account.
+                This PERMANENTLY deletes the company and everything it owns: projects, hours and payroll records, photos, storm and route history, quotes, maintenance records and every worker's team membership and the accounts (including yours) of everyone who belongs only to this company. It cannot be undone and nothing can be recovered. Everything stored for the company, including photos, videos and documents, is removed from file storage too. People could sign up again as new users, but none of this data comes back. Anyone who also belongs to another company keeps their account.
               </Text>
               {stillGoing.map((t) => <Text key={t} style={[typeScale.bodySmall, { color: semantic.error, textAlign: 'center', marginTop: spacing.sm }]}>{t}</Text>)}
               {heads.map((t) => <Text key={t} style={[typeScale.caption, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>{t}</Text>)}

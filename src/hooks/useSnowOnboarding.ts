@@ -126,6 +126,23 @@ export async function lookupSnowCode(code: string): Promise<{ valid: boolean; co
   return { valid: !!r.valid, companyName: r.company_name };
 }
 
+/**
+ * One code box for everything: works out whether a code is a team code or a Snow code (the DATABASE decides, so a phone can't
+ * turn one into the other). Works before sign-in. Says only whether it works, the company name and the kind.
+ */
+export async function lookupAnyCode(code: string): Promise<{ valid: boolean; kind?: 'team' | 'snow'; companyName?: string; workerType?: string }> {
+  const trimmed = code.trim();
+  if (!trimmed) return { valid: false };
+  if (!isSupabaseConfigured) {
+    if (demo.code && trimmed.toUpperCase() === demo.code) return { valid: true, kind: 'snow', companyName: 'Brighton Lawn + Landscape' };
+    return { valid: false };
+  }
+  const { data, error } = await supabase.rpc('lookup_any_code', { p_code: trimmed });
+  if (error || !data) return { valid: false };
+  const r = data as { valid: boolean; kind?: 'team' | 'snow'; company_name?: string; worker_type?: string };
+  return { valid: !!r.valid, kind: r.kind, companyName: r.company_name, workerType: r.worker_type };
+}
+
 /** Files a Snow access request for the signed-in person (safe to repeat). */
 export async function requestSnowAccess(code: string): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };

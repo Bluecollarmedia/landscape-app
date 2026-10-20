@@ -67,18 +67,7 @@ export default function SetupScreen() {
             <Icon name="users" size={20} color={colors.primary} />
             <View style={styles.optionText}>
               <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Join a Team</Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>I have a team code from my employer</Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
-            onPress={() => router.push('/(auth)/join-team?kind=snow' as any)}
-          >
-            <Icon name="cloud-snow" size={20} color={brand.accent} />
-            <View style={styles.optionText}>
-              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Join the Snow Team</Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>I have a Snow code for the winter crew</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>I have a team code or Snow code from my employer</Text>
             </View>
           </Pressable>
 

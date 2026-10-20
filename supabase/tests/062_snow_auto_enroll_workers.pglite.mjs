@@ -14,6 +14,9 @@ check('0 the full schema and all updates (including 062) load', failures.length 
 let again = true;
 try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/062_snow_auto_enroll_workers.sql`, 'utf8')); } catch (e) { again = false; console.log(e.message); }
 check('0b update 62 can be run a second time', again);
+// Re-running 62 puts its automatic grants back; update 66 (which switches them off) has to be run again after it.
+try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/066_account_access_hardening.sql`, 'utf8')); } catch (e) { again = false; console.log(e.message); }
+check('0c update 66 can be run again after it (and switches the automatic grants off again)', again);
 const fails = async (sql, p) => { try { await db.query(sql, p); return { raised: false, msg: '' }; } catch (e) { return { raised: true, msg: String(e.message) }; } };
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 const all = async (sql, p) => (await db.query(sql, p)).rows;
@@ -42,68 +45,78 @@ let f = await fails(`update public.companies set active_mode = 'snow' where id =
 await db.exec('reset role');
 check('2 the owner can switch to Snow Mode', !f.raised && (await one(`select active_mode from public.companies where id = $1`, [co])).active_mode === 'snow', f.msg);
 let t = await team();
-check('3 both active workers are on the snow team, active, with no sign-up', t.length === 2 && t.every((x) => x.status === 'active') && t.some((x) => x.person_id === w1.pid) && t.some((x) => x.person_id === w2.pid), JSON.stringify(t));
-const svc = await all(`select service from public.snow_staff_services where company_id = $1 and person_id = $2 order by service`, [co, w1.pid]);
-check('4 each gets plowing, salting and shoveling', svc.map((x) => x.service).join() === 'plowing,salting,shoveling', JSON.stringify(svc));
-check('5 a pending worker and a customer are not added', !t.some((x) => x.person_id === wPending.pid || x.person_id === cust.pid));
-const logs = await all(`select action, services, actor_id from public.snow_access_log where company_id = $1`, [co]);
-check('6 it is written in the access log as granted (by the system)', logs.length === 2 && logs.every((l) => l.action === 'granted' && l.actor_id === null), JSON.stringify(logs));
+check('3 switching to Snow Mode puts NOBODY on the snow team (access is explicit per person; update 66 replaced the automatic grant of update 62)', t.length === 0, JSON.stringify(t));
+await asUser(w2.u);
+const mine0 = (await one(`select public.get_my_snow_access() as a`)).a;
+await db.exec('reset role');
+check('4 a worker with no snow access sees none, even though the company is in Snow Mode', Array.isArray(mine0) && mine0.length === 0, JSON.stringify(mine0));
 
-// the worker's own view
+// the owner grants it, per person
+await asUser(owner.u);
+f = await fails(`select public.snow_grant_access($1, array['plowing','salting'])`, [w2.pid]);
+await db.exec('reset role');
+t = await team();
+check('5 the owner can give one worker snow access with chosen services; nobody else gets it', !f.raised && t.length === 1 && t[0].person_id === w2.pid && t[0].status === 'active', f.msg + JSON.stringify(t));
 await asUser(w2.u);
 const mine = (await one(`select public.get_my_snow_access() as a`)).a;
+const canPlow = (await one(`select public.snow_has_service($1, 'plowing') as ok`, [co])).ok;
+const canShovel = (await one(`select public.snow_has_service($1, 'shoveling') as ok`, [co])).ok;
 await db.exec('reset role');
-check('7 the worker\'s app sees snow access with all services (what lets the toggle show)', Array.isArray(mine) && mine.length === 1 && mine[0].services.length === 3 && mine[0].landscaping_access === true, JSON.stringify(mine));
-await asUser(w2.u);
-const asLead = (await one(`select public.snow_has_service($1, 'plowing') as ok`, [co])).ok;
+check('6 that worker sees exactly the services given and keeps landscaping', Array.isArray(mine) && mine.length === 1 && mine[0].services.join() === 'plowing,salting' && mine[0].landscaping_access === true && canPlow === true && canShovel === false, JSON.stringify(mine));
+await asUser(w1.u);
+const w1sees = (await one(`select public.get_my_snow_access() as a`)).a;
 await db.exec('reset role');
-check('8 and the database treats them as able to plow (so they can be made a route lead)', asLead === true);
+check('7 a different worker still has no snow access', Array.isArray(w1sees) && w1sees.length === 0);
 
-// revoke, then switch off and on again
+// switching the mode off and on again never changes who has access
 await asUser(owner.u);
-f = await fails(`select public.snow_revoke_access($1)`, [w1.pid]);
 await db.query(`update public.companies set active_mode = 'landscaping' where id = $1`, [co]);
 await db.query(`update public.companies set active_mode = 'snow' where id = $1`, [co]);
 await db.exec('reset role');
-const w1row = await one(`select status from public.snow_staff where company_id = $1 and person_id = $2`, [co, w1.pid]);
-const w1svc = await all(`select 1 from public.snow_staff_services where company_id = $1 and person_id = $2`, [co, w1.pid]);
-check('9 a worker the owner removed stays removed when Snow Mode is switched off and on again', !f.raised && w1row.status === 'revoked' && w1svc.length === 0, JSON.stringify({ w1row, w1svc }) + f.msg);
-await asUser(w1.u);
-const w1access = (await one(`select public.get_my_snow_access() as a`)).a;
-await db.exec('reset role');
-check('10 and their app sees no snow access (they get the "Snow Mode is on" notice, no toggle)', Array.isArray(w1access) && w1access.length === 0, JSON.stringify(w1access));
+t = await team();
+check('8 switching Snow Mode off and on again changes nobody access', t.length === 1 && t[0].person_id === w2.pid);
 
-// the owner can give access back by hand
+// removed access stays removed
 await asUser(owner.u);
-f = await fails(`select public.snow_grant_access($1, array['plowing'])`, [w1.pid]);
+f = await fails(`select public.snow_revoke_access($1)`, [w2.pid]);
+await db.query(`update public.companies set active_mode = 'landscaping' where id = $1`, [co]);
+await db.query(`update public.companies set active_mode = 'snow' where id = $1`, [co]);
 await db.exec('reset role');
-check('11 the owner can give a removed worker access again by hand', !f.raised && (await one(`select status from public.snow_staff where person_id = $1`, [w1.pid])).status === 'active', f.msg);
+const w2row = await one(`select status from public.snow_staff where company_id = $1 and person_id = $2`, [co, w2.pid]);
+check('9 a worker the owner removed stays removed when Snow Mode is switched off and on again', !f.raised && w2row.status === 'revoked', f.msg);
 
-// someone joins while Snow Mode is on
+// joining while Snow Mode is on
 const w3 = await mk('w3@x.test', 'W3');
 await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1, $2, 'worker', 'active')`, [co, w3.pid]);
-check('12 a worker who joins while Snow Mode is on is put on the team', (await one(`select status from public.snow_staff where person_id = $1`, [w3.pid]))?.status === 'active');
 const w4 = await mk('w4@x.test', 'W4');
 await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1, $2, 'worker', 'invited')`, [co, w4.pid]);
 await db.query(`update public.company_members set status = 'active' where person_id = $1`, [w4.pid]);
-check('13 so is a worker who is approved (invited → active) while Snow Mode is on', (await one(`select status from public.snow_staff where person_id = $1`, [w4.pid]))?.status === 'active');
+check('10 a worker who joins or is approved while Snow Mode is on gets NO snow access', (await one(`select 1 as x from public.snow_staff where person_id in ($1, $2)`, [w3.pid, w4.pid])) === undefined);
 
-// back to landscaping: new workers are not added
-await db.query(`update public.companies set active_mode = 'landscaping' where id = $1`, [co]);
-const w5 = await mk('w5@x.test', 'W5');
-await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1, $2, 'worker', 'active')`, [co, w5.pid]);
-check('14 in Landscaping Mode a new worker is not added', (await one(`select 1 as x from public.snow_staff where person_id = $1`, [w5.pid])) === undefined);
-await db.query(`update public.companies set active_mode = 'snow' where id = $1`, [co]);
-check('15 but is added as soon as Snow Mode is switched on', (await one(`select status from public.snow_staff where person_id = $1`, [w5.pid]))?.status === 'active');
+// deactivating a worker ends both modes
+await asUser(owner.u);
+f = await fails(`select public.snow_grant_access($1, array['plowing'])`, [w3.pid]);
+await db.exec('reset role');
+check('11a the owner can give that worker snow access explicitly', !f.raised && (await one(`select status from public.snow_staff where person_id = $1`, [w3.pid])).status === 'active', f.msg);
+await asUser(owner.u);
+f = await fails(`select public.deactivate_member($1, true)`, [w3.pid]);
+await db.exec('reset role');
+await asUser(w3.u);
+const w3a = (await one(`select public.get_my_snow_access() as a`)).a;
+const w3c = (await one(`select public.is_crew($1) as ok`, [co])).ok;
+await db.exec('reset role');
+check('11 deactivating a worker ends snow AND landscaping access together', !f.raised && Array.isArray(w3a) && w3a.length === 0 && w3c === false, f.msg);
 
 // other companies are untouched
 await db.exec(`set session_replication_role = replica`);
 const co2 = (await one(`insert into public.companies (name) values ('Other Co') returning id`)).id;
 const o2 = await mk('o2@x.test', 'O2');
-await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1, $2, 'worker', 'active')`, [co2, o2.pid]);
+await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1, $2, 'owner', 'active')`, [co2, o2.pid]);
 await db.exec(`set session_replication_role = origin`);
-await db.query(`update public.companies set active_mode = 'snow' where id = $1`, [co]);
-check('16 another company\'s worker is not touched by this company\'s switch', (await one(`select 1 as x from public.snow_staff where company_id = $1`, [co2])) === undefined);
+await asUser(o2.u);
+await db.query(`update public.companies set active_mode = 'snow' where id = $1`, [co2]);
+await db.exec('reset role');
+check('12 another company Snow Mode switch grants nobody anything either', (await one(`select 1 as x from public.snow_staff where company_id = $1`, [co2])) === undefined);
 
 const bad = results.filter((x) => !x).length;
 console.log(bad ? `\n${bad} failed` : '\nall passed');

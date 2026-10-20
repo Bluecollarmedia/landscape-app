@@ -60,15 +60,8 @@ export default function WelcomeScreen() {
           <ChoiceCard
             icon="users"
             title="Join a Team"
-            subtitle="Enter your team code or invitation"
+            subtitle="Enter the team or Snow code from your employer"
             onPress={() => router.push('/(auth)/join-team')}
-          />
-
-          <ChoiceCard
-            icon="cloud-snow"
-            title="Join the Snow Team"
-            subtitle="Seasonal snow crew with a Snow code"
-            onPress={() => router.push('/(auth)/join-team?kind=snow' as any)}
           />
 
           <Pressable

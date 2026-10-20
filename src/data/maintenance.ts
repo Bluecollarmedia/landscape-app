@@ -267,6 +267,9 @@ export function createRoute(input: NewRouteInput): Result<MaintenanceRoute> {
   const crewIds = Array.from(new Set(input.crewIds ?? []));
   if (crewIds.some((id) => !eligible.has(id))) return fail('Only approved maintenance workers can be on a maintenance route.');
   if (input.leadPersonId && !eligible.has(input.leadPersonId)) return fail('The Maintenance Lead must be an approved maintenance worker.');
+  // Every route with a crew needs one explicitly chosen crew leader (nobody becomes leader by default).
+  if (crewIds.length > 0 && !input.leadPersonId) return fail('Choose the crew leader for this route.');
+  if (input.leadPersonId && !crewIds.includes(input.leadPersonId)) return fail('The crew leader has to be on the crew of this route.');
   const route = insertRow('maintenance_routes', {
     serviceDate: input.serviceDate,
     name: input.name?.trim() || undefined,
@@ -286,13 +289,20 @@ export function updateRoute(id: string, patch: Partial<Pick<MaintenanceRoute, 's
   updateRow('maintenance_routes', id, patch);
 }
 
-/** `null` leaves the route without a lead (always allowed). */
-export function setRouteLead(routeId: string, personId: string | null): Result {
-  if (personId && !maintenanceWorkers().some((p) => p.id === personId)) {
-    return fail('The Maintenance Lead must be an approved maintenance worker.');
+/**
+ * Chooses (or changes) a route's crew leader. A route always needs one: there is no way to clear it, and nobody becomes leader
+ * implicitly. The leader has to be an approved maintenance worker who is on the route's crew. The database checks all of it.
+ */
+export async function setRouteLead(routeId: string, personId: string): Promise<Result> {
+  if (!personId) return fail('Choose a crew leader. A route always needs one.');
+  if (!maintenanceWorkers().some((p) => p.id === personId)) return fail('The crew leader must be an approved maintenance worker.');
+  if (isDemo()) {
+    updateRow('maintenance_routes', routeId, { leadPersonId: personId });
+    return ok(undefined);
   }
-  updateRow('maintenance_routes', routeId, { leadPersonId: personId ?? undefined });
-  return ok(undefined);
+  const { error } = await rpc('maintenance_set_route_leader', { p_route: routeId, p_person: personId });
+  await refresh(...MAINT_TABLES);
+  return error ? fail(error.message) : ok(undefined);
 }
 
 /**

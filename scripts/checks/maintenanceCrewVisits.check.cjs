@@ -10,9 +10,9 @@ const check = (n, ok, d) => { if (!ok) bad++; console.log((ok ? 'PASS' : 'FAIL')
 
 const L = load('src/lib/maintenanceLeader.ts');
 check('1 the named leader sees the check-in button; another crew member does not', L.isCrewLeader({ leadId: 'a', personId: 'a', role: 'worker' }) === true && L.isCrewLeader({ leadId: 'a', personId: 'b', role: 'worker' }) === false);
-check('2 owner and admin may check a crew in; a route with no leader named keeps the older rule; a signed-out person never', L.isCrewLeader({ leadId: 'a', personId: 'o', role: 'owner' }) && L.isCrewLeader({ leadId: 'a', personId: 'o', role: 'admin' })
-  && L.isCrewLeader({ leadId: null, personId: 'b', role: 'worker' }) && !L.isCrewLeader({ leadId: null, personId: null, role: 'worker' }));
-check('3 a non-leader is told what is happening instead of getting a button that does nothing', /Waiting for Lena to check the crew in/.test(L.crewStopMessage('pending', 'Lena')) && /In progress since 9:05 AM/.test(L.crewStopMessage('arrived', 'Lena', '9:05 AM', 'Lena')));
+check('2 owner and admin may check a crew in; a route with NO leader gives no worker the button (nobody becomes leader by default); a signed-out person never', L.isCrewLeader({ leadId: 'a', personId: 'o', role: 'owner' }) && L.isCrewLeader({ leadId: 'a', personId: 'o', role: 'admin' })
+  && !L.isCrewLeader({ leadId: null, personId: 'b', role: 'worker' }) && !L.isCrewLeader({ leadId: null, personId: 'a', role: 'worker' }) && !L.isCrewLeader({ leadId: 'a', personId: null, role: 'worker' }));
+check('3 a non-leader is told what is happening instead of getting a button that does nothing, and a route with no leader says so', /no crew leader yet/.test(L.crewStopMessage('pending', null, null, null, false)) && /Waiting for Lena to check the crew in/.test(L.crewStopMessage('pending', 'Lena')) && /In progress since 9:05 AM/.test(L.crewStopMessage('arrived', 'Lena', '9:05 AM', 'Lena')));
 
 const T = load('src/lib/propertyTrend.ts');
 const v = (date, el, lab) => ({ stopId: date, serviceDate: date, status: 'completed', elapsedMinutes: el, estLaborMinutes: lab, crew: [], tasksDone: 0, tasksTotal: 0, photos: 0, savedVisit: true });

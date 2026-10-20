@@ -188,6 +188,16 @@ check('S4c the shift is tagged with the storm as before', (await one(`select sto
 r = await rpc(sLead.u, `select (public.snow_clock_in(gen_random_uuid())).id as x`);
 check('S5 tapping Clock In again returns the open shift, never a second', r.ok && (await snowOpen(sLead.pid)) === 1 && (await snowAny(sLead.pid)) === 1, r.msg);
 
+// overnight: a storm dispatched a day and a half ago and a shift that began 9 hours ago (so it crossed midnight) are both legitimate
+await asDb();
+await db.query(`update public.snow_storms set created_at = now() - interval '30 hours' where id = $1`, [stormA]);
+await db.query(`update public.snow_shifts set clock_in_at = now() - interval '9 hours' where person_id = $1 and clock_out_at is null`, [sCrew.pid]);
+r = await rpc(sCrew.u, `select public.snow_can_clock_in() as x`);
+check('S5b overnight: a storm dispatched long before the shift still authorizes the crew (there is no time-of-day window)', r.ok && r.v === true, JSON.stringify(r));
+r = await rpc(sCrew.u, `select (public.snow_clock_in(gen_random_uuid())).id as x`);
+check('S5c overnight: the shift that has been open since before midnight stays one open shift (not closed, not duplicated)', r.ok && (await snowOpen(sCrew.pid)) === 1 && (await snowAny(sCrew.pid)) === 1
+  && (await one(`select (now() - clock_in_at > interval '8 hours') as old from public.snow_shifts where person_id = $1 and clock_out_at is null`, [sCrew.pid])).old === true, r.msg);
+
 // direct API
 await asUser(sNone.u);
 let sdirect;

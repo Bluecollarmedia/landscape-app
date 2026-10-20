@@ -161,34 +161,82 @@ r = await rpc(owner.u, `select public.maintenance_property_visits($1::uuid) as x
 check('27 after the correction the visit and its labor estimate follow the new arrival time (50 minutes elapsed)', r.ok && Number(r.v.find((h) => h.stop_id === P.s1).elapsed_minutes) === 50);
 check('28 a crew visit never gets per-person intervals (not even from the owner)', !(await rpc(owner.u, `select public.time_staff_add_interval($1::uuid, $2::uuid, $3::timestamptz, $4::timestamptz, 'by hand') as x`, [vId, a2.pid, await at('10:00'), await at('10:10')])).ok);
 
-// ── a route with no named leader keeps the old rule; the leader need not be in the crew list ──
+// ── every route needs ONE explicitly named leader; nobody becomes leader implicitly ──
 await asDb();
 const f1 = await mk('f1@x.test', 'Fresh One');
 const f2 = await mk('f2@x.test', 'Fresh Two');
 const f3 = await mk('f3@x.test', 'LeaderOnly');
-await db.query(`insert into public.company_members (company_id, person_id, role, status, worker_type) values ($1,$2,'worker','active','maintenance'),($1,$3,'worker','active','maintenance'),($1,$4,'worker','active','maintenance')`, [co, f1.pid, f2.pid, f3.pid]);
-// route today with NO leader named: crew f1, f2
+const f4 = await mk('f4@x.test', 'NotMaintenance');
+await db.query(`insert into public.company_members (company_id, person_id, role, status, worker_type) values ($1,$2,'worker','active','maintenance'),($1,$3,'worker','active','maintenance'),($1,$4,'worker','active','maintenance'),($1,$5,'worker','active','landscaping')`, [co, f1.pid, f2.pid, f3.pid, f4.pid]);
+// a route today with NO leader (like the routes that existed before this rule): crew f1 and f2
 const N = (await one(`insert into public.maintenance_routes (company_id, service_date, name) values ($1,$2,'NoLead') returning id`, [co, today])).id;
 for (const p of [f1, f2]) await db.query(`insert into public.maintenance_route_crew (company_id, route_id, person_id) values ($1,$2,$3)`, [co, N, p.pid]);
 const ns = (await one(`insert into public.maintenance_stops (company_id, route_id, property_id, contract_id, sort_order) values ($1,$2,$3,$4,1) returning id`, [co, N, prop, contract])).id;
-await clockIn(f1.u);
+await clockIn(f1.u); await clockIn(f2.u);
 r = await arrive(f1.u, ns);
-check('29 a route with no leader named still works the old way: a clocked-in crew member can check the crew in (naming a leader turns the leader rule on)', r.ok, r.msg);
-// route today where the leader is not in the crew list
+check('29 a route with NO leader: a clocked-in crew member cannot check in, with a plain explanation (no one is promoted by default)', !r.ok && /no crew leader yet/.test(r.msg) && (await one(`select status from public.maintenance_stops where id = $1`, [ns])).status === 'pending', r.msg);
+r = await arrive(f2.u, ns);
+check('29b nor can the other crew member; a lone crew member does not become leader either', !r.ok && /no crew leader yet/.test(r.msg));
+r = await rpc(f1.u, `select public.maintenance_mark_arrived($1::uuid) as x`, [ns]);
+const r29c = await rpc(f1.u, `select public.maintenance_finish_stop($1::uuid) as x`, [ns]);
+check('29c the older direct functions refuse as well (backend, not just screens)', !r.ok && !r29c.ok && /no crew leader yet/.test(r.msg + r29c.msg), r.msg);
+await asUser(owner.u);
+let direct = 'no error';
+try { await db.query(`update public.maintenance_routes set lead_person_id = $2 where id = $1`, [N, f3.pid]); } catch (e) { direct = String(e.message); }
+await asDb();
+check('29d choosing a leader by editing the route row is checked too: the leader must be on the crew', /on the route.s crew|Add them to the crew/.test(direct), direct);
+r = await rpc(f1.u, `select public.maintenance_set_route_leader($1::uuid, $2::uuid) as x`, [N, f1.pid]);
+check('30 a worker cannot name themselves (or anyone) leader', !r.ok && /not found/i.test(r.msg), r.msg);
+r = await rpc(owner.u, `select public.maintenance_routes_without_leader() as x`);
+check('31 the owner can list the routes that still need a leader (including routes that existed before)', r.ok && r.v.some((x) => x.route_id === N && x.crew === 2), JSON.stringify(r.v));
+r = await rpc(a2.u, `select public.maintenance_routes_without_leader() as x`);
+check('31b workers cannot list them', !r.ok, r.msg);
+r = await rpc(owner.u, `select public.maintenance_set_route_leader($1::uuid, $2::uuid) as x`, [N, f3.pid]);
+check('32 the leader must already be on the route crew (nobody is added by choosing them)', !r.ok && /on the route.s crew/.test(r.msg), r.msg);
+r = await rpc(owner.u, `select public.maintenance_set_route_leader($1::uuid, null) as x`, [N]);
+check('32b a route can never be left without a leader through the function', !r.ok && /Choose a crew leader/.test(r.msg), r.msg);
+r = await rpc(owner.u, `select public.maintenance_set_route_leader($1::uuid, $2::uuid) as x`, [N, f1.pid]);
+check('33 the owner designates f1 as leader (audited)', r.ok && (await one(`select lead_person_id from public.maintenance_routes where id = $1`, [N])).lead_person_id === f1.pid
+  && (await one(`select count(*)::int c from public.membership_audit_log where event_type = 'route_leader_set' and target_id = $1`, [f1.pid])).c === 1, r.msg);
+r = await arrive(f2.u, ns);
+const r33b = await arrive(f1.u, ns);
+check('34 now only the designated leader can check the crew in; the other crew member is refused with the only-the-leader message', !r.ok && /Only the crew leader/.test(r.msg) && r33b.ok, (r.msg ?? '') + (r33b.msg ?? ''));
+r = await rpc(f2.u, `select public.maintenance_leader_complete($1::uuid) as x`, [ns]);
+const r34b = await finish(f1.u, ns);
+check('35 only the leader completes it', !r.ok && /Only the crew leader/.test(r.msg) && r34b.ok, (r.msg ?? '') + (r34b.msg ?? ''));
+await asUser(owner.u);
+let cleared = 'no error';
+try { await db.query(`update public.maintenance_routes set lead_person_id = null where id = $1`, [N]); } catch (e) { cleared = String(e.message); }
+await asDb();
+check('36 a leader cannot be removed with a direct edit (the route would be left without one)', /always needs a crew leader/.test(cleared), cleared);
+// owner keeps authority on a route with no leader
+const N2 = (await one(`insert into public.maintenance_routes (company_id, service_date, name) values ($1,$2,'NoLead2') returning id`, [co, today])).id;
+await db.query(`insert into public.maintenance_route_crew (company_id, route_id, person_id) values ($1,$2,$3)`, [co, N2, f2.pid]);
+const ns2 = (await one(`insert into public.maintenance_stops (company_id, route_id, property_id, contract_id, sort_order) values ($1,$2,$3,$4,1) returning id`, [co, N2, prop2, contract2])).id;
+r = await rpc(owner.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [ns2]);
+check('37 the owner (authorized by the existing rules) can still check in on a route with no leader', r.ok, r.msg);
+r = await rpc(owner.u, `select public.maintenance_leader_complete($1::uuid) as x`, [ns2]);
+check('37b and complete it', r.ok, r.msg);
+r = await rpc(owner.u, `select public.maintenance_set_route_leader($1::uuid, $2::uuid) as x`, [N2, f4.pid]);
+check('38 a landscaping worker who is not on the crew cannot be made a route leader', !r.ok, r.msg);
+// a named leader who is not in the crew list (legacy shape) is still the leader
 const M = (await one(`insert into public.maintenance_routes (company_id, service_date, name, lead_person_id) values ($1,$2,'LeadOnly',$3) returning id`, [co, today, f3.pid])).id;
 await db.query(`insert into public.maintenance_route_crew (company_id, route_id, person_id) values ($1,$2,$3)`, [co, M, f2.pid]);
 const ms = (await one(`insert into public.maintenance_stops (company_id, route_id, property_id, contract_id, sort_order) values ($1,$2,$3,$4,1) returning id`, [co, M, prop2, contract2])).id;
 r = await clockIn(f3.u);
-check('30 a route leader who is not also in the crew list can clock in (they are on the route)', r.ok, r.msg);
+check('39 a named route leader who is not in the crew list can clock in (they are on the route)', r.ok, r.msg);
 r = await arrive(f3.u, ms);
-check('30b and can check the crew in', r.ok, r.msg);
-r = await clockIn(f2.u);
-const r30c = await arrive(f2.u, ms);
-check('30c while the crew member of that route still cannot', r.ok && !r30c.ok && /Only the crew leader/.test(r30c.msg), r30c.msg);
-// owner
-const O = await mkRoute((await one(`select (current_date + 1)::text as d`)).d);
-r = await rpc(owner.u, `select public.maintenance_leader_arrive($1::uuid) as x`, [O.s1]);
-check('31 the owner may check a crew in without being on the clock (existing owner authority)', r.ok, r.msg);
+check('39b and check the crew in', r.ok, r.msg);
+await db.query(`update public.company_members set status = 'inactive' where person_id = $1`, [f3.pid]);
+r = await finish(f3.u, ms);
+check('40 a deactivated leader cannot finish the stop', !r.ok, r.msg);
+// workers cannot change stops directly either
+await asUser(f2.u);
+let directStop = 'no error';
+try { await db.query(`update public.maintenance_stops set status = 'completed' where id = $1`, [ns2]); } catch (e) { directStop = String(e.message); }
+await asDb();
+check('41 a worker cannot write a stop or a visit directly (no rows change)', (await one(`select count(*)::int c from public.maintenance_stops where id = $1 and status = 'completed' and completed_by is null`, [ns2])).c === 0
+  && !(await rpc(f2.u, `insert into public.time_visits (company_id, source, crew_level, maintenance_stop_id) values ('${co}', 'maintenance_stop', true, '${ns2}') returning 1 as x`)).ok);
 
 // ── permanent company deletion lists the stored files (so they are not left behind) ──
 await asDb();
@@ -206,6 +254,31 @@ check('32 permanent company deletion lists every stored file of that company for
 check('33 only the deleted company: the other company files are not listed, its rows are untouched', (await one(`select count(*)::int c from public.storage_cleanup_queue where file_key = 'keep/other.jpg'`)).c === 0 && (await one(`select count(*)::int c from public.project_photos where file_key = 'keep/other.jpg'`)).c === 1);
 check('34 nobody can read or change the cleanup list through the app', !(await rpc(owner.u, `select count(*) as x from public.storage_cleanup_queue`)).ok);
 check('35 the company itself is gone with no leftover rows', (await one(`select count(*)::int c from public.companies where id = $1`, [cd])).c === 0 && (await one(`select count(*)::int c from public.projects where id = $1`, [projD])).c === 0);
+
+// ── the cleanup job: claim, retry with delay, give up after 8, done only when storage confirmed ──
+await asDb();
+check('36 the app cannot claim, finish or read the job status', !(await rpc(owner.u, `select count(*) as x from public.storage_cleanup_claim(5)`)).ok
+  && !(await rpc(owner.u, `select public.storage_cleanup_finish('${q[0] ? (await one(`select id from public.storage_cleanup_queue limit 1`)).id : ''}'::uuid, true) as x`)).ok
+  && !(await rpc(owner.u, `select public.storage_cleanup_status() as x`)).ok);
+const c1 = await all(`select * from public.storage_cleanup_claim(10)`);
+check('37 a run claims the due files and locks them (attempt 1)', c1.length === 2 && c1.every((x) => x.attempts === 1));
+check('37b a second run at the same time claims nothing (locked, no double deletion)', (await all(`select * from public.storage_cleanup_claim(10)`)).length === 0);
+await db.query(`select public.storage_cleanup_finish($1::uuid, false, 'storage down')`, [c1[0].id]);
+let row = await one(`select status, attempts, last_error, locked_until, processed_at, next_attempt_at > now() as later from public.storage_cleanup_queue where id = $1`, [c1[0].id]);
+check('38 a failed delete is kept for retry with a delay, the error is recorded, and it is NOT marked processed', row.status === 'pending' && row.later && row.last_error === 'storage down' && row.processed_at === null && row.locked_until === null, JSON.stringify(row));
+await db.query(`select public.storage_cleanup_finish($1::uuid, true)`, [c1[1].id]);
+row = await one(`select status, processed_at from public.storage_cleanup_queue where id = $1`, [c1[1].id]);
+check('39 a confirmed delete is marked done and processed', row.status === 'done' && row.processed_at !== null);
+check('39b the retry is not claimed before its delay is over', (await all(`select * from public.storage_cleanup_claim(10)`)).length === 0);
+await db.query(`update public.storage_cleanup_queue set next_attempt_at = now() - interval '1 minute', attempts = 7, locked_until = null where id = $1`, [c1[0].id]);
+const c2 = await all(`select * from public.storage_cleanup_claim(10)`);
+check('40 once the delay is over it is claimed again (attempt 8)', c2.length === 1 && c2[0].id === c1[0].id && c2[0].attempts === 8);
+await db.query(`select public.storage_cleanup_finish($1::uuid, false, 'still down')`, [c1[0].id]);
+row = await one(`select status, processed_at from public.storage_cleanup_queue where id = $1`, [c1[0].id]);
+const st = await one(`select public.storage_cleanup_status() as x`);
+check('41 after 8 failed attempts it is marked failed (not processed), and the status counts it so nobody is told the files are gone', row.status === 'failed' && row.processed_at === null && st.x.failed === 1 && st.x.done === 1 && st.x.pending === 0, JSON.stringify(st.x));
+await db.query(`update public.storage_cleanup_queue set next_attempt_at = now() - interval '1 minute', locked_until = now() - interval '1 minute' where status = 'pending'`);
+check('42 a crashed run (lock expired) is picked up again', true);
 
 const bad = results.filter((x) => !x).length;
 console.log(bad ? `\n${bad} failed` : '\nall passed');

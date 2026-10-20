@@ -10,8 +10,11 @@ Three separate records, never mixed up:
    minutes = 40 minutes elapsed and 120 minutes (2.0 labor-hours) estimated; if one leaves at minute 20 it is 100 minutes.
 
 Rules (enforced by the database):
-* Only the route's leader (`maintenance_routes.lead_person_id`) or an owner/admin checks the crew in and finishes a stop. A route with no
-  leader named keeps the older rule (any crew member). Other crew members see the status instead of a button.
+* Every route needs ONE explicitly named leader (`maintenance_routes.lead_person_id`); nobody becomes leader implicitly, not even a lone
+  crew member. Only that leader (or an owner/admin) checks the crew in and finishes a stop. A route with no leader blocks check-in and
+  completion for every worker, with a plain message, until the owner chooses one (`maintenance_set_route_leader`; the leader must be on the
+  route's crew and an approved maintenance worker). Owner > Maintenance lists the routes still without a leader; nothing is assigned for
+  you. A direct edit cannot remove a leader. Other crew members see the status instead of a button.
 * The leader must be clocked in to check a crew in. The stop order is the owner's (owner may work out of order; it is written to the history).
 * Workers do not start per-person property timers any more for maintenance (the older functions refuse). Landscaping jobs are unchanged.
 * A crew visit is never recomputed from intervals and never gets per-person intervals; the owner can correct its arrival/completion time
@@ -23,3 +26,13 @@ and a "longer than usual" pointer when a visit is at least 25% and 15 minutes lo
 visits. Visits recorded before this update use the stop's own arrival/completion times.
 
 Estimated labor-hours are a trend tool, not payroll, and are labelled that way.
+
+## Company deletion and stored files
+
+Deleting a company removes its rows in one all-or-nothing database step, and in the same step lists every stored photo/document key in
+`storage_cleanup_queue`. The files themselves live in the media storage (R2), which a database transaction cannot touch, so **database
+deletion and file deletion are not atomic**. The files are removed afterwards by the `storage-cleanup` Edge Function, which claims items
+(`storage_cleanup_claim`, locked 10 minutes, `skip locked`), deletes them (a file already missing counts as gone), and records the result
+(`storage_cleanup_finish`). A failure is retried after 2^attempts minutes (max 6 hours) and marked `failed` after 8 attempts;
+`storage_cleanup_status()` reports pending / done / failed so nobody is told the files are gone while any remain. The function needs the
+`CLEANUP_SECRET` secret, the existing R2 secrets, a deploy and a schedule (for example every 15 minutes); none of that has been done.

@@ -21,3 +21,13 @@ export async function loadPropertyVisits(propertyId: string): Promise<VisitRecor
     tasksDone: r.tasks_done ?? 0, tasksTotal: r.tasks_total ?? 0, photos: r.photos ?? 0, savedVisit: !!r.saved_visit,
   }));
 }
+
+export interface RouteNeedingLeader { routeId: string; name?: string; serviceDate: string; status: string; crew: number }
+
+/** Routes (today and later) that still have no crew leader: nobody but the owner can check in at their properties until one is chosen. */
+export async function loadRoutesWithoutLeader(): Promise<RouteNeedingLeader[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.rpc('maintenance_routes_without_leader');
+  if (error || !Array.isArray(data)) return [];
+  return (data as Raw[]).map((r) => ({ routeId: r.route_id, name: r.name ?? undefined, serviceDate: r.service_date, status: r.status, crew: Number(r.crew ?? 0) }));
+}

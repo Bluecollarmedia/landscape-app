@@ -62,6 +62,7 @@ const mkProp = async (company, name) => {
 const mkRoute = async (company, name, crew, n) => {
   const route = (await one(`insert into public.maintenance_routes (company_id, service_date, name) values ($1, $2, $3) returning id`, [company, today, name])).id;
   for (const pid of crew) await db.query(`insert into public.maintenance_route_crew (company_id, route_id, person_id) values ($1,$2,$3)`, [company, route, pid]);
+  if (crew.length) await db.query(`update public.maintenance_routes set lead_person_id = $2 where id = $1`, [route, crew[0]]);  // every route has an explicitly named leader (update 68)
   const stops = [];
   for (let i = 0; i < n; i++) {
     const { p, c } = await mkProp(company, `${name} Prop ${i + 1}`);

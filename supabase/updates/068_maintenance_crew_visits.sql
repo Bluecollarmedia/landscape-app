@@ -7,8 +7,9 @@
 --  • Every worker still clocks in and out for their OWN workday (update 63/67). Nothing here changes that.
 --  • At a maintenance stop only the route's CREW LEADER (maintenance_routes.lead_person_id) checks the crew in ("I'm here")
 --    and completes the stop. Owner/admin may do either. If an owner has not named a leader for a route, any crew member may (the
---    old behaviour); naming a leader on the route turns the rule on. Other crew members see the stop's status; the database refuses
---    them (also if they call the functions directly or use an old build).
+--    them (also if they call the functions directly or use an old build). EVERY route needs one explicitly named leader: a route with
+--    no leader blocks property check-in and completion for everyone except owner/admin, with a plain explanation, until the owner
+--    chooses one (maintenance_set_route_leader). Nobody becomes leader implicitly, not even a lone crew member.
 --  • The leader's check-in saves ONE property visit (time_visits, "crew_level") with the real arrival time. Completing saves the real
 --    completion time. The visit's elapsed time is therefore a saved, server-stamped fact, not a phone timer.
 --  • No per-worker property timers any more for maintenance (the old time_start_visit / time_complete_visit refuse maintenance stops).
@@ -34,14 +35,27 @@ begin
   if exists (select 1 from public.company_members m where m.company_id = s.company_id and m.person_id = p_person and m.status = 'active' and m.role in ('owner', 'admin')) then
     return true;
   end if;
-  if not exists (select 1 from public.company_members m where m.company_id = s.company_id and m.person_id = p_person and m.status = 'active' and m.role = 'worker') then
-    return false;
-  end if;
-  if r.lead_person_id is not null then return r.lead_person_id = p_person; end if;
-  return exists (select 1 from public.maintenance_route_crew c where c.route_id = r.id and c.person_id = p_person);  -- no leader named yet
+  -- A worker may act only as the route's explicitly named leader. A route with no leader has nobody (no implicit leader).
+  return r.lead_person_id is not null and r.lead_person_id = p_person
+     and exists (select 1 from public.company_members m where m.company_id = s.company_id and m.person_id = p_person and m.status = 'active' and m.role = 'worker');
 end;
 $$;
 revoke all on function public._maint_may_lead(uuid, uuid) from public, anon, authenticated;
+
+-- Raises the right sentence when the person may not act as leader at this stop.
+create or replace function public._maint_require_leader(p_stop_id uuid, p_person uuid, p_what text)
+returns void language plpgsql stable security definer set search_path = public as $$
+declare r public.maintenance_routes;
+begin
+  if public._maint_may_lead(p_stop_id, p_person) then return; end if;
+  select r1.* into r from public.maintenance_routes r1 join public.maintenance_stops s on s.route_id = r1.id where s.id = p_stop_id;
+  if r.lead_person_id is null then
+    raise exception 'This route has no crew leader yet, so nobody can % at its properties. Ask the owner to choose a crew leader for the route.', p_what;
+  end if;
+  raise exception 'Only the crew leader can % at a property.', p_what;
+end;
+$$;
+revoke all on function public._maint_require_leader(uuid, uuid, text) from public, anon, authenticated;
 
 -- A route's leader counts as being on the route (a leader who is not also in the crew list could not open the stop before).
 create or replace function public._maint_stop_for_crew(p_stop_id uuid)
@@ -91,9 +105,7 @@ declare
 begin
   s := public._maint_stop_for_crew(p_stop_id);
   if s.status in ('completed', 'skipped') then return s; end if;
-  if not public._maint_may_lead(s.id, me) then
-    raise exception 'Only the crew leader checks the crew in at a property.';
-  end if;
+  perform public._maint_require_leader(s.id, me, 'check the crew in');
   select latitude, longitude, checkin_radius_m into p from public.maintenance_properties where id = s.property_id;
   select * into loc from public._maint_location(p_lat, p_lng, p_accuracy, p_location_state, p.latitude, p.longitude, p.checkin_radius_m);
 
@@ -136,9 +148,7 @@ begin
   s := public._maint_stop_for_crew(p_stop_id);
   if s.status = 'completed' then return s; end if;
   if s.status = 'skipped' then raise exception 'This stop was skipped.'; end if;
-  if not public._maint_may_lead(s.id, me) then
-    raise exception 'Only the crew leader finishes a stop.';
-  end if;
+  perform public._maint_require_leader(s.id, me, 'finish a stop');
   staff := public.is_staff(s.company_id);
   if s.status <> 'arrived' and not staff then
     raise exception 'Tap I''m Here at this property first.';
@@ -178,6 +188,73 @@ begin
 end;
 $$;
 grant execute on function public.maintenance_finish_stop(uuid, text, double precision, double precision, double precision, text) to authenticated;
+
+-- ── Every route needs one explicitly named leader ───────────────────────────
+-- Owner/admin choose (or change) a route's leader. The leader must be an active maintenance worker who is on the route's crew.
+create or replace function public.maintenance_set_route_leader(p_route uuid, p_person uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare me uuid := public.my_person_id(); r public.maintenance_routes; old uuid;
+begin
+  select * into r from public.maintenance_routes where id = p_route for update;
+  if not found or not public.is_staff(r.company_id) then raise exception 'Route not found.'; end if;
+  if r.status in ('cancelled', 'completed') then raise exception 'This route is already %.', r.status; end if;
+  if p_person is null then raise exception 'Choose a crew leader. A route always needs one.'; end if;
+  if not exists (select 1 from public.maintenance_route_crew c where c.route_id = r.id and c.person_id = p_person) then
+    raise exception 'The leader has to be on the route''s crew. Add them to the crew first.';
+  end if;
+  if not public.person_is_maintenance_worker(r.company_id, p_person) then
+    raise exception 'The crew leader must be an approved maintenance worker.';
+  end if;
+  old := r.lead_person_id;
+  if old is not distinct from p_person then return; end if;
+  perform set_config('brighton.route_leader', 'on', true);
+  update public.maintenance_routes set lead_person_id = p_person where id = r.id;
+  perform set_config('brighton.route_leader', '', true);
+  insert into public.membership_audit_log (company_id, event_type, actor_id, target_id, metadata)
+  values (r.company_id, 'route_leader_set', me, p_person, jsonb_build_object('route_id', r.id, 'previous_leader', old));
+end;
+$$;
+
+-- Owner/admin: routes that still need a leader (including routes that existed before this rule). Nothing is assigned for you.
+create or replace function public.maintenance_routes_without_leader()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare cid uuid := public._my_owned_or_staff_company();
+begin
+  if cid is null then raise exception 'not allowed'; end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('route_id', r.id, 'name', r.name, 'service_date', r.service_date, 'status', r.status,
+             'crew', (select count(*) from public.maintenance_route_crew c where c.route_id = r.id)) order by r.service_date)
+      from public.maintenance_routes r
+     where r.company_id = cid and r.lead_person_id is null and r.status not in ('cancelled', 'completed') and r.service_date >= current_date - 1
+  ), '[]'::jsonb);
+end;
+$$;
+create or replace function public._my_owned_or_staff_company()
+returns uuid language sql stable security definer set search_path = public as $$
+  select company_id from public.company_members where person_id = public.my_person_id() and role in ('owner', 'admin') and status = 'active' order by created_at limit 1
+$$;
+revoke all on function public._my_owned_or_staff_company() from public, anon, authenticated;
+
+-- A route can't lose its leader from a phone, and a leader has to be on the crew (checked on changes; a new route gets its crew right after it).
+create or replace function public._maintenance_routes_leader_guard()
+returns trigger language plpgsql as $$
+begin
+  if current_user not in ('authenticated', 'anon') then return new; end if;
+  if new.lead_person_id is distinct from old.lead_person_id then
+    if new.lead_person_id is null then
+      raise exception 'A route always needs a crew leader. Choose a different leader instead of removing it.';
+    end if;
+    if not exists (select 1 from public.maintenance_route_crew c where c.route_id = new.id and c.person_id = new.lead_person_id) then
+      raise exception 'The leader has to be on the route''s crew. Add them to the crew first.';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public._maintenance_routes_leader_guard() from public, anon, authenticated;
+drop trigger if exists maintenance_routes_leader_guard on public.maintenance_routes;
+create trigger maintenance_routes_leader_guard before update of lead_person_id on public.maintenance_routes
+  for each row execute function public._maintenance_routes_leader_guard();
 
 -- ── Crew visits (one per stop): saved arrival and completion, no per-worker property timers ──
 -- A crew visit never has per-person intervals, and the older per-worker functions can't make a maintenance visit.
@@ -253,9 +330,7 @@ begin
   if not found or s.company_id <> cid then raise exception 'Stop not found.'; end if;
   select * into r from public.maintenance_routes where id = s.route_id;
   if r.status = 'cancelled' then raise exception 'That route was cancelled.'; end if;
-  if not public._maint_may_lead(s.id, me) then
-    raise exception 'Only the crew leader checks the crew in at a property.';
-  end if;
+  perform public._maint_require_leader(s.id, me, 'check the crew in');
   if s.status in ('completed', 'skipped') then raise exception 'This stop is already %.', s.status; end if;
 
   select * into w from public.time_workdays where person_id = me and clock_out_at is null;
@@ -319,7 +394,7 @@ begin
   staff := public.is_staff(cid);
   select * into s from public.maintenance_stops where id = p_stop_id;
   if not found or s.company_id <> cid then raise exception 'Stop not found.'; end if;
-  if not public._maint_may_lead(s.id, me) then raise exception 'Only the crew leader finishes a stop.'; end if;
+  perform public._maint_require_leader(s.id, me, 'finish a stop');
   select * into v from public.time_visits where maintenance_stop_id = s.id;
 
   if s.status = 'completed' then
@@ -415,6 +490,8 @@ begin
 end;
 $$;
 
+revoke all on function public.maintenance_set_route_leader(uuid, uuid), public.maintenance_routes_without_leader() from public, anon;
+grant execute on function public.maintenance_set_route_leader(uuid, uuid), public.maintenance_routes_without_leader() to authenticated;
 revoke all on function public.maintenance_leader_arrive(uuid, double precision, double precision, double precision, text),
   public.maintenance_leader_complete(uuid, text, double precision, double precision, double precision, text),
   public.maintenance_staff_edit_visit(uuid, timestamptz, timestamptz, text), public.maintenance_property_visits(uuid, integer) from public, anon;
@@ -529,7 +606,10 @@ $$;
 -- ── Company deletion also lists the company's stored files for removal ───────
 -- Files are not in the database (they are in the media storage); deleting the rows would leave them behind with nobody pointing at them.
 -- This list outlives the company (no link to it). Nothing reads it through the app. A storage-cleanup job (not part of this update; it
--- needs the storage credentials) reads unprocessed rows, deletes the files, and sets processed_at.
+-- needs the storage credentials; supabase/functions/storage-cleanup) claims unprocessed rows, deletes the files, and records the result.
+-- The database delete and the file delete can NOT be one atomic step (the files are outside the database). So: the rows go in one
+-- all-or-nothing step together with the list of files; the files are then removed by a retrying job. A failure is retried with a
+-- growing delay and is marked 'failed' after 8 attempts; processed_at is set only once the storage confirmed the file is gone.
 create table if not exists public.storage_cleanup_queue (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null,
@@ -538,9 +618,69 @@ create table if not exists public.storage_cleanup_queue (
   enqueued_at timestamptz not null default now(),
   processed_at timestamptz
 );
-create index if not exists idx_storage_cleanup_pending on public.storage_cleanup_queue (enqueued_at) where processed_at is null;
+alter table public.storage_cleanup_queue add column if not exists status text not null default 'pending';
+alter table public.storage_cleanup_queue add column if not exists attempts integer not null default 0;
+alter table public.storage_cleanup_queue add column if not exists last_error text;
+alter table public.storage_cleanup_queue add column if not exists next_attempt_at timestamptz not null default now();
+alter table public.storage_cleanup_queue add column if not exists locked_until timestamptz;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'storage_cleanup_status_check') then
+    alter table public.storage_cleanup_queue add constraint storage_cleanup_status_check check (status in ('pending', 'done', 'failed'));
+  end if;
+end $$;
+create unique index if not exists uq_storage_cleanup_key on public.storage_cleanup_queue (file_key);
+drop index if exists public.idx_storage_cleanup_pending;
+create index if not exists idx_storage_cleanup_due on public.storage_cleanup_queue (next_attempt_at) where status = 'pending';
 alter table public.storage_cleanup_queue enable row level security;
 revoke all on public.storage_cleanup_queue from anon, authenticated;
+
+-- Job side (service role only; never callable from the app). Claims a batch with a 10 minute lock so two runs never take the same file.
+create or replace function public.storage_cleanup_claim(p_limit integer default 25)
+returns table (id uuid, company_id uuid, file_key text, attempts integer)
+language plpgsql security definer set search_path = public as $$
+begin
+  return query
+  with due as (
+    select q.id from public.storage_cleanup_queue q
+     where q.status = 'pending' and q.next_attempt_at <= now() and (q.locked_until is null or q.locked_until < now())
+     order by q.next_attempt_at limit greatest(1, least(coalesce(p_limit, 25), 100)) for update skip locked
+  )
+  update public.storage_cleanup_queue q set locked_until = now() + interval '10 minutes', attempts = q.attempts + 1
+    from due where q.id = due.id
+  returning q.id, q.company_id, q.file_key, q.attempts;
+end;
+$$;
+
+-- Records a result. Success is the only way processed_at gets set. A failure waits 2^attempts minutes (max 6 hours) and gives up after 8.
+create or replace function public.storage_cleanup_finish(p_id uuid, p_ok boolean, p_error text default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare q public.storage_cleanup_queue;
+begin
+  select * into q from public.storage_cleanup_queue where id = p_id for update;
+  if not found then raise exception 'No such cleanup item.'; end if;
+  if p_ok then
+    update public.storage_cleanup_queue set status = 'done', processed_at = now(), locked_until = null, last_error = null where id = p_id;
+  elsif q.attempts >= 8 then
+    update public.storage_cleanup_queue set status = 'failed', locked_until = null, last_error = left(coalesce(p_error, 'failed'), 500) where id = p_id;
+  else
+    update public.storage_cleanup_queue set locked_until = null, last_error = left(coalesce(p_error, 'failed'), 500),
+      next_attempt_at = now() + least(power(2, q.attempts) * interval '1 minute', interval '6 hours') where id = p_id;
+  end if;
+end;
+$$;
+
+-- Honest progress for an operator: how many files are still in storage (pending), gone (done), or gave up (failed).
+create or replace function public.storage_cleanup_status()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('pending', count(*) filter (where status = 'pending'), 'done', count(*) filter (where status = 'done'),
+                            'failed', count(*) filter (where status = 'failed')) from public.storage_cleanup_queue
+$$;
+revoke all on function public.storage_cleanup_claim(integer), public.storage_cleanup_finish(uuid, boolean, text), public.storage_cleanup_status() from public, anon, authenticated;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.storage_cleanup_claim(integer), public.storage_cleanup_finish(uuid, boolean, text), public.storage_cleanup_status() to service_role;
+  end if;
+end $$;
 
 create or replace function public._enqueue_company_files(p_company uuid)
 returns integer language plpgsql security definer set search_path = public as $$
@@ -552,7 +692,7 @@ begin
        and exists (select 1 from pg_attribute a where a.attrelid = c1.oid and a.attname = 'company_id' and not a.attisdropped)
        and exists (select 1 from pg_attribute a where a.attrelid = c1.oid and a.attname = 'file_key' and not a.attisdropped)
   loop
-    execute format('insert into public.storage_cleanup_queue (company_id, source_table, file_key) select company_id, %L, file_key from public.%I where company_id = $1 and coalesce(file_key, '''') <> ''''', t.relname, t.relname) using p_company;
+    execute format('insert into public.storage_cleanup_queue (company_id, source_table, file_key) select company_id, %L, file_key from public.%I where company_id = $1 and coalesce(file_key, '''') <> '''' on conflict (file_key) do nothing', t.relname, t.relname) using p_company;
     get diagnostics c = row_count;
     n := n + c;
   end loop;

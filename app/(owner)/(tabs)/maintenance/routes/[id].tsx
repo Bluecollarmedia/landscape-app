@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { Avatar, EmptyState, OptimizedImage, ProgressBar, ScreenHeader, StatusBadge } from '@/components/ui';
@@ -9,7 +9,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenance, useMaintenanceRoute } from '@/hooks/useMaintenance';
 import { db, useDb } from '@/data/store';
-import { correctAttendance, locationLabel, setStopPhotoShared } from '@/data/maintenance';
+import { correctAttendance, locationLabel, setRouteLead, setStopPhotoShared } from '@/data/maintenance';
 import {
   buildRouteReview, correctStopTime, describeEvent, formatTime,
   type AttendanceReview, type RecordedTime, type StopReview, type StopTimeKind,
@@ -100,9 +100,45 @@ export default function RouteDetailScreen() {
             </View>
           ) : null}
           <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.md }]}>
-            {route.lead ? `Maintenance Lead: ${fullName(route.lead)}` : 'No Maintenance Lead for this route'}
+            {route.lead ? `Crew leader: ${fullName(route.lead)}` : 'No crew leader chosen yet'}
           </Text>
         </View>
+
+        {/* The crew leader: the only worker who checks the crew in and finishes each stop. Every route needs one, chosen by you. */}
+        {route.status !== 'cancelled' && route.status !== 'completed' ? (
+          <>
+            <SectionTitle>CREW LEADER</SectionTitle>
+            <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm, { gap: spacing.sm }]}>
+              {!route.lead ? (
+                <View style={[styles.noteBox, { backgroundColor: colors.warningLight ?? colors.groupedBackground }]}>
+                  <Icon name="alert-triangle" size={14} color={colors.warning} />
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]}>
+                    This route has no crew leader, so nobody on the crew can check in at its properties yet. Choose one below.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Only the leader (and you) can tap I'M HERE and finish each stop.</Text>
+              )}
+              {route.crewIds.length === 0 ? (
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Put people on the crew first, then choose the leader from them.</Text>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {route.crewIds.map((pid) => {
+                    const p = db.people[pid];
+                    const on = route.lead?.id === pid;
+                    return (
+                      <Pressable key={pid} accessibilityRole="button" accessibilityState={{ selected: on }}
+                        onPress={async () => { const r = await setRouteLead(route.id, pid); if (!r.ok) Alert.alert("Couldn't set the leader", r.error); }}
+                        style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.lg, backgroundColor: on ? colors.primary : colors.backgroundTertiary }}>
+                        <Text style={[typeScale.labelSmall, { color: on ? '#FFFFFF' : colors.textPrimary }]}>{p ? `${p.firstName} ${p.lastName}`.trim() : 'Worker'}{on ? ' · Leader' : ''}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          </>
+        ) : null}
 
         {/* Needs attention */}
         {review.attention.length > 0 && (

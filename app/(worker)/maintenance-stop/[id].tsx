@@ -254,7 +254,7 @@ export default function MaintenanceStopScreen() {
       >
         {!!error && <InlineNotice icon="alert-triangle" tone="error" text={error} style={{ marginBottom: spacing.sm }} />}
         {!leader && !locked && (
-          <InlineNotice icon="users" tone="neutral" text={crewStopMessage(stop.status, leaderName, stop.arrivedAt ? clockTime(stop.arrivedAt) : null, stop.arrivedBy ? nameOf(stop.arrivedBy) : null)} />
+          <InlineNotice icon="users" tone="neutral" text={crewStopMessage(stop.status, leaderName, stop.arrivedAt ? clockTime(stop.arrivedAt) : null, stop.arrivedBy ? nameOf(stop.arrivedBy) : null, !!route.lead)} />
         )}
         {leader && stop.status === 'pending' && !blockedBy && clockedIn && (
           <PrimaryButton

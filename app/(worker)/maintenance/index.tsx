@@ -448,7 +448,7 @@ function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName
             ) : null
           ) : (
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-              {crewStopMessage(stop.status, leaderName, stop.arrivedAt ? formatClock(stop.arrivedAt) : null, arrivedBy)}
+              {crewStopMessage(stop.status, leaderName, stop.arrivedAt ? formatClock(stop.arrivedAt) : null, arrivedBy, !!leaderName)}
             </Text>
           )}
         </View>

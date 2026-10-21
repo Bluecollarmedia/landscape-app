@@ -2,7 +2,7 @@
  * Snow notification settings (supabase/updates/031).
  *
  *  • OwnerCustomerMessages: the OWNER decides when customers are messaged (crew arrives, service finished), once for
- *    every property, in Snow Settings. Customers do not choose. Saved per property through snow_set_notify_prefs (logged).
+ *    every property, in the Snow More tab. Customers do not choose. Saved per property through snow_set_notify_prefs (logged).
  *  • OwnerStopAlertsToggle: the owner's own "alert me when a stop is done" switch. Independent of customer messages;
  *    turning it off never stops the visit, dashboard or activity log from recording the work.
  */

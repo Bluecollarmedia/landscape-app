@@ -28,7 +28,7 @@ interface Row {
   name: string; address: string; street: string; zip?: string; status: 'active' | 'inactive'; services: SnowService[];
 }
 
-/** `asTab` (default): the Properties tab. Otherwise a stand-alone screen with a Back button (opened from Snow settings). */
+/** `asTab` (default): the Properties tab. Otherwise a stand-alone screen with a Back button (the Properties tab is the only way in now). */
 export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {}) {
   const { colors } = useTheme();
   const router = useRouter();

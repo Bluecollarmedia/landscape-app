@@ -29,5 +29,11 @@ check('13 no new dependencies', !/expo-linear-gradient|expo-blur/.test(src));
 const act = require('fs').readFileSync(require('path').join(__dirname, '../../app/(owner)/snow-activity.tsx'), 'utf8');
 check('14 the Snow Activity filters start folded up: one period button and one Filters button, and each panel opens only when tapped',
   /setPanel\(panel === 'period' \? null : 'period'\)/.test(act) && /setPanel\(panel === 'filters' \? null : 'filters'\)/.test(act) && /\{panel === 'period' \? \(/.test(act) && /\{panel === 'filters' \? \(/.test(act));
+// Nothing is duplicated across the owner's Snow screens: ONE Sign Out, ONE Privacy Policy row, ONE Delete Account.
+const walk = (d, out = []) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p, out); else if (/\.tsx$/.test(e.name)) out.push(p); } return out; };
+const ownerSnow = [...walk(path.join(__dirname, '../../app/snow/owner')), ...walk(path.join(__dirname, '../../src/components/snow'))].filter((f) => !/SnowWorkerSettings|SnowNotice/.test(f));
+const total = (re) => ownerSnow.reduce((n, f) => n + (fs.readFileSync(f, 'utf8').match(re) || []).length, 0);
+check('15 across the owner\'s Snow screens there is exactly one Sign Out, one Privacy Policy row and one Delete Account', total(/title="Sign Out"/g) === 1 && total(/title="Privacy Policy"/g) === 1 && total(/<DeleteAccountRow \/>/g) === 1 && total(/<LegalSection/g) === 0, `${total(/title="Sign Out"/g)}/${total(/title="Privacy Policy"/g)}/${total(/<DeleteAccountRow \/>/g)}`);
+check('16 there is no second Settings screen and nothing still sends people to one', !fs.existsSync(path.join(__dirname, '../../app/snow/owner/settings.tsx')) && total(/snow\/owner\/settings/g) === 0);
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

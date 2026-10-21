@@ -120,7 +120,7 @@ export function SnowDashboardScreen() {
         )}
 
         {/* Only shown when something really needs you (for example a shift left open for hours); an empty list is just noise.
-            Worker hours live in Snow Settings > Snow hours. */}
+            Worker hours live in More > Snow hours. */}
         {needsAttention.length > 0 ? (
           <>
             <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>

@@ -1,5 +1,5 @@
 /**
- * Snow settings -> Manage storms (Owner). Every storm, whatever its status, newest first, each with a small Delete
+ * Snow More -> Manage storms (Owner). Every storm, whatever its status, newest first, each with a small Delete
  * button. A storm can always be deleted from here: one made by mistake, or one that is finished and unwanted.
  * Deleting asks first, with the real counts, and is permanent (update 50). Kept off the dashboard on purpose.
  */

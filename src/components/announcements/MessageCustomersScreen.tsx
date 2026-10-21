@@ -16,9 +16,9 @@ import { spacing, radius } from '@/theme/spacing';
 
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function MessageCustomersScreen() {
+/** The form and the sent list for messages to customers, with no screen around it (the Announcements page embeds it). */
+export function MessageCustomersPanel() {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
   const history = useCustomerMessageHistory();
   const [audience, setAudience] = useState<CustomerAudience>('customers_all');
   const [title, setTitle] = useState('');
@@ -55,9 +55,7 @@ export function MessageCustomersScreen() {
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Message Customers" subtitle="A push notification and a banner in their app" />
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing['5xl'] }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <View style={styles.content}>
         <Text style={[typeScale.overline, { color: colors.textSecondary }]}>SEND TO</Text>
         <View style={styles.chips}>
           {AUDIENCES.map((a) => {
@@ -109,6 +107,19 @@ export function MessageCustomersScreen() {
             </View>
           </View>
         )}
+    </View>
+  );
+}
+
+/** Message Customers as its own screen (Snow Mode's More opens this one). */
+export function MessageCustomersScreen() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+      <ScreenHeader title="Message Customers" subtitle="A push notification and a banner in their app" />
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing['5xl'] }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <MessageCustomersPanel />
       </ScrollView>
     </View>
   );

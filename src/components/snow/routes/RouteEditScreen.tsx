@@ -19,6 +19,7 @@ import {
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
 import { OwnerSkipRequests } from './SkipRequests';
+import { AddPropertiesSheet } from './AddPropertiesSheet';
 import { flattenGroups, groupStatus, groupStops, isGroupClosed, isGroupUntouched, servicesText, servicesToAdd } from '@/lib/snowStopGroups';
 import type { SnowService } from '@/types/snow';
 import { typeScale } from '@/theme/typography';
@@ -49,7 +50,6 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
   const [name, setName] = useState('');
   const [pickLead, setPickLead] = useState(false);
   const [pickStops, setPickStops] = useState(false);
-  const [chosen, setChosen] = useState<string[]>([]);
   const [doNext, setDoNext] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [leadLoad, setLeadLoad] = useState<Record<string, string[]>>({});
@@ -177,11 +177,11 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     }, true);
   }
 
-  async function onAddStops() {
-    if (!route || !chosen.length) return;
+  async function onAddStops(ids: string[]) {
+    if (!route || !ids.length) return;
     setBusy(true);
     // A route that does several services makes one visit per service the property offers.
-    const items = chosen.map((pid) => ({
+    const items = ids.map((pid) => ({
       propertyId: pid,
       services: route.services.length > 1 ? (servicesToAdd(route.services, eligible.find((e) => e.propertyId === pid)?.services, route.service) as SnowService[]) : undefined,
     }));
@@ -192,9 +192,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     }
     setBusy(false);
     if (!res.ok) showMessage('Couldn\'t add every stop', res.error);
-    setChosen([]);
     setDoNext(false);
-    setPickStops(false);
     reload();
   }
 
@@ -488,7 +486,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
                 }}
               />
             </View>
-          ) : !pickStops ? (
+          ) : (
             <View style={styles.empty}>
               <View>
                 <Icon name="home" size={44} color={colors.textTertiary} />
@@ -497,55 +495,10 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
               <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginTop: spacing.md }]}>No properties added yet</Text>
               {editable ? <Button title="Add Property" icon="plus" onPress={() => setPickStops(true)} style={{ marginTop: spacing.lg }} /> : null}
             </View>
-          ) : null}
+          )}
 
-          {editable ? (
-            pickStops ? (
-              <View style={{ marginTop: spacing.md }}>
-                {addable.length ? addable.map((p, i) => {
-                  const on = chosen.includes(p.propertyId);
-                  return (
-                    <Pressable
-                      key={p.propertyId}
-                      style={[styles.row, { paddingHorizontal: 0 }, i > 0 && sep]}
-                      onPress={() => setChosen(on ? chosen.filter((x) => x !== p.propertyId) : [...chosen, p.propertyId])}
-                    >
-                      <Icon name={on ? 'check-square' : 'square'} size={20} color={on ? colors.primary : colors.textTertiary} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{p.name}</Text>
-                        <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{p.address}</Text>
-                        {visitsOn.get(p.propertyId) ? (
-                          <Text style={[typeScale.caption, { color: colors.primary }]}>
-                            Already on this route ×{visitsOn.get(p.propertyId)}. Adding it again makes another visit.
-                          </Text>
-                        ) : null}
-                      </View>
-                    </Pressable>
-                  );
-                }) : (
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                    No property offers {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} yet. Turn the service on for a property first.
-                  </Text>
-                )}
-                {route.stormStatus === 'dispatched' && route.stops.length > 0 ? (
-                  <View style={[styles.inline, { marginTop: spacing.md }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Do these next</Text>
-                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                        Puts them right after the stop the lead is on, ahead of stops not yet started.
-                      </Text>
-                    </View>
-                    <Switch value={doNext} onValueChange={setDoNext} accessibilityLabel="Do these next" />
-                  </View>
-                ) : null}
-                <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
-                  <Button title="Cancel" variant="ghost" onPress={() => { setPickStops(false); setChosen([]); }} />
-                  <Button title={chosen.length ? `Add ${chosen.length}` : 'Add'} disabled={!chosen.length} loading={busy} onPress={onAddStops} />
-                </View>
-              </View>
-            ) : (
-              groups.length ? <Button title="Add Property" icon="plus" variant="secondary" size="sm" onPress={() => setPickStops(true)} style={{ marginTop: spacing.md, alignSelf: 'flex-start' }} /> : null
-            )
+          {editable && groups.length ? (
+            <Button title="Add Property" icon="plus" variant="secondary" size="sm" onPress={() => setPickStops(true)} style={{ marginTop: spacing.md, alignSelf: 'flex-start' }} />
           ) : null}
         </SetupCard>
 
@@ -560,6 +513,22 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
 
         {embedded && route.stops.length ? (
           <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary, marginTop: spacing.xs }]}>Tap a property to set photos and add a note for it.</Text>
+        ) : null}
+
+        {editable ? (
+          <AddPropertiesSheet
+            visible={pickStops}
+            onClose={() => setPickStops(false)}
+            properties={addable}
+            services={route.services}
+            serviceLabel={svcLabel}
+            visitsOn={visitsOn}
+            busy={busy}
+            showDoNext={route.stormStatus === 'dispatched' && route.stops.length > 0}
+            doNext={doNext}
+            onDoNext={setDoNext}
+            onAdd={onAddStops}
+          />
         ) : null}
 
         <Modal visible={renaming} transparent animationType="fade" onRequestClose={() => setRenaming(false)}>

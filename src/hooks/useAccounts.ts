@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { db, rpc, refresh, isDemo } from '@/data/store';
 
-/** Where someone stands with the company, derived from membership + latest join request. */
+/** Where someone stands with the company, derived from their membership. */
 export type AccountStatus = 'active' | 'pending' | 'removed' | 'declined' | 'not_joined';
 export type AccountRole = 'owner' | 'admin' | 'worker' | 'customer';
 
@@ -61,7 +61,7 @@ function fromRow(r: AccountRow): Account {
   };
 }
 
-/** Demo mode: build the list from the local store's members and join requests. */
+/** Demo mode: build the list from the local store's members. */
 function demoAccounts(): Account[] {
   const out = new Map<string, Account>();
   for (const m of db.members) {

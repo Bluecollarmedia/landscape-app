@@ -271,7 +271,7 @@ export default function NewProjectScreen() {
           <Card title="Customer" style={{ marginBottom: spacing.lg }}>
             {customers.length === 0 ? (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                No customers yet. Add one below, or share the project code later so the customer can join on their own.
+                No customers yet. Add one below, then send them a private link from their page so they can see the project.
               </Text>
             ) : (
               <View style={styles.chipRow}>

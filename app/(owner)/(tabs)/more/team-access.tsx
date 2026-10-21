@@ -113,7 +113,7 @@ export default function TeamAccessScreen() {
               {p.role ? <StatusBadge label={ROLE_LABEL[p.role] ?? p.role} status="info" /> : null}
               {p.landscaping ? <StatusBadge label={p.workerType === 'maintenance' ? 'Maintenance' : 'Landscaping'} status="success" /> : null}
               {p.snowServices.length ? <StatusBadge label={`Snow: ${p.snowServices.join(', ')}`} status="success" /> : null}
-              {p.state === 'waiting' ? <StatusBadge label="Waiting for approval" status="warning" /> : null}
+              {p.state === 'waiting' ? <StatusBadge label="Invited" status="info" /> : null}
               {p.state === 'deactivated' ? <StatusBadge label="Deactivated" status="error" /> : null}
             </View>
           </View>
@@ -129,7 +129,7 @@ export default function TeamAccessScreen() {
                 {!locked && !adminTarget ? <Button title="Reactivate…" size="sm" variant="secondary" onPress={() => show({ kind: 'reactivate', person: p })} /> : null}
               </>
             ) : p.state === 'waiting' ? (
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Their request is under More → Pending Requests (team) or Snow team (snow).</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>They haven't opened their invite link yet. Use Add Worker to send them a new link.</Text>
             ) : locked ? (
               <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{p.isMe ? 'This is you.' : 'The owner’s account can’t be changed here.'}</Text>
             ) : adminTarget ? (
@@ -181,7 +181,7 @@ export default function TeamAccessScreen() {
           </Pressable>
         ) : null}
         <FilterChips<TeamState> selected={filter} onSelect={setFilter}
-          options={[{ key: 'active', label: 'Active', count: count('active') }, { key: 'waiting', label: 'Waiting', count: count('waiting') }, { key: 'deactivated', label: 'Deactivated', count: count('deactivated') }]} />
+          options={[{ key: 'active', label: 'Active', count: count('active') }, { key: 'waiting', label: 'Invited', count: count('waiting') }, { key: 'deactivated', label: 'Deactivated', count: count('deactivated') }]} />
         <View style={{ height: spacing.md }} />
         {T.error ? <Text style={[typeScale.bodySmall, { color: semantic.error, marginBottom: spacing.md }]}>{T.error}</Text> : null}
         {!T.loading && !T.error && shown.length === 0 ? (

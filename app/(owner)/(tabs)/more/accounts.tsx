@@ -175,7 +175,7 @@ export default function AccountsScreen() {
 
             {a.status === 'removed' && (
               <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-                Access removed {formatDate(a.removedAt)}. They can't use the app until you reactivate them (Team Access) or approve a new join request.
+                Access removed {formatDate(a.removedAt)}. They can't use the app until you reactivate them (Team Access) or send them a new invite link.
               </Text>
             )}
 
@@ -205,7 +205,7 @@ export default function AccountsScreen() {
   const sheetCopy = pending && target ? {
     remove: {
       icon: 'user-x', title: `Remove ${fullName(target)}?`,
-      body: 'They keep their login but can’t use the app. To get back in they’ll need you to restore them here or approve a new join request.',
+      body: 'They keep their login but can’t use the app. To get back in they’ll need you to restore them here or send them a new invite link.',
       button: 'Remove Access',
     },
     restore: {

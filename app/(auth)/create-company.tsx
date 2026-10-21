@@ -143,7 +143,7 @@ export default function CreateCompanyScreen() {
       // can't quietly make an account with no company when one already exists.
       const { data: slotOpen, error: slotError } = await supabase.rpc('company_slot_open');
       if (!slotError && slotOpen === false) {
-        throw new Error('A company already exists. Ask the owner for a team code to join it.');
+        throw new Error('A company already exists. Ask the owner to send you a private invite link to join it.');
       }
 
       if (signedIn) {

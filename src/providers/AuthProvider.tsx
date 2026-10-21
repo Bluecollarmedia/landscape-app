@@ -152,7 +152,7 @@ interface AuthContextValue extends ExtendedAuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, profile: SignUpProfile, intent?: SignUpIntent) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
-  /** Re-checks memberships / join requests (e.g. after creating a company or while waiting for approval). */
+  /** Re-checks memberships (e.g. after creating a company or signing up from an invite link). */
   refreshContext: () => Promise<AppState>;
   switchDevRole: (role: UserRole) => void;
   switchDevState: (appState: AppState, onboardingStep?: OnboardingStep) => void;

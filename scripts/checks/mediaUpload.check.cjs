@@ -37,6 +37,8 @@ const load = (r2) => {
     if (name === './ids') return { uuid: () => 'uuid-1' };
     if (name === './uploadErrors') return errors;
     if (name === './uploadLimit') return { tooLargeMessage: () => null };
+    // Compression is not what this check is about: treat every picture as already prepared.
+    if (name === './mediaCompress') return { isPrepared: () => true, prepareImage: async (j) => ({ uri: j.sourceUri }) };
     return {};
   };
   req.env = r2 ? { EXPO_PUBLIC_R2_PUBLIC_URL: 'https://r2.test' } : {};

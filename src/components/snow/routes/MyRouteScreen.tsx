@@ -17,9 +17,10 @@ import { pickSnowMedia } from '@/components/snow/pickSnowMedia';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { openDirections } from '@/lib/maps';
+import { mediaQueue, useMediaJobs, waitForMediaJobs } from '@/lib/mediaQueueRuntime';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
-  addCompletionMedia, arriveAtStop, finishStop, loadMyRoutes, loadRoute, STOP_STATUS_LABEL,
+  addCompletionMedia, arriveAtStop, finishStop, loadMyRoutes, loadRoute, SNOW_COMPLETION_TARGET, STOP_STATUS_LABEL,
   type MyRoute, type RouteDetail, type RouteStop,
   stopNeedsPhotos,
 } from '@/data/snowRoutes';
@@ -64,6 +65,11 @@ export function MyRouteScreen() {
 
   useEffect(() => { reload(); }, [reload]);
 
+  // Photos upload in the background. When one finishes saving, refresh so the stop's photo count is the real one.
+  const mediaJobs = useMediaJobs();
+  const savedPhotos = mediaJobs.filter((j) => j.target.type === SNOW_COMPLETION_TARGET && j.status === 'uploaded').length;
+  useEffect(() => { if (savedPhotos > 0) reload(); }, [savedPhotos]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function act(run: () => Promise<{ ok: boolean; error?: string }>, failTitle: string) {
     setBusy(true);
     const res = await run();
@@ -89,8 +95,13 @@ export function MyRouteScreen() {
   const isLead = canWorkRoute(routes.find((r) => r.id === route?.id)?.role);
   const svcLabel = (x: string) => SERVICE_LABEL[x as SnowService];
   const groupServices = (g: RouteStop[]) => g.map((v) => v.service ?? route!.service);
-  // Photos are added once for the stop, on its first visit.
-  const needMedia = route && current && stopNeedsPhotos(current, route) ? Math.max(0, route.minMedia - current.mediaCount) : 0;
+  // Photos are added once for the stop, on its first visit. Ones still uploading count as added: they are saved on the phone and
+  // keep going in the background; ones that failed do not count until they are retried.
+  const stopJobs = current ? mediaJobs.filter((j) => j.target.type === SNOW_COMPLETION_TARGET && j.target.payload.visitId === current.id) : [];
+  const uploading = stopJobs.filter((j) => j.status === 'preparing' || j.status === 'uploading');
+  const failedJobs = stopJobs.filter((j) => j.status === 'failed');
+  const addedCount = (current?.mediaCount ?? 0) + uploading.length;
+  const needMedia = route && current && stopNeedsPhotos(current, route) ? Math.max(0, route.minMedia - addedCount) : 0;
 
   /** Starts every visit at this property that has not been started, in order. Stops at the first problem. */
   async function arriveGroup(g: RouteStop[]): Promise<{ ok: boolean; error?: string }> {
@@ -103,6 +114,12 @@ export function MyRouteScreen() {
 
   /** Finishes every visit at this property that is not finished. The note goes on the first one. */
   async function finishGroup(g: RouteStop[]): Promise<{ ok: boolean; error?: string }> {
+    // The database counts only saved photos, so wait (a little) for the ones still uploading before finishing.
+    if (uploading.length) {
+      const waited = await waitForMediaJobs(uploading.map((j) => j.id), 90_000);
+      if (waited === 'failed') return { ok: false, error: "A photo didn't upload. Tap Retry under the photos, then finish the stop." };
+      if (waited === 'timeout') return { ok: false, error: 'The photos are still uploading. Give it a moment and tap Finish Stop again.' };
+    }
     let first = true;
     for (const v of g.filter((x) => x.status === 'arrived' || x.status === 'pending')) {
       const res = await finishStop(v.id, first ? note : undefined);
@@ -186,16 +203,35 @@ export function MyRouteScreen() {
                 ) : (
                   <>
                     <Button
-                      title={current.mediaCount ? `Add photos (${current.mediaCount} added)` : 'Add photos'}
+                      title={addedCount ? `Add photos (${addedCount} added)` : 'Add photos'}
                       icon="camera"
                       variant="secondary"
                       disabled={busy}
                       onPress={async () => {
                         const drafts = await pickSnowMedia();
-                        if (drafts.length) act(() => addCompletionMedia(route.companyId, current.id, drafts), 'Couldn\'t add the photos');
+                        if (!drafts.length) return;
+                        // Instant: the photos are queued and upload in the background, so there is nothing to wait for here.
+                        const res = await addCompletionMedia(route.companyId, current.id, drafts);
+                        if (!res.ok) showMessage("Couldn't add the photos", res.error);
                       }}
                       fullWidth
                     />
+                    {uploading.length ? (
+                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                        {uploading.length === 1 ? '1 photo is' : `${uploading.length} photos are`} uploading in the background. You can keep going.
+                      </Text>
+                    ) : null}
+                    {failedJobs.map((j) => (
+                      <View key={j.id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                        <Text style={[typeScale.caption, { color: colors.warning, flex: 1 }]} numberOfLines={2}>A photo didn't upload{j.error ? `: ${j.error}` : '.'}</Text>
+                        <Pressable onPress={() => mediaQueue.retry(j.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retry the photo upload">
+                          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Retry</Text>
+                        </Pressable>
+                        <Pressable onPress={() => { void mediaQueue.cancel(j.id); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Remove the photo">
+                          <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>Remove</Text>
+                        </Pressable>
+                      </View>
+                    ))}
                     <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Anything the owner should know" />
                     {needMedia > 0 ? (
                       <Text style={[typeScale.caption, { color: colors.warning }]}>
@@ -206,7 +242,7 @@ export function MyRouteScreen() {
                       title="Finish Stop"
                       icon="check"
                       loading={busy}
-                      disabled={needMedia > 0}
+                      disabled={needMedia > 0 || failedJobs.length > 0}
                       onPress={async () => { if (await act(() => finishGroup(currentGroup), 'Can\'t finish yet')) setNote(''); }}
                       fullWidth
                     />

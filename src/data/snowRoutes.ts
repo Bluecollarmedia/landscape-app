@@ -10,7 +10,6 @@
 import { roleFor, type RouteRole } from '@/lib/snowCrew';
 import { peopleWhoDoAll } from '@/lib/snowStopGroups';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { discardSnowUpload, uploadSnowMedia } from '@/lib/snowMedia';
 import type { SnowService } from '@/types/snow';
 import type { SnowMediaDraft } from '@/data/snowProperties';
 
@@ -393,25 +392,30 @@ export async function finishStop(visitId: string, note?: string): Promise<Result
 /** Uploads completion photos/videos for a stop. A file only counts once its database row is saved. */
 export async function addCompletionMedia(companyId: string, visitId: string, drafts: SnowMediaDraft[]): Promise<Result<number>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  let saved = 0;
+  // The photos join the shared background queue (compress -> upload -> save the record), so this returns at once and the screen can
+  // say "added" while they finish uploading. Failures stay in the queue as Failed with Retry (see MyRouteScreen).
+  const { queueMedia } = require('@/lib/mediaQueueRuntime') as typeof import('@/lib/mediaQueueRuntime');
   for (const d of drafts) {
-    let key: string | null = null;
-    try {
-      key = await uploadSnowMedia(d.uri, `${companyId}/completion/${visitId}`, d.mimeType);
-      const { error } = await supabase.rpc('snow_add_completion_media', {
-        p_visit_id: visitId,
-        p_kind: d.mediaType === 'video' ? 'video' : 'photo',
-        p_file_key: key,
-        p_size_bytes: d.sizeBytes ?? null,
-      });
-      if (error) throw new Error(message(error, 'Couldn\'t save the photo.'));
-      saved += 1;
-    } catch (e) {
-      if (key) await discardSnowUpload(key);
-      return saved ? ok(saved) : fail(e instanceof Error ? e.message : 'Upload failed.');
-    }
+    queueMedia({
+      kind: d.mediaType === 'video' ? 'video' : 'image', sourceUri: d.uri, mimeType: d.mimeType, bytesIn: d.sizeBytes,
+      folder: `${companyId}/completion/${visitId}`, target: { type: SNOW_COMPLETION_TARGET, payload: { visitId } },
+    });
   }
-  return ok(saved);
+  return ok(drafts.length);
+}
+
+/** The queue's name for a Snow stop photo or video. */
+export const SNOW_COMPLETION_TARGET = 'snow_completion';
+
+/** Last step of a queued Snow photo: the file is stored, so save its record on the stop. Safe to repeat (the database ignores a file it already has). */
+export async function saveCompletionRecord(job: { kind: string; bytesIn?: number; bytesOut?: number; target: { payload: Record<string, unknown> } }, key: string): Promise<void> {
+  const { error } = await supabase.rpc('snow_add_completion_media', {
+    p_visit_id: String(job.target.payload.visitId),
+    p_kind: job.kind === 'video' ? 'video' : 'photo',
+    p_file_key: key,
+    p_size_bytes: job.bytesOut ?? job.bytesIn ?? null,
+  });
+  if (error) throw new Error(message(error, "Couldn't save the photo."));
 }
 
 export const STOP_STATUS_LABEL: Record<VisitStatus, string> = {

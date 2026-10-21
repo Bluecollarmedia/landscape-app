@@ -1,15 +1,24 @@
 import React from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { ListSection, ListRow } from '@/components/ui';
+import { legalHubPath } from '@/lib/legalPaths';
 
-/** Privacy Policy / Terms of Use / Help & Support rows for any settings screen. */
+/**
+ * The single "Legal & Support" row for any Settings screen. It opens the Legal & Support page that belongs to the area the person is in
+ * (owner, worker, customer or Snow), so Settings stays underneath and Back returns to it.
+ */
 export function LegalSection() {
   const router = useRouter();
+  const segments = useSegments() as string[];
   return (
-    <ListSection title="Legal & Support">
-      <ListRow icon="shield" title="Privacy Policy" showChevron onPress={() => router.push('/legal/privacy' as any)} />
-      <ListRow icon="file-text" title="Terms of Use" showChevron onPress={() => router.push('/legal/terms' as any)} />
-      <ListRow icon="help-circle" title="Help & Support" showChevron onPress={() => router.push('/legal/support' as any)} />
+    <ListSection>
+      <ListRow
+        icon="shield"
+        title="Legal & Support"
+        subtitle="Privacy Policy, Terms of Use and Help"
+        showChevron
+        onPress={() => router.push(legalHubPath(segments[0]) as any)}
+      />
     </ListSection>
   );
 }

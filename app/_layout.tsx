@@ -85,9 +85,11 @@ function RootNavigator() {
       const target =
         shell === 'snow' ? `/snow/${role}` : shell === 'snow_notice' ? '/snow/notice' : `/(${role})`;
       const s1 = (segments as string[])[1];
+      // Legal & Support opens inside the Snow area (so Back returns to Settings): it is part of whichever Snow shell they are in.
+      const inLegal = s1 === 'legal-support';
       const onTarget =
-        shell === 'snow' ? currentGroup === 'snow' && s1 === role
-        : shell === 'snow_notice' ? currentGroup === 'snow' && s1 === 'notice'
+        shell === 'snow' ? currentGroup === 'snow' && (s1 === role || inLegal)
+        : shell === 'snow_notice' ? currentGroup === 'snow' && (s1 === 'notice' || inLegal)
         : currentGroup === `(${role})`;
       if (inAuthGroup || inOnboardingGroup || !onTarget) {
         router.replace(target as any);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCompanySlotOpen } from '@/hooks/useCompanySlot';
+import { LegalModal } from '@/components/legal/LegalModal';
+import type { LegalDoc } from '@/legal/legalContent';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { brand } from '@/theme/colors';
@@ -18,6 +20,8 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const canCreateCompany = useCompanySlotOpen();
   const insets = useSafeAreaInsets();
+  // The legal pages open as a pop-up over this screen, so closing one lands exactly here.
+  const [reading, setReading] = useState<LegalDoc['slug'] | null>(null);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -68,13 +72,14 @@ export default function WelcomeScreen() {
           Brighton Lawn + Landscape
         </Text>
         <View style={styles.legalRow}>
-          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => router.push('/legal/privacy' as any)}>Privacy Policy</Text>
+          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => setReading('privacy')}>Privacy Policy</Text>
           <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{'  ·  '}</Text>
-          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => router.push('/legal/terms' as any)}>Terms of Use</Text>
+          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => setReading('terms')}>Terms of Use</Text>
           <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{'  ·  '}</Text>
-          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => router.push('/legal/support' as any)}>Support</Text>
+          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => setReading('support')}>Support</Text>
         </View>
       </View>
+      <LegalModal slug={reading} onClose={() => setReading(null)} />
     </View>
   );
 }

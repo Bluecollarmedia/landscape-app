@@ -88,14 +88,9 @@ export default function SnowOwnerMoreScreen() {
             {mode.canSwitch ? <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} /> : null}
           </Group>
 
-          <Group title="Legal & Support">
-            <Row compact icon="shield" title="Privacy Policy" onPress={() => router.push('/legal/privacy' as any)} />
-            <Row compact icon="file-text" title="Terms of Use" onPress={() => router.push('/legal/terms' as any)} />
-            <Row compact icon="help-circle" title="Help & Support" onPress={() => router.push('/legal/support' as any)} />
-          </Group>
-
           <Group title="Account">
-            <Row icon="log-out" title="Sign Out" destructive onPress={signOut} single />
+            <Row icon="shield" title="Legal & Support" subtitle="Privacy Policy, Terms of Use and Help" onPress={() => router.push('/snow/legal-support' as any)} />
+            <Row icon="log-out" title="Sign Out" destructive onPress={signOut} />
           </Group>
           <ListSection>
             <DeleteAccountRow />

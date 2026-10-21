@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { LegalModal } from '@/components/legal/LegalModal';
+import type { LegalDoc } from '@/legal/legalContent';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
@@ -11,7 +12,8 @@ export const TERMS_REQUIRED_MESSAGE = 'Please agree to the Terms of Use and Priv
 /** "I agree to the Terms of Use and Privacy Policy" check box with links. Shown wherever an account is created. */
 export function TermsAgreement({ value, onChange }: { value: boolean; onChange: (next: boolean) => void }) {
   const { colors } = useTheme();
-  const router = useRouter();
+  // The documents open as a pop-up, not a new screen: leaving this screen would throw away what has been typed so far.
+  const [reading, setReading] = useState<LegalDoc['slug'] | null>(null);
   return (
     <View style={styles.row}>
       <Pressable
@@ -26,10 +28,11 @@ export function TermsAgreement({ value, onChange }: { value: boolean; onChange: 
       </Pressable>
       <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1 }]}>
         I agree to the{' '}
-        <Text style={{ color: colors.primary, fontWeight: '600' }} onPress={() => router.push('/legal/terms' as any)}>Terms of Use</Text>
+        <Text style={{ color: colors.primary, fontWeight: '600' }} onPress={() => setReading('terms')}>Terms of Use</Text>
         {' '}and{' '}
-        <Text style={{ color: colors.primary, fontWeight: '600' }} onPress={() => router.push('/legal/privacy' as any)}>Privacy Policy</Text>.
+        <Text style={{ color: colors.primary, fontWeight: '600' }} onPress={() => setReading('privacy')}>Privacy Policy</Text>.
       </Text>
+      <LegalModal slug={reading} onClose={() => setReading(null)} />
     </View>
   );
 }

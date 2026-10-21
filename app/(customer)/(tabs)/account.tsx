@@ -36,7 +36,7 @@ export default function CustomerAccountScreen() {
           onPress={() => router.push('/(customer)/edit-profile' as any)}
           accessibilityRole="button"
           accessibilityLabel="Edit your profile and photo"
-          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm }}
+          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md }}
         >
           <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={52} uri={user?.avatarUrl} />
           <View style={{ marginLeft: spacing.md, flex: 1 }}>

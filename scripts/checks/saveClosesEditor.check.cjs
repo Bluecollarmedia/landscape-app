@@ -32,6 +32,6 @@ for (const [file, n] of Object.entries(must)) {
 const sp = read('app/(owner)/snow-property.tsx');
 check('Snow instructions fold up to a short summary after Save (and only open while writing)', /setEditing\(false\)/.test(sp) && /setEditing\(true\)/.test(sp) && /numberOfLines=\{3\}/.test(sp));
 const pay = read('app/(owner)/(tabs)/more/payroll.tsx');
-check('a saved hourly rate folds the worker card back up', /Keyboard\.dismiss\(\);\n\s*onToggle\(\);/.test(pay));
+check('a saved hourly rate folds the worker card back up', /Keyboard\.dismiss\(\);\s*onToggle\(\);/.test(pay));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

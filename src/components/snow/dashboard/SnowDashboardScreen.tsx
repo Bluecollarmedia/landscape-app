@@ -13,7 +13,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useSnowDashboard } from '@/hooks/useSnowDashboard';
 import { SERVICE_LABEL } from '@/data/snowStorms';
-import { LONG_OPEN_SHIFT_HOURS, type AttentionItem, type StormOverview } from '@/data/snowDashboard';
+import type { AttentionItem, StormOverview } from '@/data/snowDashboard';
 import { snowDashboardHref } from '@/lib/snowLinks';
 import {
   crewRows, dispatchedLabel, otherStorms, pickActiveStorm, stormHeadline, type CrewRow, type CrewStatus, type StormHeadline,
@@ -53,7 +53,7 @@ export function SnowDashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
-  const { state, storms, needsAttention, shiftsChecked, clockedInCount, refreshing, onRefresh, reload } = useSnowDashboard();
+  const { state, storms, needsAttention, refreshing, onRefresh, reload } = useSnowDashboard();
 
   const active = pickActiveStorm(storms);
   const headline = active ? stormHeadline(active) : undefined;
@@ -119,53 +119,37 @@ export function SnowDashboardScreen() {
           </View>
         )}
 
-        <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>
-          Needs attention{needsAttention.length ? ` (${needsAttention.length})` : ''}
-        </Text>
-        {!shiftsChecked && (
-          <InlineNotice
-            icon="clock"
-            tone="neutral"
-            text="Time records aren't checked: snow clock in and out isn't set up on this database yet."
-            style={{ marginBottom: spacing.sm }}
-          />
-        )}
-        {needsAttention.length === 0 ? (
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Nothing is waiting on you.</Text>
-          </View>
-        ) : (
-          <View style={[styles.card, { backgroundColor: colors.surface, paddingVertical: 0 }]}>
-            {needsAttention.map((item, i) => (
-              <Pressable
-                key={item.key}
-                onPress={() => router.push(snowDashboardHref(item.target))}
-                style={({ pressed }) => [
-                  styles.row,
-                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
-                  pressed && { opacity: 0.6 },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.title}. ${item.detail}`}
-              >
-                <Icon name={ATTENTION_ICON[item.kind]} size={18} color={colors.warning} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{item.title}</Text>
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{item.detail}</Text>
-                </View>
-                <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-              </Pressable>
-            ))}
-          </View>
-        )}
-        {shiftsChecked && (
-          <Pressable onPress={() => router.push('/snow/owner/hours')} accessibilityRole="button" style={styles.clockedIn}>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-              {clockedInCount} clocked in now · shifts open over {LONG_OPEN_SHIFT_HOURS} hours are listed above
+        {/* Only shown when something really needs you (for example a shift left open for hours); an empty list is just noise.
+            Worker hours live in Snow Settings > Snow hours. */}
+        {needsAttention.length > 0 ? (
+          <>
+            <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>
+              Needs attention ({needsAttention.length})
             </Text>
-            <Icon name="chevron-right" size={14} color={colors.textTertiary} />
-          </Pressable>
-        )}
+            <View style={[styles.card, { backgroundColor: colors.surface, paddingVertical: 0 }]}>
+              {needsAttention.map((item, i) => (
+                <Pressable
+                  key={item.key}
+                  onPress={() => router.push(snowDashboardHref(item.target))}
+                  style={({ pressed }) => [
+                    styles.row,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.title}. ${item.detail}`}
+                >
+                  <Icon name={ATTENTION_ICON[item.kind]} size={18} color={colors.warning} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{item.title}</Text>
+                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{item.detail}</Text>
+                  </View>
+                  <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {others.length > 0 && (
           <>
@@ -386,7 +370,6 @@ const styles = StyleSheet.create({
   label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },
   card: { borderRadius: radius.lg, padding: spacing.lg },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, minHeight: 44 },
-  clockedIn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm, marginLeft: spacing.sm, minHeight: 32 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.full, alignSelf: 'flex-start' },
   pillDot: { width: 6, height: 6, borderRadius: 3 },
   heroCard: { borderRadius: radius.xl, overflow: 'hidden', marginTop: spacing.lg },

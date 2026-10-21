@@ -108,8 +108,8 @@ export function SnowDashboardScreen() {
 
         {active && headline ? (
           <>
-            <ActiveStormCard storm={active} headline={headline} onOpen={() => openStorm(active.id)} />
-            <CrewsSection storm={active} headline={headline} onOpenStorm={() => openStorm(active.id)} onOpenRoute={(routeId) => openRoute(active.id, routeId)} />
+            <ActiveStormCard storm={active} headline={headline} />
+            <CrewsSection storm={active} headline={headline} onOpenStorm={() => openStorm(active.id)} />
           </>
         ) : (
           <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }]}>
@@ -167,7 +167,8 @@ export function SnowDashboardScreen() {
 }
 
 /** The whole-storm picture: name, services, status, the four numbers, one bar and a sentence. */
-function ActiveStormCard({ storm, headline, onOpen }: { storm: StormOverview; headline: StormHeadline; onOpen: () => void }) {
+/** Read-only: the dashboard has one way into the storm ("View all" under Crews), so the card itself doesn't navigate. */
+function ActiveStormCard({ storm, headline }: { storm: StormOverview; headline: StormHeadline }) {
   const { colors } = useTheme();
   const services = servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x]);
   const crews = `${headline.routeCount} ${headline.routeCount === 1 ? 'Crew' : 'Crews'}`;
@@ -180,12 +181,7 @@ function ActiveStormCard({ storm, headline, onOpen }: { storm: StormOverview; he
   ];
   return (
     <View style={[styles.heroCard, { backgroundColor: colors.surface }]}>
-      <Pressable
-        onPress={onOpen}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${storm.name}`}
-        style={[styles.heroBand, { backgroundColor: colors.primaryDark }]}
-      >
+      <View style={[styles.heroBand, { backgroundColor: colors.primaryDark }]}>
         <View style={{ flex: 1 }}>
           <Text style={[typeScale.headingLarge, { color: '#FFFFFF' }]} numberOfLines={2}>{storm.name}</Text>
           <Text style={[typeScale.bodyMedium, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]} numberOfLines={1}>
@@ -194,7 +190,7 @@ function ActiveStormCard({ storm, headline, onOpen }: { storm: StormOverview; he
           </Text>
         </View>
         <Pill label={headline.stateLabel} tone={stateTone} onDark />
-      </Pressable>
+      </View>
       <View style={styles.heroBody}>
         <View style={styles.statRow}>
           {stats.map((s) => (
@@ -217,8 +213,8 @@ function ActiveStormCard({ storm, headline, onOpen }: { storm: StormOverview; he
   );
 }
 
-function CrewsSection({ storm, headline, onOpenStorm, onOpenRoute }: {
-  storm: StormOverview; headline: StormHeadline; onOpenStorm: () => void; onOpenRoute: (routeId: string) => void;
+function CrewsSection({ storm, headline, onOpenStorm }: {
+  storm: StormOverview; headline: StormHeadline; onOpenStorm: () => void;
 }) {
   const { colors } = useTheme();
   const rows = crewRows(storm);
@@ -243,10 +239,10 @@ function CrewsSection({ storm, headline, onOpenStorm, onOpenRoute }: {
       ) : (
         <>
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-            View each crew's progress and open their routes.
+            Each crew's progress. Tap View all to open the routes.
           </Text>
           <View style={{ gap: spacing.sm }}>
-            {rows.map((r) => <CrewRowView key={r.id} row={r} onPress={() => onOpenRoute(r.id)} />)}
+            {rows.map((r) => <CrewRowView key={r.id} row={r} />)}
           </View>
           {headline.cancelledRoutes > 0 ? (
             <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs, marginLeft: spacing.sm }]}>
@@ -259,16 +255,16 @@ function CrewsSection({ storm, headline, onOpenStorm, onOpenRoute }: {
   );
 }
 
-function CrewRowView({ row, onPress }: { row: CrewRow; onPress: () => void }) {
+/** Read-only progress for one crew; the way in is "View all" in the Crews header. */
+function CrewRowView({ row }: { row: CrewRow }) {
   const { colors } = useTheme();
   const tone = STATUS_TONE[row.status];
   const count = row.total ? `${row.completed} / ${row.total}` : '0 stops';
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${row.name}. ${row.leadLabel}. ${row.completed} of ${row.total} stops, ${row.percent} percent. ${row.statusLabel}`}
-      style={({ pressed }) => [styles.crewRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }, pressed && { opacity: 0.7 }]}
+    <View
+      accessible
+      accessibilityLabel={`${row.name}. ${row.leadLabel}. ${row.completed} of ${row.total} stops, ${row.percent} percent. ${row.statusLabel}`}
+      style={[styles.crewRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
     >
       <View style={[styles.avatar, { backgroundColor: colors.primarySurface }]}>
         <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{row.initials}</Text>
@@ -287,8 +283,7 @@ function CrewRowView({ row, onPress }: { row: CrewRow; onPress: () => void }) {
           <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{row.skipped} skipped</Text>
         ) : null}
       </View>
-      <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-    </Pressable>
+    </View>
   );
 }
 

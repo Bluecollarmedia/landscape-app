@@ -13,7 +13,7 @@
  * enforced by the database; these screens just call it and show the result.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Keyboard } from 'react-native';
 import { Button, InlineNotice, Input } from '@/components/ui';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -44,6 +44,7 @@ export function LeadSkipPanel({ visitId, disabled, onChanged }: { visitId: strin
     const res = await requestSkip(visitId, reason);
     setBusy(false);
     if (!res.ok) return showMessage('Couldn\'t send the request', res.error);
+    Keyboard.dismiss();
     setAsking(false);
     setReason('');
     await refresh();

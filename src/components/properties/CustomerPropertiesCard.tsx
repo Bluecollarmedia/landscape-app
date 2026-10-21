@@ -3,7 +3,7 @@
  * here (or from any form); it is then available everywhere, including Snow. Nothing about the customer is typed again.
  */
 import React, { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Keyboard } from 'react-native';
 import { Button, Icon, Input } from '@/components/ui';
 import { showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -32,6 +32,7 @@ export function CustomerPropertiesCard({ customerId, firstName }: { customerId: 
     if (!res.ok) return showMessage("Couldn't add the property", res.missing ? 'This needs the latest database update (79).' : res.error);
     if (!res.created) showMessage('Already saved', `${firstName} already has a property at that address, so it was not added twice.`);
     setForm(EMPTY);
+    Keyboard.dismiss();
     setAdding(false);
   }
 

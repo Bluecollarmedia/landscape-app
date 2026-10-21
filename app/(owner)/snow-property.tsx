@@ -6,7 +6,7 @@
  * it. Everything here saves to the live database (supabase/updates/022).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Alert, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Alert, Platform, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -254,6 +254,8 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
   const versions = details.instructions.filter((i) => i.propertyServiceId === ps.id);
   const [text, setText] = useState(current.instructions?.body ?? '');
   const [saving, setSaving] = useState(false);
+  // Saved instructions show as a short read-only summary; the text box only opens while you are writing.
+  const [editing, setEditing] = useState(false);
   const [uploading, setUploading] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
@@ -274,7 +276,16 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
     setSaving(false);
     if (!res.ok) return notify('Not Saved', res.error);
     haptics.success();
+    // Saved: put the keyboard away and fold the editor back up.
+    Keyboard.dismiss();
+    setEditing(false);
     onChanged();
+  }
+
+  function cancelEdit() {
+    Keyboard.dismiss();
+    setText(current.instructions?.body ?? '');
+    setEditing(false);
   }
 
   async function add() {
@@ -307,24 +318,43 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
   return (
     <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
       <Text style={[typeScale.labelSmall, { color: colors.textSecondary }]}>Instructions</Text>
-      <TextInput
-        value={text}
-        onChangeText={setText}
-        placeholder="Where to push snow, what to avoid, gates, ramps, drains…"
-        placeholderTextColor={colors.textTertiary}
-        multiline
-        textAlignVertical="top"
-        accessibilityLabel={`${SNOW_SERVICE_LABELS[ps.service]} instructions`}
-        style={[styles.instructions, typeScale.bodyLarge, { color: colors.textPrimary, backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-      />
-      <View style={styles.versionRow}>
-        <Text style={[typeScale.caption, { color: colors.textTertiary, flex: 1 }]}>
-          {current.instructions
-            ? `Version ${current.instructions.version}, saved ${formatDate(current.instructions.createdAt)}`
-            : 'Not saved yet'}
+      {editing ? (
+        <>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Where to push snow, what to avoid, gates, ramps, drains…"
+            placeholderTextColor={colors.textTertiary}
+            multiline
+            autoFocus
+            textAlignVertical="top"
+            accessibilityLabel={`${SNOW_SERVICE_LABELS[ps.service]} instructions`}
+            style={[styles.instructions, typeScale.bodyLarge, { color: colors.textPrimary, backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+          />
+          <View style={styles.versionRow}>
+            <View style={{ flex: 1 }} />
+            <Button title="Cancel" variant="ghost" size="sm" onPress={cancelEdit} />
+            <Button title="Save" size="sm" loading={saving} disabled={!changed} onPress={save} />
+          </View>
+        </>
+      ) : (
+        <Pressable
+          onPress={() => setEditing(true)}
+          style={[styles.summary, { backgroundColor: colors.backgroundSecondary }]}
+          accessibilityRole="button"
+          accessibilityLabel={current.instructions?.body ? `Edit ${SNOW_SERVICE_LABELS[ps.service]} instructions` : `Add ${SNOW_SERVICE_LABELS[ps.service]} instructions`}
+        >
+          <Text style={[typeScale.bodyLarge, { color: current.instructions?.body ? colors.textPrimary : colors.textTertiary, flex: 1 }]} numberOfLines={3}>
+            {current.instructions?.body || 'Add instructions: where to push snow, what to avoid, gates, drains…'}
+          </Text>
+          <Icon name={current.instructions?.body ? 'edit-2' : 'plus'} size={16} color={colors.textTertiary} />
+        </Pressable>
+      )}
+      {!editing && current.instructions ? (
+        <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+          Version {current.instructions.version}, saved {formatDate(current.instructions.createdAt)}
         </Text>
-        <Button title="Save" size="sm" loading={saving} disabled={!changed} onPress={save} />
-      </View>
+      ) : null}
       {versions.length > 1 && (
         <Pressable onPress={() => setShowHistory((s) => !s)} accessibilityRole="button" style={styles.historyToggle}>
           <Icon name={showHistory ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
@@ -371,6 +401,7 @@ const styles = StyleSheet.create({
   serviceHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
   instructions: { minHeight: 110, borderWidth: 1.5, borderRadius: radius.lg, padding: spacing.md },
   versionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, minHeight: 52 },
   historyToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs, minHeight: 36 },
   oldVersion: { borderRadius: radius.md, padding: spacing.md, gap: 2 },
 });

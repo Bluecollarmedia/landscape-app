@@ -4,7 +4,7 @@
  * stay out of Snow. Nothing about the customer or the address is ever typed a second time. Then pick plowing, shoveling or salting.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Keyboard } from 'react-native';
 import { Button, Icon, Input } from '@/components/ui';
 import { CustomerPicker } from '@/components/customers/CustomerPicker';
 import { showMessage } from '@/components/financials/ActionSheet';
@@ -50,6 +50,7 @@ export function AddSnowProperty({ onCancel, onDone, snowPropertyIds = [] }: { on
     const res = await enableSnowForProperty(pid);
     setSaving(false);
     if (!res.ok) return showMessage("Couldn't turn Snow on", res.error);
+    Keyboard.dismiss();
     setForm(EMPTY);
     onDone(res.snowPropertyId);
   }

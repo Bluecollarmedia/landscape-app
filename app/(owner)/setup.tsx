@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert, Keyboard } from 'react-native';
 import { Switch } from '@/components/ui/Switch';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
@@ -286,7 +286,7 @@ function PayRatesStep({ onGoToWorkers }: { onGoToWorkers: () => void }) {
               size="sm"
               variant={changed ? 'primary' : 'ghost'}
               disabled={!changed}
-              onPress={() => setHourlyRate(w.personId, parsed)}
+              onPress={() => { Keyboard.dismiss(); setHourlyRate(w.personId, parsed); }}
             />
           </View>
         );

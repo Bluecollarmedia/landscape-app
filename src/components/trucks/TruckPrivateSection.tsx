@@ -4,7 +4,7 @@
  * anyone else either (supabase/updates/056).
  */
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Linking, Alert, Platform, TextInput } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Linking, Alert, Platform, TextInput, Keyboard } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { Button, Card } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -44,6 +44,7 @@ export function TruckPrivateSection({ truckId }: { truckId: string }) {
     if (!r.ok) { setNoteError(r.error); return; }
     setDraft('');
     setNoteError(null);
+    Keyboard.dismiss();
   }
 
   return (
@@ -107,7 +108,7 @@ export function TruckPrivateSection({ truckId }: { truckId: string }) {
                 <TextInput value={editText} onChangeText={(t) => setEditText(t.slice(0, NOTE_MAX))} multiline autoFocus style={[typeScale.bodyLarge, styles.noteInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]} />
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   <Button title="Cancel" variant="ghost" onPress={() => setEditing(null)} style={{ flex: 1 }} />
-                  <Button title="Save" onPress={() => { const r = updateTruckNote(n.id, editText); if (r.ok) setEditing(null); else setNoteError(r.error); }} style={{ flex: 1 }} />
+                  <Button title="Save" onPress={() => { const r = updateTruckNote(n.id, editText); if (r.ok) { Keyboard.dismiss(); setEditing(null); } else setNoteError(r.error); }} style={{ flex: 1 }} />
                 </View>
               </View>
             ) : (

@@ -6,7 +6,7 @@
  */
 import { crewAfterLeadChange, crewChoices, nextCrew, routeTeam, type TeamMember } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, PressableScale, ScreenHeader, StatusBadge, Switch } from '@/components/ui';
@@ -243,6 +243,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive, refre
 
   async function saveStop() {
     if (!detailStop || !route) return;
+    Keyboard.dismiss();
     setBusy(true);
     let failure: string | null = null;
     for (const [i, v] of detailStop.entries()) {
@@ -547,7 +548,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive, refre
               <Input label="Route name" value={renameText} onChangeText={setRenameText} autoFocus />
               <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
                 <Button title="Cancel" variant="ghost" onPress={() => setRenaming(false)} />
-                <Button title="Save" icon="check" disabled={!renameText.trim()} onPress={() => { setRenaming(false); if (renameText.trim() && renameText.trim() !== route.name) save({ name: renameText }); }} />
+                <Button title="Save" icon="check" disabled={!renameText.trim()} onPress={() => { Keyboard.dismiss(); setRenaming(false); if (renameText.trim() && renameText.trim() !== route.name) save({ name: renameText }); }} />
               </View>
             </View>
           </KeyboardAvoidingView>

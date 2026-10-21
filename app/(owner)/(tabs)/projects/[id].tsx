@@ -1,7 +1,7 @@
 import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { IssuesSection } from '@/components/issues/IssuesSection';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking, Keyboard } from 'react-native';
 import { Switch } from '@/components/ui/Switch';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
@@ -322,6 +322,7 @@ export default function ProjectDetailScreen() {
 
   function handleSaveNotes() {
     updateProject({ notes: notesDraft.trim() || undefined });
+    Keyboard.dismiss();
     setEditingNotes(false);
   }
 
@@ -1515,6 +1516,7 @@ export default function ProjectDetailScreen() {
   function handleSaveCustomerDesc() {
     if (!reviewPhoto) return;
     updatePhoto(reviewPhoto.id, { customerDescription: customerDesc });
+    Keyboard.dismiss();
     setEditingCustomerDesc(false);
   }
 
@@ -1693,6 +1695,7 @@ export default function ProjectDetailScreen() {
 
   function handlePostUpdate() {
     if (!updateTitle.trim()) return;
+    Keyboard.dismiss();
     postUpdate({ title: updateTitle.trim(), body: updateBody.trim(), isCustomerVisible: updateVisible });
     setUpdateTitle('');
     setUpdateBody('');
@@ -1951,7 +1954,7 @@ export default function ProjectDetailScreen() {
                         autoFocus
                       />
                       <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm }}>
-                        <Button title="Save" onPress={() => { editRequestResponse(req.id, responseDraft); setEditingResponseFor(null); }} size="sm" icon="check" style={{ flex: 1 }} />
+                        <Button title="Save" onPress={() => { Keyboard.dismiss(); editRequestResponse(req.id, responseDraft); setEditingResponseFor(null); }} size="sm" icon="check" style={{ flex: 1 }} />
                         <Button title="Cancel" onPress={() => setEditingResponseFor(null)} variant="secondary" size="sm" style={{ flex: 1 }} />
                       </View>
                     </View>

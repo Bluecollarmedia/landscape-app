@@ -30,9 +30,9 @@ function RootNavigator() {
   const segments = useSegments();
   const router = useRouter();
   const [splashDone, setSplashDone] = useState(false);
-  // The approval page (/approve/<token>), the invite page (/invite/<token>), the legal pages (/legal/privacy, terms, support) and the password reset page are public:
+  // The approval page (/approve/<token>), the invite page (/invite/<token>), the legal pages (/legal/privacy, terms, support) the password reset page and the email-link landing page (auth-callback) are public:
   // no sign-in, no redirects.
-  const isPublicPage = ['approve', 'invite', 'legal', 'reset-password'].includes((segments as string[])[0]);
+  const isPublicPage = ['approve', 'invite', 'legal', 'reset-password', 'auth-callback'].includes((segments as string[])[0]);
   const { shell } = useModeAccess(user?.role);
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);

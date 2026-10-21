@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Button, Input } from '@/components/ui';
@@ -21,6 +22,7 @@ type Phase = 'checking' | 'ready' | 'expired' | 'done';
 export default function ResetPasswordScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>('checking');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -88,9 +90,12 @@ export default function ResetPasswordScreen() {
           <View style={[styles.notice, { backgroundColor: colors.primarySurface, marginTop: spacing.lg }]}>
             <Icon name="check-circle" size={18} color={colors.primary} />
             <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm }]}>
-              Your password was changed. Open the {BUSINESS.appName} app and sign in with your new password.
+              {Platform.OS === 'web' ? `Your password was changed. Open the ${BUSINESS.appName} app and sign in with your new password.` : 'Your password was changed. Sign in with your new password.'}
             </Text>
           </View>
+        ) : null}
+        {phase === 'done' && Platform.OS !== 'web' ? (
+          <Button title="Go to Sign In" onPress={() => router.replace('/')} fullWidth size="lg" style={{ marginTop: spacing.lg }} />
         ) : null}
       </ScrollView>
     </View>

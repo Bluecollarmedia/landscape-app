@@ -15,6 +15,8 @@
  */
 
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useCallback, useRef } from 'react';
+import { Platform } from 'react-native';
+import { AUTH_CALLBACK_URL } from '@/lib/authLink';
 import { properName } from '@/lib/names';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { startSession, endSession, startDemoSession, updateRow } from '@/data/store';
@@ -400,7 +402,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       if (intent?.inviteToken) metadata.invite_token = intent.inviteToken;
 
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: metadata } });
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: metadata, ...(Platform.OS !== 'web' ? { emailRedirectTo: AUTH_CALLBACK_URL } : {}) } });
       if (error) throw error;
       if (!data.user) throw new Error('Sign up failed');
       // Supabase hides "already registered" behind a fake user with no identities.

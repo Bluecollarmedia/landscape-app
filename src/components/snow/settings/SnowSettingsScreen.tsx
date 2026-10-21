@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassIconButton, InlineNotice, Switch } from '@/components/ui';
 import { SettingsGroup, SettingsRow } from '@/components/settings/SettingsList';
 import { ModeSwitchRow } from '@/components/snow/ModeSwitchRow';
-import { OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
+import { OwnerCustomerMessages, OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { db, useDb } from '@/data/store';
@@ -101,12 +101,17 @@ export function SnowSettingsScreen() {
             <OwnerStopAlertsToggle companyId={companyId} />
           </SettingsGroup>
         ) : null}
+        {companyId ? (
+          <SettingsGroup title="Customer messages" footer="You decide when customers are messaged. It applies to every Snow property.">
+            <OwnerCustomerMessages />
+          </SettingsGroup>
+        ) : null}
 
-        <SettingsGroup title="Team and access" footer="Give existing workers snow access, approve new ones, and share the Snow signup code.">
-          <SettingsRow icon="users" title="Snow team" subtitle="Members, requests and the signup code" onPress={() => router.push('/snow/owner/team-list' as any)} />
+        <SettingsGroup title="Team and access" footer="Every worker is listed. Choose what each one works in snow, or add a new worker with a private link.">
+          <SettingsRow icon="users" title="Snow team" subtitle="Every worker and their snow services" onPress={() => router.push('/snow/owner/team-list' as any)} />
         </SettingsGroup>
 
-        <SettingsGroup title="Customers and properties" footer="Add an existing customer's property from Properties → From a customer. Customers see snow updates only for properties linked to them.">
+        <SettingsGroup title="Customers and properties" footer="Add a property, or import one of a customer's existing properties. Customers see snow updates only for properties linked to them.">
           <SettingsRow icon="home" title="Properties" subtitle="Services, contacts and instructions" onPress={() => router.push('/snow/owner/properties-list' as any)} />
           <SettingsRow icon="camera" title="Customer photo updates" subtitle="Approve photos before customers see them" onPress={() => router.push('/snow/owner/review')} />
         </SettingsGroup>

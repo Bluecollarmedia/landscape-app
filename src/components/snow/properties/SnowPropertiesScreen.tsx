@@ -22,10 +22,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
 interface Row {
-  /** The Snow record's id, or the shared property's id when Snow is not on for it yet. */
   id: string;
-  /** Set when this row is a shared property that has no Snow record yet. */
-  propertyOnly?: boolean;
   propertyId?: string;
   customer?: string;
   name: string; address: string; street: string; zip?: string; status: 'active' | 'inactive'; services: SnowService[];

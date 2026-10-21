@@ -23,7 +23,7 @@ check('5 the guards run only for changes made from the app (the database functio
 check('6 a deactivated customer is blocked in all four customer-access functions', (s75.match(/_customer_in_good_standing\(/g) || []).length >= 5);
 check('7 a project-code claim merges the owner-created record', /_merge_placeholder_customer\(pr\.company_id, pr\.old_customer, pid\)/.test(s75));
 check('8 choosing a different customer in the maintenance form clears the old project link', /if \(id !== customerId\) \{ setSourceProjectId\(undefined\); setLinkedPropertyId\(undefined\); \}/.test(edit));
-check('9 the document email goes to the customer the document was made for', /doc\.customer_id \?\? project\?\.customer_id/.test(email) && /project_id, company_id, customer_id/.test(email));
+check('9 the document email goes to the customer the document was made for', /doc\.customer_id \?\? project\?\.customer_id/.test(email) && /project_id, company_id, status, customer_id/.test(email));
 check('10 the rules are written down for the owner', fs.existsSync(path.join(__dirname, '..', '..', 'docs', 'customers-and-properties.md')));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

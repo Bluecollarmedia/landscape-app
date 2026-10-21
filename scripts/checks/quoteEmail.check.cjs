@@ -31,8 +31,21 @@ check('5 errors are explained in plain words (not set up, no address, function m
 
 const doc = read('app/(owner)/document.tsx');
 check('6 the Send menu offers Email to Customer first, then Text Approval Link, and asks for an address when none is on file',
-  doc.indexOf("label: 'Email to Customer'") > 0 && doc.indexOf("label: 'Email to Customer'") < doc.indexOf("label: 'Text Approval Link'") && /menu === 'email'/.test(doc) && /recipientFor\(doc\.customer\?\.email, typed\)/.test(doc));
+  doc.indexOf("label: 'Email to Customer'") > 0 && doc.indexOf("label: 'Email to Customer'") < doc.indexOf("'Text Approval Link'") && /menu === 'email'/.test(doc) && /recipientFor\(doc\.customer\?\.email, typed\)/.test(doc));
 check('7 an email is only sent after the owner confirms, and the result is shown', /confirmAction\(\s*`Email \$\{label\.toLowerCase\(\)\} \$\{doc\.number\}\?`/.test(doc) && /Email sent/.test(doc));
+
+const inv = email.buildDocumentEmailMessage({ customerName: 'David Cohen', kind: 'invoice', totalText: '$250.00', dateText: 'October 21, 2026', contactEmail: 'info@brightonlawn.com', company: 'Brighton Lawn + Landscape', dueText: 'November 4, 2026' });
+check('9 an invoice email says invoice, the total and the due date, and the same words live in the server function',
+  inv.body === 'Here is your invoice. The invoice total is $250.00 as of October 21, 2026. Payment is due by November 4, 2026.'
+  && inv.button === 'View invoice'
+  && fn.includes('Here is your invoice. The invoice total is ${o.totalText} as of ${o.dateText}.')
+  && /'invoice' \? 'invoices'/.test(fn));
+check('10 invoices are no longer refused by the app, the link works for them, and the invoice send menu says Invoice Link',
+  !/Invoices are not emailed from here yet/.test(read('src/data/financials.ts'))
+  && !/doc\.kind === 'invoice' \|\| doc\.status === 'draft'/.test(read('src/data/financials.ts'))
+  && /'Text Invoice Link'/.test(doc) && /doc\.status === 'issued'/.test(doc));
+check('11 the database update gives invoices a token and the public page shows them read-only (test 081 proves the behavior)',
+  fs.existsSync(path.join(__dirname, '../../supabase/updates/081_invoice_links.sql')) && fs.existsSync(path.join(__dirname, '../../supabase/tests/081_invoice_links.pglite.mjs')));
 
 const strokes = [[{ x: 1, y: 2 }, { x: 3.14, y: 4 }, { x: 5, y: 6 }, { x: 7, y: 8 }, { x: 9, y: 10 }], [{ x: 20, y: 20 }, { x: 25, y: 22 }, { x: 30, y: 21 }, { x: 35, y: 25 }]];
 const path1 = sig.strokesToPath(strokes);

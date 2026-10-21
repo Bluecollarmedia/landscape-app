@@ -89,7 +89,7 @@ export default function DocumentScreen() {
 
   // Quotes and change orders can go out as a link the customer approves in
   // their browser; invoices (and every document, as a fallback) as a PDF.
-  const linkable = approvalLinksEnabled && doc.kind !== 'invoice';
+  const linkable = approvalLinksEnabled;
 
   const withLink = async (use: (link: string) => void) => {
     const fresh = getDoc(doc.kind, doc.id) ?? doc;
@@ -114,7 +114,9 @@ export default function DocumentScreen() {
     if (!to) { setEmailText(typed ?? ''); setMenu('email'); return; }
     confirmAction(
       `Email ${label.toLowerCase()} ${doc.number}?`,
-      `${to} gets a short message with a View ${label.toLowerCase()} button. They can approve it, request changes, or download the PDF from there.`,
+      doc.kind === 'invoice'
+        ? `${to} gets a short message with a View invoice button. They can read it and download the PDF from there.`
+        : `${to} gets a short message with a View ${label.toLowerCase()} button. They can approve it, request changes, or download the PDF from there.`,
       'Send Email',
       async () => {
         setEmailing(true);
@@ -164,7 +166,7 @@ export default function DocumentScreen() {
     if (copy) router.replace({ pathname: '/(owner)/document-edit', params: { kind: copy.kind, id: copy.id } } as any);
   };
 
-  const canSendLink = linkable && doc.status === 'sent' && status !== 'expired';
+  const canSendLink = linkable && (doc.kind === 'invoice' ? doc.status === 'issued' : doc.status === 'sent') && status !== 'expired';
   // An approved quote on a Prospect: make it the real project (same record).
   const canStart = doc.kind === 'quote' && doc.status === 'approved' && canStartProject(doc.projectId);
   const startProject = () => confirmAction(
@@ -177,13 +179,13 @@ export default function DocumentScreen() {
 
   const sendActions: SheetAction[] = [
     { key: 'email', label: 'Email to Customer', icon: 'mail', onPress: () => emailCustomer() },
-    { key: 'link', label: 'Text Approval Link', icon: 'message-square', onPress: sendLink },
-    { key: 'copy', label: 'Copy Approval Link', icon: 'link', onPress: copyLink },
+    { key: 'link', label: doc.kind === 'invoice' ? 'Text Invoice Link' : 'Text Approval Link', icon: 'message-square', onPress: sendLink },
+    { key: 'copy', label: doc.kind === 'invoice' ? 'Copy Invoice Link' : 'Copy Approval Link', icon: 'link', onPress: copyLink },
     { key: 'pdf', label: 'Share PDF', icon: 'share-2', onPress: shareTapped },
   ];
 
   const moreActions: SheetAction[] = [
-    ...(canSendLink ? [{ key: 'link', label: 'Send Approval Link', icon: 'send' as const, onPress: () => setMenu('send') }] : []),
+    ...(canSendLink ? [{ key: 'link', label: doc.kind === 'invoice' ? 'Send Invoice Link' : 'Send Approval Link', icon: 'send' as const, onPress: () => setMenu('send') }] : []),
     { key: 'pdf', label: isDraft ? 'Share Draft PDF' : 'Share PDF', icon: 'share-2', onPress: shareTapped },
     ...(canStart ? [{ key: 'start', label: 'Start Project', icon: 'play-circle' as const, onPress: startProject }] : []),
     ...(doc.kind === 'quote' && doc.status === 'approved'
@@ -302,7 +304,9 @@ export default function DocumentScreen() {
       <ActionSheet
         visible={menu === 'send'}
         title={`Send ${label.toLowerCase()} ${doc.number}`}
-        message="Email sends them a short message with a View button. The link opens the document in any browser, where they can approve, request changes, or download the PDF, and you're notified right away."
+        message={doc.kind === 'invoice'
+          ? 'Email sends them a short message with a View button. The link opens the invoice in any browser, where they can read it and download the PDF.'
+          : "Email sends them a short message with a View button. The link opens the document in any browser, where they can approve, request changes, or download the PDF, and you're notified right away."}
         actions={sendActions}
         onClose={() => setMenu(null)}
       />

@@ -1,14 +1,16 @@
-// Emailing a sent quote or change order to the customer. Pure helpers: the wording the customer reads (kept the same as
+// Emailing a sent quote, change order or issued invoice to the customer. Pure helpers: the wording the customer reads (kept the same as
 // supabase/functions/send-document-email), who it goes to, and what to tell the owner when it can't be sent.
 
-export interface EmailWords { customerName: string; kind: 'quote' | 'change_order'; totalText: string; dateText: string; contactEmail: string; company: string }
+export interface EmailWords { customerName: string; kind: 'quote' | 'change_order' | 'invoice'; totalText: string; dateText: string; contactEmail: string; company: string; dueText?: string }
 
 export function buildDocumentEmailMessage(o: EmailWords) {
-  const what = o.kind === 'quote' ? 'quote' : 'change order';
+  const what = o.kind === 'quote' ? 'quote' : o.kind === 'invoice' ? 'invoice' : 'change order';
   const hello = o.customerName ? `Hi ${o.customerName},` : 'Hello,';
   const body = o.kind === 'quote'
     ? `Thank you for asking us to quote your project. The quote total is ${o.totalText} as of ${o.dateText}.`
-    : `Here is the change order for your project. The change order total is ${o.totalText} as of ${o.dateText}.`;
+    : o.kind === 'invoice'
+      ? `Here is your invoice. The invoice total is ${o.totalText} as of ${o.dateText}.${o.dueText ? ` Payment is due by ${o.dueText}.` : ''}`
+      : `Here is the change order for your project. The change order total is ${o.totalText} as of ${o.dateText}.`;
   const closing = `If you have any questions or concerns regarding this ${what}, please don't hesitate to get in touch with ${o.contactEmail}.`;
   return { what, hello, body, closing, sign: `Sincerely,\n${o.company}`, button: `View ${what}` };
 }
@@ -26,10 +28,11 @@ export const EMAIL_ERRORS: Record<string, string> = {
   email_not_configured: "Email sending isn't set up on the server yet (the Resend key is missing). Use Text Approval Link for now.",
   no_email: 'There is no email address for this customer. Type one to send it.',
   bad_email: "That doesn't look like an email address.",
-  not_sent_yet: 'Mark it as sent first. Drafts are never emailed.',
+  not_sent_yet: 'Mark it as sent (or issue the invoice) first. Drafts are never emailed.',
   not_allowed: 'Only the owner or an admin can email a quote.',
   sign_in_required: 'Please sign in again, then try once more.',
   not_found: "That document couldn't be found.",
+  bad_request: 'The email service needs its update. Deploy send-document-email again (with database update 81 for invoices).',
   send_failed: "The email service didn't accept it. Check the sender setup in Resend, then try again.",
 };
 

@@ -1,8 +1,9 @@
 /**
  * Edge Function: send-document-email
  *
- * The owner taps "Email to customer" on a sent quote or change order. This emails the customer a short message with a
- * "View quote" button that opens the private approval page (…/approve/<token>). Nothing is emailed for a draft.
+ * The owner taps "Email to customer" on a sent quote, change order or issued invoice (update 81). This emails the customer
+ * a short message with a "View quote" / "View invoice" button that opens the private page (…/approve/<token>). Nothing is
+ * emailed for a draft.
  *
  * Who may call it: a signed-in owner or admin of the document's company. The recipient is the project's customer, or an
  * address the owner typed (`email`) when the customer has none on file.
@@ -34,12 +35,14 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const looksLikeEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 
 /** The email's words. Kept in one place so the app and the function say the same thing. */
-export function buildMessage(o: { customerName: string; kind: 'quote' | 'change_order'; totalText: string; dateText: string; contactEmail: string; company: string }) {
-  const what = o.kind === 'quote' ? 'quote' : 'change order';
+export function buildMessage(o: { customerName: string; kind: 'quote' | 'change_order' | 'invoice'; totalText: string; dateText: string; contactEmail: string; company: string; dueText?: string }) {
+  const what = o.kind === 'quote' ? 'quote' : o.kind === 'invoice' ? 'invoice' : 'change order';
   const hello = o.customerName ? `Hi ${o.customerName},` : 'Hello,';
   const body = o.kind === 'quote'
     ? `Thank you for asking us to quote your project. The quote total is ${o.totalText} as of ${o.dateText}.`
-    : `Here is the change order for your project. The change order total is ${o.totalText} as of ${o.dateText}.`;
+    : o.kind === 'invoice'
+      ? `Here is your invoice. The invoice total is ${o.totalText} as of ${o.dateText}.${o.dueText ? ` Payment is due by ${o.dueText}.` : ''}`
+      : `Here is the change order for your project. The change order total is ${o.totalText} as of ${o.dateText}.`;
   const closing = `If you have any questions or concerns regarding this ${what}, please don't hesitate to get in touch with ${o.contactEmail}.`;
   return { what, hello, body, closing, sign: `Sincerely,\n${o.company}` };
 }
@@ -63,13 +66,14 @@ serve(async (req: Request) => {
     if (!me) return reply({ error: 'sign_in_required' }, 401);
 
     const body = await req.json();
-    const kind = body.kind === 'change_order' ? 'change_order' : body.kind === 'quote' ? 'quote' : null;
+    const kind = ['change_order', 'quote', 'invoice'].includes(body.kind) ? (body.kind as 'change_order' | 'quote' | 'invoice') : null;
     const id = typeof body.id === 'string' && /^[0-9a-f-]{36}$/i.test(body.id) ? body.id : null;
     if (!kind || !id) return reply({ error: 'bad_request' }, 400);
 
+    const table = kind === 'quote' ? 'quotes' : kind === 'invoice' ? 'invoices' : 'change_orders';
     const { data: doc } = await db
-      .from(kind === 'quote' ? 'quotes' : 'change_orders')
-      .select('id, number, total, share_token, project_id, company_id, customer_id, status, sent_at')
+      .from(table)
+      .select(`id, number, total, share_token, project_id, company_id, status, customer_id${kind === 'invoice' ? ', issued_at, due_date' : ', sent_at'}`)
       .eq('id', id).maybeSingle();
     if (!doc) return reply({ error: 'not_found' }, 404);
 
@@ -78,12 +82,13 @@ serve(async (req: Request) => {
       .eq('company_id', doc.company_id).eq('person_id', me.id).eq('status', 'active').maybeSingle();
     if (!member || !['owner', 'admin'].includes(member.role)) return reply({ error: 'not_allowed' }, 403);
     if (doc.status === 'draft' || !doc.share_token) return reply({ error: 'not_sent_yet' }, 409);
+    if (kind === 'invoice' && doc.status === 'void') return reply({ error: 'not_sent_yet' }, 409);
 
     const [{ data: project }, { data: company }] = await Promise.all([
       db.from('projects').select('name, customer_id').eq('id', doc.project_id).maybeSingle(),
       db.from('companies').select('name, email').eq('id', doc.company_id).maybeSingle(),
     ]);
-    // The customer the DOCUMENT was made for (what the customer sees in it), not whoever the project points at now.
+    // The customer the DOCUMENT was made for (what the customer sees in it; an invoice can bill someone other than the project's customer), not whoever the project points at now.
     const customerId = doc.customer_id ?? project?.customer_id;
     const { data: customer } = customerId
       ? await db.from('people').select('email, first_name, last_name').eq('id', customerId).maybeSingle()
@@ -99,9 +104,12 @@ serve(async (req: Request) => {
     const companyName = company?.name ?? 'Brighton Lawn + Landscape';
     const contact = company?.email || 'info@brightonlawn.com';
     const total = Number(doc.total).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-    const date = new Date(doc.sent_at ?? Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
+    const date = new Date(doc.sent_at ?? doc.issued_at ?? Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
+    const dueText = kind === 'invoice' && doc.due_date
+      ? new Date(`${doc.due_date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' })
+      : undefined;
     const customerName = typed && !customer?.email ? '' : [customer?.first_name, customer?.last_name].filter(Boolean).join(' ').trim();
-    const m = buildMessage({ customerName, kind, totalText: total, dateText: date, contactEmail: contact, company: companyName });
+    const m = buildMessage({ customerName, kind, totalText: total, dateText: date, contactEmail: contact, company: companyName, dueText });
 
     const html = `
 <div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1B3A2D;max-width:520px;line-height:1.55">

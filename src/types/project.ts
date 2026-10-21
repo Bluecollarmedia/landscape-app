@@ -27,6 +27,8 @@ export interface Project {
   id: string;
   companyId: string;
   customerId?: string;
+  /** The property (supabase/updates/075 and 79) this job is at; its address is kept in step with it. */
+  propertyId?: string;
   name: string;
   /** The one worker who can start/complete this job's tasks (update 016). */
   taskLeadId?: string;

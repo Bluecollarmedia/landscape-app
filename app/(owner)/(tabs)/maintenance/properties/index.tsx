@@ -15,6 +15,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useMaintenance, activeContractOf } from '@/hooks/useMaintenance';
 import { db } from '@/data/store';
+import { customerNameOf, enableMaintenanceForProperty, useAllProperties } from '@/data/properties';
 import { propertyDue, compareUrgency } from '@/lib/maintenanceSchedule';
 import { todayKey } from '@/lib/ids';
 import type { PropertyDueInfo } from '@/types/maintenance';
@@ -66,6 +67,22 @@ export default function MaintenancePropertiesScreen() {
 
   const add = () => router.push('/(owner)/maintenance-property-edit' as any);
 
+  // Every property in the system is here. The ones Maintenance is not on for yet are listed below; one tap turns it on.
+  const allProperties = useAllProperties();
+  const onMaintenance = new Set(m.properties.map((p) => p.propertyId).filter(Boolean));
+  const notYet = allProperties
+    .filter((p) => !onMaintenance.has(p.id))
+    .filter((p) => {
+      const q = search.trim().toLowerCase();
+      return !q || [p.name, p.address, p.city, customerNameOf(p.customerId)].some((x) => (x ?? '').toLowerCase().includes(q));
+    });
+  function turnOn(propertyId: string) {
+    const p = allProperties.find((x) => x.id === propertyId);
+    if (!p) return;
+    const id = enableMaintenanceForProperty(p);
+    router.push({ pathname: '/(owner)/maintenance-property-edit', params: { id } } as any);
+  }
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader
@@ -106,6 +123,32 @@ export default function MaintenancePropertiesScreen() {
             description={search ? 'Try a different name or address.' : undefined}
           />
         ) : shown.map((r) => <PropertyCard key={r.property.id} row={r} today={today} />)}
+
+        {notYet.length > 0 ? (
+          <View style={{ gap: spacing.sm }}>
+            <Text style={[typeScale.overline, { color: colors.textSecondary, marginTop: spacing.md }]}>NOT ON MAINTENANCE YET</Text>
+            {notYet.map((p) => (
+              <Pressable
+                key={p.id}
+                onPress={() => turnOn(p.id)}
+                style={({ pressed }) => [styles.card, styles.head, { backgroundColor: pressed ? colors.backgroundSecondary : colors.surface }, shadow.sm]}
+                accessibilityRole="button"
+                accessibilityLabel={`Turn Maintenance on for ${p.name || p.address}`}
+              >
+                <View style={[styles.iconWrap, { backgroundColor: colors.backgroundTertiary }]}>
+                  <Icon name="home" size={18} color={colors.textTertiary} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]} numberOfLines={1}>{p.name || p.address}</Text>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {[customerNameOf(p.customerId), [p.address, p.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
+                  </Text>
+                </View>
+                <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Turn on</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );

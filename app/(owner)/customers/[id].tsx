@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCustomers } from '@/hooks/useCustomers';
 import { StatusBadge, Avatar, ProgressBar, EmptyState } from '@/components/ui';
+import { CustomerPropertiesCard } from '@/components/properties/CustomerPropertiesCard';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
@@ -111,6 +112,8 @@ export default function CustomerDetailScreen() {
               </Pressable>
             </View>
           </View>
+
+          <CustomerPropertiesCard customerId={p.id} firstName={p.firstName} />
 
           {/* Projects */}
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>

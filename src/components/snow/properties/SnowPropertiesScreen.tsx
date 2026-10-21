@@ -4,8 +4,8 @@
  * reference media are edited on the property screen (update 022). Working
  * layout in the existing app style; no approved mockup yet.
  */
-import { applyStreetInput } from '@/lib/address';
-import { AddFromCustomer } from './AddFromCustomer';
+import { AddSnowProperty } from './AddSnowProperty';
+import { customerNameOf, enableSnowForProperty, useAllProperties } from '@/data/properties';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -21,9 +21,15 @@ import type { SnowService } from '@/types/snow';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
-interface Row { id: string; name: string; address: string; street: string; zip?: string; status: 'active' | 'inactive'; services: SnowService[] }
-
-const EMPTY = { name: '', address: '', city: '', state: '', zip: '' };
+interface Row {
+  /** The Snow record's id, or the shared property's id when Snow is not on for it yet. */
+  id: string;
+  /** Set when this row is a shared property that has no Snow record yet. */
+  propertyOnly?: boolean;
+  propertyId?: string;
+  customer?: string;
+  name: string; address: string; street: string; zip?: string; status: 'active' | 'inactive'; services: SnowService[];
+}
 
 /** `asTab` (default): the Properties tab. Otherwise a stand-alone screen with a Back button (opened from Snow settings). */
 export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {}) {
@@ -36,21 +42,20 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
-  const [fromCustomer, setFromCustomer] = useState(false);
-  const [form, setForm] = useState(EMPTY);
-  const [saving, setSaving] = useState(false);
+  const allProperties = useAllProperties();
 
   const reload = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return setError('Snow properties need the live database.'); }
     const { data, error: e } = await supabase
       .from('snow_properties')
-      .select('id, name, address, city, state, zip, status, snow_property_services(service, is_active)')
+      .select('id, name, address, city, state, zip, status, property_id, snow_property_services(service, is_active)')
       .order('name');
     setLoading(false);
     if (e) return setError('Couldn\'t load snow properties.');
     setError(null);
     setRows((data ?? []).map((p) => ({
       id: p.id,
+      propertyId: (p as { property_id?: string | null }).property_id ?? undefined,
       name: p.name,
       address: [p.address, p.city, p.state].filter(Boolean).join(', '),
       street: p.address,
@@ -64,35 +69,26 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
 
   const open = (id: string) => router.push({ pathname: '/snow/owner/property', params: { id } });
 
-  async function save() {
-    let companyId = db.companyId;
-    if (!companyId) {
-      const { data: m } = await supabase.from('company_members').select('company_id')
-        .in('role', ['owner', 'admin']).eq('status', 'active').limit(1).maybeSingle();
-      companyId = m?.company_id ?? undefined;
-    }
-    if (!form.name.trim() || !form.address.trim()) return showMessage('Add a name and address', 'Both are needed so the crew can find the property.');
-    if (!companyId) return showMessage('Couldn\'t add the property', 'Your company wasn\'t found. Sign out and back in.');
-    setSaving(true);
-    const { data, error: e } = await supabase.from('snow_properties').insert({
-      company_id: companyId,
-      name: form.name.trim(),
-      address: form.address.trim(),
-      city: form.city.trim() || null,
-      state: form.state.trim() || null,
-      zip: form.zip.trim() || null,
-    }).select('id').single();
-    setSaving(false);
-    if (e || !data) return showMessage('Couldn\'t add the property', e?.message ?? 'Try again.');
-    setForm(EMPTY);
-    setAdding(false);
+  /** Every property in the system is here. One that Snow is not on for yet turns Snow on when tapped (nothing is typed again). */
+  async function openRow(r: Row) {
+    if (!r.propertyOnly) return open(r.id);
+    const res = await enableSnowForProperty(r.id);
+    if (!res.ok) return showMessage("Couldn't turn Snow on", res.error);
     reload();
-    open(data.id);
+    open(res.snowPropertyId);
   }
 
+  const linked = new Set(rows.map((r) => r.propertyId).filter(Boolean));
+  const all: Row[] = [
+    ...rows.map((r) => ({ ...r, customer: customerNameOf(allProperties.find((p) => p.id === r.propertyId)?.customerId) || undefined })),
+    ...allProperties.filter((p) => !linked.has(p.id)).map((p): Row => ({
+      id: p.id, propertyOnly: true, propertyId: p.id, customer: customerNameOf(p.customerId) || undefined,
+      name: p.name || p.address, address: [p.address, p.city, p.state].filter(Boolean).join(', '), street: p.address, zip: p.zip, status: 'active', services: [],
+    })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+
   const q = query.trim().toLowerCase();
-  const shown = q ? rows.filter((r) => `${r.name} ${r.address}`.toLowerCase().includes(q)) : rows;
-  const set = (k: keyof typeof EMPTY) => (v: string) => setForm({ ...form, [k]: v });
+  const shown = q ? all.filter((r) => `${r.name} ${r.address} ${r.customer ?? ''}`.toLowerCase().includes(q)) : all;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -104,55 +100,27 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
         {asTab ? null : <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back" />}
         <View style={[styles.titleRow, !asTab && { marginTop: spacing.lg }]}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]}>Properties</Text>
-          {!adding && !fromCustomer ? <Button title="From a customer" icon="user-plus" size="sm" variant="secondary" onPress={() => setFromCustomer(true)} /> : null}
-          {!adding && !fromCustomer ? <Button title="Add" icon="plus" size="sm" onPress={() => setAdding(true)} /> : null}
+          {!adding ? <Button title="Add" icon="plus" size="sm" onPress={() => setAdding(true)} /> : null}
         </View>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
 
-        {fromCustomer ? (
-          <AddFromCustomer
-            snowProperties={rows.map((r) => ({ id: r.id, name: r.name, address: r.street, zip: r.zip }))}
-            onCancel={() => setFromCustomer(false)}
-            onDone={(id) => { setFromCustomer(false); reload(); open(id); }}
+        {adding ? (
+          <AddSnowProperty
+            onCancel={() => setAdding(false)}
+            onDone={(id) => { setAdding(false); reload(); open(id); }}
           />
         ) : null}
 
-        {adding ? (
-          <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md, gap: spacing.sm }]}>
-            <Input label="Property name" value={form.name} onChangeText={set('name')} placeholder="Oak Plaza" />
-            <Input
-              label="Street address"
-              value={form.address}
-              onChangeText={(text) => setForm((f) => ({ ...f, ...applyStreetInput(text, f) }))}
-              placeholder="1 Oak St"
-              textContentType="fullStreetAddress"
-              autoComplete="street-address"
-            />
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Input label="City" value={form.city} onChangeText={set('city')} containerStyle={{ flex: 2 }} />
-              <Input label="State" value={form.state} onChangeText={set('state')} containerStyle={{ flex: 1 }} autoCapitalize="characters" />
-              <Input label="ZIP" value={form.zip} onChangeText={set('zip')} containerStyle={{ flex: 1 }} keyboardType="number-pad" />
-            </View>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-              After saving, turn on plowing, shoveling or salting and add contacts and instructions.
-            </Text>
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Button title="Cancel" variant="ghost" onPress={() => { setAdding(false); setForm(EMPTY); }} />
-              <Button title="Save property" loading={saving} onPress={save} />
-            </View>
-          </View>
-        ) : null}
+        {all.length > 6 ? <SearchBar value={query} onChangeText={setQuery} placeholder="Search properties" style={{ marginTop: spacing.md }} /> : null}
 
-        {rows.length > 6 ? <SearchBar value={query} onChangeText={setQuery} placeholder="Search properties" style={{ marginTop: spacing.md }} /> : null}
-
-        {loading ? <LoadingSpinner /> : !rows.length && !adding ? (
-          <EmptyState icon="home" title="No snow properties yet" description="Add the lots, driveways and walks your crews clear." />
+        {loading ? <LoadingSpinner /> : !all.length && !adding ? (
+          <EmptyState icon="home" title="No properties yet" description="Add a customer's property once. It shows up in landscaping, Maintenance and Snow." />
         ) : (
           <View style={[styles.group, { backgroundColor: colors.surface, marginTop: spacing.md }]}>
             {shown.map((r, i) => (
               <Pressable
                 key={r.id}
-                onPress={() => open(r.id)}
+                onPress={() => openRow(r)}
                 accessibilityRole="button"
                 style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}
               >
@@ -160,9 +128,9 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
                     {r.name}{r.status === 'inactive' ? ' (inactive)' : ''}
                   </Text>
-                  <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{r.address}</Text>
-                  <Text style={[typeScale.caption, { color: r.services.length ? colors.primary : colors.warning }]}>
-                    {r.services.length ? r.services.map((s) => SERVICE_LABEL[s]).join(' · ') : 'No services on yet'}
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{[r.customer, r.address].filter(Boolean).join(' · ')}</Text>
+                  <Text style={[typeScale.caption, { color: r.services.length ? colors.primary : r.propertyOnly ? colors.textTertiary : colors.warning }]}>
+                    {r.services.length ? r.services.map((s) => SERVICE_LABEL[s]).join(' · ') : r.propertyOnly ? 'Not on Snow yet · tap to turn on' : 'No services on yet'}
                   </Text>
                 </View>
                 <Icon name="chevron-right" size={18} color={colors.textTertiary} />

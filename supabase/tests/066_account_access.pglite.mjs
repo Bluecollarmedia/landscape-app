@@ -13,6 +13,8 @@ const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ?
 check('0 the full schema and all updates (including 066) load', failures.length === 0, JSON.stringify(failures));
 let again = true;
 try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/066_account_access_hardening.sql`, 'utf8')); } catch (e) { again = false; console.log(e.message); }
+// Update 78 turns the old code paths off again after an older update is re-run.
+try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/078_invite_links.sql`, 'utf8')); } catch (e) { again = false; console.log(e.message); }
 check('0b update 66 can be run a second time', again);
 
 const fails = async (sql, p) => { try { await db.query(sql, p); return { raised: false, msg: '' }; } catch (e) { return { raised: true, msg: String(e.message) }; } };
@@ -57,20 +59,10 @@ const proj = (await one(`insert into public.projects (company_id, name, status) 
 
 // ── 1. one code box ─────────────────────────────────────────────────────────
 let r = await rpc(pL.u, `select public.join_with_code('land1') as x`);
-check('1 a landscaping code files a pending TEAM request (server decides the kind)', r.ok && r.v.success && r.v.kind === 'team'
-  && (await one(`select count(*)::int c from public.join_requests where person_id = $1 and status = 'pending'`, [pL.pid])).c === 1, r.msg);
-r = await rpc(pS.u, `select public.join_with_code('SNOW1') as x`);
-check('2 a snow code files a pending SNOW request', r.ok && r.v.success && r.v.kind === 'snow'
-  && (await one(`select count(*)::int c from public.snow_access_requests where person_id = $1 and status = 'pending'`, [pS.pid])).c === 1, r.msg);
-r = await rpc(pBad.u, `select public.join_with_code('NOPE99') as x`);
-check('6 an invalid code is refused and reveals nothing', r.ok && r.v.success === false && r.v.error === 'invalid_code' && !('company_name' in r.v), JSON.stringify(r.v));
+check('1 the one code box is gone (update 78): the app can no longer call join_with_code', !r.ok, r.msg);
 await asDb();
-let lk = await one(`select public.lookup_any_code('SNOW1') as x`);
-check('2b the signed-out lookup says which kind it is and only the company name', lk.x.valid === true && lk.x.kind === 'snow' && Object.keys(lk.x).sort().join() === 'company_name,kind,valid', JSON.stringify(lk.x));
-await db.query(`update public.team_codes set is_active = false where code = 'LAND1'`);
-r = await rpc(pBad.u, `select public.join_with_code('LAND1') as x`);
-check('7 a revoked code is refused', r.ok && r.v.success === false, JSON.stringify(r.v));
-await db.query(`update public.team_codes set is_active = true where code = 'LAND1'`);
+await db.query(`insert into public.join_requests (company_id, person_id, status, requested_role) values ($1,$2,'pending','worker')`, [co, pL.pid]);
+await db.query(`insert into public.snow_access_requests (company_id, person_id, status) values ($1,$2,'pending')`, [co, pS.pid]);
 
 // ── 2. pending is not access ───────────────────────────────────────────────
 check('5 a pending employee reads no company data and has no snow access', (await count(pL.u, `select count(*)::int from public.projects`)) === 0
@@ -88,32 +80,28 @@ check('20 a pending employee cannot approve their own request through the functi
 r = await rpc(wL.u, `select public.approve_join_request((select id from public.join_requests where person_id = '${pL.pid}'), 'worker') as x`);
 check('20b a worker cannot approve requests', !r.ok, r.msg);
 
-// ── 3. approval gives only what was asked ──────────────────────────────────
+// ── 3. approval gives only what was asked (the approval screens are gone; access is granted directly) ──
 const reqL = (await one(`select id from public.join_requests where person_id = $1`, [pL.pid])).id;
 r = await rpc(adminU.u, `select public.approve_join_request($1::uuid, 'admin') as x`, [reqL]);
-check('15 an admin cannot hand out the admin role', !r.ok && /Only the owner/.test(r.msg), r.msg);
-r = await rpc(adminU.u, `select public.approve_join_request($1::uuid, 'worker') as x`, [reqL]);
-check('3 an admin approves the landscaping request: one account, landscaping access, NO snow access', r.ok
-  && (await rpc(pL.u, `select public.is_crew($1::uuid) as x`, [co])).v === true && (await rpc(pL.u, `select public.snow_is_active($1::uuid) as x`, [co])).v === false, r.msg);
-const reqS = (await one(`select id from public.snow_access_requests where person_id = $1`, [pS.pid])).id;
-r = await rpc(owner.u, `select public.approve_snow_access_request($1::uuid, array['plowing']) as x`, [reqS]);
-check('3b the snow request approval gives snow only: no landscaping access', r.ok && (await rpc(pS.u, `select public.snow_is_active($1::uuid) as x`, [co])).v === true
-  && (await rpc(pS.u, `select public.is_crew($1::uuid) as x`, [co])).v === false, r.msg);
+check('15 the old approval function can no longer be called', !r.ok, r.msg);
+await asDb();
+await db.query(`insert into public.company_members (company_id, person_id, role, status, worker_type) values ($1,$2,'worker','active','landscaping')`, [co, pL.pid]);
+await grantSnow(pS.pid, ['plowing']);
+check('3 a landscaping employee has landscaping access and NO snow access', (await rpc(pL.u, `select public.is_crew($1::uuid) as x`, [co])).v === true && (await rpc(pL.u, `select public.snow_is_active($1::uuid) as x`, [co])).v === false);
+check('3b a snow-only employee has snow only: no landscaping access', (await rpc(pS.u, `select public.snow_is_active($1::uuid) as x`, [co])).v === true
+  && (await rpc(pS.u, `select public.is_crew($1::uuid) as x`, [co])).v === false);
 check('26 snow access alone never dispatches anyone (no storm route crew rows)', (await one(`select count(*)::int c from public.snow_route_crew where person_id in ($1,$2)`, [pS.pid, wB.pid])).c === 0);
 check('4 one person can have both modes on ONE account', (await rpc(wB.u, `select public.is_crew($1::uuid) as x`, [co])).v === true && (await rpc(wB.u, `select public.snow_is_active($1::uuid) as x`, [co])).v === true
   && (await one(`select count(*)::int c from public.people where email = 'wb@x.test'`)).c === 1);
 check('21 a landscaping-only employee has no snow operations', (await rpc(wL.u, `select public.snow_is_active($1::uuid) as x`, [co])).v === false);
 check('22 a snow-only employee has no landscaping tables', (await count(wS.u, `select count(*)::int from public.projects`)) === 0 && (await rpc(wS.u, `select public.is_crew($1::uuid) as x`, [co])).v === false);
-r = await rpc(adminU.u, `select public.approve_join_request($1::uuid, 'worker') as x`, [reqL]);
-check('10a approving the same request twice changes nothing (double tap)', r.ok);
 
 // declined / cancelled requests cannot be replayed
 await asDb();
 await db.query(`insert into public.join_requests (company_id, person_id, status, requested_role) values ($1,$2,'declined','worker')`, [co, pBad.pid]);
 const declined = (await one(`select id from public.join_requests where person_id = $1`, [pBad.pid])).id;
 r = await rpc(owner.u, `select public.approve_join_request($1::uuid, 'worker') as x`, [declined]);
-check('10 a declined request cannot be approved later (the person has to ask again with a code)', !r.ok && /no longer open/.test(r.msg)
-  && (await rpc(pBad.u, `select public.is_member($1::uuid) as x`, [co])).v === false, r.msg);
+check('10 a declined request cannot be approved (the function is off entirely)', !r.ok && (await rpc(pBad.u, `select public.is_member($1::uuid) as x`, [co])).v === false, r.msg);
 
 // ── 4. owner protection ─────────────────────────────────────────────────────
 r = await rpc(owner.u, `select public.delete_my_account() as x`);
@@ -217,8 +205,8 @@ const r10 = await rpc(wB.u, `select public.snow_grant_access('${wB.pid}'::uuid, 
 check('29 direct calls cannot bring it back: approve, edit the team list, grant themselves snow all change nothing', !r.ok && !r10.ok
   && (await one(`select status from public.company_members where person_id = $1`, [wB.pid])).status === 'inactive', [r.msg, r9.msg, r10.msg].join(' | '));
 r = await rpc(wB.u, `select public.join_with_code('LAND1') as x`);
-check('29b an old code does not restore it: it only files a new PENDING request, and they still have no access', r.ok && r.v.success === true
-  && (await rpc(wB.u, `select public.is_member($1::uuid) as x`, [co])).v === false, JSON.stringify(r.v));
+check('29b an old code does not restore it: codes are off, and they still have no access', !r.ok
+  && (await rpc(wB.u, `select public.is_member($1::uuid) as x`, [co])).v === false, r.msg);
 await asDb();
 check('30 their time, history and push-free state are intact: workday and audit rows remain, push token removed', (await one(`select count(*)::int c from public.time_workdays where id = $1`, [wd])).c === 1
   && (await one(`select count(*)::int c from public.time_audit where workday_id = $1`, [wd])).c === 1 && (await one(`select count(*)::int c from public.push_tokens where person_id = $1`, [wB.pid])).c === 0);
@@ -304,8 +292,8 @@ check('40c the permanent delete took the company data with it: projects, hours, 
 check('40b every code and pending request of that company is gone with it: the codes no longer work', (await one(`select public.lookup_any_code('LAND1') as x`)).x.valid === false
   && (await one(`select public.lookup_any_code('SNOW1') as x`)).x.valid === false);
 r = await rpc(pBad.u, `select public.join_with_code('LAND1') as x`);
-check('11 an old code or pending request cannot recreate membership in a closed company', r.ok && r.v.success === false
-  && (await one(`select count(*)::int c from public.company_members where company_id = $1`, [co])).c === 0, JSON.stringify(r.v));
+check('11 an old code or pending request cannot recreate membership in a closed company', !r.ok
+  && (await one(`select count(*)::int c from public.company_members where company_id = $1`, [co])).c === 0, r.msg);
 check('41 old sessions of the closed company read nothing', (await rpc(adminU.u, `select public.is_member($1::uuid) as x`, [co])).v === false && (await count(adminU.u, `select count(*)::int from public.projects`)) === 0);
 check('43 a closure record was kept (who, when, what was pending)', (await one(`select count(*)::int c from public.company_closure_log where company_id = $1 and closed_by = $2`, [co, owner.pid])).c === 1);
 r = await rpc(owner.u, `select public.delete_my_company('Acme Lawn') as x`);

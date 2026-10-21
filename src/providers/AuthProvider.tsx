@@ -22,7 +22,7 @@ import { unregisterForPush } from '@/lib/push';
 import { syncMaterialReminders } from '@/lib/materialReminders';
 import type { AuthState, UserProfile, UserRole } from '@/types';
 import type { OnboardingStep } from '@/types/onboarding';
-import { fetchMySnowStatus, type MySnowStatus } from '@/hooks/useSnowOnboarding';
+import { fetchMySnowAccess } from '@/hooks/useSnowOnboarding';
 
 // ── Extended auth state ─────────────────────────────────────────
 
@@ -197,11 +197,10 @@ interface Resolution {
 }
 
 async function resolveContext(): Promise<Resolution | null> {
-  // Snow status is separate so a database without the Snow update still works
-  // (fetchMySnowStatus returns null then).
-  const [{ data, error }, snow] = await Promise.all([
+  // Snow access is read separately so a database without the Snow update still works (the list is just empty then).
+  const [{ data, error }, snowAccess] = await Promise.all([
     supabase.rpc('get_my_context'),
-    fetchMySnowStatus().catch(() => null as MySnowStatus | null),
+    fetchMySnowAccess().catch(() => [] as Awaited<ReturnType<typeof fetchMySnowAccess>>),
   ]);
   if (error || !data) {
     console.warn('[auth] get_my_context failed:', error?.message);
@@ -230,20 +229,20 @@ async function resolveContext(): Promise<Resolution | null> {
     updatedAt: p.updated_at,
   };
 
-  const snowActive = snow?.member?.status === 'active';
+  const snowOnly = snowAccess[0];
 
   if (membership) {
     return {
       user, appState: 'active', onboardingStep: 'ready', memberRole: membership.role, companyId: membership.company_id,
-      modeAccess: { landscaping: true, snow: snowActive || membership.role === 'owner' || membership.role === 'admin' },
+      modeAccess: { landscaping: true, snow: snowAccess.some((e) => e.companyId === membership.company_id) || membership.role === 'owner' || membership.role === 'admin' },
     };
   }
   // Approved for snow only: a worker with no landscaping access. They get no
   // company membership, so landscaping data stays closed to them.
-  if (snowActive && snow?.member) {
+  if (snowOnly) {
     return {
-      user: { ...user, role: 'worker', activeCompanyId: snow.member.companyId },
-      appState: 'active', onboardingStep: 'ready', memberRole: 'worker', companyId: snow.member.companyId,
+      user: { ...user, role: 'worker', activeCompanyId: snowOnly.companyId },
+      appState: 'active', onboardingStep: 'ready', memberRole: 'worker', companyId: snowOnly.companyId,
       modeAccess: { landscaping: false, snow: true },
     };
   }

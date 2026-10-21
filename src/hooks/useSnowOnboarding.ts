@@ -106,6 +106,15 @@ function demoChanged() {
 
 // ── The signed-in person's standing ──
 
+/** The companies this person has active snow access in (get_my_snow_access, update 20). Empty without a database. */
+export async function fetchMySnowAccess(): Promise<{ companyId: string; services: string[]; landscaping: boolean }[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.rpc('get_my_snow_access');
+  if (error || !Array.isArray(data)) return [];
+  return (data as { company_id: string; services?: string[]; landscaping_access?: boolean }[])
+    .map((r) => ({ companyId: r.company_id, services: r.services ?? [], landscaping: r.landscaping_access !== false }));
+}
+
 export async function fetchMySnowStatus(): Promise<MySnowStatus | null> {
   if (!isSupabaseConfigured) return null;
   const { data, error } = await supabase.rpc('get_my_snow_status');

@@ -5,7 +5,7 @@
  * the existing app style; no approved mockup yet.
  */
 import { crewAfterLeadChange, crewChoices, nextCrew, routeTeam, type TeamMember } from '@/lib/snowCrew';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,7 +37,11 @@ export function RouteEditScreen() {
  * The route's settings and stops. On its own screen it has a header and a Done button; `embedded` (inside the storm screen) shows
  * just the content: the storm is the route, so there is no route name, template or cancel here.
  */
-export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { routeId?: string; embedded?: boolean; onDragActive?: (active: boolean) => void }) {
+export function RouteEditor({ routeId: id, embedded = false, onDragActive, refreshToken }: {
+  routeId?: string; embedded?: boolean; onDragActive?: (active: boolean) => void;
+  /** Bumped by the storm screen when realtime changes arrive, so the embedded editor never goes stale. */
+  refreshToken?: number;
+}) {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -83,6 +87,12 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
   }, [id]);
 
   useEffect(() => { reload(); }, [reload]);
+  const firstToken = useRef(true);
+  useEffect(() => {
+    if (firstToken.current) { firstToken.current = false; return; }
+    if (refreshToken !== undefined && !dragging) reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken]);
 
   async function save(patch: Parameters<typeof updateRoute>[1]) {
     if (!route) return;
@@ -645,7 +655,6 @@ const styles = StyleSheet.create({
   done: { height: 44, paddingHorizontal: spacing.lg, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   screen: { flex: 1 },
   card: { borderRadius: radius.lg, padding: spacing.lg },
-  label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },
   help: { marginHorizontal: spacing.sm },
   group: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 52 },

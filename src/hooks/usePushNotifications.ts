@@ -35,7 +35,8 @@ function useNativePushNotifications(role: UserRole | undefined, active: boolean)
   const segments = useSegments();
   const response = Notifications.useLastNotificationResponse();
   const handled = useRef(new Set<string>());
-  const inRoleGroup = !!role && segments[0] === `(${role === 'admin' ? 'owner' : role})`;
+  // The snow shell counts as "the role's screens are showing" too, so a tap isn't ignored in Snow Mode.
+  const inRoleGroup = !!role && (segments[0] === `(${role === 'admin' ? 'owner' : role})` || segments[0] === 'snow');
 
   useEffect(() => {
     if (active) registerForPush();

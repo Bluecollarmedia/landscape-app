@@ -6,9 +6,9 @@
  */
 import { AddSnowProperty } from './AddSnowProperty';
 import { customerNameOf, useAllProperties } from '@/data/properties';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, SearchBar } from '@/components/ui';
 import { showMessage } from '@/components/financials/ActionSheet';
@@ -62,7 +62,8 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
         .filter((s) => s.is_active).map((s) => s.service),
     })));
   }, []);
-  useEffect(() => { reload(); }, [reload]);
+  // Reload whenever the screen comes back into view (services may just have been turned on, or a customer changed).
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
   const open = (id: string) => router.push({ pathname: '/snow/owner/property', params: { id } });
 

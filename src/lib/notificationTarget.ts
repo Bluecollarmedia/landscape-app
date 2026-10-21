@@ -32,6 +32,8 @@ export function ownerNotificationTarget(n: NotificationLike): OwnerTarget | null
     return `/(owner)/projects/${id}`;
   }
   if (type === 'materials') return `/(owner)/projects/${id}?section=materials`;
+  // A snow stop alert (update 31) opens the snow dashboard, where the storm's progress lives.
+  if (type === 'snow_visit') return '/snow/owner';
   return null;
 }
 

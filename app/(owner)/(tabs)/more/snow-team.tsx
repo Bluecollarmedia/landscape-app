@@ -8,7 +8,7 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform, Alert, Pressable, RefreshControl, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { ScreenHeader, RaisedAddButton, Avatar, Button, InlineNotice, LoadingSpinner, Icon } from '@/components/ui';
@@ -31,6 +31,9 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
   const tabBarClearance = useTabBarClearance();
   const { colors } = useTheme();
   const router = useRouter();
+  // Inside the snow shell, (owner) screens get bounced by the root guard, so Add Worker opens through the snow route.
+  const inSnowShell = useSegments()[0] === 'snow';
+  const addWorker = () => router.push((inSnowShell ? '/snow/owner/worker-new' : '/(owner)/worker-new') as any);
   const admin = useSnowOnboardingAdmin();
   const dbVersion = useDb();
   const [refreshing, setRefreshing] = useState(false);
@@ -81,7 +84,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
         title="Snow Team"
         subtitle="Every worker and what they work in snow"
         hideBack={asTab}
-        right={<RaisedAddButton onPress={() => router.push('/(owner)/worker-new' as any)} accessibilityLabel="Add a worker" />}
+        right={<RaisedAddButton onPress={addWorker} accessibilityLabel="Add a worker" />}
       />
       <ScrollView
         // Always clear the floating tab bar (also when opened from More), so the last row can be reached.
@@ -135,7 +138,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginVertical: spacing.sm }]}>
                   Add a worker with just a name and phone number. They get a private link to set up their own login.
                 </Text>
-                <Button title="Add Worker" icon="user-plus" onPress={() => router.push('/(owner)/worker-new' as any)} />
+                <Button title="Add Worker" icon="user-plus" onPress={addWorker} />
               </View>
             ) : shown.length === 0 ? (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl }]}>No one matches.</Text>

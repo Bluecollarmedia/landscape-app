@@ -20,7 +20,7 @@ const projectStatusBadge = (status: string): { label: string; status: 'success' 
 };
 
 export default function CustomerDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, justAdded } = useLocalSearchParams<{ id: string; justAdded?: string }>();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -131,7 +131,7 @@ export default function CustomerDetailScreen() {
           {/* Login: a private one-time link */}
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700', marginBottom: spacing.sm }]}>Customer Login</Text>
-            <CustomerInviteCard personId={p.id} firstName={p.firstName} phone={p.phone} />
+            <CustomerInviteCard personId={p.id} firstName={p.firstName} phone={p.phone} autoMake={justAdded === '1'} />
           </View>
 
 

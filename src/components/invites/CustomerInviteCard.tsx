@@ -2,7 +2,7 @@
  * Owner: send one customer a private one-time link (supabase/updates/078_invite_links.sql). The customer taps it once, creates
  * their login, and their projects and properties are already on it. A customer who already has a login does not need a link.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Button } from '@/components/ui';
 import { Icon } from '@/components/ui/Icon';
@@ -14,7 +14,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 
-export function CustomerInviteCard({ personId, firstName, phone }: { personId: string; firstName: string; phone?: string }) {
+export function CustomerInviteCard({ personId, firstName, phone, autoMake }: { personId: string; firstName: string; phone?: string; /** Make the link as soon as this opens (right after the customer was added). */ autoMake?: boolean }) {
   const { colors } = useTheme();
   useDb();
   const [invite, setInvite] = useState<IssuedInvite | null>(null);
@@ -31,6 +31,13 @@ export function CustomerInviteCard({ personId, firstName, phone }: { personId: s
   }
 
   const url = invite ? inviteLinkUrl(invite.token) : '';
+
+  // Right after adding a customer the link is made for you, so the Text / Copy buttons are already there.
+  const autoDone = useRef(false);
+  useEffect(() => {
+    if (autoMake && !hasLogin && !autoDone.current) { autoDone.current = true; void make(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoMake, hasLogin]);
 
   async function text() {
     await textInvite(inviteMessage(url, db.company?.name, firstName, 'customer'), phone);

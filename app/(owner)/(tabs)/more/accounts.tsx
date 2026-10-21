@@ -12,6 +12,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { useAccounts, type Account, type AccountStatus } from '@/hooks/useAccounts';
+import { CollapsibleFilters } from '@/components/ui/CollapsibleFilters';
 import { haptics } from '@/lib/haptics';
 
 type RoleFilter = 'all' | 'owner' | 'worker' | 'customer' | 'none';
@@ -240,42 +241,38 @@ export default function AccountsScreen() {
       >
         <SearchBar value={query} onChangeText={setQuery} placeholder="Search name, email or phone" />
 
-        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textTertiary }]}>ROLE</Text>
-        <FilterChips<RoleFilter>
-          selected={role}
-          onSelect={setRole}
-          options={[
-            { key: 'all', label: 'All', count: accounts.length },
-            { key: 'owner', label: 'Owners', count: roleCount('owner') },
-            { key: 'worker', label: 'Workers', count: roleCount('worker') },
-            { key: 'customer', label: 'Customers', count: roleCount('customer') },
-            { key: 'none', label: 'No role', count: roleCount('none') },
-          ]}
-        />
-
-        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textTertiary }]}>STATUS</Text>
-        <FilterChips<StatusFilter>
-          selected={status}
-          onSelect={setStatus}
-          options={[
-            { key: 'all', label: 'All' },
-            { key: 'active', label: 'Active', count: statusCount('active') },
-            { key: 'pending', label: 'Waiting', count: statusCount('pending') },
-            { key: 'removed', label: 'Removed', count: statusCount('removed') },
-            { key: 'declined', label: 'Declined', count: statusCount('declined') },
-            { key: 'not_joined', label: 'Not joined', count: statusCount('not_joined') },
-          ]}
-        />
-
-        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textTertiary }]}>SORT</Text>
-        <FilterChips<SortKey>
-          selected={sort}
-          onSelect={setSort}
-          options={[
-            { key: 'newest', label: 'Newest' },
-            { key: 'oldest', label: 'Oldest' },
-            { key: 'name', label: 'Name A–Z' },
-            { key: 'last_active', label: 'Last sign-in' },
+        <CollapsibleFilters
+          groups={[
+            {
+              key: 'role', label: 'Role', selected: role, onSelect: (k) => setRole(k as RoleFilter), defaultKey: 'all',
+              options: [
+                { key: 'all', label: 'All', count: accounts.length },
+                { key: 'owner', label: 'Owners', count: roleCount('owner') },
+                { key: 'worker', label: 'Workers', count: roleCount('worker') },
+                { key: 'customer', label: 'Customers', count: roleCount('customer') },
+                { key: 'none', label: 'No role', count: roleCount('none') },
+              ],
+            },
+            {
+              key: 'status', label: 'Status', selected: status, onSelect: (k) => setStatus(k as StatusFilter), defaultKey: 'all',
+              options: [
+                { key: 'all', label: 'All' },
+                { key: 'active', label: 'Active', count: statusCount('active') },
+                { key: 'pending', label: 'Waiting', count: statusCount('pending') },
+                { key: 'removed', label: 'Removed', count: statusCount('removed') },
+                { key: 'declined', label: 'Declined', count: statusCount('declined') },
+                { key: 'not_joined', label: 'Not joined', count: statusCount('not_joined') },
+              ],
+            },
+            {
+              key: 'sort', label: 'Sort', selected: sort, onSelect: (k) => setSort(k as SortKey), defaultKey: 'newest',
+              options: [
+                { key: 'newest', label: 'Newest' },
+                { key: 'oldest', label: 'Oldest' },
+                { key: 'name', label: 'Name A–Z' },
+                { key: 'last_active', label: 'Last sign-in' },
+              ],
+            },
           ]}
         />
 

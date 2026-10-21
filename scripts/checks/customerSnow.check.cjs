@@ -59,6 +59,11 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
   const sw = read('src/components/snow/customer/SnowNotifyChoices.tsx');
   check('23 the switches are Crew arrives and Service finished, save at once, and go back if saving fails', /Crew arrives/.test(sw) && /Service finished/.test(sw) && /saveNotifyChoices\(/.test(sw) && /setChoices\(before\)/.test(sw));
   check('24 the landscaping screens (project card, project screen) were not touched by this change', /ActiveCard/.test(home) && /No active projects right now/.test(home));
+  const noSpin = screen + read('src/hooks/useSnowHome.ts') + read('src/components/snow/customer/SnowNotifyChoices.tsx');
+  check('25 the customer Snow screen has NO spinner: no LoadingSpinner or ActivityIndicator, anywhere', !/LoadingSpinner|ActivityIndicator|Spinner/.test(noSpin));
+  check('26 while loading it shows quiet placeholder blocks in the shape of the page, not a spinner', /function Placeholder\(\)/.test(screen) && /waiting \? \(\s*<Placeholder \/>/.test(screen));
+  check('27 it opens with the last data that loaded (properties and timeline are remembered for the session)', /let remembered: MySnowProperty\[\] \| null = null/.test(read('src/hooks/useHasSnow.ts')) && /peekTimeline\(\)/.test(screen));
+  check('28 a customer with no Snow property sees a plain message, not a spinner that never ends', /loaded && properties\.length === 0/.test(screen) && /No Snow service is linked to your account yet/.test(screen));
   console.log(bad ? `\n${bad} failed` : '\nall passed');
   process.exit(bad ? 1 : 0);
 })();

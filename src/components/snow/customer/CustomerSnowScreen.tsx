@@ -10,11 +10,11 @@ import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
-import { InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
+import { InlineNotice, ScreenHeader } from '@/components/ui';
 import { TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
 import { useTheme } from '@/providers/ThemeProvider';
-import { useMySnowProperties } from '@/hooks/useHasSnow';
-import { loadServices, loadStatuses, loadTimeline } from '@/data/snowCustomer';
+import { useMySnowPropertyList } from '@/hooks/useHasSnow';
+import { loadServices, loadStatuses, loadTimeline, peekTimeline } from '@/data/snowCustomer';
 import {
   DAYS_PREVIEW, SERVICE_NAME, SERVICE_VERB, clampPage, countLabel, daysToShow, groupTimeline, lastServiceLabel, seasonStats, sortServices,
   statusView, timeLabel,
@@ -34,8 +34,9 @@ export function CustomerSnowScreen() {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ property?: string }>();
-  const properties = useMySnowProperties();
-  const [entries, setEntries] = useState<TimelineEntry[] | null>(null);
+  const { list: properties, loaded } = useMySnowPropertyList();
+  // Opens with the last timeline that loaded (if any); otherwise the page shows its layout in quiet placeholders. Never a spinner.
+  const [entries, setEntries] = useState<TimelineEntry[] | null>(() => peekTimeline());
   const [statuses, setStatuses] = useState<SnowStatus[]>([]);
   const [services, setServices] = useState<Record<string, SnowSvc[]>>({});
   const [error, setError] = useState<string | null>(null);
@@ -86,8 +87,12 @@ export function CustomerSnowScreen() {
         </View>
       ) : null}
 
-      {entries === null || properties.length === 0 ? (
-        <LoadingSpinner />
+      {loaded && properties.length === 0 ? (
+        <View style={{ paddingHorizontal: spacing.lg }}>
+          <InlineNotice icon="cloud-snow" tone="info" text="No Snow service is linked to your account yet." />
+        </View>
+      ) : properties.length === 0 ? (
+        <Placeholder />
       ) : (
         <ScrollView
           ref={pager}
@@ -102,7 +107,7 @@ export function CustomerSnowScreen() {
             <View key={p.id} style={{ width }}>
               <PropertyPage
                 prop={p}
-                entries={entries.filter((e) => sameProperty(e, p))}
+                entries={entries === null ? null : entries.filter((e) => sameProperty(e, p))}
                 status={statuses.find((s) => s.propertyId === p.id)}
                 services={sortServices(services[p.id] ?? [])}
                 error={error}
@@ -125,13 +130,16 @@ export function CustomerSnowScreen() {
   );
 }
 
-function PropertyPage({ prop, entries, status, services, error, refreshing, onRefresh, onOpenPhoto }: {
-  prop: Prop; entries: TimelineEntry[]; status?: SnowStatus; services: SnowSvc[]; error: string | null;
+function PropertyPage({ prop, entries: loadedEntries, status, services, error, refreshing, onRefresh, onOpenPhoto }: {
+  prop: Prop; entries: TimelineEntry[] | null; status?: SnowStatus; services: SnowSvc[]; error: string | null;
   refreshing: boolean; onRefresh: () => void; onOpenPhoto: (e: TimelineEntry, index: number) => void;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [showAll, setShowAll] = useState(false);
+  // null = the timeline has not loaded yet: show quiet placeholders where it will be, and no "nothing yet" message.
+  const entries = useMemo(() => loadedEntries ?? [], [loadedEntries]);
+  const waiting = loadedEntries === null;
   const stats = useMemo(() => seasonStats(entries), [entries]);
   const groups = useMemo(() => groupTimeline(entries), [entries]);
   const shown = daysToShow(groups, showAll);
@@ -183,7 +191,9 @@ function PropertyPage({ prop, entries, status, services, error, refreshing, onRe
         </View>
       ) : null}
 
-      {entries.length === 0 ? (
+      {waiting ? (
+        <Placeholder />
+      ) : entries.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface, gap: spacing.md }, shadow.sm]}>
           <View style={[styles.snowCircle, { backgroundColor: semantic.infoLight }]}><Icon name="cloud-snow" size={28} color={semantic.info} /></View>
           <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>No service yet this season</Text>
@@ -223,6 +233,21 @@ function PropertyPage({ prop, entries, status, services, error, refreshing, onRe
         </View>
       )}
     </ScrollView>
+  );
+}
+
+/** Quiet grey blocks in the shape of the content that is about to appear. No spinner, no movement. */
+function Placeholder() {
+  const { colors } = useTheme();
+  const block = (h: number, w: number | string = '100%') => <View style={{ height: h, width: w as any, borderRadius: radius.lg, backgroundColor: colors.borderLight }} />;
+  return (
+    <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {block(18, 110)}
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>{block(64, '31%')}{block(64, '31%')}{block(64, '31%')}</View>
+      {block(18, 150)}
+      {block(120)}
+      {block(120)}
+    </View>
   );
 }
 

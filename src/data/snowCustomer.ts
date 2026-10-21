@@ -13,6 +13,10 @@ const ok = <T,>(data: T): Result<T> => ({ ok: true, data });
 const fail = (error: string): Result<never> => ({ ok: false, error });
 const missing = (m?: string) => /could not find the function|schema cache|does not exist/i.test(m ?? '');
 
+// The last full timeline that loaded (with photo links), kept for the session so the Snow screen can open with it already on screen.
+let rememberedTimeline: TimelineEntry[] | null = null;
+export const peekTimeline = (): TimelineEntry[] | null => rememberedTimeline;
+
 export async function loadTimeline(opts: { withUrls?: boolean } = {}): Promise<Result<TimelineEntry[]>> {
   const withUrls = opts.withUrls !== false;
   if (!isSupabaseConfigured) return fail('Snow updates need the live app, not demo mode.');
@@ -31,11 +35,13 @@ export async function loadTimeline(opts: { withUrls?: boolean } = {}): Promise<R
   const rows = (data ?? []) as Row[];
   let urls: Record<string, string> = {};
   if (withUrls) { try { urls = await signedSnowMediaUrls(rows.flatMap((r) => r.media.map((m) => m.file_key))); } catch { /* shown without photos */ } }
-  return ok(rows.map((r) => ({
+  const list = rows.map((r) => ({
     visitId: r.visit_id, propertyId: r.property_id, propertyName: r.property_name, service: r.service,
     stormName: r.storm_name ?? undefined, completedAt: r.completed_at,
     media: r.media.map((m) => ({ id: m.id, kind: m.kind, url: urls[m.file_key] })),
-  })));
+  }));
+  if (withUrls) rememberedTimeline = list;
+  return ok(list);
 }
 
 /** What is happening now at each of their properties. Empty when nothing is, and when the database does not have update 86 yet. */

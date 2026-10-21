@@ -253,21 +253,6 @@ function CrewsSection({ storm, headline, onOpenStorm, onOpenRoute }: {
               {headline.cancelledRoutes} cancelled route{headline.cancelledRoutes === 1 ? ' isn’t' : 's aren’t'} counted.
             </Text>
           ) : null}
-          <Pressable
-            onPress={onOpenStorm}
-            accessibilityRole="button"
-            accessibilityLabel="View all routes. See the full route list and details"
-            style={({ pressed }) => [styles.allRoutes, { backgroundColor: colors.surface, borderColor: colors.borderLight }, pressed && { opacity: 0.7 }]}
-          >
-            <View style={[styles.allRoutesIcon, { backgroundColor: colors.primarySurface }]}>
-              <Icon name="map-pin" size={18} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>View all routes</Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>See the full route list and details</Text>
-            </View>
-            <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-          </Pressable>
         </>
       )}
     </>
@@ -382,8 +367,6 @@ const styles = StyleSheet.create({
   crewRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
   crewTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  allRoutes: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, marginTop: spacing.md },
-  allRoutesIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   stormHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   routeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, marginTop: spacing.md, paddingTop: spacing.md, minHeight: 44 },
   routeTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

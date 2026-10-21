@@ -273,7 +273,7 @@ export function StormDetailScreen() {
                 {liveRoutes.length > 1 ? (
                   <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.sm }]}>{SERVICE_LABEL[r.service]}</Text>
                 ) : null}
-                <RouteEditor routeId={r.id} embedded onDragActive={setDragging} refreshToken={reloadToken} />
+                <RouteEditor routeId={r.id} onDragActive={setDragging} refreshToken={reloadToken} onRouteCancelled={reload} />
               </View>
             ))}
             {storm.status !== 'ended' && templates.length > 0 ? (

@@ -10,9 +10,10 @@ export function snowDashboardHref(target: SnowTarget): Href {
   switch (target.kind) {
     case 'storm':
       return { pathname: '/snow/owner/storm/[id]', params: { id: target.stormId } };
+    // A route (or one of its stops) opens the storm: the route is edited right there, on the one screen.
     case 'route':
     case 'visit':
-      return { pathname: '/snow/owner/route/[id]', params: { id: target.routeId } };
+      return { pathname: '/snow/owner/storm/[id]', params: { id: target.stormId } };
     case 'employee':
       return '/snow/owner/hours';
     case 'media_review':

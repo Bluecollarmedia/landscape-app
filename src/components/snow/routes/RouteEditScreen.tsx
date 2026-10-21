@@ -28,19 +28,16 @@ import { spacing, radius } from '@/theme/spacing';
 
 export const STOP_TONE = { pending: 'neutral', arrived: 'info', completed: 'success', skipped: 'warning' } as const;
 
-export function RouteEditScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  return <RouteEditor routeId={id} />;
-}
-
 /**
- * The route's settings and stops. On its own screen it has a header and a Done button; `embedded` (inside the storm screen) shows
- * just the content: the storm is the route, so there is no route name, template or cancel here.
+ * The route's settings and stops, edited right on the storm screen: crew, crew lead, ordered properties, notes, Save as template and
+ * Cancel route. There is no second screen for the same route.
  */
-export function RouteEditor({ routeId: id, embedded = false, onDragActive, refreshToken }: {
+export function RouteEditor({ routeId: id, embedded = true, onDragActive, refreshToken, onRouteCancelled }: {
   routeId?: string; embedded?: boolean; onDragActive?: (active: boolean) => void;
   /** Bumped by the storm screen when realtime changes arrive, so the embedded editor never goes stale. */
   refreshToken?: number;
+  /** The route was cancelled: the storm screen reloads its list. */
+  onRouteCancelled?: () => void;
 }) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -215,23 +212,12 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive, refre
       res.ok ? `"${route.name}" can be added to the next ${SERVICE_LABEL[route.service].toLowerCase()} storm.` : res.error);
   }
 
-  /** Everything on this screen saves as it changes; Done also saves a name still being typed, then closes. */
-  async function done() {
-    if (route && name.trim() && name.trim() !== route.name) {
-      setBusy(true);
-      const res = await updateRoute(route.id, { name });
-      setBusy(false);
-      if (!res.ok) return showMessage("Couldn't save", res.error);
-    }
-    router.back();
-  }
-
   function onCancelRoute() {
     if (!route) return;
     confirmAction(`Cancel ${route.name}?`, 'Its lead stops seeing it. Work already done stays recorded.', 'Cancel route', async () => {
       const res = await cancelRoute(route.id);
       if (!res.ok) return showMessage('Couldn\'t cancel the route', res.error);
-      router.back();
+      onRouteCancelled?.();
     }, true);
   }
 
@@ -262,24 +248,8 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive, refre
     reload();
   }
 
-  if (loading) {
-    if (embedded) return <LoadingSpinner />;
-    return (
-      <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-        <ScreenHeader title="Route" />
-        <LoadingSpinner />
-      </View>
-    );
-  }
-  if (!route) {
-    if (embedded) return <InlineNotice icon="alert-circle" tone="error" text={error ?? 'This route is not available.'} />;
-    return (
-      <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-        <ScreenHeader title="Route" />
-        <EmptyState icon="map" title="Route not available" description={error ?? 'It may have been removed.'} />
-      </View>
-    );
-  }
+  if (loading) return <LoadingSpinner />;
+  if (!route) return <InlineNotice icon="alert-circle" tone="error" text={error ?? 'This route is not available.'} />;
 
   const editable = !route.cancelled && route.stormStatus !== 'ended';
   const leadName = leads.find((l) => l.personId === route.leadPersonId)?.name;
@@ -308,11 +278,6 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive, refre
         ) : null}
 
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
-        {!route.cancelled && !embedded ? (
-          <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-            Changes save as you make them. Tap Done when you are finished.
-          </Text>
-        ) : null}
         {route.cancelled ? <InlineNotice icon="slash" tone="warning" text="This route was cancelled." style={{ marginBottom: spacing.md }} /> : null}
 
         {route.stormStatus === 'dispatched' ? (
@@ -461,11 +426,10 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive, refre
                   const movable = editable && isGroupUntouched(g);
                   const status = groupStatus(g);
                   const live = route.stormStatus === 'dispatched';
-                  const detail = [
-                    servicesText(g.map((x) => x.service ?? route.service), svcLabel),
-                    stopNeedsPhotos(s, route) ? 'Photos required' : null,
-                    s.ownerNote ? 'Note' : null,
-                  ].filter(Boolean).join(' · ');
+                  // The address is the second line. The service is only named when the route does several (one service is already the
+                  // route's title); a camera shows only when photos ARE required and a note icon when one is set, and nothing is written out when photos are not needed.
+                  const where = [s.propertyAddress, several ? servicesText(g.map((x) => x.service ?? route.service), svcLabel) : null].filter(Boolean).join(' · ');
+                  const needsPhotos = stopNeedsPhotos(s, route);
                   return (
                     <View style={[styles.stopRow, i > 0 && sep]}>
                       <View style={[styles.stopNo, { borderColor: colors.border }]}>
@@ -481,7 +445,11 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive, refre
                         accessibilityLabel={`${s.propertyName}: photos and notes`}
                       >
                         <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{s.propertyName}</Text>
-                        <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{detail}</Text>
+                        <View style={styles.inline}>
+                          <Text style={[typeScale.caption, { color: colors.textSecondary, flexShrink: 1 }]} numberOfLines={1}>{where}</Text>
+                          {needsPhotos ? <Icon name="camera" size={12} color={colors.primary} /> : null}
+                          {s.ownerNote ? <Icon name="file-text" size={12} color={colors.primary} /> : null}
+                        </View>
                       </Pressable>
                       {movable ? (
                         <View style={styles.inline}>
@@ -513,13 +481,17 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive, refre
           ) : null}
         </SetupCard>
 
-        {!embedded ? (
-        <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
-          {route.stops.length && !several ? (
-            <Button title="Save as template" icon="copy" variant="secondary" onPress={onSaveTemplate} disabled={busy} fullWidth />
-          ) : null}
-          {editable ? <Button title="Cancel route" variant="ghost" onPress={onCancelRoute} disabled={busy} fullWidth /> : null}
-        </View>
+        {editable ? (
+          <View style={[styles.inline, { marginTop: spacing.md, justifyContent: 'center', gap: spacing.lg }]}>
+            {route.stops.length && !several ? (
+              <Pressable onPress={onSaveTemplate} disabled={busy} hitSlop={8} accessibilityRole="button" accessibilityLabel="Save this route as a template">
+                <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Save as template</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={onCancelRoute} disabled={busy} hitSlop={8} accessibilityRole="button" accessibilityLabel="Cancel this route">
+              <Text style={[typeScale.labelSmall, { color: colors.textTertiary }]}>Cancel route</Text>
+            </Pressable>
+          </View>
         ) : null}
 
         {embedded && route.stops.length ? (
@@ -577,40 +549,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive, refre
     </>
   );
 
-  if (embedded) return <View>{body}</View>;
-
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader
-        title={route.name}
-        subtitle={`${route.stormName} · ${servicesText(route.services, svcLabel)}`}
-        right={
-          <View style={styles.inline}>
-            <IconTap icon="edit-2" label="Rename route" onPress={() => { setRenameText(route.name); setRenaming(true); }} color={colors.textSecondary} />
-          <PressableScale
-            onPress={done}
-            disabled={busy}
-            scaleTo={0.92}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Done"
-            style={[styles.done, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}
-          >
-            <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary }]}>Done</Text>
-          </PressableScale>
-          </View>
-        }
-      />
-      <ScrollView
-        scrollEnabled={!dragging}
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
-        keyboardShouldPersistTaps="handled"
-      >
-      {body}
-      </ScrollView>
-    </View>
-  );
+  return <View>{body}</View>;
 }
 
 function IconTap({ icon, label, onPress, disabled, color }: { icon: React.ComponentProps<typeof Icon>['name']; label: string; onPress: () => void; disabled?: boolean; color: string }) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -62,6 +62,18 @@ export default function CustomerDetailScreen() {
   function handleCall() {
     if (!p.phone) return;
     Linking.openURL(`tel:${p.phone.replace(/[^\d+]/g, '')}`);
+  }
+
+  /** One Add button, two choices: a project, or a maintenance property. Either form opens already knowing this customer. */
+  function addForCustomer() {
+    const project = () => router.push(`/(owner)/project-new?customerId=${p.id}` as any);
+    const maintenance = () => router.push(`/(owner)/maintenance-property-edit?customerId=${p.id}` as any);
+    if (Platform.OS === 'web') { project(); return; }
+    Alert.alert(`Add for ${p.firstName}`, undefined, [
+      { text: 'Add project', onPress: project },
+      { text: 'Add maintenance property', onPress: maintenance },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   function handleEmail() {
@@ -131,10 +143,12 @@ export default function CustomerDetailScreen() {
               </Text>
               <Pressable
                 style={[styles.addProjectBtn, { backgroundColor: colors.backgroundTertiary }]}
-                onPress={() => router.push(`/(owner)/project-new?customerId=${p.id}` as any)}
+                onPress={addForCustomer}
+                accessibilityRole="button"
+                accessibilityLabel="Add a project or a maintenance property for this customer"
               >
                 <Icon name="plus" size={14} color={colors.textSecondary} />
-                <Text style={[typeScale.labelSmall, { color: colors.textSecondary, fontWeight: '600', marginLeft: 4 }]}>Add Project</Text>
+                <Text style={[typeScale.labelSmall, { color: colors.textSecondary, fontWeight: '600', marginLeft: 4 }]}>Add</Text>
               </Pressable>
             </View>
 

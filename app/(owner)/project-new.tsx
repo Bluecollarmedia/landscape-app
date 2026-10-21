@@ -43,7 +43,8 @@ export default function NewProjectScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  // `customerId` is set when this is opened from a customer's own page: that customer is already the customer, so it is not asked again.
+  const { editId, customerId: fromCustomer } = useLocalSearchParams<{ editId?: string; customerId?: string }>();
   const { project: existing, updateProject } = useProject(editId ?? '');
   const isEdit = !!editId && !!existing;
   const { allCustomers } = useCustomers();
@@ -58,7 +59,8 @@ export default function NewProjectScreen() {
   );
   const [checking, setChecking] = useState(false);
   const [notes, setNotes] = useState(existing?.notes ?? '');
-  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId);
+  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId ?? (editId ? undefined : fromCustomer));
+  const lockedCustomer = !editId && !!fromCustomer && allCustomers.some((c) => c.person.id === fromCustomer);
   const [propertyId, setPropertyId] = useState<string | undefined>(existing?.propertyId);
   const [startDate, setStartDate] = useState(existing?.startDate ?? '');
   const [endDate, setEndDate] = useState(existing?.estimatedEndDate ?? '');
@@ -268,6 +270,18 @@ export default function NewProjectScreen() {
             )}
           </Card>
 
+          {lockedCustomer ? (
+            <Card title="Customer" style={{ marginBottom: spacing.lg }}>
+              {(() => {
+                const c = allCustomers.find((x) => x.person.id === customerId);
+                return (
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
+                    {c ? `${c.person.firstName} ${c.person.lastName}`.trim() || c.person.email : 'Customer'}
+                  </Text>
+                );
+              })()}
+            </Card>
+          ) : (
           <Card title="Customer" style={{ marginBottom: spacing.lg }}>
             {customers.length === 0 ? (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
@@ -301,6 +315,7 @@ export default function NewProjectScreen() {
             )}
             <QuickAddCustomer onAdded={changeCustomer} />
           </Card>
+          )}
 
           <Card title="Project Info">
             <Input

@@ -184,7 +184,8 @@ export default function MaintenancePropertyEditScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ id?: string }>();
+  // `customerId` is set when this is opened from a customer's own page: that customer is already the customer, so it is not asked again.
+  const params = useLocalSearchParams<{ id?: string; customerId?: string }>();
   const detail = useMaintenanceProperty(params.id);
   const existing = detail?.property;
   const existingContract = detail ? detail.activeContract ?? detail.contracts[0] : undefined;
@@ -196,8 +197,9 @@ export default function MaintenancePropertyEditScreen() {
   );
   const { allCustomers, getCustomer } = useCustomers();
 
-  const [name, setName] = useState(existing?.name ?? '');
-  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId);
+  const fromCustomer = !params.id && params.customerId && allCustomers.some((c) => c.person.id === params.customerId) ? params.customerId : undefined;
+  const [name, setName] = useState(existing?.name ?? (fromCustomer ? `${getCustomer(fromCustomer)?.person.lastName ?? ''} Residence`.trim() : ''));
+  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId ?? fromCustomer);
   const [sourceProjectId, setSourceProjectId] = useState<string | undefined>(existing?.sourceProjectId);
   const [linkedPropertyId, setLinkedPropertyId] = useState<string | undefined>(existing?.propertyId);
   const [address, setAddress] = useState<AddressParts>({
@@ -389,10 +391,10 @@ export default function MaintenancePropertyEditScreen() {
             icon="user"
             title={customer ? `${customer.person.firstName} ${customer.person.lastName}` : 'Customer'}
             subtitle={customer ? 'Linked customer' : 'Optional · pick one or add a new customer'}
-            value={customer ? 'Change' : 'Choose'}
-            onPress={() => setPicking((v) => !v)}
+            value={fromCustomer ? undefined : customer ? 'Change' : 'Choose'}
+            onPress={fromCustomer ? undefined : () => setPicking((v) => !v)}
           />
-          {picking && (
+          {picking && !fromCustomer && (
             <View style={styles.pad}>
               <SearchBar value={customerSearch} onChangeText={setCustomerSearch} placeholder="Search customers" autoFocus={Platform.OS === 'web'} />
               {customerMatches.map((c) => (

@@ -8,11 +8,12 @@
  * picture behind the header only, white cards, summary, routes, services and
  * a history timeline). The lifecycle buttons and their wording are unchanged.
  */
-import { crewTag } from '@/lib/snowCrew';
+import { dispatchGaps } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, ImageBackground } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, LoadingSpinner, ProgressBar, ScreenHeader } from '@/components/ui';
 import { SnowPill } from '@/components/snow/SnowPill';
 import { snowStatus } from '@/theme/colors';
@@ -21,7 +22,7 @@ import { confirmAction, showMessage } from '@/components/financials/ActionSheet'
 import { useTheme } from '@/providers/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
-  deleteDraftStorm, dispatchStorm, endStorm, endStormConfirmation, loadEligibleProperties, loadStormRoutes,
+  deleteDraftStorm, dispatchStorm, endStorm, endStormConfirmation, loadStormRoutes,
   previewEndStorm, reopenStorm, setStormServices, SERVICE_LABEL, STORM_STATUS_LABEL,
   type StormRouteRow, type StormSummary,
 } from '@/data/snowStorms';
@@ -46,7 +47,6 @@ export function StormDetailScreen() {
   const [storm, setStorm] = useState<SnowStorm | null>(null);
   const [summary, setSummary] = useState<StormSummary | null>(null);
   const [routes, setRoutes] = useState<StormRouteRow[]>([]);
-  const [eligible, setEligible] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const ensured = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,10 +81,6 @@ export function StormDetailScreen() {
       const again = await loadStormRoutes(id);
       if (ticket === latest.current && again.ok) setRoutes(again.data);
     }
-    if (s.data.storm.status === 'draft') {
-      const e = await loadEligibleProperties(id);
-      if (ticket === latest.current && e.ok) setEligible(e.data.length);
-    }
   }, [id]);
 
   useEffect(() => {
@@ -116,6 +112,8 @@ export function StormDetailScreen() {
 
   function onDispatch() {
     if (!storm) return;
+    const gaps = dispatchGaps(routes.filter((r) => !r.cancelled));
+    if (gaps.length) return showMessage('Not ready to dispatch', `${gaps.join('. ')}.`);
     confirmAction(
       `Dispatch ${storm.name}?`,
       'Route leads can start their routes. You can still add stops, reorder and reassign leads after dispatching.',
@@ -184,7 +182,7 @@ export function StormDetailScreen() {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView
         scrollEnabled={!dragging}
-        contentContainerStyle={{ paddingBottom: insets.bottom + spacing['4xl'] }}
+        contentContainerStyle={{ paddingBottom: storm.status === 'draft' ? spacing['2xl'] : insets.bottom + spacing['4xl'] }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* The header picture is decorative: it sits behind the title only and never behind the cards. */}
@@ -194,12 +192,13 @@ export function StormDetailScreen() {
           style={[styles.header, { paddingTop: insets.top + spacing.sm }]}
           accessibilityIgnoresInvertColors
         >
+          <LinearGradient pointerEvents="none" colors={['transparent', colors.groupedBackground]} style={styles.headerFade} />
           <View style={styles.headerTop}>
             <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back" />
             <SnowPill label={STORM_STATUS_LABEL[storm.status]} fg={tone.fg} bg={tone.bg} />
           </View>
-          <Text style={[styles.title, { color: colors.textPrimary }]} accessibilityRole="header">{storm.name}</Text>
-          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: 2 }]}>{servicesText}</Text>
+          <Text style={[styles.title, { color: colors.textPrimary }]} accessibilityRole="header">{`${servicesText} Route`}</Text>
+          <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>{storm.name}</Text>
         </ImageBackground>
 
         <View style={styles.body}>
@@ -238,31 +237,29 @@ export function StormDetailScreen() {
                 <RouteEditor routeId={r.id} embedded onDragActive={setDragging} />
               </View>
             ))}
-            {storm.status === 'draft' && eligible !== null ? (
-              <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary }]}>
-                {eligible === 0
-                  ? `No active properties offer ${servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x].toLowerCase())} yet. Turn the service on for a property first.`
-                  : `${eligible} ${eligible === 1 ? 'property offers' : 'properties offer'} ${servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x].toLowerCase())}.`}
-              </Text>
-            ) : null}
           </View>
 
-          <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
-            {storm.status === 'draft' ? (
-              <>
-                <Button title="Dispatch storm" icon="send" onPress={onDispatch} loading={busy} fullWidth size="lg" />
-                <Button title="Delete draft" variant="ghost" onPress={onDelete} disabled={busy} fullWidth />
-              </>
-            ) : null}
-            {storm.status === 'dispatched' ? (
-              <Button title="End storm" icon="flag" variant="danger" onPress={onEnd} loading={busy} fullWidth size="lg" />
-            ) : null}
-            {storm.status === 'ended' ? (
-              <Button title="Reopen storm" icon="rotate-ccw" variant="secondary" onPress={onReopen} loading={busy} fullWidth size="lg" />
-            ) : null}
-          </View>
+          {storm.status !== 'draft' ? (
+            <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
+              {storm.status === 'dispatched' ? (
+                <Button title="End storm" icon="flag" variant="danger" onPress={onEnd} loading={busy} fullWidth size="lg" />
+              ) : null}
+              {storm.status === 'ended' ? (
+                <Button title="Reopen storm" icon="rotate-ccw" variant="secondary" onPress={onReopen} loading={busy} fullWidth size="lg" />
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </ScrollView>
+      {storm.status === 'draft' ? (
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + spacing.sm, backgroundColor: colors.groupedBackground }]}>
+          <Button title="Dispatch Storm" icon="send" onPress={onDispatch} loading={busy} fullWidth size="lg" />
+          <Button title="Save Draft" variant="ghost" onPress={() => router.back()} disabled={busy} fullWidth />
+          <Pressable onPress={onDelete} disabled={busy} hitSlop={8} accessibilityRole="button" accessibilityLabel="Delete draft">
+            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Delete draft</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -278,7 +275,9 @@ function Stat({ label, value, color, sub, divider }: { label: string; value: num
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { minHeight: 210, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  header: { minHeight: 176, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  headerFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 70 },
+  bottomBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.xs, alignItems: 'center' },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.4 },
   body: { paddingHorizontal: spacing.lg, marginTop: -spacing.md },

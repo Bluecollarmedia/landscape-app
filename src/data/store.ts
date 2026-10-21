@@ -71,6 +71,7 @@ const TABLES = {
   customer_timeline: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'eventType', 'title', 'description', 'photoUrl', 'timestamp'] },
   truck_documents: { scope: 'company', cols: ['id', 'companyId', 'truckId', 'kind', 'title', 'fileUrl', 'fileKey', 'contentType', 'sizeBytes', 'expiresOn', 'createdBy', 'createdAt', 'updatedAt'] },
   truck_notes: { scope: 'company', cols: ['id', 'companyId', 'truckId', 'body', 'createdBy', 'createdAt', 'updatedAt'] },
+  truck_maintenance: { scope: 'company', cols: ['id', 'companyId', 'truckId', 'title', 'servicedOn', 'dueOn', 'notes', 'createdBy', 'createdAt', 'updatedAt'] },
   owner_project_notes: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'body', 'createdBy', 'createdAt', 'updatedAt'] },
   owner_project_photos: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'fileUrl', 'fileKey', 'caption', 'createdBy', 'createdAt', 'updatedAt'] },
   owner_material_lists: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'title', 'items', 'sourceText', 'createdBy', 'createdAt', 'updatedAt'] },

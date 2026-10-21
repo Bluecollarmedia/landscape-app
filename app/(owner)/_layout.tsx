@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { ScheduleProvider } from '@/providers/ScheduleProvider';
 import { useMaterialReminders } from '@/hooks/useMaterialReminders';
+import { useTruckReminders } from '@/hooks/useTruckReminders';
 
 /**
  * Stack that sits above the (tabs) navigator. Screens declared here with
@@ -12,6 +13,8 @@ import { useMaterialReminders } from '@/hooks/useMaterialReminders';
 export default function OwnerLayout() {
   // Materials prep reminders on this phone (see lib/materialReminders.ts).
   useMaterialReminders(true);
+  // Truck maintenance due-date reminders on this phone (see lib/truckReminders.ts).
+  useTruckReminders(true);
   return (
     <ScheduleProvider>
       <Stack screenOptions={{ headerShown: false }}>
@@ -43,6 +46,7 @@ export default function OwnerLayout() {
         <Stack.Screen name="document-edit" options={{ presentation: 'modal', gestureEnabled: false }} />
         {/* Maintenance property + contract form: opened from Maintenance and from a route. */}
         <Stack.Screen name="maintenance-property-edit" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="maintenance-service-add" options={{ presentation: 'modal' }} />
         {/* Snow Mode activity log: opened from the snow dashboard and settings. */}
         <Stack.Screen name="snow-activity" />
         {/* Reported problems: opened from the dashboard card, More, and a notification. */}

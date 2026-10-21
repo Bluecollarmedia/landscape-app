@@ -46,6 +46,23 @@ export interface TruckDocument {
   updatedAt: string;
 }
 
+/** One entry in a truck's maintenance log: what was done, when, and when it is next due. Owner only. */
+export interface TruckMaintenance {
+  id: string;
+  companyId: string;
+  truckId: string;
+  title: string;
+  /** YYYY-MM-DD: the day the service was done. */
+  servicedOn: string;
+  /** YYYY-MM-DD: when it is next due. The owner is reminded on this day. */
+  dueOn?: string;
+  /** What was done. */
+  notes?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** The owner's private dated note about one truck. Nobody else can see it. */
 export interface TruckNote {
   id: string;

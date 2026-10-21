@@ -8,7 +8,8 @@ let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + detail}`); };
 
 const must = {
-  'src/components/trucks/TruckPrivateSection.tsx': 2,
+  'src/components/trucks/TruckMaintenanceSheet.tsx': 1,
+  'src/components/trucks/TruckDocumentSheet.tsx': 1,
   'src/components/projects/ProjectPrivateNotes.tsx': 2,
   'app/(owner)/(tabs)/more/payroll.tsx': 2,
   'app/(owner)/(tabs)/more/storage.tsx': 3,

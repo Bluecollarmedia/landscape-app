@@ -742,7 +742,7 @@ export default function ProjectDetailScreen() {
                 {i > 0 && <Divider style={{ marginHorizontal: spacing.md }} />}
                 <Pressable
                   style={styles.teamRow}
-                  onPress={() => router.push(`/(owner)/workers/${member.personId}`)}
+                  onPress={() => router.push(`/(owner)/workers/${member.personId}` as any)}
                 >
                   <Avatar
                     firstName={member.person?.firstName ?? '?'}

@@ -47,6 +47,8 @@ export default function WorkerSettingsScreen() {
       <Pressable
         style={[styles.profileCard, { backgroundColor: colors.surface }, shadow.sm]}
         onPress={() => router.push('/(worker)/edit-profile' as any)}
+        accessibilityRole="button"
+        accessibilityLabel="Edit your profile and photo"
       >
         <View style={styles.profileRow}>
           <View style={styles.avatarWrap}>
@@ -66,9 +68,6 @@ export default function WorkerSettingsScreen() {
           </View>
           <Feather name="chevron-right" size={18} color={colors.textTertiary} />
         </View>
-        <Text style={[typeScale.bodyMedium, { color: colors.primary, fontWeight: '600', marginTop: spacing.sm }]}>
-          Edit Profile
-        </Text>
       </Pressable>
 
       <ListSection title="Preferences">

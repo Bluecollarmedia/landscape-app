@@ -12,6 +12,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { Input, Button } from '@/components/ui';
 import { SignupPhotoPicker } from '@/components/account/SignupPhotoPicker';
 import { saveSignupPhoto } from '@/data/signupPhoto';
+import { stashPendingSignup } from '@/data/pendingSignup';
 import { AddressFields, missingAddressPart } from '@/components/ui/AddressFields';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -172,13 +173,15 @@ export default function CreateCompanyScreen() {
       if (photoUri && !result.needsEmailConfirmation) {
         const saved = await saveSignupPhoto(photoUri);
         if (!saved.ok) {
-          const note = `Your account is ready, but your profile photo wasn't saved. ${saved.error} You can add it in Edit Profile.`;
+          const note = `Your account is ready, but your profile photo wasn't saved. ${saved.error} You can add it by tapping your name in Settings.`;
           if (Platform.OS === 'web') alert(note);
           else Alert.alert('Photo not saved', note);
         }
       }
       if (result.needsEmailConfirmation) {
-        const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in. Your company is already set up.`;
+        // Not signed in yet: keep the photo on the phone and save it at first sign-in.
+        await stashPendingSignup({ email: email.trim(), photoUri });
+        const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in. Your company is already set up.${photoUri ? ' Your photo is saved and will be added then.' : ''}`;
         if (Platform.OS === 'web') alert(msg);
         else Alert.alert('Check your email', msg);
         router.replace('/(auth)/login');

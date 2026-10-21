@@ -8,7 +8,7 @@ import React from 'react';
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
-import { ListSection } from '@/components/ui';
+import { Avatar, ListSection } from '@/components/ui';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useModeSwitch } from '@/components/snow/ModeSwitchRow';
 import { OwnerCustomerMessages, OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
@@ -82,7 +82,7 @@ export default function SnowOwnerMoreScreen() {
           </Group>
 
           <Group title="You">
-            <Row icon="user" title="Your profile and photo" onPress={() => router.push('/snow/owner/edit-profile' as any)} />
+            <ProfileCard onPress={() => router.push('/snow/owner/edit-profile' as any)} />
             {mode.canSwitch ? <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} /> : null}
           </Group>
 
@@ -101,6 +101,27 @@ export default function SnowOwnerMoreScreen() {
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+/** Your name, email and photo. Tapping it is the one way to the profile screen. */
+function ProfileCard({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
+  const { user } = useAuth();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Edit your profile and photo"
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfacePressed }]}
+    >
+      <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={48} uri={user?.avatarUrl} />
+      <View style={{ flex: 1 }}>
+        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{user?.firstName} {user?.lastName}</Text>
+        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]} numberOfLines={1}>{user?.email}</Text>
+      </View>
+      <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+    </Pressable>
   );
 }
 

@@ -173,7 +173,7 @@ export default function InviteScreen() {
       if (birthdayIso) await saveBirthdayForCurrentUser(birthdayIso);
       if (isWorker) {
         const note = await saveDetailsForCurrentUser({ hoodieSize: hoodie, idUri });
-        if (note) say('Not saved', `You're in, but ${note} You can add your hoodie size and ID later in Settings → Edit Profile.`);
+        if (note) say('Not saved', `You're in, but ${note} You can add your hoodie size and ID later by tapping your name in Settings.`);
       }
       if (photoUri) {
         try {
@@ -185,7 +185,7 @@ export default function InviteScreen() {
           }
         } catch (photoErr) {
           const why = photoErr instanceof Error ? photoErr.message : 'Unknown error';
-          say('Photo not saved', `You're in, but your profile photo wasn't saved. ${why} You can add it later in Settings → Edit Profile.`);
+          say('Photo not saved', `You're in, but your profile photo wasn't saved. ${why} You can add it later by tapping your name in Settings.`);
         }
       }
       await goHome();

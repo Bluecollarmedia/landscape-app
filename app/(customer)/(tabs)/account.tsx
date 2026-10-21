@@ -1,7 +1,7 @@
 import { LegalSection } from '@/components/legal/LegalSection';
 import { useMyMaintenanceProperties } from '@/data/maintenanceCustomer';
 import React from 'react';
-import { View, Text, Linking } from 'react-native';
+import { View, Text, Linking, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -10,6 +10,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { ScreenContainer } from '@/components/layout';
 import { Avatar, ListSection, ListRow } from '@/components/ui';
+import { Icon } from '@/components/ui/Icon';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import { db, useDb } from '@/data/store';
@@ -32,7 +33,12 @@ export default function CustomerAccountScreen() {
       </View>
 
       <ListSection>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm }}>
+        <Pressable
+          onPress={() => router.push('/(customer)/edit-profile' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Edit your profile and photo"
+          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm }}
+        >
           <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={52} uri={user?.avatarUrl} />
           <View style={{ marginLeft: spacing.md, flex: 1 }}>
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
@@ -42,15 +48,8 @@ export default function CustomerAccountScreen() {
               {user?.email}
             </Text>
           </View>
-        </View>
-        <ListRow
-          icon="edit-2"
-          iconColor={colors.primary}
-          title="Edit profile & photo"
-          subtitle="Your name, phone and picture"
-          showChevron
-          onPress={() => router.push('/(customer)/edit-profile' as any)}
-        />
+          <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+        </Pressable>
       </ListSection>
 
       {myMaintenance.length > 0 ? (

@@ -71,7 +71,7 @@ export default function SignUpScreen() {
       if (photoUri && !result.needsEmailConfirmation) {
         const saved = await saveSignupPhoto(photoUri);
         if (!saved.ok) {
-          const note = `Your account is ready, but your profile photo wasn't saved. ${saved.error} You can add it in Edit Profile.`;
+          const note = `Your account is ready, but your profile photo wasn't saved. ${saved.error} You can add it by tapping your name in Settings.`;
           if (Platform.OS === 'web') alert(note);
           else Alert.alert('Photo not saved', note);
         }

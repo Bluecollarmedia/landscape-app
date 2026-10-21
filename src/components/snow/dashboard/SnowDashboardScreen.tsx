@@ -13,7 +13,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useSnowDashboard } from '@/hooks/useSnowDashboard';
 import { SERVICE_LABEL } from '@/data/snowStorms';
-import { LONG_OPEN_SHIFT_HOURS, type AttentionItem, type StormOverview } from '@/data/snowDashboard';
+import type { AttentionItem, StormOverview } from '@/data/snowDashboard';
 import { snowDashboardHref } from '@/lib/snowLinks';
 import {
   crewRows, dispatchedLabel, otherStorms, pickActiveStorm, stormHeadline, type CrewRow, type CrewStatus, type StormHeadline,
@@ -53,7 +53,7 @@ export function SnowDashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
-  const { state, storms, needsAttention, shiftsChecked, clockedInCount, refreshing, onRefresh, reload } = useSnowDashboard();
+  const { state, storms, needsAttention, refreshing, onRefresh, reload } = useSnowDashboard();
 
   const active = pickActiveStorm(storms);
   const headline = active ? stormHeadline(active) : undefined;
@@ -108,8 +108,8 @@ export function SnowDashboardScreen() {
 
         {active && headline ? (
           <>
-            <ActiveStormCard storm={active} headline={headline} onOpen={() => openStorm(active.id)} />
-            <CrewsSection storm={active} headline={headline} onOpenStorm={() => openStorm(active.id)} onOpenRoute={(routeId) => openRoute(active.id, routeId)} />
+            <ActiveStormCard storm={active} headline={headline} />
+            <CrewsSection storm={active} headline={headline} onOpenStorm={() => openStorm(active.id)} />
           </>
         ) : (
           <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }]}>
@@ -119,53 +119,37 @@ export function SnowDashboardScreen() {
           </View>
         )}
 
-        <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>
-          Needs attention{needsAttention.length ? ` (${needsAttention.length})` : ''}
-        </Text>
-        {!shiftsChecked && (
-          <InlineNotice
-            icon="clock"
-            tone="neutral"
-            text="Time records aren't checked: snow clock in and out isn't set up on this database yet."
-            style={{ marginBottom: spacing.sm }}
-          />
-        )}
-        {needsAttention.length === 0 ? (
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Nothing is waiting on you.</Text>
-          </View>
-        ) : (
-          <View style={[styles.card, { backgroundColor: colors.surface, paddingVertical: 0 }]}>
-            {needsAttention.map((item, i) => (
-              <Pressable
-                key={item.key}
-                onPress={() => router.push(snowDashboardHref(item.target))}
-                style={({ pressed }) => [
-                  styles.row,
-                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
-                  pressed && { opacity: 0.6 },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.title}. ${item.detail}`}
-              >
-                <Icon name={ATTENTION_ICON[item.kind]} size={18} color={colors.warning} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{item.title}</Text>
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{item.detail}</Text>
-                </View>
-                <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-              </Pressable>
-            ))}
-          </View>
-        )}
-        {shiftsChecked && (
-          <Pressable onPress={() => router.push('/snow/owner/hours')} accessibilityRole="button" style={styles.clockedIn}>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-              {clockedInCount} clocked in now · shifts open over {LONG_OPEN_SHIFT_HOURS} hours are listed above
+        {/* Only shown when something really needs you (for example a shift left open for hours); an empty list is just noise.
+            Worker hours live in More > Snow hours. */}
+        {needsAttention.length > 0 ? (
+          <>
+            <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>
+              Needs attention ({needsAttention.length})
             </Text>
-            <Icon name="chevron-right" size={14} color={colors.textTertiary} />
-          </Pressable>
-        )}
+            <View style={[styles.card, { backgroundColor: colors.surface, paddingVertical: 0 }]}>
+              {needsAttention.map((item, i) => (
+                <Pressable
+                  key={item.key}
+                  onPress={() => router.push(snowDashboardHref(item.target))}
+                  style={({ pressed }) => [
+                    styles.row,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.title}. ${item.detail}`}
+                >
+                  <Icon name={ATTENTION_ICON[item.kind]} size={18} color={colors.warning} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{item.title}</Text>
+                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{item.detail}</Text>
+                  </View>
+                  <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {others.length > 0 && (
           <>
@@ -183,7 +167,8 @@ export function SnowDashboardScreen() {
 }
 
 /** The whole-storm picture: name, services, status, the four numbers, one bar and a sentence. */
-function ActiveStormCard({ storm, headline, onOpen }: { storm: StormOverview; headline: StormHeadline; onOpen: () => void }) {
+/** Read-only: the dashboard has one way into the storm ("View all" under Crews), so the card itself doesn't navigate. */
+function ActiveStormCard({ storm, headline }: { storm: StormOverview; headline: StormHeadline }) {
   const { colors } = useTheme();
   const services = servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x]);
   const crews = `${headline.routeCount} ${headline.routeCount === 1 ? 'Crew' : 'Crews'}`;
@@ -196,12 +181,7 @@ function ActiveStormCard({ storm, headline, onOpen }: { storm: StormOverview; he
   ];
   return (
     <View style={[styles.heroCard, { backgroundColor: colors.surface }]}>
-      <Pressable
-        onPress={onOpen}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${storm.name}`}
-        style={[styles.heroBand, { backgroundColor: colors.primaryDark }]}
-      >
+      <View style={[styles.heroBand, { backgroundColor: colors.primaryDark }]}>
         <View style={{ flex: 1 }}>
           <Text style={[typeScale.headingLarge, { color: '#FFFFFF' }]} numberOfLines={2}>{storm.name}</Text>
           <Text style={[typeScale.bodyMedium, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]} numberOfLines={1}>
@@ -210,7 +190,7 @@ function ActiveStormCard({ storm, headline, onOpen }: { storm: StormOverview; he
           </Text>
         </View>
         <Pill label={headline.stateLabel} tone={stateTone} onDark />
-      </Pressable>
+      </View>
       <View style={styles.heroBody}>
         <View style={styles.statRow}>
           {stats.map((s) => (
@@ -233,8 +213,8 @@ function ActiveStormCard({ storm, headline, onOpen }: { storm: StormOverview; he
   );
 }
 
-function CrewsSection({ storm, headline, onOpenStorm, onOpenRoute }: {
-  storm: StormOverview; headline: StormHeadline; onOpenStorm: () => void; onOpenRoute: (routeId: string) => void;
+function CrewsSection({ storm, headline, onOpenStorm }: {
+  storm: StormOverview; headline: StormHeadline; onOpenStorm: () => void;
 }) {
   const { colors } = useTheme();
   const rows = crewRows(storm);
@@ -259,47 +239,32 @@ function CrewsSection({ storm, headline, onOpenStorm, onOpenRoute }: {
       ) : (
         <>
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-            View each crew's progress and open their routes.
+            Each crew's progress. Tap View all to open the routes.
           </Text>
           <View style={{ gap: spacing.sm }}>
-            {rows.map((r) => <CrewRowView key={r.id} row={r} onPress={() => onOpenRoute(r.id)} />)}
+            {rows.map((r) => <CrewRowView key={r.id} row={r} />)}
           </View>
           {headline.cancelledRoutes > 0 ? (
             <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs, marginLeft: spacing.sm }]}>
               {headline.cancelledRoutes} cancelled route{headline.cancelledRoutes === 1 ? ' isn’t' : 's aren’t'} counted.
             </Text>
           ) : null}
-          <Pressable
-            onPress={onOpenStorm}
-            accessibilityRole="button"
-            accessibilityLabel="View all routes. See the full route list and details"
-            style={({ pressed }) => [styles.allRoutes, { backgroundColor: colors.surface, borderColor: colors.borderLight }, pressed && { opacity: 0.7 }]}
-          >
-            <View style={[styles.allRoutesIcon, { backgroundColor: colors.primarySurface }]}>
-              <Icon name="map-pin" size={18} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>View all routes</Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>See the full route list and details</Text>
-            </View>
-            <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-          </Pressable>
         </>
       )}
     </>
   );
 }
 
-function CrewRowView({ row, onPress }: { row: CrewRow; onPress: () => void }) {
+/** Read-only progress for one crew; the way in is "View all" in the Crews header. */
+function CrewRowView({ row }: { row: CrewRow }) {
   const { colors } = useTheme();
   const tone = STATUS_TONE[row.status];
   const count = row.total ? `${row.completed} / ${row.total}` : '0 stops';
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${row.name}. ${row.leadLabel}. ${row.completed} of ${row.total} stops, ${row.percent} percent. ${row.statusLabel}`}
-      style={({ pressed }) => [styles.crewRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }, pressed && { opacity: 0.7 }]}
+    <View
+      accessible
+      accessibilityLabel={`${row.name}. ${row.leadLabel}. ${row.completed} of ${row.total} stops, ${row.percent} percent. ${row.statusLabel}`}
+      style={[styles.crewRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
     >
       <View style={[styles.avatar, { backgroundColor: colors.primarySurface }]}>
         <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{row.initials}</Text>
@@ -318,8 +283,7 @@ function CrewRowView({ row, onPress }: { row: CrewRow; onPress: () => void }) {
           <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{row.skipped} skipped</Text>
         ) : null}
       </View>
-      <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-    </Pressable>
+    </View>
   );
 }
 
@@ -386,7 +350,6 @@ const styles = StyleSheet.create({
   label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },
   card: { borderRadius: radius.lg, padding: spacing.lg },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, minHeight: 44 },
-  clockedIn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm, marginLeft: spacing.sm, minHeight: 32 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.full, alignSelf: 'flex-start' },
   pillDot: { width: 6, height: 6, borderRadius: 3 },
   heroCard: { borderRadius: radius.xl, overflow: 'hidden', marginTop: spacing.lg },
@@ -399,8 +362,6 @@ const styles = StyleSheet.create({
   crewRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
   crewTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  allRoutes: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, marginTop: spacing.md },
-  allRoutesIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   stormHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   routeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, marginTop: spacing.md, paddingTop: spacing.md, minHeight: 44 },
   routeTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

@@ -30,15 +30,6 @@ function fromDb<T>(row: Row): T {
 
 // ── Customer preferences ────────────────────────────────────────────────────
 
-/** Preferences for one property (owner/admin, or a linked customer contact). */
-export async function loadNotifyPrefs(propertyId: string): Promise<Result<SnowNotifyPrefs | null>> {
-  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const { data, error } = await supabase
-    .from('snow_property_notify_prefs').select('*').eq('property_id', propertyId).maybeSingle();
-  if (error) return fail(error.message);
-  return ok(data ? fromDb<SnowNotifyPrefs>(data) : null);
-}
-
 /** Every property's preferences this person may see, keyed by property id. */
 export async function loadAllNotifyPrefs(): Promise<Result<Record<string, SnowNotifyPrefs>>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
@@ -85,50 +76,6 @@ export async function setOwnerStopAlerts(companyId: string, enabled: boolean): P
   if (error) return fail(error.message);
   if (!data?.length) return fail('Only the owner or an admin can change this.');
   return ok(undefined);
-}
-
-// ── Notification records (owner/admin) ──────────────────────────────────────
-
-export async function loadSnowNotifications(filter: {
-  stormId?: string; visitId?: string; propertyId?: string; limit?: number;
-} = {}): Promise<Result<SnowNotification[]>> {
-  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  let q = supabase
-    .from('snow_notifications')
-    .select('*, deliveries:snow_notification_deliveries(*)')
-    .order('created_at', { ascending: false })
-    .limit(filter.limit ?? 200);
-  if (filter.stormId) q = q.eq('storm_id', filter.stormId);
-  if (filter.visitId) q = q.eq('visit_id', filter.visitId);
-  if (filter.propertyId) q = q.eq('property_id', filter.propertyId);
-  const { data, error } = await q;
-  if (error) return fail(error.message);
-  return ok((data ?? []).map((row: Row) => {
-    const n = fromDb<SnowNotification>(row);
-    n.deliveries = ((row.deliveries as Row[]) ?? []).map((d) => fromDb<SnowNotificationDelivery>(d));
-    return n;
-  }));
-}
-
-/** After this long without an answer, a pending channel most likely never went out. */
-const SENDER_SILENT_MS = 15 * 60 * 1000;
-
-/**
- * Plain words for one channel's state. Never says "delivered" for anything
- * the provider merely accepted.
- */
-export function describeDelivery(d: SnowNotificationDelivery, now = Date.now()): { label: string; tone: 'ok' | 'waiting' | 'problem' } {
-  const channel = d.channel === 'in_app' ? 'In app' : d.channel === 'push' ? 'Push' : 'Email';
-  const s: SnowDeliveryStatus = d.status;
-  if (s === 'stored') return { label: `${channel}: saved in their notifications`, tone: 'ok' };
-  if (s === 'delivered') return { label: `${channel}: delivered`, tone: 'ok' };
-  if (s === 'accepted') return { label: `${channel}: sent (not yet confirmed received)`, tone: 'ok' };
-  if (s === 'failed') return { label: `${channel}: failed${d.detail ? ` (${d.detail})` : ''}`, tone: 'problem' };
-  if (s === 'unavailable') return { label: `${channel}: not sent${d.detail ? ` (${d.detail})` : ''}`, tone: 'problem' };
-  if (now - new Date(d.createdAt).getTime() > SENDER_SILENT_MS) {
-    return { label: `${channel}: no answer from the sender, probably not sent`, tone: 'problem' };
-  }
-  return { label: `${channel}: sending…`, tone: 'waiting' };
 }
 
 // ── A customer's own properties ─────────────────────────────────────────────

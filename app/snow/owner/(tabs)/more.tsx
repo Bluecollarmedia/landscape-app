@@ -1,16 +1,19 @@
 /**
- * Snow Mode More (Owner). The header is one bundled picture (snow-mode-more-header.png: the green leaf, the blue "Snow Mode"
- * wordmark, the "More" title and the snowy evergreens). Everything under it is real, working controls in grouped white cards.
- * Destinations, the alert switch, the mode switch, legal pages, Sign Out and Delete Account are the same ones as before.
+ * Snow Mode More (Owner): the ONE place for every Snow setting. The header is one bundled picture (snow-mode-more-header.png: the
+ * green leaf, the blue "Snow Mode" wordmark, the "More" title and the snowy evergreens). Everything under it is real, working
+ * controls in grouped white cards: the rules and alerts, customer messages, records, storm management, your profile and mode,
+ * legal pages, Sign Out and Delete Account. Team and Properties have their own tabs, so they are not repeated here.
  */
 import React from 'react';
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
-import { ListSection } from '@/components/ui';
+import { Avatar, ListSection } from '@/components/ui';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useModeSwitch } from '@/components/snow/ModeSwitchRow';
-import { OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
+import { OwnerCustomerMessages, OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
+import { StopRuleToggle } from '@/components/snow/settings/StopRuleToggle';
+import { AutoShareToggle } from '@/components/snow/settings/AutoShareToggle';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -55,37 +58,39 @@ export default function SnowOwnerMoreScreen() {
         />
 
         <View style={{ paddingTop: headerHeight * (1 - HEADER_OVERLAP), paddingHorizontal: spacing.lg }}>
-          <Group title="Settings">
-            <Row icon="settings" title="Snow settings" subtitle="Stop rule, alerts, team and customers" onPress={() => router.push('/snow/owner/settings')} />
-          </Group>
+          {db.companyId ? (
+            <Group title="Rules">
+              <StopRuleToggle companyId={db.companyId} />
+              <AutoShareToggle companyId={db.companyId} />
+            </Group>
+          ) : null}
+
+          {db.companyId ? (
+            <Group title="Alerts">
+              <OwnerStopAlertsToggle companyId={db.companyId} bare />
+              <OwnerCustomerMessages />
+            </Group>
+          ) : null}
 
           <Group title="Records">
             <Row icon="activity" title="Activity log" subtitle="Everything that happened, by storm, route and person" onPress={() => router.push('/snow/owner/activity')} />
             <Row icon="clock" title="Snow hours" subtitle="Who clocked in this week, and fix a missed clock-out" onPress={() => router.push('/snow/owner/hours')} />
             <Row icon="send" title="Message customers" subtitle="Send a push notification and banner to customers" onPress={() => router.push('/snow/owner/message-customers')} />
-            <Row icon="camera" title="Photo review" subtitle="Approve photos and send updates to customers" onPress={() => router.push('/snow/owner/review')} />
+            <Row icon="camera" title="Photo review" subtitle="See what customers were sent, and withdraw a photo if needed" onPress={() => router.push('/snow/owner/review')} />
           </Group>
 
-          {db.companyId ? (
-            <Group title="Alerts">
-              <OwnerStopAlertsToggle companyId={db.companyId} bare />
-            </Group>
-          ) : null}
+          <Group title="Storms">
+            <Row icon="trash-2" title="Manage storms" subtitle="Delete any storm, even an ended one" onPress={() => router.push('/snow/owner/manage-storms' as any)} />
+          </Group>
 
-          {mode.canSwitch ? (
-            <Group title="Mode">
-              <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} />
-            </Group>
-          ) : null}
-
-          <Group title="Legal & Support">
-            <Row compact icon="shield" title="Privacy Policy" onPress={() => router.push('/legal/privacy' as any)} />
-            <Row compact icon="file-text" title="Terms of Use" onPress={() => router.push('/legal/terms' as any)} />
-            <Row compact icon="help-circle" title="Help & Support" onPress={() => router.push('/legal/support' as any)} />
+          <Group title="You">
+            <ProfileCard onPress={() => router.push('/snow/owner/edit-profile' as any)} />
+            {mode.canSwitch ? <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} /> : null}
           </Group>
 
           <Group title="Account">
-            <Row icon="log-out" title="Sign Out" destructive onPress={signOut} single />
+            <Row icon="shield" title="Legal & Support" subtitle="Privacy Policy, Terms of Use and Help" onPress={() => router.push('/snow/legal-support' as any)} />
+            <Row icon="log-out" title="Sign Out" destructive onPress={signOut} />
           </Group>
           <ListSection>
             <DeleteAccountRow />
@@ -93,6 +98,27 @@ export default function SnowOwnerMoreScreen() {
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+/** Your name, email and photo. Tapping it is the one way to the profile screen. */
+function ProfileCard({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
+  const { user } = useAuth();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Edit your profile and photo"
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfacePressed }]}
+    >
+      <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={48} uri={user?.avatarUrl} />
+      <View style={{ flex: 1 }}>
+        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{user?.firstName} {user?.lastName}</Text>
+        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]} numberOfLines={1}>{user?.email}</Text>
+      </View>
+      <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+    </Pressable>
   );
 }
 

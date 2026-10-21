@@ -28,17 +28,6 @@ export function nextCrew(current: string[], personId: string, add: boolean): str
   return current.filter((id) => id !== personId);
 }
 
-/** "No crew", "1 crew member", "3 crew members". */
-export function crewCountLabel(n: number): string {
-  if (n <= 0) return 'No crew';
-  return `${n} crew ${n === 1 ? 'member' : 'members'}`;
-}
-
-/** Short tag for a storm's route row: "+2 crew", or nothing when there is none. */
-export function crewTag(n: number): string {
-  return n > 0 ? `+${n} crew` : '';
-}
-
 /** Which role shows for a route: the database's answer, or lead for databases without update 41 (only leads can see routes there). */
 export function roleFor(roles: Map<string, RouteRole> | null, routeId: string): RouteRole {
   return roles?.get(routeId) ?? 'lead';
@@ -59,11 +48,6 @@ export function crewAfterLeadChange(crewIds: string[], oldLead: string | undefin
   const next = crewIds.filter((id) => id !== newLead);
   if (oldLead && oldLead !== newLead && !next.includes(oldLead)) next.push(oldLead);
   return next;
-}
-
-/** "No stops", "1 stop", "5 stops added". */
-export function stopsAddedLabel(n: number): string {
-  return `${n} ${n === 1 ? 'stop' : 'stops'} added`;
 }
 
 /** What is still missing before a draft storm can go out (the database still has the final say). */

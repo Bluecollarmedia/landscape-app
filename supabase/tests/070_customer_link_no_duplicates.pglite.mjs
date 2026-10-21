@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import { buildFullSchema } from './helpers/fullSchema.mjs';
 
 const repo = process.argv[2];
-const { db, failures } = await buildFullSchema(repo);
+// Written for the old code-based joining (closed by update 78, functions removed by update 85, tested in 085): runs against the schema as of update 84.
+const { db, failures } = await buildFullSchema(repo, { upTo: 84 });
 const results = [];
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + String(detail).slice(0, 280)}`); };
 check('0 the full schema and all updates (including 70) load', failures.length === 0, JSON.stringify(failures));

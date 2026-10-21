@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Directory, Paths } from 'expo-file-system';
 import { MediaQueue, PermanentError, type MediaJob, type NewJob } from './mediaQueue';
 import { prepareImage, prepareVideo } from './mediaCompress';
+import { isSnowKey, isSnowTarget } from '@/data/snowMediaTargets';
 
 const KEY = 'mediaQueue.v1';
 const QDIR = '/media-queue/';
@@ -53,17 +54,33 @@ export const mediaQueue = new MediaQueue({
     // A pending item belongs to the company it was picked in: never send it under a different sign-in.
     const { db } = require('@/data/store') as typeof import('@/data/store');
     if (db.companyId && !job.folder.startsWith(`${db.companyId}/`)) throw new PermanentError('This photo belongs to a different account, so it was not uploaded.');
+    if (isSnowTarget(job.target.type)) {
+      // Snow photos live in the private snow-media bucket, not the public one.
+      const { uploadSnowMedia } = require('./snowMedia') as typeof import('./snowMedia');
+      const snowMime = job.kind === 'video' ? (job.useOriginal ? job.mimeType : 'video/mp4') : (uri === job.sourceUri ? job.mimeType : 'image/jpeg');
+      return { url: '', key: await uploadSnowMedia(uri, job.folder, snowMime) };
+    }
     const { uploadImage } = require('./media') as typeof import('./media');
     const mime = job.kind === 'video' ? (job.useOriginal ? job.mimeType : 'video/mp4') : (uri === job.sourceUri ? job.mimeType : 'image/jpeg');
     return uploadImage(uri, job.folder, mime);
   },
 
   complete: async (job, uploaded) => {
+    if (isSnowTarget(job.target.type)) {
+      const { completeSnowTarget } = require('@/data/snowMediaTargets') as typeof import('@/data/snowMediaTargets');
+      await completeSnowTarget(job, uploaded.key);
+      return;
+    }
     const { completeMediaTarget } = require('@/data/mediaTargets') as typeof import('@/data/mediaTargets');
     await completeMediaTarget(job, uploaded);
   },
 
   removeStored: async (key) => {
+    if (isSnowKey(key)) {
+      const { discardSnowUpload } = require('./snowMedia') as typeof import('./snowMedia');
+      await discardSnowUpload(key);
+      return;
+    }
     const { removeMedia } = require('./media') as typeof import('./media');
     await removeMedia(key);
   },
@@ -95,6 +112,21 @@ export function queueMedia(input: NewJob): MediaJob {
 
 let snapshot: MediaJob[] = mediaQueue.list();
 mediaQueue.subscribe(() => { snapshot = mediaQueue.list(); });
+
+/** Waits until every given job has been saved ('done'), one of them failed ('failed'), or the time runs out ('timeout'). */
+export function waitForMediaJobs(ids: string[], timeoutMs: number): Promise<'done' | 'failed' | 'timeout'> {
+  return new Promise((resolve) => {
+    let off: () => void = () => {};
+    const timer = setTimeout(() => { off(); resolve('timeout'); }, timeoutMs);
+    const check = () => {
+      const jobs = ids.map((id) => mediaQueue.get(id));
+      if (jobs.some((j) => j?.status === 'failed')) { clearTimeout(timer); off(); resolve('failed'); return; }
+      if (jobs.every((j) => !j || j.status === 'uploaded')) { clearTimeout(timer); off(); resolve('done'); }
+    };
+    off = mediaQueue.subscribe(check);
+    check();
+  });
+}
 
 /** Live list of every job (pending, failed and just-uploaded). */
 export function useMediaJobs(): MediaJob[] {

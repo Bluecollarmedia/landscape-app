@@ -3,7 +3,7 @@
  * when it is next due (you get a reminder that morning), and notes about what was done.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, TextInput, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Input, DateField } from '@/components/ui';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
@@ -47,7 +47,7 @@ export function TruckMaintenanceSheet({ visible, editing, onClose, onSubmit }: P
     const problem = maintenanceProblem(input);
     if (problem) { setError(problem); return; }
     const err = onSubmit(input);
-    if (err) setError(err); else onClose();
+    if (err) setError(err); else { Keyboard.dismiss(); onClose(); }
   }
 
   return (

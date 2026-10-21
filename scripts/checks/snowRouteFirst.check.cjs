@@ -9,7 +9,13 @@ const check = (n, ok, detail) => { if (!ok) bad++; console.log((ok ? 'PASS' : 'F
 
 const storm = read('src/components/snow/storms/StormDetailScreen.tsx');
 check('1 the storm screen no longer has Add Route, saved-route buttons, or a Services card; it shows the route editor itself',
-  !/Add Route/.test(storm) && !/Change Services/.test(storm) && !/Add saved route/.test(storm) && /<RouteEditor routeId=\{r\.id\} embedded/.test(storm));
+  !/Add Route/.test(storm) && !/Change Services/.test(storm) && !/Add saved route/.test(storm) && /<RouteEditor routeId=\{r\.id\}/.test(storm));
+check('1b there is ONE screen for a route (no standalone view/edit copy); every crew or route tap opens the storm, and "View all routes" appears once',
+  !fs.existsSync(path.join(__dirname, '../../app/snow/owner/route/[id].tsx'))
+  && /'\/snow\/owner\/storm\/\[id\]'/.test(read('src/lib/snowLinks.ts')) && !/snow\/owner\/route\//.test(read('src/lib/snowLinks.ts'))
+  && (read('src/components/snow/dashboard/SnowDashboardScreen.tsx').match(/accessibilityLabel="View all routes/g) || []).length === 1);
+check('1c Save as template and Cancel route live on that one screen, and a property row shows name + address with no "No photos required" text',
+  /Save as template/.test(read('src/components/snow/routes/RouteEditScreen.tsx')) && /onRouteCancelled/.test(read('src/components/snow/routes/RouteEditScreen.tsx')) && !/No photos required/.test(read('src/components/snow/routes/RouteEditScreen.tsx')));
 check('2 the route is made for the storm automatically (one route for all its services), once, with photos NOT required by default',
   /ensured\.current !== s\.data\.storm\.id/.test(storm) && /service: services\[0\], services, mediaRequired: false, minMedia: 1/.test(storm));
 const edit = read('src/components/snow/routes/RouteEditScreen.tsx');

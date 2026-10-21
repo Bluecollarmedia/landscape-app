@@ -2,7 +2,8 @@
  * Edge Function: send-snow-notification
  *
  * Called by the database (update 031, trigger snow_visits_notify) when a snow
- * visit's arrival or completion creates a notification. It sends that
+ * visit's arrival or completion creates a notification, and (update 082) when a storm is dispatched or a lead/crew
+ * member is assigned to a route. It sends that
  * notification's pending channels and records what actually happened:
  *   push  → Expo push service, to the recipient's registered phones
  *   email → Resend, to the property contact's email
@@ -45,6 +46,7 @@ interface SnowNotification {
   category: 'owner_alert' | 'customer' | 'employee';
   event: string;
   property_id: string | null;
+  route_id?: string | null;
   visit_id: string | null;
   recipient_person_id: string | null;
   recipient_name: string | null;
@@ -119,8 +121,9 @@ async function sendPush(db: Db, n: SnowNotification): Promise<Outcome> {
     sound: 'default',
     data: {
       eventType: `snow_${n.event.replace('.', '_')}`,
-      linkedEntityType: n.category === 'customer' ? 'snow_property' : 'snow_visit',
-      linkedEntityId: n.category === 'customer' ? n.property_id : n.visit_id,
+      // customer notices open their property; crew notices (update 82) open the route; owner alerts open the stop
+      linkedEntityType: n.category === 'customer' ? 'snow_property' : n.category === 'employee' ? 'snow_route' : 'snow_visit',
+      linkedEntityId: n.category === 'customer' ? n.property_id : n.category === 'employee' ? n.route_id : n.visit_id,
     },
   }));
   const res = await fetch(EXPO_PUSH_URL, {

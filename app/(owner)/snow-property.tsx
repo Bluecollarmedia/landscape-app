@@ -6,16 +6,21 @@
  * it. Everything here saves to the live database (supabase/updates/022).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Alert, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Alert, Platform, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
-import { Button, Icon, Input, LoadingSpinner } from '@/components/ui';
+import { Button, Icon, LoadingSpinner } from '@/components/ui';
+import { CustomerPicker } from '@/components/customers/CustomerPicker';
+import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { TaskMediaStrip, TaskMediaViewer } from '@/components/tasks/TaskMedia';
 import { snowMediaItems } from '@/components/snow/SnowReference';
-import { OwnerPropertyNotifications } from '@/components/snow/notifications/SnowNotifySettings';
 import { notify, pickSnowMedia } from '@/components/snow/pickSnowMedia';
+import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
+import { useSnowUploads } from '@/hooks/useSnowUploads';
+import { SNOW_REFERENCE_TARGET } from '@/data/snowMediaTargets';
+import { confirmAction } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -24,24 +29,13 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { db, useDb } from '@/data/store';
 import { useSnowPropertyDetails } from '@/hooks/useSnowPropertyDetails';
 import {
-  addContact, addReferenceMedia, addService, referenceAsOf, removeContact, retireReferenceMedia, saveInstructions,
+  addContact, addReferenceMedia, addService, referenceAsOf, retireReferenceMedia, saveInstructions,
   setServiceActive, updateContact, type ContactInput, type SnowPropertyDetails,
 } from '@/data/snowProperties';
 import {
   SNOW_SERVICES, SNOW_SERVICE_ICONS, SNOW_SERVICE_LABELS,
   type SnowPropertyContact, type SnowPropertyService, type SnowService,
 } from '@/types/snowProperty';
-
-function confirmAction(title: string, message: string, action: string, run: () => void) {
-  if (Platform.OS === 'web') {
-    if (confirm(`${title}\n\n${message}`)) run();
-    return;
-  }
-  Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: action, style: 'destructive', onPress: run },
-  ]);
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -113,7 +107,6 @@ export default function SnowPropertyScreen() {
                 onChanged={reload}
               />
             ))}
-            <OwnerPropertyNotifications propertyId={id} />
           </>
         )}
       </KeyboardAwareScrollView>
@@ -123,59 +116,73 @@ export default function SnowPropertyScreen() {
 
 // ── Contacts ────────────────────────────────────────────────────────────────
 
+const firstNameOf = (full: string) => (full ?? '').trim().split(/\s+/)[0] ?? '';
+
 function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
   companyId: string; propertyId: string; contacts: SnowPropertyContact[]; onChanged: () => void;
 }) {
   const { colors } = useTheme();
-  const [editing, setEditing] = useState<string | 'new' | null>(null);
+  const v = useDb();
+  const [choosing, setChoosing] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // The property's customer: the linked account, else the main contact. Every property has one.
+  const customer = contacts.find((x) => x.personId) ?? contacts.find((x) => x.isPrimary);
+  /** Puts an existing customer on this property (their name, phone and email come from their record; nothing is typed). */
+  async function linkCustomer(personId: string) {
+    const m = db.members.find((x) => x.personId === personId);
+    if (!m?.person || busy) return;
+    const p = m.person;
+    const input: ContactInput = {
+      name: `${p.firstName} ${p.lastName}`.trim() || p.email, title: '', phone: p.phone ?? '', email: p.email ?? '', personId, isPrimary: true,
+    };
+    setBusy(true);
+    const res = customer ? await updateContact(customer, input) : await addContact(companyId, propertyId, input);
+    setBusy(false);
+    if (!res.ok) return notify('Not Saved', res.error);
+    haptics.success();
+    setChoosing(false);
+    onChanged();
+  }
 
   return (
     <>
-      <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>CONTACTS</Text>
+      <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>CUSTOMER</Text>
       <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
-        {contacts.length === 0 && editing !== 'new' && (
-          <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>
-            No contacts yet. Add the customer or property manager.
-          </Text>
-        )}
-        {contacts.map((c) => editing === c.id ? (
-          <ContactForm
-            key={c.id}
-            companyId={companyId}
-            propertyId={propertyId}
-            contact={c}
-            onDone={() => { setEditing(null); onChanged(); }}
-            onCancel={() => setEditing(null)}
-          />
+        {customer && !choosing ? (
+          <>
+            <ContactRow contact={customer} onEdit={() => setChoosing(true)} customer />
+            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+              {customer.personId ? 'They see this property and its completed snow services in their app.' : 'Not linked to a customer account yet. Tap to choose the customer.'}
+            </Text>
+            {/* Their one private link, right here in Snow Mode: it covers everything on their customer record, not just this property. */}
+            {customer.personId ? (
+              <CustomerInviteCard personId={customer.personId} firstName={firstNameOf(customer.name)} phone={customer.phone} />
+            ) : null}
+          </>
         ) : (
-          <ContactRow key={c.id} contact={c} onEdit={() => setEditing(c.id)} />
-        ))}
-        {editing === 'new' ? (
-          <ContactForm
-            companyId={companyId}
-            propertyId={propertyId}
-            makePrimary={contacts.length === 0}
-            onDone={() => { setEditing(null); onChanged(); }}
-            onCancel={() => setEditing(null)}
-          />
-        ) : (
-          <Button title="Add Contact" icon="plus" variant="ghost" size="sm" onPress={() => setEditing('new')} style={{ alignSelf: 'flex-start', marginTop: spacing.xs }} />
+          <>
+            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{customer ? 'Change the customer' : 'Choose the customer'}</Text>
+            <CustomerPicker onPick={linkCustomer} checkedId={customer?.personId ?? undefined} disabled={busy} />
+            {customer ? <Button title="Cancel" variant="ghost" size="sm" onPress={() => setChoosing(false)} style={{ alignSelf: 'flex-start' }} /> : null}
+          </>
         )}
       </View>
+
     </>
   );
 }
 
-function ContactRow({ contact, onEdit }: { contact: SnowPropertyContact; onEdit: () => void }) {
+function ContactRow({ contact, onEdit, customer }: { contact: SnowPropertyContact; onEdit: () => void; customer?: boolean }) {
   const { colors } = useTheme();
   const reach = [contact.phone, contact.email].filter(Boolean).join(' · ');
-  const tags = [contact.isPrimary && 'Main contact', contact.personId && 'Has the customer app'].filter(Boolean).join(' · ');
+  const tags = customer ? (contact.personId ? 'Customer account linked' : '') : [contact.isPrimary && 'Main contact'].filter(Boolean).join(' · ');
   return (
     <Pressable
       onPress={onEdit}
       style={({ pressed }) => [styles.contactRow, pressed && { opacity: 0.7 }]}
       accessibilityRole="button"
-      accessibilityLabel={`Edit ${contact.name}`}
+      accessibilityLabel={customer ? `Change the customer, now ${contact.name}` : `Edit ${contact.name}`}
     >
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
@@ -184,108 +191,10 @@ function ContactRow({ contact, onEdit }: { contact: SnowPropertyContact; onEdit:
         {!!reach && <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{reach}</Text>}
         {!!tags && <Text style={[typeScale.caption, { color: colors.primary }]}>{tags}</Text>}
       </View>
-      <Icon name="edit-2" size={16} color={colors.textTertiary} />
+      <Icon name={customer ? 'repeat' : 'edit-2'} size={16} color={colors.textTertiary} />
     </Pressable>
   );
 }
-
-function ContactForm({ companyId, propertyId, contact, makePrimary, onDone, onCancel }: {
-  companyId: string; propertyId: string; contact?: SnowPropertyContact; makePrimary?: boolean;
-  onDone: () => void; onCancel: () => void;
-}) {
-  const { colors } = useTheme();
-  const v = useDb();
-  const customers = useMemo(
-    () => db.members.filter((m) => m.role === 'customer' && m.status !== 'inactive' && m.person),
-    [v],
-  );
-  const [form, setForm] = useState<ContactInput>({
-    name: contact?.name ?? '',
-    title: contact?.title ?? '',
-    phone: contact?.phone ?? '',
-    email: contact?.email ?? '',
-    personId: contact?.personId,
-    isPrimary: contact?.isPrimary ?? !!makePrimary,
-  });
-  const [busy, setBusy] = useState(false);
-  const set = (patch: Partial<ContactInput>) => setForm((f) => ({ ...f, ...patch }));
-
-  async function save() {
-    setBusy(true);
-    const res = contact ? await updateContact(contact, { ...form, personId: form.personId ?? '' }) : await addContact(companyId, propertyId, form);
-    setBusy(false);
-    if (!res.ok) return notify('Not Saved', res.error);
-    haptics.success();
-    onDone();
-  }
-
-  function remove() {
-    if (!contact) return;
-    confirmAction('Remove Contact', `Remove ${contact.name} from this property?${contact.personId ? ' Their customer app will stop showing it.' : ''}`, 'Remove', async () => {
-      const res = await removeContact(contact.id);
-      if (!res.ok) return notify('Not Removed', res.error);
-      haptics.destructive();
-      onDone();
-    });
-  }
-
-  return (
-    <View style={[styles.form, { borderColor: colors.border }]}>
-      <Input label="Name" value={form.name} onChangeText={(name) => set({ name })} placeholder="Jordan Smith" autoCapitalize="words" />
-      <Input label="Role (optional)" value={form.title} onChangeText={(title) => set({ title })} placeholder="Property manager" autoCapitalize="words" />
-      <Input label="Phone (optional)" value={form.phone} onChangeText={(phone) => set({ phone })} keyboardType="phone-pad" />
-      <Input label="Email (optional)" value={form.email} onChangeText={(email) => set({ email })} keyboardType="email-address" autoCapitalize="none" />
-
-      <Pressable
-        onPress={() => set({ isPrimary: !form.isPrimary })}
-        style={styles.checkRow}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: !!form.isPrimary }}
-      >
-        <Icon name={form.isPrimary ? 'check-square' : 'square'} size={20} color={form.isPrimary ? colors.primary : colors.textTertiary} />
-        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Main contact</Text>
-      </Pressable>
-
-      <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>Customer app account</Text>
-      <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-        Linking an account lets this customer see the property and its completed snow services in their app.
-      </Text>
-      <View style={styles.chips}>
-        <Chip label="None" selected={!form.personId} onPress={() => set({ personId: undefined })} />
-        {customers.map((m) => (
-          <Chip
-            key={m.personId}
-            label={`${m.person!.firstName} ${m.person!.lastName}`.trim() || m.person!.email}
-            selected={form.personId === m.personId}
-            onPress={() => set({ personId: m.personId })}
-          />
-        ))}
-      </View>
-
-      <View style={styles.formButtons}>
-        {contact && <Button title="Remove" variant="ghost" size="sm" onPress={remove} />}
-        <View style={{ flex: 1 }} />
-        <Button title="Cancel" variant="ghost" size="sm" onPress={onCancel} />
-        <Button title="Save" size="sm" loading={busy} disabled={!form.name.trim()} onPress={save} />
-      </View>
-    </View>
-  );
-}
-
-function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.chip, { backgroundColor: selected ? colors.primary : colors.backgroundTertiary }]}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-    >
-      <Text style={[typeScale.labelSmall, { color: selected ? colors.textOnPrimary : colors.textPrimary }]} numberOfLines={1}>{label}</Text>
-    </Pressable>
-  );
-}
-
 // ── Services ────────────────────────────────────────────────────────────────
 
 function ServiceCard({ companyId, propertyId, service, details, mediaUrls, onChanged }: {
@@ -355,7 +264,11 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
   const versions = details.instructions.filter((i) => i.propertyServiceId === ps.id);
   const [text, setText] = useState(current.instructions?.body ?? '');
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(0);
+  // Saved instructions show as a short read-only summary; the text box only opens while you are writing.
+  const [editing, setEditing] = useState(false);
+  // Reference photos upload in the background (shared queue); this screen only shows how many are on their way and any that failed.
+  const { uploading, failed, saved } = useSnowUploads(SNOW_REFERENCE_TARGET, (p) => p.propertyServiceId === ps.id);
+  useEffect(() => { if (saved > 0) onChanged(); }, [saved]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showHistory, setShowHistory] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const items = useMemo(() => snowMediaItems(current.media, mediaUrls), [current.media, mediaUrls]);
@@ -375,20 +288,25 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
     setSaving(false);
     if (!res.ok) return notify('Not Saved', res.error);
     haptics.success();
+    // Saved: put the keyboard away and fold the editor back up.
+    Keyboard.dismiss();
+    setEditing(false);
     onChanged();
+  }
+
+  function cancelEdit() {
+    Keyboard.dismiss();
+    setText(current.instructions?.body ?? '');
+    setEditing(false);
   }
 
   async function add() {
     const drafts = await pickSnowMedia();
     if (drafts.length === 0) return;
-    setUploading(drafts.length);
-    const { saved, errors } = await addReferenceMedia(companyId, ps.id, drafts);
-    setUploading(0);
-    if (saved.length > 0) haptics.success();
-    if (errors.length > 0) {
-      notify(errors.length === 1 ? 'A file wasn\'t saved' : `${errors.length} files weren't saved`, errors[0]);
-    }
-    onChanged();
+    // Instant: queued, then uploaded in the background.
+    const { queued, errors } = await addReferenceMedia(companyId, ps.id, drafts);
+    if (queued > 0) haptics.success();
+    if (errors.length > 0) notify("The files weren't added", errors[0]);
   }
 
   function retire(mediaId: string) {
@@ -408,24 +326,43 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
   return (
     <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
       <Text style={[typeScale.labelSmall, { color: colors.textSecondary }]}>Instructions</Text>
-      <TextInput
-        value={text}
-        onChangeText={setText}
-        placeholder="Where to push snow, what to avoid, gates, ramps, drains…"
-        placeholderTextColor={colors.textTertiary}
-        multiline
-        textAlignVertical="top"
-        accessibilityLabel={`${SNOW_SERVICE_LABELS[ps.service]} instructions`}
-        style={[styles.instructions, typeScale.bodyLarge, { color: colors.textPrimary, backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
-      />
-      <View style={styles.versionRow}>
-        <Text style={[typeScale.caption, { color: colors.textTertiary, flex: 1 }]}>
-          {current.instructions
-            ? `Version ${current.instructions.version}, saved ${formatDate(current.instructions.createdAt)}`
-            : 'Not saved yet'}
+      {editing ? (
+        <>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Where to push snow, what to avoid, gates, ramps, drains…"
+            placeholderTextColor={colors.textTertiary}
+            multiline
+            autoFocus
+            textAlignVertical="top"
+            accessibilityLabel={`${SNOW_SERVICE_LABELS[ps.service]} instructions`}
+            style={[styles.instructions, typeScale.bodyLarge, { color: colors.textPrimary, backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+          />
+          <View style={styles.versionRow}>
+            <View style={{ flex: 1 }} />
+            <Button title="Cancel" variant="ghost" size="sm" onPress={cancelEdit} />
+            <Button title="Save" size="sm" loading={saving} disabled={!changed} onPress={save} />
+          </View>
+        </>
+      ) : (
+        <Pressable
+          onPress={() => setEditing(true)}
+          style={[styles.summary, { backgroundColor: colors.backgroundSecondary }]}
+          accessibilityRole="button"
+          accessibilityLabel={current.instructions?.body ? `Edit ${SNOW_SERVICE_LABELS[ps.service]} instructions` : `Add ${SNOW_SERVICE_LABELS[ps.service]} instructions`}
+        >
+          <Text style={[typeScale.bodyLarge, { color: current.instructions?.body ? colors.textPrimary : colors.textTertiary, flex: 1 }]} numberOfLines={3}>
+            {current.instructions?.body || 'Add instructions: where to push snow, what to avoid, gates, drains…'}
+          </Text>
+          <Icon name={current.instructions?.body ? 'edit-2' : 'plus'} size={16} color={colors.textTertiary} />
+        </Pressable>
+      )}
+      {!editing && current.instructions ? (
+        <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+          Version {current.instructions.version}, saved {formatDate(current.instructions.createdAt)}
         </Text>
-        <Button title="Save" size="sm" loading={saving} disabled={!changed} onPress={save} />
-      </View>
+      ) : null}
       {versions.length > 1 && (
         <Pressable onPress={() => setShowHistory((s) => !s)} accessibilityRole="button" style={styles.historyToggle}>
           <Icon name={showHistory ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
@@ -445,14 +382,10 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
       <TaskMediaStrip
         items={items}
         onOpen={setOpen}
-        onAdd={uploading ? undefined : add}
+        onAdd={add}
         onRemove={retire}
       />
-      {uploading > 0 && (
-        <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-          Uploading {uploading === 1 ? '1 file' : `${uploading} files`}…
-        </Text>
-      )}
+      <SnowUploadStatus uploading={uploading} failed={failed} />
       <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
         Shown to the route lead for {SNOW_SERVICE_LABELS[ps.service].toLowerCase()} only. Not shared with the customer.
         {removed > 0 ? ` ${removed} removed ${removed === 1 ? 'item is' : 'items are'} kept for past visits.` : ''}
@@ -463,19 +396,16 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
 }
 
 const styles = StyleSheet.create({
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, minHeight: 52 },
   screen: { flex: 1 },
   backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { marginTop: spacing.xl, marginBottom: spacing.xs, marginLeft: spacing.md },
   card: { borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.md, gap: spacing.sm },
   contactRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  form: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, marginVertical: spacing.xs },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs, minHeight: 44 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, maxWidth: 220, minHeight: 36, justifyContent: 'center' },
-  formButtons: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   serviceHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
   instructions: { minHeight: 110, borderWidth: 1.5, borderRadius: radius.lg, padding: spacing.md },
   versionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, minHeight: 52 },
   historyToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs, minHeight: 36 },
   oldVersion: { borderRadius: radius.md, padding: spacing.md, gap: 2 },
 });

@@ -9,6 +9,9 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Button, Input, Card, DateField } from '@/components/ui';
 import { QuickAddCustomer } from '@/components/customers/QuickAddCustomer';
+import { PropertyChoice } from '@/components/properties/PropertyChoice';
+import { propertyForSave } from '@/data/properties';
+import type { Property } from '@/types/property';
 import { useCustomers } from '@/hooks/useCustomers';
 import { generateProjectCode } from '@/hooks/useCustomerAccess';
 import { useProject } from '@/hooks/useProject';
@@ -40,7 +43,8 @@ export default function NewProjectScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  // `customerId` is set when this is opened from a customer's own page: that customer is already the customer, so it is not asked again.
+  const { editId, customerId: fromCustomer } = useLocalSearchParams<{ editId?: string; customerId?: string }>();
   const { project: existing, updateProject } = useProject(editId ?? '');
   const isEdit = !!editId && !!existing;
   const { allCustomers } = useCustomers();
@@ -55,7 +59,9 @@ export default function NewProjectScreen() {
   );
   const [checking, setChecking] = useState(false);
   const [notes, setNotes] = useState(existing?.notes ?? '');
-  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId);
+  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId ?? (editId ? undefined : fromCustomer));
+  const lockedCustomer = !editId && !!fromCustomer && allCustomers.some((c) => c.person.id === fromCustomer);
+  const [propertyId, setPropertyId] = useState<string | undefined>(existing?.propertyId);
   const [startDate, setStartDate] = useState(existing?.startDate ?? '');
   const [endDate, setEndDate] = useState(existing?.estimatedEndDate ?? '');
   const [status, setStatus] = useState<ProjectStatus>(existing?.status ?? 'active');
@@ -120,8 +126,28 @@ export default function NewProjectScreen() {
     save(addressCheck);
   }
 
-  function save(check: AddressCheck) {
+  /** Picking one of the customer's saved properties fills the address; picking "New address" lets you type one. */
+  function pickProperty(p: Property | null) {
+    if (!p) { setPropertyId(undefined); return; }
+    setPropertyId(p.id);
+    setAddress(p.address); setCity(p.city ?? ''); setState(p.state ?? ''); setZip(p.zip ?? '');
+    setAddressCheck(p.latitude != null && p.longitude != null ? { latitude: p.latitude, longitude: p.longitude } : {});
+  }
+
+  function changeCustomer(id: string | undefined) {
+    if (id !== customerId) setPropertyId(undefined);
+    setCustomerId(id);
+  }
+
+  async function save(check: AddressCheck) {
+    // The address is saved ONCE for the customer (or their existing property is reused); this project links to it.
+    const linked = await propertyForSave({
+      customerId, propertyId,
+      fields: { address, city, state: state.trim().toUpperCase(), zip, latitude: check.latitude, longitude: check.longitude },
+    });
+    if (linked.error) { showAlert('Couldn\'t save the property', linked.error); return; }
     const fields = {
+      propertyId: linked.propertyId,
       name: name.trim(),
       address: address.trim() || undefined,
       city: city.trim() || undefined,
@@ -244,6 +270,53 @@ export default function NewProjectScreen() {
             )}
           </Card>
 
+          {lockedCustomer ? (
+            <Card title="Customer" style={{ marginBottom: spacing.lg }}>
+              {(() => {
+                const c = allCustomers.find((x) => x.person.id === customerId);
+                return (
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
+                    {c ? `${c.person.firstName} ${c.person.lastName}`.trim() || c.person.email : 'Customer'}
+                  </Text>
+                );
+              })()}
+            </Card>
+          ) : (
+          <Card title="Customer" style={{ marginBottom: spacing.lg }}>
+            {customers.length === 0 ? (
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                No customers yet. Add one below, then send them a private link from their page so they can see the project.
+              </Text>
+            ) : (
+              <View style={styles.chipRow}>
+                <Pressable
+                  onPress={() => changeCustomer(undefined)}
+                  style={[styles.chip, { backgroundColor: !customerId ? colors.primary : colors.backgroundTertiary }]}
+                >
+                  <Text style={[typeScale.labelSmall, { color: !customerId ? '#FFFFFF' : colors.textSecondary, fontWeight: '600' }]}>
+                    None
+                  </Text>
+                </Pressable>
+                {customers.map((c) => {
+                  const active = customerId === c.person.id;
+                  return (
+                    <Pressable
+                      key={c.person.id}
+                      onPress={() => changeCustomer(c.person.id)}
+                      style={[styles.chip, { backgroundColor: active ? colors.primary : colors.backgroundTertiary }]}
+                    >
+                      <Text style={[typeScale.labelSmall, { color: active ? '#FFFFFF' : colors.textSecondary, fontWeight: '600' }]}>
+                        {`${c.person.firstName} ${c.person.lastName}`.trim() || c.person.email}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+            <QuickAddCustomer onAdded={changeCustomer} />
+          </Card>
+          )}
+
           <Card title="Project Info">
             <Input
               label="Project Name"
@@ -253,6 +326,10 @@ export default function NewProjectScreen() {
               icon="folder"
               containerStyle={styles.fieldGap}
             />
+            <PropertyChoice customerId={customerId} propertyId={propertyId} onSelect={pickProperty} />
+            {propertyId ? (
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginBottom: spacing.md }]}>{[address, city, state, zip].filter(Boolean).join(', ')}</Text>
+            ) : (
             <AddressFields
               required
               style={styles.fieldGap}
@@ -261,6 +338,7 @@ export default function NewProjectScreen() {
               check={addressCheck}
               onCheckChange={setAddressCheck}
             />
+            )}
             <View style={styles.row}>
               <DateField
                 label="Start Date"
@@ -280,40 +358,6 @@ export default function NewProjectScreen() {
                 containerStyle={{ ...styles.fieldGap, flex: 1 }}
               />
             </View>
-          </Card>
-
-          <Card title="Customer" style={{ marginTop: spacing.lg }}>
-            {customers.length === 0 ? (
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                No customers yet. Add one below, or share the project code later so the customer can join on their own.
-              </Text>
-            ) : (
-              <View style={styles.chipRow}>
-                <Pressable
-                  onPress={() => setCustomerId(undefined)}
-                  style={[styles.chip, { backgroundColor: !customerId ? colors.primary : colors.backgroundTertiary }]}
-                >
-                  <Text style={[typeScale.labelSmall, { color: !customerId ? '#FFFFFF' : colors.textSecondary, fontWeight: '600' }]}>
-                    None
-                  </Text>
-                </Pressable>
-                {customers.map((c) => {
-                  const active = customerId === c.person.id;
-                  return (
-                    <Pressable
-                      key={c.person.id}
-                      onPress={() => setCustomerId(c.person.id)}
-                      style={[styles.chip, { backgroundColor: active ? colors.primary : colors.backgroundTertiary }]}
-                    >
-                      <Text style={[typeScale.labelSmall, { color: active ? '#FFFFFF' : colors.textSecondary, fontWeight: '600' }]}>
-                        {`${c.person.firstName} ${c.person.lastName}`.trim() || c.person.email}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-            <QuickAddCustomer onAdded={setCustomerId} />
           </Card>
 
           <Card title="Internal Notes" style={{ marginTop: spacing.lg }}>

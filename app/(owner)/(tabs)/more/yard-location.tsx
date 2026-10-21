@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, Platform, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
@@ -86,6 +86,7 @@ export default function YardLocationScreen() {
   function save(c: AddressCheck) {
     saveYard({ ...form, latitude: c.latitude, longitude: c.longitude });
     haptics.success();
+    Keyboard.dismiss();
     setFeedback({ tone: 'success', text: 'Yard location saved. Workers see it on their Today screen.' });
   }
 

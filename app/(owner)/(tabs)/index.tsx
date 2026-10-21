@@ -275,13 +275,8 @@ export default function OwnerDashboard() {
             >
               <Icon name="plus" size={20} color={colors.primary} />
             </Pressable>
-            <Pressable
-              onPress={() => router.push('/(owner)/edit-profile' as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Edit your profile and photo"
-            >
-              <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={44} uri={user?.avatarUrl} />
-            </Pressable>
+            {/* Display only: the profile opens from your name in More > Settings, the one way in. */}
+            <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={44} uri={user?.avatarUrl} />
           </View>
         </View>
 

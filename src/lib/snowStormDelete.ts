@@ -1,4 +1,4 @@
-// Wording and small helpers for deleting a storm for good (Snow settings -> Manage storms). Pure, no network.
+// Wording and small helpers for deleting a storm for good (Snow More -> Manage storms). Pure, no network.
 
 export interface StormCounts { routes: number; stops: number; completedStops: number; media: number }
 

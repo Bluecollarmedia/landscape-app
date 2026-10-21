@@ -25,6 +25,8 @@ export interface MaintenanceProperty {
   name: string;
   /** Existing customer (a person with the customer role), when there is one. */
   customerId?: string;
+  /** The shared property (supabase/updates/075 and 79); its address is kept in step with it. */
+  propertyId?: string;
   /** The project this property was created from, if any. Never required. */
   sourceProjectId?: string;
   address: string;

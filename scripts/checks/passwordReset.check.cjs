@@ -27,10 +27,14 @@ const fakeSupabase = {
 };
 let webUrl = 'https://brighton-app.netlify.app';
 let configured = true;
+let os = 'web';
+const authLink = compile(read('src/lib/authLink.ts'), () => ({}));
 const data = compile(read('src/data/passwordReset.ts'), (n) => {
   if (n === '@/lib/supabase') return { supabase: fakeSupabase, get isSupabaseConfigured() { return configured; } };
   if (n === '@/lib/config') return { config: { get webUrl() { return webUrl; } } };
   if (n === '@/lib/passwordReset') return lib;
+  if (n === '@/lib/authLink') return authLink;
+  if (n === 'react-native') return { Platform: { get OS() { return os; } } };
   return {};
 });
 
@@ -49,6 +53,11 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
   calls = []; resetResult = { error: null };
   let r = await data.requestPasswordReset(' a@gmail.com ');
   check('7 sends the link to the trimmed email with the web reset page as the destination', r.ok && calls[0][1] === 'a@gmail.com' && calls[0][2].redirectTo === 'https://brighton-app.netlify.app/reset-password', JSON.stringify(calls));
+  // in the app (not the web) the link comes back into the app
+  os = 'ios'; calls = [];
+  const rApp = await data.requestPasswordReset('a@gmail.com');
+  check('7b in the app the reset link comes back into the app (brighton-lawn://auth-callback)', rApp.ok && calls[0][2].redirectTo === 'brighton-lawn://auth-callback', JSON.stringify(calls));
+  os = 'web'; calls = []; resetResult = { error: null };
   calls = [];
   r = await data.requestPasswordReset('not-an-email');
   check('8 a bad email is refused before anything is sent', !r.ok && calls.length === 0);

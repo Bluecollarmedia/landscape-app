@@ -24,6 +24,9 @@ import { DateRow, InputRow, NoteField } from '@/components/financials/FormBits';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCustomers } from '@/hooks/useCustomers';
 import { QuickAddCustomer } from '@/components/customers/QuickAddCustomer';
+import { PropertyChoice } from '@/components/properties/PropertyChoice';
+import { propertyForSave } from '@/data/properties';
+import type { Property } from '@/types/property';
 import { useMaintenanceProperty } from '@/hooks/useMaintenance';
 import { db } from '@/data/store';
 import {
@@ -53,7 +56,8 @@ export default function MaintenancePropertyEditScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ id?: string }>();
+  // `customerId` is set when this is opened from a customer's own page: that customer is already the customer, so it is not asked again.
+  const params = useLocalSearchParams<{ id?: string; customerId?: string }>();
   const detail = useMaintenanceProperty(params.id);
   const existing = detail?.property;
   const existingContract = detail ? detail.activeContract ?? detail.contracts[0] : undefined;
@@ -65,9 +69,11 @@ export default function MaintenancePropertyEditScreen() {
   );
   const { allCustomers, getCustomer } = useCustomers();
 
-  const [name, setName] = useState(existing?.name ?? '');
-  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId);
+  const fromCustomer = !params.id && params.customerId && allCustomers.some((c) => c.person.id === params.customerId) ? params.customerId : undefined;
+  const [name, setName] = useState(existing?.name ?? (fromCustomer ? `${getCustomer(fromCustomer)?.person.lastName ?? ''} Residence`.trim() : ''));
+  const [customerId, setCustomerId] = useState<string | undefined>(existing?.customerId ?? fromCustomer);
   const [sourceProjectId, setSourceProjectId] = useState<string | undefined>(existing?.sourceProjectId);
+  const [linkedPropertyId, setLinkedPropertyId] = useState<string | undefined>(existing?.propertyId);
   const [address, setAddress] = useState<AddressParts>({
     address: existing?.address ?? '', city: existing?.city ?? '', state: existing?.state ?? '', zip: existing?.zip ?? '',
   });
@@ -109,7 +115,7 @@ export default function MaintenancePropertyEditScreen() {
   function pickCustomer(id: string | undefined) {
     haptics.select();
     // A different customer means the old customer's project (the source of a copied address) no longer applies.
-    if (id !== customerId) setSourceProjectId(undefined);
+    if (id !== customerId) { setSourceProjectId(undefined); setLinkedPropertyId(undefined); }
     setCustomerId(id);
     setPicking(false);
     setCustomerSearch('');
@@ -143,7 +149,17 @@ export default function MaintenancePropertyEditScreen() {
     if (openKey === key) setOpenKey(undefined);
   }
 
-  function handleSave() {
+  /** One of the customer's saved properties: the address comes from it, nothing is typed again. */
+  function pickProperty(p: Property | null) {
+    setSourceProjectId(undefined);
+    if (!p) { setLinkedPropertyId(undefined); return; }
+    setLinkedPropertyId(p.id);
+    setAddress({ address: p.address, city: p.city ?? '', state: p.state ?? '', zip: p.zip ?? '' });
+    setCheck(p.latitude != null && p.longitude != null ? { latitude: p.latitude, longitude: p.longitude } : {});
+    if (!name.trim()) setName(p.name || p.address);
+  }
+
+  async function handleSave() {
     if (saving) return;
     const trimmed = name.trim();
     if (!trimmed) return notify('Name Needed', 'Give the property a name you’ll recognize, like "Mitchell Residence".');
@@ -158,9 +174,16 @@ export default function MaintenancePropertyEditScreen() {
     }
 
     setSaving(true);
+    // The address is saved ONCE for the customer (or their existing property is reused); this record links to it.
+    const linked = await propertyForSave({
+      customerId, propertyId: linkedPropertyId,
+      fields: { address: address.address, city: address.city, state: address.state, zip: address.zip, latitude: check.latitude, longitude: check.longitude },
+    });
+    if (linked.error) { setSaving(false); return notify("Couldn't save the property", linked.error); }
     const propertyFields = {
       name: trimmed,
       customerId,
+      propertyId: linked.propertyId,
       sourceProjectId: customerId ? sourceProjectId : undefined,
       address: address.address.trim(),
       city: address.city.trim() || undefined,
@@ -240,10 +263,10 @@ export default function MaintenancePropertyEditScreen() {
             icon="user"
             title={customer ? `${customer.person.firstName} ${customer.person.lastName}` : 'Customer'}
             subtitle={customer ? 'Linked customer' : 'Optional · pick one or add a new customer'}
-            value={customer ? 'Change' : 'Choose'}
-            onPress={() => setPicking((v) => !v)}
+            value={fromCustomer ? undefined : customer ? 'Change' : 'Choose'}
+            onPress={fromCustomer ? undefined : () => setPicking((v) => !v)}
           />
-          {picking && (
+          {picking && !fromCustomer && (
             <View style={styles.pad}>
               <SearchBar value={customerSearch} onChangeText={setCustomerSearch} placeholder="Search customers" autoFocus={Platform.OS === 'web'} />
               {customerMatches.map((c) => (
@@ -281,7 +304,8 @@ export default function MaintenancePropertyEditScreen() {
         {/* Address */}
         <ListSection title="SERVICE ADDRESS">
           <View style={styles.pad}>
-            {addressSources.length > 0 && (
+            <PropertyChoice customerId={customerId} propertyId={linkedPropertyId} onSelect={pickProperty} />
+            {addressSources.length > 0 && !linkedPropertyId && (
               <View style={{ marginBottom: spacing.sm }}>
                 <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: 6 }]}>Use an address from {customer?.person.firstName}'s projects</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>

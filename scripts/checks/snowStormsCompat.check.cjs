@@ -21,7 +21,7 @@ const storms = compile(read('src/data/snowStorms.ts'), (name) => {
   if (name === '@/lib/snowServices') return services;
   return {};
 });
-const { createStorm, setStormServices, loadEligibleProperties } = storms;
+const { createStorm, loadEligibleProperties } = storms;
 
 const stormResult = { storm: { id: 's1', name: 'X', service: 'plowing', services: ['plowing', 'shoveling'], status: 'draft', created_at: 'x', updated_at: 'x', reopened_count: 0 }, changed: true, summary: { routes: 0, visits: 0, completed: 0, skipped: 0, arrived: 0, pending: 0, pending_skip_requests: 0 } };
 const missing = (sig) => ({ data: null, error: { message: `Could not find the function public.${sig} in the schema cache` } });
@@ -54,11 +54,7 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
   check('5 no services is refused before asking the database', !r.ok && calls.length === 0);
 
   calls = []; handler = () => ({ data: stormResult, error: null });
-  r = await setStormServices('s1', ['plowing', 'shoveling']);
-  check('6 editing services calls the new function', r.ok && calls[0].fn === 'snow_set_storm_services' && calls[0].args.p_services.length === 2);
   calls = []; handler = () => missing('snow_set_storm_services(p_services, p_storm_id)');
-  r = await setStormServices('s1', ['plowing']);
-  check('7 before update 40, editing services explains that update 40 is needed', !r.ok && /update 40/.test(r.error));
 
   calls = []; handler = () => ({ data: [{ property_id: 'p1', name: 'A', address: 'x', services: ['shoveling'] }], error: null });
   let e = await loadEligibleProperties('s1', 'shoveling');

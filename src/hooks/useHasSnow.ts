@@ -4,21 +4,34 @@ import { loadMySnowProperties } from '@/data/snowNotifications';
 
 export interface MySnowProperty { id: string; name: string; address: string }
 
+// The last list that loaded, kept for the rest of the session: a screen that opens after Home shows it at once instead of waiting.
+let remembered: MySnowProperty[] | null = null;
+
 /**
  * The Snow properties linked to the signed-in customer. Empty while loading and if the check
  * fails, so a customer who is not enrolled never sees Snow. Re-checked every time the screen
  * comes into view.
  */
 export function useMySnowProperties(): MySnowProperty[] {
-  const [list, setList] = useState<MySnowProperty[]>([]);
+  return useMySnowPropertyList().list;
+}
+
+/** Same list, plus whether it has loaded yet, so a screen can tell "still loading" from "they really have none". */
+export function useMySnowPropertyList(): { list: MySnowProperty[]; loaded: boolean } {
+  const [state, setState] = useState<{ list: MySnowProperty[]; loaded: boolean }>({ list: remembered ?? [], loaded: remembered !== null });
   useFocusEffect(
     useCallback(() => {
       let alive = true;
-      loadMySnowProperties().then((res) => { if (alive) setList(res.ok ? res.data : []); });
+      loadMySnowProperties().then((res) => {
+        if (!alive) return;
+        const list = res.ok ? res.data : [];
+        if (res.ok) remembered = list;
+        setState({ list, loaded: true });
+      });
       return () => { alive = false; };
     }, []),
   );
-  return list;
+  return state;
 }
 
 /**

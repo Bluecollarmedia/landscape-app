@@ -1,12 +1,8 @@
 /**
- * One storm (Owner): where its work stands, its routes, and the lifecycle
- * actions: Dispatch (draft), End Storm (active, always confirmed), Reopen
- * (ended). The database decides what's allowed; this screen shows its answer.
- *
- * Routes are added here (blank or from a saved template) and edited on the
- * route screen (update 025). Layout: the approved icy-blue design (winter
- * picture behind the header only, white cards, summary, routes, services and
- * a history timeline). The lifecycle buttons and their wording are unchanged.
+ * One storm (Owner): the setup (crew, crew lead, properties, edited right here), the lifecycle actions (Dispatch a draft,
+ * End Storm always confirmed, Reopen an ended one), and on a dispatched storm the progress numbers. The database decides
+ * what's allowed; this screen shows its answer. The storm's route is created automatically; a saved route template can be
+ * added as another route. Layout: the approved icy-blue design (winter picture behind the header only, white cards).
  */
 import { dispatchGaps } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,28 +12,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, LoadingSpinner, ProgressBar, ScreenHeader } from '@/components/ui';
 import { SnowPill } from '@/components/snow/SnowPill';
-import { snowStatus } from '@/theme/colors';
-import { routeCountLabel } from '@/lib/snowStormView';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
+import { STORM_PILL } from '@/lib/snowStormView';
 import { useTheme } from '@/providers/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   deleteDraftStorm, dispatchStorm, endStorm, endStormConfirmation, loadStormRoutes,
-  previewEndStorm, reopenStorm, setStormServices, SERVICE_LABEL, STORM_STATUS_LABEL,
+  previewEndStorm, reopenStorm, SERVICE_LABEL, STORM_STATUS_LABEL,
   type StormRouteRow, type StormSummary,
 } from '@/data/snowStorms';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import { SNOW_SERVICES, type SnowService, type SnowStorm } from '@/types/snow';
-import { LOCKED_SERVICE_HELP, lockedServiceNote, removableServices, routeServiceChoice, routesPerService, serviceRouteCount, servicesLabel, stormServices, toggleService } from '@/lib/snowServices';
-import { createRoute } from '@/data/snowRoutes';
+import type { SnowStorm } from '@/types/snow';
+import { servicesLabel, stormServices } from '@/lib/snowServices';
+import { addRouteFromTemplate, createRoute, loadRouteTemplates, type RouteTemplate } from '@/data/snowRoutes';
 import { RouteEditor } from '@/components/snow/routes/RouteEditScreen';
 
 /** The winter header picture, bundled with the app (made by scripts/make-storm-header.py from assets/source/snow-panorama.jpg). */
 const STORM_HEADER_IMAGE = require('../../../../assets/images/snow-storm-header.jpg');
-
-/** Badge colours per storm state, from the Snow palette. */
-const STORM_PILL = { draft: snowStatus.scheduled, dispatched: snowStatus.dispatched, ended: snowStatus.completed } as const;
 
 export function StormDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,6 +39,9 @@ export function StormDetailScreen() {
   const [storm, setStorm] = useState<SnowStorm | null>(null);
   const [summary, setSummary] = useState<StormSummary | null>(null);
   const [routes, setRoutes] = useState<StormRouteRow[]>([]);
+  const [templates, setTemplates] = useState<RouteTemplate[]>([]);
+  // Bumped on every reload so the embedded route editors refresh with the summary (realtime updates included).
+  const [reloadToken, setReloadToken] = useState(0);
   const [dragging, setDragging] = useState(false);
   const ensured = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,33 +61,57 @@ export function StormDetailScreen() {
     setStorm(s.data.storm);
     setSummary(s.data.summary);
     if (r.ok) setRoutes(r.data);
-    // The storm you create is the route: make it now (one per service) so there is something to add properties to.
-    if (r.ok && s.data.storm.status !== 'ended' && r.data.filter((x) => !x.cancelled).length === 0 && ensured.current !== s.data.storm.id) {
+    // The storm you create is the route: make it now so there is something to add properties to. Only when the storm never
+    // had one (a storm whose routes were all cancelled gets a "New route" button instead of a silent replacement).
+    if (r.ok && s.data.storm.status !== 'ended' && r.data.length === 0 && ensured.current !== s.data.storm.id) {
       ensured.current = s.data.storm.id;
-      const services = stormServices(s.data.storm);
-      // One route does every service of the storm together (for example plowing + salting on one truck).
-      const combined = await createRoute(s.data.storm.id, { name: s.data.storm.name, service: services[0], services, mediaRequired: false, minMedia: 1 });
-      // A database without update 61 can't have one route do several services: fall back to one route per service.
-      if (!combined.ok && services.length > 1 && /services/i.test(combined.error)) {
-        for (const sv of services) {
-          await createRoute(s.data.storm.id, { name: `${s.data.storm.name} · ${SERVICE_LABEL[sv]}`, service: sv, mediaRequired: false, minMedia: 1 });
-        }
+      const made = await makeRoute(s.data.storm);
+      if (!made.ok) {
+        // Say so and let pull-to-refresh try again, instead of leaving a draft with no route and no message.
+        ensured.current = null;
+        if (ticket === latest.current) setError(made.error);
       }
       const again = await loadStormRoutes(id);
       if (ticket === latest.current && again.ok) setRoutes(again.data);
     }
+    if (s.data.storm.status !== 'ended') {
+      const t = await loadRouteTemplates(stormServices(s.data.storm));
+      if (ticket === latest.current && t.ok) setTemplates(t.data);
+    }
+    if (ticket === latest.current) setReloadToken((n) => n + 1);
   }, [id]);
 
+  /** One route does every service of the storm together (for example plowing + salting on one truck). */
+  async function makeRoute(st: SnowStorm): Promise<{ ok: true } | { ok: false; error: string }> {
+    const services = stormServices(st);
+    const combined = await createRoute(st.id, { name: st.name, service: services[0], services, mediaRequired: false, minMedia: 1 });
+    if (combined.ok) return { ok: true };
+    // A database without update 61 can't have one route do several services: fall back to one route per service.
+    if (services.length > 1 && /services/i.test(combined.error)) {
+      for (const sv of services) {
+        const one = await createRoute(st.id, { name: `${st.name} · ${SERVICE_LABEL[sv]}`, service: sv, mediaRequired: false, minMedia: 1 });
+        if (!one.ok) return { ok: false, error: one.error };
+      }
+      return { ok: true };
+    }
+    return { ok: false, error: combined.error };
+  }
+
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     reload();
     if (!id || !isSupabaseConfigured) return;
     const channel = supabase.channel(`snow-storm-${id}`);
     for (const table of ['snow_storms', 'snow_routes', 'snow_visits', 'snow_skip_requests']) {
       const filter = table === 'snow_storms' ? `id=eq.${id}` : `storm_id=eq.${id}`;
-      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter }, () => { reload(); });
+      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter }, () => {
+        // A storm in progress changes in bursts (arrive, photos, complete); collapse them into one reload.
+        if (debounce.current) clearTimeout(debounce.current);
+        debounce.current = setTimeout(() => { reload(); }, 400);
+      });
     }
     channel.subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { if (debounce.current) clearTimeout(debounce.current); supabase.removeChannel(channel); };
   }, [id, reload]);
 
   async function onRefresh() {
@@ -199,6 +218,7 @@ export function StormDetailScreen() {
           </View>
           <Text style={[styles.title, { color: colors.textPrimary }]} accessibilityRole="header">{`${servicesText} Route`}</Text>
           <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>{storm.name}</Text>
+          {storm.notes ? <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]} numberOfLines={3}>{storm.notes}</Text> : null}
         </ImageBackground>
 
         <View style={styles.body}>
@@ -229,14 +249,66 @@ export function StormDetailScreen() {
           ) : null}
 
           <View style={{ marginTop: spacing.xl }}>
+            {liveRoutes.length === 0 && routes.length > 0 && storm.status !== 'ended' ? (
+              <View style={{ gap: spacing.md }}>
+                <InlineNotice icon="slash" tone="warning" text="Every route on this storm was cancelled." />
+                <Button
+                  title="New route"
+                  icon="plus"
+                  variant="secondary"
+                  loading={busy}
+                  onPress={async () => {
+                    setBusy(true);
+                    const made = await makeRoute(storm);
+                    setBusy(false);
+                    if (!made.ok) return showMessage("Couldn't create the route", made.error);
+                    reload();
+                  }}
+                  fullWidth
+                />
+              </View>
+            ) : null}
             {liveRoutes.map((r) => (
               <View key={r.id} style={{ marginBottom: spacing.lg }}>
                 {liveRoutes.length > 1 ? (
                   <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.sm }]}>{SERVICE_LABEL[r.service]}</Text>
                 ) : null}
-                <RouteEditor routeId={r.id} embedded onDragActive={setDragging} />
+                <RouteEditor routeId={r.id} onDragActive={setDragging} refreshToken={reloadToken} onRouteCancelled={reload} />
               </View>
             ))}
+            {storm.status !== 'ended' && templates.length > 0 ? (
+              <View style={{ marginTop: spacing.md }}>
+                <Text style={[typeScale.overline, { color: colors.textTertiary, marginBottom: spacing.sm, marginLeft: spacing.sm }]}>SAVED TEMPLATES</Text>
+                {templates.map((t) => (
+                  <Pressable
+                    key={t.id}
+                    disabled={busy}
+                    onPress={() => confirmAction(
+                      `Add "${t.name}"?`,
+                      `Adds a ${SERVICE_LABEL[t.service].toLowerCase()} route with its ${t.stops} saved ${t.stops === 1 ? 'stop' : 'stops'} to this storm.`,
+                      'Add route',
+                      async () => {
+                        setBusy(true);
+                        const res = await addRouteFromTemplate(storm.id, t.id);
+                        setBusy(false);
+                        if (!res.ok) return showMessage("Couldn't add the route", res.error);
+                        reload();
+                      },
+                    )}
+                    style={[styles.templateRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add a route from the template ${t.name}`}
+                  >
+                    <Icon name="copy" size={18} color={colors.primary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{t.name}</Text>
+                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{SERVICE_LABEL[t.service]} · {t.stops} {t.stops === 1 ? 'stop' : 'stops'}</Text>
+                    </View>
+                    <Icon name="plus" size={18} color={colors.primary} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
           </View>
 
           {storm.status !== 'draft' ? (
@@ -286,19 +358,5 @@ const styles = StyleSheet.create({
   stat: { alignItems: 'center', flex: 1, paddingVertical: spacing.xs },
   statValue: { fontSize: 30, lineHeight: 36, fontWeight: '700' },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
-  sectionTitle: { marginTop: spacing.xl, marginBottom: spacing.sm },
-  routeCard: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
-  iconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  routeTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  leadRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  savedRoute: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: radius.lg, borderWidth: 1 },
-  help: { marginTop: spacing.sm, marginHorizontal: spacing.sm },
-  serviceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 40 },
-  servicesRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  serviceLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  changeServices: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, minHeight: 44, borderRadius: radius.full },
-  historyRow: { flexDirection: 'row', gap: spacing.md },
-  timeline: { width: 12, alignItems: 'center', paddingTop: 6 },
-  marker: { width: 10, height: 10, borderRadius: 5 },
-  line: { width: 2, flex: 1, marginTop: 2 },
+  templateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, marginBottom: spacing.sm },
 });

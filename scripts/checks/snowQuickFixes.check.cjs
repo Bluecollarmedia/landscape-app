@@ -8,7 +8,7 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
 
 const act = read('app/(owner)/snow-activity.tsx');
 check('1 the Snow Activity filter chips wrap onto more lines (no sideways scrolling that cut them off)', !/<ScrollView horizontal[^>]*styles\.filterBar/.test(act) && /filterBar: \{[^}]*flexWrap: 'wrap'/.test(act));
-const settings = read('src/components/snow/settings/SnowSettingsScreen.tsx');
+const settings = read('app/snow/owner/(tabs)/more.tsx');
 check('2 "Your profile and photo" stays inside Snow Mode', /router\.push\('\/snow\/owner\/edit-profile'/.test(settings) && !/router\.push\('\/\(owner\)\/edit-profile'/.test(settings));
 check('3 that screen exists and is registered', fs.existsSync(path.join(__dirname, '../../app/snow/owner/edit-profile.tsx')) && /edit-profile/.test(read('app/snow/owner/_layout.tsx')));
 const team = read('app/(owner)/(tabs)/more/snow-team.tsx');

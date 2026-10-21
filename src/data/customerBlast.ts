@@ -24,6 +24,18 @@ export async function sendCustomerMessage(input: { title: string; body: string; 
   }
 }
 
+/** How many people each group reaches right now (update 83). Null when it can't be read; the screen just shows no counts. */
+export async function fetchCustomerReach(): Promise<Partial<Record<CustomerAudience, number>> | null> {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data, error } = await supabase.rpc('customer_message_reach');
+    if (error || !data) return null;
+    return data as Partial<Record<CustomerAudience, number>>;
+  } catch {
+    return null;
+  }
+}
+
 /** The messages this company has sent to customers, newest first. */
 export function useCustomerMessageHistory(): Announcement[] {
   const v = useDb();

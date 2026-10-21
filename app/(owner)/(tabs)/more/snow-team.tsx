@@ -7,22 +7,18 @@
  */
 
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Platform, Alert, Pressable, RefreshControl, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, ScrollView, StyleSheet, Pressable, RefreshControl, TextInput } from 'react-native';
+import { useRouter, useSegments } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { ScreenHeader, RaisedAddButton, Avatar, Button, InlineNotice, LoadingSpinner, Icon } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
+import { showMessage } from '@/components/financials/ActionSheet';
 import { haptics } from '@/lib/haptics';
 import { db, useDb } from '@/data/store';
 import { filterSnowTeam, servicesSummary, snowTeamRows, type SnowTeamFilter, type SnowTeamRow } from '@/lib/snowTeam';
-import { useSnowOnboardingAdmin, SNOW_SERVICES, snowServiceLabel, type SnowService } from '@/hooks/useSnowOnboarding';
-
-function showError(message: string) {
-  if (Platform.OS === 'web') alert(message);
-  else Alert.alert('Couldn’t save', message);
-}
+import { useSnowOnboardingAdmin, SNOW_SERVICES, snowServiceLabel, type SnowService } from '@/hooks/useSnowTeam';
 
 const ALL_SERVICES = SNOW_SERVICES.map((s) => s.key);
 
@@ -31,6 +27,9 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
   const tabBarClearance = useTabBarClearance();
   const { colors } = useTheme();
   const router = useRouter();
+  // Inside the snow shell, (owner) screens get bounced by the root guard, so Add Worker opens through the snow route.
+  const inSnowShell = useSegments()[0] === 'snow';
+  const addWorker = () => router.push((inSnowShell ? '/snow/owner/worker-new' : '/(owner)/worker-new') as any);
   const admin = useSnowOnboardingAdmin();
   const dbVersion = useDb();
   const [refreshing, setRefreshing] = useState(false);
@@ -65,7 +64,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
       ? (member && member.status === 'active' ? await admin.revoke(member) : { ok: true })
       : await admin.grantAccess({ personId: row.personId, firstName: row.firstName, lastName: row.lastName, email: row.email, phone: row.phone }, next);
     setBusy(null);
-    if (!res.ok) return showError((res as { error?: string }).error ?? 'Could not save.');
+    if (!res.ok) return showMessage('Couldn’t save', (res as { error?: string }).error ?? 'Could not save.');
     flashSaved(`Saved. ${row.firstName} ${row.lastName}: ${servicesSummary(next, ALL_SERVICES, snowServiceLabel)}.`);
   }
 
@@ -81,7 +80,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
         title="Snow Team"
         subtitle="Every worker and what they work in snow"
         hideBack={asTab}
-        right={<RaisedAddButton onPress={() => router.push('/(owner)/worker-new' as any)} accessibilityLabel="Add a worker" />}
+        right={<RaisedAddButton onPress={addWorker} accessibilityLabel="Add a worker" />}
       />
       <ScrollView
         // Always clear the floating tab bar (also when opened from More), so the last row can be reached.
@@ -135,7 +134,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginVertical: spacing.sm }]}>
                   Add a worker with just a name and phone number. They get a private link to set up their own login.
                 </Text>
-                <Button title="Add Worker" icon="user-plus" onPress={() => router.push('/(owner)/worker-new' as any)} />
+                <Button title="Add Worker" icon="user-plus" onPress={addWorker} />
               </View>
             ) : shown.length === 0 ? (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl }]}>No one matches.</Text>

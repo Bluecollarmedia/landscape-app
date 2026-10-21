@@ -12,7 +12,7 @@ const compile = (src, req) => {
 };
 
 const crewLib = compile(read('src/lib/snowCrew.ts'), () => ({}));
-const { canWorkRoute, crewChoices, nextCrew, crewCountLabel, crewTag, roleFor } = crewLib;
+const { canWorkRoute, crewChoices, nextCrew, roleFor } = crewLib;
 
 // ---- fake supabase ------------------------------------------------------------
 let rpcHandler, tables, calls;
@@ -53,7 +53,6 @@ const routeRow = (id, status) => ({ id, name: `R-${id}`, service: 'plowing', cre
   const people = [{ personId: 'a', name: 'Zed' }, { personId: 'b', name: 'Amy' }, { personId: 'lead', name: 'Lee' }, { personId: 'c', name: 'Cy' }, { personId: 'b', name: 'Amy' }];
   check('2 crew choices leave out the lead, existing crew and repeats, sorted by name', crewChoices(people, 'lead', ['c']).map((p) => p.personId).join() === 'b,a');
   check('3 next crew adds once and removes cleanly', nextCrew(['a'], 'b', true).join() === 'a,b' && nextCrew(['a', 'b'], 'b', true).join() === 'a,b' && nextCrew(['a', 'b'], 'a', false).join() === 'b');
-  check('4 labels read plainly', crewCountLabel(0) === 'No crew' && crewCountLabel(1) === '1 crew member' && crewCountLabel(3) === '3 crew members' && crewTag(0) === '' && crewTag(2) === '+2 crew');
   check('5 without update 41 every route counts as lead (only leads could see routes then)', roleFor(null, 'x') === 'lead' && roleFor(new Map([['x', 'crew']]), 'x') === 'crew' && roleFor(new Map(), 'x') === 'lead');
 
   // after update 41
@@ -95,8 +94,13 @@ const routeRow = (id, status) => ({ id, name: `R-${id}`, service: 'plowing', cre
   const team = crewLib.routeTeam('b', 'Bea', [{ personId: 'a', name: 'Amy' }, { personId: 'b', name: 'Bea' }]);
   check('15 the team is the lead first, then the crew, with no repeats; the lead is always one of the team', team.length === 2 && team[0].lead && team[0].personId === 'b' && !team[1].lead);
   check('16 choosing a new lead keeps the old lead on the route as crew and takes the new one off the crew list', JSON.stringify(crewLib.crewAfterLeadChange(['a', 'c'], 'b', 'a')) === JSON.stringify(['c', 'b']) && JSON.stringify(crewLib.crewAfterLeadChange(['a'], undefined, 'a')) === '[]');
-  check('17 the stop count reads "0 stops added" / "1 stop added" / "5 stops added"', crewLib.stopsAddedLabel(0) === '0 stops added' && crewLib.stopsAddedLabel(1) === '1 stop added' && crewLib.stopsAddedLabel(5) === '5 stops added');
   check('18 a draft explains what is missing before it can go out', crewLib.dispatchGaps([{ stops: 0 }]).join('|') === 'Choose a crew lead|Add at least one property' && crewLib.dispatchGaps([{ leadPersonId: 'a', stops: 2 }]).length === 0);
+
+  // Promoting a crew member to lead: they stay on the route (shown first, labelled Lead), the old lead stays as crew.
+  const after = crewLib.crewAfterLeadChange(['bo', 'cy'], 'al', 'bo');
+  const teamAfter = crewLib.routeTeam('bo', 'Bo', after.map((id) => ({ personId: id, name: id })));
+  check('19 making a crew member the lead keeps them on the route and keeps the old lead as crew', teamAfter.map((m) => m.personId).join() === 'bo,cy,al' && teamAfter[0].lead === true && teamAfter.filter((m) => m.lead).length === 1, JSON.stringify(teamAfter));
+  check('20 the crew row labels who the lead is', /m\.lead \? <Text[^>]*>Lead<\/Text>/.test(read('src/components/snow/routes/RouteEditScreen.tsx')));
 
   console.log(bad ? `\n${bad} failed` : '\nall passed');
   process.exit(bad ? 1 : 0);

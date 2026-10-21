@@ -33,6 +33,6 @@ const hook = read('src/hooks/useProfilePhoto.tsx');
 check('9 the crop screen opens after the picker (camera or library) has closed', /AFTER_PICKER_MS/.test(hook) && /await sleep\(AFTER_PICKER_MS\)/.test(hook));
 const screens = ['src/components/account/EditProfileScreen.tsx', 'src/components/account/SignupPhotoPicker.tsx', 'app/invite/[token].tsx'];
 check('10 every place that picks a profile photo uses the crop flow', screens.every((f) => /useProfilePhoto\(/.test(read(f)) && /\{photo\.cropper\}/.test(read(f)) && !/chooseProfilePhoto\(/.test(read(f))));
-check('11 the account-creation screens get it through the shared picker', ['app/(auth)/signup.tsx', 'app/(auth)/create-company.tsx'].every((f) => /<SignupPhotoPicker /.test(read(f))));
+check('11 the account-creation screens get it through the shared picker', ['app/(auth)/create-company.tsx'].every((f) => /<SignupPhotoPicker /.test(read(f))));
 console.log(bad ? '\n' + bad + ' failed' : '\nall passed');
 process.exit(bad ? 1 : 0);

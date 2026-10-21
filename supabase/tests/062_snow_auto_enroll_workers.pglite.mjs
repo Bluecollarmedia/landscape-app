@@ -78,7 +78,7 @@ check('8 switching Snow Mode off and on again changes nobody access', t.length =
 
 // removed access stays removed
 await asUser(owner.u);
-f = await fails(`select public.snow_revoke_access($1)`, [w2.pid]);
+f = await fails(`select public.revoke_snow_access($1)`, [w2.pid]);
 await db.query(`update public.companies set active_mode = 'landscaping' where id = $1`, [co]);
 await db.query(`update public.companies set active_mode = 'snow' where id = $1`, [co]);
 await db.exec('reset role');

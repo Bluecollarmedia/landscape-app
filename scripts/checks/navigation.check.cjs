@@ -13,9 +13,10 @@ const layout = read('app/_layout.tsx');
 check('1 the root layout never returns a bare <Slot /> for public pages (that rebuilt the navigator)', !/if \(isPublicPage\) \{\s*return <Slot \/>;/.test(layout));
 check('2 the same tree is returned for public and normal pages: <Slot /> then optional overlays (the worker mode toggle, the welcome)', /<>\s*<Slot \/>\s*\{isPublicPage \? null : <WorkerModeToggle \/>\}\s*\{isPublicPage \? null : <SignInWelcome \/>\}\s*<\/>/.test(layout));
 check('3 the splash still shows for normal pages while loading, but not for public pages', /!isPublicPage && \(isLoading \|\| !splashDone\)/.test(layout));
-const settings = read('src/components/snow/settings/SnowSettingsScreen.tsx');
-check('4 Snow settings opens Properties and Snow team as their own screens (no hopping to the tab bar)', /router\.push\('\/snow\/owner\/properties-list'/.test(settings) && /router\.push\('\/snow\/owner\/team-list'/.test(settings) && !/router\.(push|navigate)\('\/snow\/owner\/(properties|team)'/.test(settings));
-check('4b those two screens exist and are registered in the Snow owner stack', fs.existsSync(path.join(__dirname, '../../app/snow/owner/properties-list.tsx')) && fs.existsSync(path.join(__dirname, '../../app/snow/owner/team-list.tsx')) && /properties-list/.test(read('app/snow/owner/_layout.tsx')) && /team-list/.test(read('app/snow/owner/_layout.tsx')));
+check('4 Snow Mode has ONE More screen with every setting; there is no second Settings screen and no duplicate Team or Properties routes (the tabs cover them)',
+  !fs.existsSync(path.join(__dirname, '../../app/snow/owner/settings.tsx')) && !fs.existsSync(path.join(__dirname, '../../src/components/snow/settings/SnowSettingsScreen.tsx'))
+  && !fs.existsSync(path.join(__dirname, '../../app/snow/owner/team-list.tsx')) && !fs.existsSync(path.join(__dirname, '../../app/snow/owner/properties-list.tsx'))
+  && !/settings|properties-list|team-list/.test(read('app/snow/owner/_layout.tsx')));
 check('4c profile photos no longer use the built-in crop screen', !/allowsEditing: true/.test(read('src/components/account/EditProfileScreen.tsx')) && !/allowsEditing: true/.test(read('app/invite/[token].tsx')));
 
 // No screen outside the tabs may push to a tab route of the same shell.

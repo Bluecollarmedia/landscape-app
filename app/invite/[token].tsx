@@ -26,6 +26,8 @@ import { uploadImage } from '@/lib/media';
 import { saveBirthdayForCurrentUser } from '@/data/birthday';
 import { saveDetailsForCurrentUser } from '@/data/workerDetails';
 import { useProfilePhoto } from '@/hooks/useProfilePhoto';
+import { stashPendingSignup } from '@/data/pendingSignup';
+import { PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePhoto';
 import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
 import { localDateKey } from '@/lib/ids';
 import { typeScale } from '@/theme/typography';
@@ -87,6 +89,17 @@ export default function InviteScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const photo = useProfilePhoto(setPhotoUri, setError);
+  // Same choices as every other sign-up photo: take one, choose one, or remove it. The sheet must be gone before iOS opens the picker.
+  function choosePhoto() {
+    const pick = (source: ProfilePhotoSource) => photo.pick(source, { afterSheetMs: PICKER_AFTER_SHEET_MS });
+    if (Platform.OS === 'web') { pick('library'); return; }
+    Alert.alert('Profile photo', undefined, [
+      { text: 'Take Photo', onPress: () => pick('camera') },
+      { text: 'Choose from Library', onPress: () => pick('library') },
+      ...(photoUri ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: () => setPhotoUri(null) }] : []),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -101,6 +114,9 @@ export default function InviteScreen() {
   }, [token]);
 
   const isWorker = info?.kind !== 'customer';
+  // A customer's name is whatever the owner typed: shown here, kept as it is. (A part the owner left empty can still be filled in.)
+  const firstLocked = info?.kind === 'customer' && !!info?.firstName?.trim();
+  const lastLocked = info?.kind === 'customer' && !!info?.lastName?.trim();
 
   async function goHome() {
     await refreshContext();
@@ -149,7 +165,10 @@ export default function InviteScreen() {
     try {
       const result = await signUp(email.trim(), password, { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() }, { inviteToken: String(token) });
       if (result.needsEmailConfirmation) {
-        say('Check your email', `We sent a confirmation link to ${email.trim()}. Open it, then sign in. ${info?.companyName ?? 'Your employer'} is already expecting you.`);
+        // Not signed in yet, so none of the extras can be saved now: keep them on the phone and save them at first sign-in.
+        await stashPendingSignup({ email: email.trim(), photoUri, birthdayIso: parseBirthday(birthday), hoodieSize: isWorker ? hoodie : null, idUri: isWorker ? idUri : null });
+        const kept = photoUri || parseBirthday(birthday) || (isWorker && (hoodie || idUri));
+        say('Check your email', `We sent a confirmation link to ${email.trim()}. Open it, then sign in. ${info?.companyName ?? 'Your employer'} is already expecting you.${kept ? ' Your photo and details are saved and will be added when you sign in.' : ''}`);
         router.replace('/(auth)/login');
         return;
       }
@@ -157,7 +176,7 @@ export default function InviteScreen() {
       if (birthdayIso) await saveBirthdayForCurrentUser(birthdayIso);
       if (isWorker) {
         const note = await saveDetailsForCurrentUser({ hoodieSize: hoodie, idUri });
-        if (note) say('Not saved', `You're in, but ${note} You can add your hoodie size and ID later in Settings → Edit Profile.`);
+        if (note) say('Not saved', `You're in, but ${note} You can add your hoodie size and ID later by tapping your name in Settings.`);
       }
       if (photoUri) {
         try {
@@ -169,7 +188,7 @@ export default function InviteScreen() {
           }
         } catch (photoErr) {
           const why = photoErr instanceof Error ? photoErr.message : 'Unknown error';
-          say('Photo not saved', `You're in, but your profile photo wasn't saved. ${why} You can add it later in Settings → Edit Profile.`);
+          say('Photo not saved', `You're in, but your profile photo wasn't saved. ${why} You can add it later by tapping your name in Settings.`);
         }
       }
       await goHome();
@@ -222,11 +241,10 @@ export default function InviteScreen() {
           </View>
         ) : (
           <View style={styles.form}>
-            {isWorker ? (
-              <View style={styles.photoSection}>
+            <View style={styles.photoSection}>
                 <Pressable
                   style={[styles.photoUpload, { borderColor: photoUri ? colors.primary : colors.border, backgroundColor: photoUri ? colors.primarySurface : colors.surface }]}
-                  onPress={() => photo.pick('library')}
+                  onPress={choosePhoto}
                   accessibilityRole="button"
                   accessibilityLabel="Add a profile photo"
                 >
@@ -234,11 +252,10 @@ export default function InviteScreen() {
                 </Pressable>
                 <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>Profile photo (optional)</Text>
               </View>
-            ) : null}
 
             <View style={styles.row}>
-              <Input label="First Name *" placeholder="First name" value={firstName} onChangeText={setFirstName} containerStyle={{ flex: 1 }} />
-              <Input label="Last Name" placeholder="Last name" value={lastName} onChangeText={setLastName} containerStyle={{ flex: 1 }} />
+              <Input label="First Name *" placeholder="First name" value={firstName} onChangeText={setFirstName} editable={!firstLocked} containerStyle={{ flex: 1 }} />
+              <Input label="Last Name" placeholder="Last name" value={lastName} onChangeText={setLastName} editable={!lastLocked} containerStyle={{ flex: 1 }} />
             </View>
             <Input label={isWorker ? 'Phone *' : 'Phone'} placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
             <Input label="Email *" placeholder="you@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />

@@ -4,7 +4,7 @@
  * is saved). Other records (maintenance, repairs, registration ...) use TruckRecordSheet.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Platform, Alert, ActivityIndicator, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { Icon } from '@/components/ui/Icon';
@@ -82,7 +82,7 @@ export function TruckDocumentSheet({ visible, onClose, onSubmit }: Props) {
     setError(null);
     const err = await onSubmit({ kind, title: title.trim() || suggestedTitle(kind, file.name), uri: file.uri, name: file.name, mimeType: file.mimeType, size: file.size, expiresOn: expiresOn || undefined });
     setBusy(false);
-    if (err) setError(err); else onClose();
+    if (err) setError(err); else { Keyboard.dismiss(); onClose(); }
   }
 
   return (

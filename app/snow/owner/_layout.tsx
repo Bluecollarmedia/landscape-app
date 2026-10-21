@@ -7,17 +7,13 @@ export default function SnowOwnerLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="storm-new" options={{ presentation: 'modal' }} />
       <Stack.Screen name="storm/[id]" />
-      <Stack.Screen name="route/[id]" />
       <Stack.Screen name="property" />
       <Stack.Screen name="activity" />
       <Stack.Screen name="hours" />
       <Stack.Screen name="review" />
-      <Stack.Screen name="settings" />
       <Stack.Screen name="message-customers" />
       <Stack.Screen name="manage-storms" />
       <Stack.Screen name="edit-profile" />
-      <Stack.Screen name="properties-list" />
-      <Stack.Screen name="team-list" />
     </Stack>
   );
 }

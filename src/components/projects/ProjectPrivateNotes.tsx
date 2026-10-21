@@ -4,7 +4,7 @@
  * written while quoting is still here once the quote is approved. Shown inside the quote editor and in the project's More menu.
  */
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, Platform, TextInput, Modal, ScrollView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert, Platform, TextInput, Modal, ScrollView, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Button, Card, OptimizedImage } from '@/components/ui';
@@ -58,6 +58,7 @@ export function ProjectPrivateNotes({ projectId, projectName, address }: Props) 
     if (!r.ok) { setNoteError(r.error); return; }
     setDraft('');
     setNoteError(null);
+    Keyboard.dismiss();
   }
 
   async function takePicture(source: 'camera' | 'library') {
@@ -127,7 +128,7 @@ export function ProjectPrivateNotes({ projectId, projectName, address }: Props) 
                 <TextInput value={editText} onChangeText={(t) => setEditText(t.slice(0, NOTE_MAX))} multiline autoFocus style={[typeScale.bodyLarge, styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]} />
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   <Button title="Cancel" variant="ghost" onPress={() => setEditing(null)} style={{ flex: 1 }} />
-                  <Button title="Save" onPress={() => { const r = updateOwnerNote(n.id, editText); if (r.ok) setEditing(null); else setNoteError(r.error); }} style={{ flex: 1 }} />
+                  <Button title="Save" onPress={() => { const r = updateOwnerNote(n.id, editText); if (r.ok) { Keyboard.dismiss(); setEditing(null); } else setNoteError(r.error); }} style={{ flex: 1 }} />
                 </View>
               </View>
             ) : (

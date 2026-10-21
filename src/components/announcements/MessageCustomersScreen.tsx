@@ -3,27 +3,29 @@
  * a banner on their home screen, like an announcement to workers but for customers. Below the form, the messages already sent.
  * Used by both the landscaping owner (More > Announcements) and the Snow Mode owner (More).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Button, Input, ScreenHeader, InlineNotice } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
-import { sendCustomerMessage, useCustomerMessageHistory } from '@/data/customerBlast';
+import { fetchCustomerReach, sendCustomerMessage, useCustomerMessageHistory } from '@/data/customerBlast';
 import { AUDIENCES, BODY_MAX, TITLE_MAX, audienceLabel, confirmText, messageProblem, sentText, type CustomerAudience } from '@/lib/customerMessage';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function MessageCustomersScreen() {
+/** The form and the sent list for messages to customers, with no screen around it (the Announcements page embeds it). */
+export function MessageCustomersPanel() {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
   const history = useCustomerMessageHistory();
   const [audience, setAudience] = useState<CustomerAudience>('customers_all');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [reach, setReach] = useState<Partial<Record<CustomerAudience, number>> | null>(null);
+  useEffect(() => { fetchCustomerReach().then(setReach); }, [history.length]);
   const [note, setNote] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   const problem = messageProblem(title, body);
@@ -53,9 +55,7 @@ export function MessageCustomersScreen() {
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Message Customers" subtitle="A push notification and a banner in their app" />
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing['5xl'] }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <View style={styles.content}>
         <Text style={[typeScale.overline, { color: colors.textSecondary }]}>SEND TO</Text>
         <View style={styles.chips}>
           {AUDIENCES.map((a) => {
@@ -69,6 +69,9 @@ export function MessageCustomersScreen() {
                 style={[styles.chip, { backgroundColor: on ? colors.primary : colors.surface, borderColor: on ? colors.primary : colors.border }]}
               >
                 <Text style={[typeScale.labelLarge, { color: on ? '#FFFFFF' : colors.textSecondary }]}>{a.label}</Text>
+                {reach?.[a.key] != null ? (
+                  <Text style={[typeScale.caption, { color: on ? '#FFFFFF' : colors.textTertiary, opacity: on ? 0.85 : 1 }]}>{reach[a.key]}</Text>
+                ) : null}
               </Pressable>
             );
           })}
@@ -104,6 +107,19 @@ export function MessageCustomersScreen() {
             </View>
           </View>
         )}
+    </View>
+  );
+}
+
+/** Message Customers as its own screen (Snow Mode's More opens this one). */
+export function MessageCustomersScreen() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
+      <ScreenHeader title="Message Customers" subtitle="A push notification and a banner in their app" />
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing['5xl'] }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <MessageCustomersPanel />
       </ScrollView>
     </View>
   );
@@ -113,7 +129,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.md },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { paddingHorizontal: spacing.md, height: 38, borderRadius: radius.full, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chip: { paddingHorizontal: spacing.md, height: 38, flexDirection: 'row', gap: 6, borderRadius: radius.full, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   list: { borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   row: { flexDirection: 'row', gap: spacing.md, padding: spacing.md, alignItems: 'flex-start' },
 });

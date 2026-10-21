@@ -1,4 +1,4 @@
-// Update 69: revoking a maintenance customer's access also works for a customer the owner linked by hand.
+// Update 69, kept up to date: unlinking a maintenance customer (now by editing the property) removes their view of it.
 import fs from 'node:fs';
 import { buildFullSchema } from './helpers/fullSchema.mjs';
 
@@ -29,26 +29,22 @@ await db.query(`insert into public.company_members (company_id, person_id, role,
 const mkProp = async (name) => (await one(`insert into public.maintenance_properties (company_id, name, address, customer_id) values ($1,$2,'1 Main',$3) returning id`, [co, name, cust.pid])).id;
 const linked = async (id) => (await one(`select customer_id from public.maintenance_properties where id = $1`, [id])).customer_id;
 
+// The old "revoke with a code" function is gone (update 85). What this test protected still matters: the owner can unlink a customer from
+// a maintenance property (by editing the property: Customer > No customer), a worker cannot, and an unlinked customer stops seeing it.
+const clear = async (u, id) => { await asUser(u); try { await db.query(`update public.maintenance_properties set customer_id = null where id = $1`, [id]); } catch { /* refused */ } finally { await asDb(); } };
+
 const p1 = await mkProp('Hand linked');
-let r = await rpc(owner.u, `select public.regenerate_maintenance_code($1::uuid, false) as x`, [p1]);
-check('1 a new code without revoking keeps a hand-linked customer linked', r.ok && (await linked(p1)) === cust.pid, r.msg);
-r = await rpc(owner.u, `select public.regenerate_maintenance_code($1::uuid, true) as x`, [p1]);
-check('2 revoking removes a customer the owner linked BY HAND (this used to do nothing)', r.ok && (await linked(p1)) === null, r.msg);
-
-const p2 = await mkProp('Claimed by code');
-await db.query(`update public.maintenance_customer_codes set claimed_by = $2, claimed_at = now() where property_id = $1`, [p2, cust.pid]);
-r = await rpc(owner.u, `select public.regenerate_maintenance_code($1::uuid, true) as x`, [p2]);
-check('3 revoking still removes a customer who claimed the code, and the claim is cleared', r.ok && (await linked(p2)) === null
-  && (await one(`select claimed_by from public.maintenance_customer_codes where property_id = $1`, [p2])).claimed_by === null, r.msg);
-
-const p3 = await mkProp('Worker tries');
-r = await rpc(worker.u, `select public.regenerate_maintenance_code($1::uuid, true) as x`, [p3]);
-check('4 a worker cannot revoke or regenerate', !r.ok && (await linked(p3)) === cust.pid, r.msg);
+let r = await rpc(cust.u, `select count(*)::int as x from public.maintenance_my_properties()`);
+check('1 a linked customer sees their property through the customer function (the link they were given works)', r.ok && r.v === 1, JSON.stringify(r));
+await clear(worker.u, p1);
+check('2 a worker cannot unlink the customer', (await linked(p1)) === cust.pid);
+await clear(owner.u, p1);
+check('3 the owner unlinks the customer by editing the property', (await linked(p1)) === null);
 r = await rpc(cust.u, `select count(*)::int as x from public.maintenance_my_properties()`);
-check('5 a linked customer sees their property through the customer function (the link they were given works)', r.ok && r.v === 1, JSON.stringify(r));
-r = await rpc(owner.u, `select public.regenerate_maintenance_code($1::uuid, true) as x`, [p3]);
-const r5 = await rpc(cust.u, `select count(*)::int as x from public.maintenance_my_properties()`);
-check('6 after revoking, that customer no longer sees the property', r.ok && r5.ok && r5.v === 0, JSON.stringify(r5));
+check('4 after unlinking, that customer no longer sees the property', r.ok && r.v === 0, JSON.stringify(r));
+const p2 = await mkProp('Second');
+r = await rpc(cust.u, `select count(*)::int as x from public.maintenance_my_properties()`);
+check('5 linking again (the owner picks the customer on the property) gives the customer their property back', r.ok && r.v === 1, JSON.stringify(r));
 
 const bad = results.filter((x) => !x).length;
 console.log(bad ? `\n${bad} failed` : '\nall passed');

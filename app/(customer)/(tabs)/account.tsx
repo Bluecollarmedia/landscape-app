@@ -1,7 +1,6 @@
 import { LegalSection } from '@/components/legal/LegalSection';
-import { useMyMaintenanceProperties } from '@/data/maintenanceCustomer';
 import React from 'react';
-import { View, Text, Linking } from 'react-native';
+import { View, Text, Linking, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -10,6 +9,8 @@ import { useAuth } from '@/providers/AuthProvider';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { ScreenContainer } from '@/components/layout';
 import { Avatar, ListSection, ListRow } from '@/components/ui';
+import { Icon } from '@/components/ui/Icon';
+import { SnowNotifyChoices } from '@/components/snow/customer/SnowNotifyChoices';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import { db, useDb } from '@/data/store';
@@ -22,7 +23,6 @@ export default function CustomerAccountScreen() {
   const { user, signOut, switchDevRole } = useAuth();
   useDb();
   const hasSnow = useHasSnow();
-  const myMaintenance = useMyMaintenanceProperties();
   const insets = useSafeAreaInsets();
 
   return (
@@ -32,7 +32,12 @@ export default function CustomerAccountScreen() {
       </View>
 
       <ListSection>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm }}>
+        <Pressable
+          onPress={() => router.push('/(customer)/edit-profile' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Edit your profile and photo"
+          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md }}
+        >
           <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={52} uri={user?.avatarUrl} />
           <View style={{ marginLeft: spacing.md, flex: 1 }}>
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
@@ -42,42 +47,12 @@ export default function CustomerAccountScreen() {
               {user?.email}
             </Text>
           </View>
-        </View>
-        <ListRow
-          icon="edit-2"
-          iconColor={colors.primary}
-          title="Edit profile & photo"
-          subtitle="Your name, phone and picture"
-          showChevron
-          onPress={() => router.push('/(customer)/edit-profile' as any)}
-        />
+          <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+        </Pressable>
       </ListSection>
 
-      {myMaintenance.length > 0 ? (
-        <ListSection title="Maintenance">
-          <ListRow
-            icon="repeat"
-            iconColor={colors.primary}
-            title="Maintenance updates"
-            subtitle="Recent visits to your property, with photos we've shared"
-            showChevron
-            onPress={() => router.push('/(customer)/maintenance-updates')}
-          />
-        </ListSection>
-      ) : null}
-
-      {hasSnow ? (
-        <ListSection title="Snow">
-          <ListRow
-            icon="cloud-snow"
-            iconColor={colors.primary}
-            title="Snow updates"
-            subtitle="Plowing, shoveling and salting at your property, with photos"
-            showChevron
-            onPress={() => router.push('/(customer)/snow-updates')}
-          />
-        </ListSection>
-      ) : null}
+      {/* Snow and Maintenance updates open from their cards on Home (one way in each), so Account has no rows for them. Here are the customer's own Snow notification switches. */}
+      {hasSnow ? <SnowNotifyChoices /> : null}
 
       <ListSection title="Your Project Team">
         <ListRow

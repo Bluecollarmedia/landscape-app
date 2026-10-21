@@ -17,7 +17,7 @@ import { uuid } from '@/lib/ids';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { SNOW_SERVICES, type SnowService } from '@/types/snow';
-import { SERVICE_ICON } from './StormsListScreen';
+import { SERVICE_ICON } from '@/types/snow';
 
 const SERVICE_HINT: Record<SnowService, string> = {
   plowing: 'Lots and driveways',
@@ -89,7 +89,7 @@ export function StormNewScreen() {
           })}
         </View>
         <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary }]}>
-          Pick every service this storm covers. Each route you add later does one of them, so one storm can have plowing routes and shoveling routes.
+          Pick every service this storm covers. The storm's route does them together (plowing + salting on one truck); you can add more routes, or one from a saved template, on the storm screen.
         </Text>
 
         <Input

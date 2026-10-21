@@ -202,12 +202,6 @@ export async function createStorm(input: { name: string; services: SnowService[]
   return fail(NEEDS_UPDATE_40);
 }
 
-/** Changes the services a draft or running storm covers (a service that has a route can't be removed). */
-export async function setStormServices(stormId: string, services: SnowService[]): Promise<Result<StormActionResult>> {
-  const res = await call('snow_set_storm_services', { p_storm_id: stormId, p_services: services }, 'Couldn\'t change the services.');
-  return !res.ok && OLD_DATABASE.test(res.error) ? fail(NEEDS_UPDATE_40) : res;
-}
-
 /** Draft → dispatched. Needs a route with stops, and a lead on every route with stops. */
 export function dispatchStorm(stormId: string) {
   return call('snow_dispatch_storm', { p_storm_id: stormId }, 'Couldn\'t dispatch the storm.');
@@ -221,20 +215,6 @@ export function endStorm(stormId: string) {
 /** Ended → dispatched again. Earlier work, media and notifications are left as they were. */
 export function reopenStorm(stormId: string) {
   return call('snow_reopen_storm', { p_storm_id: stormId }, 'Couldn\'t reopen the storm.');
-}
-
-/** Name and notes are the only fields the app edits directly. */
-export async function renameStorm(stormId: string, patch: { name?: string; notes?: string | null }): Promise<Result> {
-  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const values: Row = {};
-  if (patch.name !== undefined) {
-    if (!patch.name.trim()) return fail('Give the storm a name.');
-    values.name = patch.name.trim();
-  }
-  if (patch.notes !== undefined) values.notes = patch.notes?.trim() || null;
-  const { error } = await supabase.from('snow_storms').update(values).eq('id', stormId);
-  if (error) return fail(message(error, 'Couldn\'t save the storm.'));
-  return ok(undefined);
 }
 
 /** How much work hangs off a storm, for the "delete for good" confirmation. */
@@ -283,11 +263,8 @@ export async function deleteDraftStorm(stormId: string): Promise<Result> {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-export const SERVICE_LABEL: Record<SnowService, string> = {
-  plowing: 'Plowing',
-  shoveling: 'Shoveling / Sidewalks',
-  salting: 'Salting',
-};
+import { SERVICE_LABEL } from '@/types/snow';
+export { SERVICE_LABEL };
 
 export const STORM_STATUS_LABEL: Record<SnowStorm['status'], string> = {
   draft: 'Draft',

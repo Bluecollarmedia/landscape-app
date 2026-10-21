@@ -16,14 +16,17 @@ import { db, useDb } from '@/data/store';
 import { useTheme } from '@/providers/ThemeProvider';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
-  addOwnerMedia, loadCustomerSnowUpdates, loadReviewQueue, reviewMedia, sendCustomerUpdate, withdrawMedia,
-  type CustomerSnowUpdate, type ReviewMedia, type ReviewStop,
+  addOwnerMedia, loadReviewQueue, reviewMedia, sendCustomerUpdate, withdrawMedia,
+  type ReviewMedia, type ReviewStop,
 } from '@/data/snowMediaReview';
-import { CustomerNotifyPrefs } from '@/components/snow/notifications/SnowNotifySettings';
+import { shortWhen } from '@/lib/snowFormat';
+import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
+import { useSnowUploads } from '@/hooks/useSnowUploads';
+import { SNOW_OWNER_MEDIA_TARGET } from '@/data/snowMediaTargets';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
-const when = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const when = shortWhen;
 
 function Thumb({ m, children }: { m: { kind: string; url?: string }; children?: React.ReactNode }) {
   const { colors } = useTheme();
@@ -55,6 +58,9 @@ export function SnowMediaReviewScreen() {
     setStops(res.data);
   }, []);
   useEffect(() => { reload(); }, [reload]);
+  // Photos the owner adds upload in the background; when one finishes saving, refresh the list.
+  const { saved: savedOwnerPhotos } = useSnowUploads(SNOW_OWNER_MEDIA_TARGET, () => true);
+  useEffect(() => { if (savedOwnerPhotos > 0) reload(); }, [savedOwnerPhotos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function review(m: ReviewMedia, status: 'approved' | 'hidden') {
     setBusy(m.id);
@@ -95,17 +101,16 @@ export function SnowMediaReviewScreen() {
     if (!db.companyId) return;
     const drafts = await pickSnowMedia();
     if (!drafts.length) return;
-    setBusy(s.visitId);
+    // Instant: queued, then uploaded in the background (shown under the button).
     const res = await addOwnerMedia(db.companyId, s.visitId, drafts);
-    setBusy(null);
     if (!res.ok) showMessage("Couldn't add the photo", res.error);
-    reload();
   }
 
   const waiting = stops.filter((s) => !s.notified);
   const sent = stops.filter((s) => s.notified);
 
   function StopCard({ s }: { s: ReviewStop }) {
+    const { uploading, failed } = useSnowUploads(SNOW_OWNER_MEDIA_TARGET, (p) => p.visitId === s.visitId);
     const pending = s.media.some((m) => m.status === 'pending');
     const newlyApproved = s.media.some((m) => m.status === 'approved' && !m.shared);
     return (
@@ -156,6 +161,7 @@ export function SnowMediaReviewScreen() {
           disabled={busy === s.visitId}
           onPress={() => addPhotos(s)}
         />
+        <SnowUploadStatus uploading={uploading} failed={failed} />
         {!s.notified || newlyApproved ? (
           <Button
             title={s.notified ? 'Share newly approved photos' : 'Send to customer'}
@@ -195,45 +201,6 @@ export function SnowMediaReviewScreen() {
 }
 
 /** Customer: Account → Snow updates. */
-export function CustomerSnowUpdatesScreen() {
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-  const [updates, setUpdates] = useState<CustomerSnowUpdate[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const reload = useCallback(async () => {
-    const res = await loadCustomerSnowUpdates();
-    setLoading(false);
-    if (!res.ok) return setError(res.error);
-    setError(null);
-    setUpdates(res.data);
-  }, []);
-  useEffect(() => { reload(); }, [reload]);
-
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Snow updates" />
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
-      >
-        {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
-        {loading ? <LoadingSpinner /> : !updates.length ? (
-          <EmptyState icon="cloud-snow" title="No snow updates yet" description="When your property is plowed, shoveled or salted, you'll see it here with photos." />
-        ) : updates.map((u) => (
-          <View key={u.visitId} style={[styles.card, { backgroundColor: colors.surface, marginBottom: spacing.md, gap: spacing.sm }]}>
-            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{SERVICE_LABEL[u.service]} done</Text>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{u.propertyName} · {when(u.completedAt)}</Text>
-            {u.media.length ? <View style={styles.thumbs}>{u.media.map((m) => <Thumb key={m.id} m={m} />)}</View> : null}
-          </View>
-        ))}
-        <CustomerNotifyPrefs />
-      </ScrollView>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   card: { borderRadius: radius.lg, padding: spacing.lg },

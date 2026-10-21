@@ -55,3 +55,13 @@ It is deliberately cautious: two spellings it cannot tell apart stay two records
 - Linking a sign-up to an owner-created record by email alone is unchanged (`handle_new_user`); making it safe depends on email confirmation and
   needs testing against real sign-ups.
 - Prospect projects can still be read by workers at the database level.
+
+## Update 79: one place for every property (built on phase 1)
+
+- A property is entered once, for one customer (`ensure_property`). The same customer + the same address, typed any way, gives the same property back.
+- New Project, Maintenance property, Snow property and the customer page all pick the customer first, then their saved property or a new address.
+  The record they save links to it (`property_id`); its address is kept in step (change it once, it changes everywhere).
+- Snow Properties and the Maintenance list show every property; one tap turns Snow (`snow_enable_for_property`, which also links the customer as the
+  Snow contact) or Maintenance on. A customer is never typed twice: forms pick from the one customer list or add them once.
+- Before SQL 75, 76 and 79 are run, the forms still save as they did (no property link); nothing breaks.
+- Existing records get linked by the phase 1 backfill (preview first).

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert, Platform, Keyboard } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { Button, DateField, Input } from '@/components/ui';
@@ -64,13 +64,13 @@ export default function LaborPropertyScreen() {
     const n = targetText.trim() === '' ? null : Number(targetText);
     if (n != null && !(n >= 5 && n <= 1440)) { say('Check the target', 'A target is a number of minutes between 5 and 1440.'); return; }
     const r = await saveTarget(db.companyId ?? '', kind, id, n, db.personId);
-    if (!r.ok) say("Couldn't save", r.error); else { setSavedTarget(n); say(n == null ? 'Target removed' : 'Target saved', n == null ? 'No alert will use a target here.' : `New visits will use ${n} minutes. Visits already recorded keep the target they started with.`); }
+    if (!r.ok) say("Couldn't save", r.error); else { Keyboard.dismiss(); setSavedTarget(n); say(n == null ? 'Target removed' : 'Target saved', n == null ? 'No alert will use a target here.' : `New visits will use ${n} minutes. Visits already recorded keep the target they started with.`); }
   }
   async function saveEstimate() {
     const n = estText.trim() === '' ? null : Number(estText);
     if (n != null && !(n > 0)) { say('Check the estimate', 'Enter the estimated labor-hours (the total person-hours).'); return; }
     const r = await saveProjectEstimate(db.companyId ?? '', id, n, null, db.personId);
-    if (!r.ok) say("Couldn't save", r.error); else setSavedEst(n);
+    if (!r.ok) say("Couldn't save", r.error); else { Keyboard.dismiss(); setSavedEst(n); }
   }
 
   return (

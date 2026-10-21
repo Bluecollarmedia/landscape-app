@@ -16,6 +16,8 @@ import { Icon } from '@/components/ui/Icon';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { EmptyState, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
+import { SERVICE_LABEL as SNOW_SERVICE_LABEL } from '@/types/snow';
+import { shortWhen } from '@/lib/snowFormat';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -36,11 +38,10 @@ const FILTERS: { kind: SnowFilterKind; label: string; field: Exclude<keyof SnowA
   { kind: 'action', label: 'Action', field: 'action' },
 ];
 
-const SERVICE_LABEL: Record<string, string> = { plowing: 'Plowing', shoveling: 'Shoveling', salting: 'Salting' };
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-}
+const SERVICE_LABEL: Record<string, string> = SNOW_SERVICE_LABEL;
+
+const formatTime = shortWhen;
 
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -61,6 +62,8 @@ export default function SnowActivityScreen() {
 
   const [filters, setFilters] = useState<SnowActivityFilters>({});
   const [picking, setPicking] = useState<SnowFilterKind | null>(null);
+  // The filter area is two small buttons; each opens its own panel and a second tap (or a choice) puts it away again.
+  const [panel, setPanel] = useState<'period' | 'filters' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // Group by day and fold long runs of routine entries. Off shows the plain list. Either way nothing is hidden.
@@ -81,7 +84,9 @@ export default function SnowActivityScreen() {
     return (kind: SnowFilterKind, value?: string) => (value ? map.get(`${kind}:${value}`) : undefined);
   }, [options]);
 
+  const filterCount = FILTERS.filter((f) => filters[f.field]).length + (archivedView ? 1 : 0);
   const activeCount = FILTERS.filter((f) => filters[f.field]).length + (filters.range && filters.range !== 'all' ? 1 : 0);
+  const periodLabel = DATE_RANGES.find((r) => r.key === (filters.range ?? 'all'))?.label ?? 'All time';
   const view = useMemo(() => buildView(events, { group: grouped, fold: grouped }), [events, grouped]);
 
   async function onRefresh() {
@@ -237,71 +242,104 @@ export default function SnowActivityScreen() {
       {clearedNote ? <Text style={[typeScale.bodySmall, styles.error, { color: colors.success }]}>{clearedNote}</Text> : null}
 
       <View style={styles.filterBar}>
-        {DATE_RANGES.map((r) => {
-          const on = (filters.range ?? 'all') === r.key;
-          return (
-            <Pressable
-              key={r.key}
-              onPress={() => { setFilters((prev) => ({ ...prev, range: r.key === 'all' ? undefined : r.key })); setExpandedId(null); }}
-              style={[styles.chip, { backgroundColor: on ? colors.primary : colors.backgroundTertiary, borderColor: on ? colors.primary : colors.borderLight }]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={`Show ${r.label.toLowerCase()}`}
-            >
-              <Text style={[typeScale.labelSmall, { color: on ? colors.textOnPrimary : colors.textPrimary }]}>{r.label}</Text>
-            </Pressable>
-          );
-        })}
         <Pressable
-          onPress={() => { setFilters((prev) => ({ ...prev, archived: archivedView ? undefined : true })); setExpandedId(null); setClearedNote(null); }}
-          style={[styles.chip, { backgroundColor: archivedView ? colors.primarySurface : colors.backgroundTertiary, borderColor: archivedView ? colors.primary : colors.borderLight }]}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: archivedView }}
-          accessibilityLabel="Show archived entries"
+          onPress={() => setPanel(panel === 'period' ? null : 'period')}
+          style={[styles.chip, { backgroundColor: panel === 'period' ? colors.primarySurface : colors.backgroundTertiary, borderColor: panel === 'period' ? colors.primary : colors.borderLight }]}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: panel === 'period' }}
+          accessibilityLabel={`Time period: ${periodLabel}. Tap to change`}
         >
-          <Icon name="archive" size={14} color={archivedView ? colors.primary : colors.textSecondary} />
-          <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Archived</Text>
+          <Icon name="calendar" size={14} color={colors.textSecondary} />
+          <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{periodLabel}</Text>
+          <Icon name={panel === 'period' ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
         </Pressable>
         <Pressable
-          onPress={() => setGrouped(!grouped)}
-          style={[styles.chip, { backgroundColor: grouped ? colors.primarySurface : colors.backgroundTertiary, borderColor: grouped ? colors.primary : colors.borderLight }]}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: grouped }}
-          accessibilityLabel="Group by day and fold repeated entries"
+          onPress={() => setPanel(panel === 'filters' ? null : 'filters')}
+          style={[styles.chip, { backgroundColor: filterCount > 0 ? colors.primary : panel === 'filters' ? colors.primarySurface : colors.backgroundTertiary, borderColor: filterCount > 0 ? colors.primary : panel === 'filters' ? colors.primary : colors.borderLight }]}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: panel === 'filters' }}
+          accessibilityLabel={filterCount > 0 ? `Filters, ${filterCount} on. Tap to change` : 'Filters'}
         >
-          <Icon name={grouped ? 'check-square' : 'square'} size={14} color={grouped ? colors.primary : colors.textSecondary} />
-          <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Group by day</Text>
+          <Icon name="sliders" size={14} color={filterCount > 0 ? colors.textOnPrimary : colors.textSecondary} />
+          <Text style={[typeScale.labelSmall, { color: filterCount > 0 ? colors.textOnPrimary : colors.textPrimary }]}>{filterCount > 0 ? `Filters · ${filterCount}` : 'Filters'}</Text>
+          <Icon name={panel === 'filters' ? 'chevron-up' : 'chevron-down'} size={14} color={filterCount > 0 ? colors.textOnPrimary : colors.textSecondary} />
         </Pressable>
-      </View>
-
-      <View style={styles.filterBar}>
-        {FILTERS.map((f) => {
-          const value = filters[f.field];
-          const on = !!value;
-          return (
-            <Pressable
-              key={f.kind}
-              onPress={() => setPicking(f.kind)}
-              style={[styles.chip, {
-                backgroundColor: on ? colors.primary : colors.backgroundTertiary,
-                borderColor: on ? colors.primary : colors.borderLight,
-              }]}
-              accessibilityRole="button"
-              accessibilityLabel={on ? `${f.label}: ${labelOf(f.kind, value)}. Change filter` : `Filter by ${f.label.toLowerCase()}`}
-            >
-              <Text style={[typeScale.labelSmall, { color: on ? colors.textOnPrimary : colors.textPrimary }]} numberOfLines={1}>
-                {on ? labelOf(f.kind, value) ?? f.label : f.label}
-              </Text>
-              <Icon name="chevron-down" size={14} color={on ? colors.textOnPrimary : colors.textSecondary} />
-            </Pressable>
-          );
-        })}
         {activeCount > 0 && (
-          <Pressable onPress={() => setFilters({})} style={styles.clear} accessibilityRole="button" accessibilityLabel="Clear all filters">
+          <Pressable onPress={() => { setFilters({}); setPanel(null); }} style={styles.clear} accessibilityRole="button" accessibilityLabel="Clear all filters">
             <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Clear</Text>
           </Pressable>
         )}
       </View>
+
+      {panel === 'period' ? (
+        <View style={styles.filterBar}>
+          {DATE_RANGES.map((r) => {
+            const on = (filters.range ?? 'all') === r.key;
+            return (
+              <Pressable
+                key={r.key}
+                onPress={() => { setFilters((prev) => ({ ...prev, range: r.key === 'all' ? undefined : r.key })); setExpandedId(null); setPanel(null); }}
+                style={[styles.chip, { backgroundColor: on ? colors.primary : colors.backgroundTertiary, borderColor: on ? colors.primary : colors.borderLight }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`Show ${r.label.toLowerCase()}`}
+              >
+                <Text style={[typeScale.labelSmall, { color: on ? colors.textOnPrimary : colors.textPrimary }]}>{r.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {panel === 'filters' ? (
+        <>
+          <View style={styles.filterBar}>
+            {FILTERS.map((f) => {
+              const value = filters[f.field];
+              const on = !!value;
+              return (
+                <Pressable
+                  key={f.kind}
+                  onPress={() => setPicking(f.kind)}
+                  style={[styles.chip, {
+                    backgroundColor: on ? colors.primary : colors.backgroundTertiary,
+                    borderColor: on ? colors.primary : colors.borderLight,
+                  }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={on ? `${f.label}: ${labelOf(f.kind, value)}. Change filter` : `Filter by ${f.label.toLowerCase()}`}
+                >
+                  <Text style={[typeScale.labelSmall, { color: on ? colors.textOnPrimary : colors.textPrimary }]} numberOfLines={1}>
+                    {on ? labelOf(f.kind, value) ?? f.label : f.label}
+                  </Text>
+                  <Icon name="chevron-down" size={14} color={on ? colors.textOnPrimary : colors.textSecondary} />
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.filterBar}>
+            <Pressable
+              onPress={() => { setFilters((prev) => ({ ...prev, archived: archivedView ? undefined : true })); setExpandedId(null); setClearedNote(null); }}
+              style={[styles.chip, { backgroundColor: archivedView ? colors.primarySurface : colors.backgroundTertiary, borderColor: archivedView ? colors.primary : colors.borderLight }]}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: archivedView }}
+              accessibilityLabel="Show archived entries"
+            >
+              <Icon name="archive" size={14} color={archivedView ? colors.primary : colors.textSecondary} />
+              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Archived</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setGrouped(!grouped)}
+              style={[styles.chip, { backgroundColor: grouped ? colors.primarySurface : colors.backgroundTertiary, borderColor: grouped ? colors.primary : colors.borderLight }]}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: grouped }}
+              accessibilityLabel="Group by day and fold repeated entries"
+            >
+              <Icon name={grouped ? 'check-square' : 'square'} size={14} color={grouped ? colors.primary : colors.textSecondary} />
+              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Group by day</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
 
       {error ? (
         <Text style={[typeScale.bodySmall, styles.error, { color: semantic.error }]}>{error}</Text>
@@ -396,7 +434,6 @@ export default function SnowActivityScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.md },
   dayHeader: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xs },
   filterBar: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm, alignItems: 'center' },
   chip: {

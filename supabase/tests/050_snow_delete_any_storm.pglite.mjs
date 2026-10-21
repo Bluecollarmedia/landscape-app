@@ -15,6 +15,8 @@ try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/050_snow_delete_an
 check('0b update 50 can be run a second time', again2);
 // Update 61 (later) replaces snow_delete_storm, so put it back after re-running 50 (the real order).
 try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/061_snow_combined_routes.sql`, 'utf8')); } catch (e) { check('0c update 61 re-applies after 50', false, e.message); }
+// Re-running 50 above puts its original guard back; in the real order, later updates (80's lock-down, 85's guard fix) come after it, so apply them again.
+try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/085_drop_old_code_functions.sql`, 'utf8')); } catch (e) { check('0d update 85 re-applies after 50', false, e.message); }
 const fails = async (sql, p) => { try { await db.query(sql, p); return { raised: false, msg: '' }; } catch (e) { return { raised: true, msg: String(e.message) }; } };
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 

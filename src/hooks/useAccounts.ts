@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { db, rpc, refresh, isDemo } from '@/data/store';
 
-/** Where someone stands with the company, derived from membership + latest join request. */
-export type AccountStatus = 'active' | 'pending' | 'removed' | 'declined' | 'not_joined';
+/**
+ * Where someone stands with the company, from their membership. Someone added with a private link is "not joined" until they use
+ * it, and active the moment they do: there is nothing to approve.
+ */
+export type AccountStatus = 'active' | 'removed' | 'not_joined';
 export type AccountRole = 'owner' | 'admin' | 'worker' | 'customer';
 
 export interface Account {
@@ -36,11 +39,9 @@ interface AccountRow {
   is_me: boolean;
 }
 
-function statusOf(member: string | null | undefined, request: string | null | undefined): AccountStatus {
+function statusOf(member: string | null | undefined): AccountStatus {
   if (member === 'active') return 'active';
-  if (request === 'pending') return 'pending';
   if (member === 'inactive') return 'removed';
-  if (request === 'declined') return 'declined';
   return 'not_joined';
 }
 
@@ -55,13 +56,13 @@ function fromRow(r: AccountRow): Account {
     signedUpAt: r.signed_up_at ?? undefined,
     lastSignInAt: r.last_sign_in_at ?? undefined,
     role: r.role ?? undefined,
-    status: statusOf(r.member_status, r.request_status),
+    status: statusOf(r.member_status),
     removedAt: r.removed_at ?? undefined,
     isMe: !!r.is_me,
   };
 }
 
-/** Demo mode: build the list from the local store's members and join requests. */
+/** Demo mode: build the list from the local store's members. */
 function demoAccounts(): Account[] {
   const out = new Map<string, Account>();
   for (const m of db.members) {
@@ -75,7 +76,7 @@ function demoAccounts(): Account[] {
       avatarUrl: m.person.avatarUrl,
       signedUpAt: m.createdAt,
       role: m.role as AccountRole,
-      status: statusOf(m.status, undefined),
+      status: statusOf(m.status),
       isMe: m.personId === db.personId,
     });
   }

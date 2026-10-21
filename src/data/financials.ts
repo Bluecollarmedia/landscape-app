@@ -578,10 +578,10 @@ function personName(id?: string): string | undefined {
 /** Whether approval links can be sent (the web app's address is set). */
 export const approvalLinksEnabled = !!config.webUrl;
 
-/** The private link a customer opens to view and approve a sent quote or
- * change order in any browser, without the app. */
+/** The private link a customer opens in any browser, without the app: view and approve a sent quote or change order,
+ * or view an issued invoice (update 81). */
 export async function approvalLink(doc: FinancialDoc): Promise<string | null> {
-  if (!config.webUrl || doc.kind === 'invoice' || doc.status === 'draft') return null;
+  if (!config.webUrl || doc.status === 'draft') return null;
   let token = doc.shareToken;
   if (!token && !isDemo()) {
     // Made by the database; fetch it if this copy predates the column.
@@ -599,7 +599,6 @@ export type EmailResult = { ok: true; to: string } | { ok: false; error: string;
  * customer has no address on file, or when the owner wants it to go somewhere else.
  */
 export async function emailDocumentToCustomer(doc: FinancialDoc, typedEmail?: string): Promise<EmailResult> {
-  if (doc.kind === 'invoice') return { ok: false, error: 'Invoices are not emailed from here yet.' };
   if (isDemo()) return { ok: false, error: 'Emailing needs the live app (not demo mode).' };
   try {
     const { data, error } = await supabase.functions.invoke('send-document-email', {
@@ -624,7 +623,8 @@ export function approvalMessage(doc: FinancialDoc, link: string): string {
   const first = doc.customer?.firstName?.trim();
   const company = db.company?.name ?? 'Brighton Lawn + Landscape';
   const what = `${DOC_LABEL[doc.kind].toLowerCase()} ${doc.number}`;
-  return `${first ? `Hi ${first}, here` : 'Here'}'s your ${what} from ${company} (${formatMoney(doc.total)}). You can review and approve it here: ${link}`;
+  const act = doc.kind === 'invoice' ? 'You can view it here' : 'You can review and approve it here';
+  return `${first ? `Hi ${first}, here` : 'Here'}'s your ${what} from ${company} (${formatMoney(doc.total)}). ${act}: ${link}`;
 }
 
 /** Extra details the document template prints: the quote a change order

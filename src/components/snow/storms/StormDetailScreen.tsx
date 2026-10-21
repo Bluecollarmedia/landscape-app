@@ -206,7 +206,8 @@ export function StormDetailScreen() {
         <View style={styles.body}>
           {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
 
-          {s ? (
+          {/* The progress numbers only mean something once the storm is dispatched; a draft is just being set up. */}
+          {s && storm.status !== 'draft' ? (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.stats}>
                 <Stat label="Completed" value={s.completed} color={colors.textPrimary} sub={colors.textSecondary} />

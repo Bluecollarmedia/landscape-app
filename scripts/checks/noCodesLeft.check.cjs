@@ -35,5 +35,11 @@ const prop = read('app/(owner)/snow-property.tsx');
 check('6 the Snow property screen has no customer-notification card and no "Other contacts"', !/NOTIFICATIONS/.test(prop) && !/OTHER CONTACTS/.test(prop) && !/Add Contact/.test(prop) && !/OwnerPropertyNotifications/.test(prop));
 const setup = read('src/hooks/useCompanySetup.ts');
 check('7 the setup checklist talks about invite links, not a team code', /private link/.test(setup) && !/team code/i.test(setup));
+{
+  const fs2 = require('fs'), path2 = require('path');
+  const rd = (f) => fs2.readFileSync(path2.join(__dirname, '../..', f), 'utf8');
+  const acc = rd('app/(owner)/(tabs)/more/accounts.tsx') + rd('src/hooks/useAccounts.ts');
+  check('N1 nothing waits for approval: Accounts has no "Waiting" or "Declined" status (a link makes someone active the moment they use it)', !/label: 'Waiting'|label: 'Declined'|key: 'pending'|key: 'declined'|request_status === /.test(acc) && /type AccountStatus = 'active' \| 'removed' \| 'not_joined'/.test(acc));
+}
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

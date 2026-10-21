@@ -26,9 +26,7 @@ const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', wor
 
 const STATUS_BADGE: Record<AccountStatus, { label: string; status: 'success' | 'warning' | 'error' | 'neutral' }> = {
   active: { label: 'Active', status: 'success' },
-  pending: { label: 'Waiting', status: 'warning' },
   removed: { label: 'Removed', status: 'error' },
-  declined: { label: 'Declined', status: 'neutral' },
   not_joined: { label: 'Not joined', status: 'neutral' },
 };
 
@@ -129,7 +127,7 @@ export default function AccountsScreen() {
     const badge = STATUS_BADGE[a.status];
     // Owners (and you) can't be changed from here.
     const locked = a.isMe || a.role === 'owner';
-    const canRemove = !locked && (a.status === 'active' || a.status === 'pending');
+    const canRemove = !locked && a.status === 'active';
     const canRestore = !locked && a.status === 'removed';
 
     return (
@@ -258,9 +256,7 @@ export default function AccountsScreen() {
               options: [
                 { key: 'all', label: 'All' },
                 { key: 'active', label: 'Active', count: statusCount('active') },
-                { key: 'pending', label: 'Waiting', count: statusCount('pending') },
                 { key: 'removed', label: 'Removed', count: statusCount('removed') },
-                { key: 'declined', label: 'Declined', count: statusCount('declined') },
                 { key: 'not_joined', label: 'Not joined', count: statusCount('not_joined') },
               ],
             },

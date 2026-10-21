@@ -5,7 +5,7 @@
  * layout in the existing app style; no approved mockup yet.
  */
 import { AddSnowProperty } from './AddSnowProperty';
-import { customerNameOf, enableSnowForProperty, useAllProperties } from '@/data/properties';
+import { customerNameOf, useAllProperties } from '@/data/properties';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -69,23 +69,9 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
 
   const open = (id: string) => router.push({ pathname: '/snow/owner/property', params: { id } });
 
-  /** Every property in the system is here. One that Snow is not on for yet turns Snow on when tapped (nothing is typed again). */
-  async function openRow(r: Row) {
-    if (!r.propertyOnly) return open(r.id);
-    const res = await enableSnowForProperty(r.id);
-    if (!res.ok) return showMessage("Couldn't turn Snow on", res.error);
-    reload();
-    open(res.snowPropertyId);
-  }
-
-  const linked = new Set(rows.map((r) => r.propertyId).filter(Boolean));
-  const all: Row[] = [
-    ...rows.map((r) => ({ ...r, customer: customerNameOf(allProperties.find((p) => p.id === r.propertyId)?.customerId) || undefined })),
-    ...allProperties.filter((p) => !linked.has(p.id)).map((p): Row => ({
-      id: p.id, propertyOnly: true, propertyId: p.id, customer: customerNameOf(p.customerId) || undefined,
-      name: p.name || p.address, address: [p.address, p.city, p.state].filter(Boolean).join(', '), street: p.address, zip: p.zip, status: 'active', services: [],
-    })),
-  ].sort((a, b) => a.name.localeCompare(b.name));
+  const all: Row[] = rows
+    .map((r) => ({ ...r, customer: customerNameOf(allProperties.find((p) => p.id === r.propertyId)?.customerId) || undefined }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const q = query.trim().toLowerCase();
   const shown = q ? all.filter((r) => `${r.name} ${r.address} ${r.customer ?? ''}`.toLowerCase().includes(q)) : all;
@@ -106,6 +92,7 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
 
         {adding ? (
           <AddSnowProperty
+            snowPropertyIds={rows.map((r) => r.propertyId).filter((x): x is string => !!x)}
             onCancel={() => setAdding(false)}
             onDone={(id) => { setAdding(false); reload(); open(id); }}
           />
@@ -114,13 +101,13 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
         {all.length > 6 ? <SearchBar value={query} onChangeText={setQuery} placeholder="Search properties" style={{ marginTop: spacing.md }} /> : null}
 
         {loading ? <LoadingSpinner /> : !all.length && !adding ? (
-          <EmptyState icon="home" title="No properties yet" description="Add a customer's property once. It shows up in landscaping, Maintenance and Snow." />
+          <EmptyState icon="home" title="No snow properties yet" description="Add the lots, driveways and walks your crews clear. You can import a customer's existing property." />
         ) : (
           <View style={[styles.group, { backgroundColor: colors.surface, marginTop: spacing.md }]}>
             {shown.map((r, i) => (
               <Pressable
                 key={r.id}
-                onPress={() => openRow(r)}
+                onPress={() => open(r.id)}
                 accessibilityRole="button"
                 style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}
               >
@@ -129,8 +116,8 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
                     {r.name}{r.status === 'inactive' ? ' (inactive)' : ''}
                   </Text>
                   <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{[r.customer, r.address].filter(Boolean).join(' · ')}</Text>
-                  <Text style={[typeScale.caption, { color: r.services.length ? colors.primary : r.propertyOnly ? colors.textTertiary : colors.warning }]}>
-                    {r.services.length ? r.services.map((s) => SERVICE_LABEL[s]).join(' · ') : r.propertyOnly ? 'Not on Snow yet · tap to turn on' : 'No services on yet'}
+                  <Text style={[typeScale.caption, { color: r.services.length ? colors.primary : colors.warning }]}>
+                    {r.services.length ? r.services.map((s) => SERVICE_LABEL[s]).join(' · ') : 'No services on yet'}
                   </Text>
                 </View>
                 <Icon name="chevron-right" size={18} color={colors.textTertiary} />

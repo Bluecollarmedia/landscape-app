@@ -27,6 +27,8 @@ function targetFor(role: UserRole, d: PushData): string | { pathname: string; pa
     if (type === 'snow_visit' || type === 'snow_property') return '/(customer)/snow-updates';
     return '/(customer)';
   }
+  // A crew notice (update 82: storm dispatched, you were added to a route) opens the snow shell's My Route.
+  if (type === 'snow_route') return '/snow/worker';
   return '/(worker)/notifications';
 }
 

@@ -149,12 +149,6 @@ export default function LoginScreen() {
             <Text style={{ color: colors.primary, fontWeight: '600' }}>Get started</Text>
           </Text>
         </Pressable>
-        <Pressable onPress={() => router.push('/(auth)/signup')} style={{ marginTop: spacing.md }}>
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-            Invited by email?{' '}
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>Create your account</Text>
-          </Text>
-        </Pressable>
       </View>
     </ScreenContainer>
   );

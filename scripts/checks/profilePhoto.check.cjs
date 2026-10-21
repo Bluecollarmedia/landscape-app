@@ -2,7 +2,7 @@
 // Profile photo picking: opened after the sheet closes, no library permission wall, errors are shown, every profile screen uses it.
 const fs = require('fs'); const path = require('path');
 const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8');
-const lib = read('src/lib/profilePhoto.ts'), edit = read('src/components/account/EditProfileScreen.tsx'), join = read('app/(auth)/join-team.tsx');
+const lib = read('src/lib/profilePhoto.ts'), edit = read('src/components/account/EditProfileScreen.tsx'), join = read('app/invite/[token].tsx');
 let bad = 0; const check = (n, ok) => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}`); };
 check('1 waits for the sheet to close before opening the picker', /PICKER_AFTER_SHEET_MS = \d{3,}/.test(lib) && /afterSheetMs: PICKER_AFTER_SHEET_MS/.test(edit) && /await sleep\(opts\.afterSheetMs\)/.test(lib));
 check('2 library choice does not ask for photo-library permission', !/requestMediaLibraryPermissionsAsync/.test(lib + edit + join));

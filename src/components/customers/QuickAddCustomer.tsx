@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Keyboard } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Button, Input } from '@/components/ui';
@@ -36,6 +36,7 @@ export function QuickAddCustomer({ onAdded }: { onAdded: (personId: string) => v
     setSaving(true);
     try {
       const id = await addCustomer({ firstName: properName(firstName), lastName: properName(lastName), email: mail, phone });
+      Keyboard.dismiss();
       reset();
       onAdded(id);
     } catch (e) {

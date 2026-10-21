@@ -6,8 +6,10 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, FilterChips, Icon, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
+import { Button, Icon, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
+import { CollapsibleFilters } from '@/components/ui/CollapsibleFilters';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -36,6 +38,8 @@ function useShifts() {
     setShifts(res.data);
   }, []);
   useEffect(() => { reload(); }, [reload]);
+  // Tabs stay mounted: when the person comes back to this screen (for example after clocking in on the Route page), read it again.
+  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
   return { shifts, error, loading, reload, setShifts };
 }
 
@@ -245,12 +249,13 @@ export function SnowHoursScreen() {
       >
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
 
-        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textSecondary }]}>DATES</Text>
-        <FilterChips options={RANGES} selected={range} onSelect={(k) => { setRange(k); setStormId(null); }} />
-        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textSecondary }]}>STORM</Text>
-        <FilterChips options={stormOptions} selected={stormId ?? 'none'} onSelect={(k) => setStormId(k === 'none' ? null : k)} />
-        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textSecondary }]}>WORKER</Text>
-        <FilterChips options={workerOptions} selected={personId ?? 'all'} onSelect={(k) => setPersonId(k === 'all' ? null : k)} />
+        <CollapsibleFilters
+          groups={[
+            { key: 'dates', label: 'Dates', options: RANGES, selected: range, onSelect: (k) => { setRange(k as typeof range); setStormId(null); }, defaultKey: 'this_week' },
+            { key: 'storm', label: 'Storm', options: stormOptions, selected: stormId ?? 'none', onSelect: (k) => setStormId(k === 'none' ? null : k), defaultKey: 'none' },
+            { key: 'worker', label: 'Worker', options: workerOptions, selected: personId ?? 'all', onSelect: (k) => setPersonId(k === 'all' ? null : k), defaultKey: 'all' },
+          ]}
+        />
         {storm ? (
           <View style={{ marginTop: spacing.sm, marginHorizontal: spacing.sm, gap: spacing.xs }}>
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>

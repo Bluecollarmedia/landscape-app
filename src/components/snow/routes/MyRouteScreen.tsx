@@ -1,7 +1,7 @@
 /**
  * Snow worker "My Route": the route this person leads on a dispatched storm.
  * Shows the current stop with directions, I'm Here, completion photos and
- * Finish Stop, then the whole route in order. The database decides what's
+ * Complete Stop, then the whole route in order. The database decides what's
  * allowed (order, one stop at a time, photo minimum, dispatched storm only;
  * update 026). Working layout in the existing app style; no approved mockup.
  */
@@ -11,15 +11,20 @@ import { groupStatus, groupStops, isGroupClosed, servicesText } from '@/lib/snow
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, StatusBadge } from '@/components/ui';
+import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, ProgressBar, StatusBadge } from '@/components/ui';
 import { showMessage } from '@/components/financials/ActionSheet';
 import { pickSnowMedia } from '@/components/snow/pickSnowMedia';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { openDirections } from '@/lib/maps';
+import { useMediaJobs, waitForMediaJobs } from '@/lib/mediaQueueRuntime';
+import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
+import { formatClock } from '@/data/snowShifts';
+import { cardStatusWord, primaryActionFor, routeHeaderLine, routeProgress, splitAddress, stopStatusWord } from '@/lib/snowRouteView';
+import { snowUploadState } from '@/hooks/useSnowUploads';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
-  addCompletionMedia, arriveAtStop, finishStop, loadMyRoutes, loadRoute, STOP_STATUS_LABEL,
+  addCompletionMedia, arriveAtStop, finishStop, loadMyRoutes, loadRoute, SNOW_COMPLETION_TARGET, STOP_STATUS_LABEL,
   type MyRoute, type RouteDetail, type RouteStop,
   stopNeedsPhotos,
 } from '@/data/snowRoutes';
@@ -30,7 +35,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { SnowService } from '@/types/snow';
 
-export function MyRouteScreen() {
+export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked in (the Route tab only shows this screen once they have). */ clockedInSince?: string } = {}) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
@@ -64,6 +69,11 @@ export function MyRouteScreen() {
 
   useEffect(() => { reload(); }, [reload]);
 
+  // Photos upload in the background. When one finishes saving, refresh so the stop's photo count is the real one.
+  const mediaJobs = useMediaJobs();
+  const savedPhotos = snowUploadState(mediaJobs, SNOW_COMPLETION_TARGET, () => true).saved;
+  useEffect(() => { if (savedPhotos > 0) reload(); }, [savedPhotos]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function act(run: () => Promise<{ ok: boolean; error?: string }>, failTitle: string) {
     setBusy(true);
     const res = await run();
@@ -78,19 +88,23 @@ export function MyRouteScreen() {
   }
 
   // A route that does several services together has one visit per service at each property. The crew works the property
-  // once, so those visits are one stop here: I'm Here starts all of them, Finish Stop finishes all of them.
+  // once, so those visits are one stop here: I'm Here starts all of them, Complete Stop completes all of them.
   const groups = route ? groupStops(route.stops) : [];
   const currentGroup = groups.find((g) => !isGroupClosed(g));
   const current = currentGroup?.[0];
-  const done = groups.filter(isGroupClosed).length;
+  const progress = routeProgress(groups.map(groupStatus));
   const working = route?.stormStatus === 'dispatched' && !route.cancelled;
   const { active: activeRoutes, history: pastRoutes } = splitMyRoutes(routes);
   // Update 41: crew can see the route, its stops and instructions; only the lead can act on it.
   const isLead = canWorkRoute(routes.find((r) => r.id === route?.id)?.role);
   const svcLabel = (x: string) => SERVICE_LABEL[x as SnowService];
+  const { street, place } = current ? splitAddress(current.propertyName, current.propertyAddress) : { street: undefined, place: undefined };
   const groupServices = (g: RouteStop[]) => g.map((v) => v.service ?? route!.service);
-  // Photos are added once for the stop, on its first visit.
-  const needMedia = route && current && stopNeedsPhotos(current, route) ? Math.max(0, route.minMedia - current.mediaCount) : 0;
+  // Photos are added once for the stop, on its first visit. Ones still uploading count as added: they are saved on the phone and
+  // keep going in the background; ones that failed do not count until they are retried.
+  const { uploading, failed: failedJobs } = snowUploadState(mediaJobs, SNOW_COMPLETION_TARGET, (p) => !!current && p.visitId === current.id);
+  const addedCount = (current?.mediaCount ?? 0) + uploading.length;
+  const needMedia = route && current && stopNeedsPhotos(current, route) ? Math.max(0, route.minMedia - addedCount) : 0;
 
   /** Starts every visit at this property that has not been started, in order. Stops at the first problem. */
   async function arriveGroup(g: RouteStop[]): Promise<{ ok: boolean; error?: string }> {
@@ -103,6 +117,12 @@ export function MyRouteScreen() {
 
   /** Finishes every visit at this property that is not finished. The note goes on the first one. */
   async function finishGroup(g: RouteStop[]): Promise<{ ok: boolean; error?: string }> {
+    // The database counts only saved photos, so wait (a little) for the ones still uploading before finishing.
+    if (uploading.length) {
+      const waited = await waitForMediaJobs(uploading.map((j) => j.id), 90_000);
+      if (waited === 'failed') return { ok: false, error: "A photo didn't upload. Tap Retry under the photos, then complete the stop." };
+      if (waited === 'timeout') return { ok: false, error: 'The photos are still uploading. Give it a moment and tap Complete Stop again.' };
+    }
     let first = true;
     for (const v of g.filter((x) => x.status === 'arrived' || x.status === 'pending')) {
       const res = await finishStop(v.id, first ? note : undefined);
@@ -119,7 +139,15 @@ export function MyRouteScreen() {
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>My Route</Text>
+        {clockedInSince ? (
+          <View style={[styles.clockLine, { backgroundColor: colors.primarySurface }]} accessible accessibilityLabel={`Clocked in since ${formatClock(clockedInSince)}. Clock out in the Time Clock tab.`}>
+            <View style={[styles.clockDot, { backgroundColor: colors.success }]} />
+            <Text style={[typeScale.caption, { color: colors.textSecondary, flex: 1 }]} numberOfLines={2}>
+              <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>Clocked in since {formatClock(clockedInSince)}.</Text> Clock out in the Time Clock tab.
+            </Text>
+          </View>
+        ) : null}
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>My Route</Text>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
 
         {historyId ? (
@@ -150,12 +178,18 @@ export function MyRouteScreen() {
         ) : null}
 
         {!route ? (
-          <EmptyState icon="navigation" title="No active route" description="When the owner dispatches a storm and makes you a route lead, your stops show up here. Finished storms are under Past work below." />
+          <>
+          <EmptyState icon="navigation" title="No active route" description="When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are under Past work below." />
+          </>
         ) : (
           <>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>
-              {route.name} · {route.stormName} · {servicesText(route.services, svcLabel)} · {done} of {groups.length} done
+            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
+              {routeHeaderLine(route.name, route.services.map(svcLabel))}
             </Text>
+            <View style={styles.progressRow} accessible accessibilityLabel={progress.text}>
+              <ProgressBar progress={progress.percent} height={5} style={{ flex: 1 }} />
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{progress.text}</Text>
+            </View>
             {!working ? (
               <InlineNotice icon="info" tone="info" text={route.cancelled ? 'This route was cancelled.' : 'This storm has ended. Nothing more to do here.'} style={{ marginTop: spacing.md }} />
             ) : null}
@@ -164,13 +198,14 @@ export function MyRouteScreen() {
               <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md, gap: spacing.md }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>
-                    {groupStatus(currentGroup) === 'pending' ? 'Next stop' : 'You\'re here'}
+                    {groupStatus(currentGroup) === 'pending' ? 'NEXT STOP' : 'CURRENT STOP'}
                   </Text>
-                  <StatusBadge label={STOP_STATUS_LABEL[groupStatus(currentGroup)]} status={STOP_TONE[groupStatus(currentGroup)]} />
+                  <StatusBadge label={cardStatusWord(groupStatus(currentGroup))} status={STOP_TONE[groupStatus(currentGroup)]} />
                 </View>
-                <View>
+                <View style={{ gap: 2 }}>
                   <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{current.propertyName}</Text>
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{current.propertyAddress}</Text>
+                  {street ? <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>{street}</Text> : null}
+                  {place ? <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>{place}</Text> : null}
                   {route.services.length > 1 ? (
                     <Text style={[typeScale.labelLarge, { color: colors.primary, marginTop: 2 }]}>{servicesText(groupServices(currentGroup), svcLabel)}</Text>
                   ) : null}
@@ -178,36 +213,45 @@ export function MyRouteScreen() {
                 {current.ownerNote ? (
                   <InlineNotice icon="file-text" tone="info" text={current.ownerNote} />
                 ) : null}
-                <Button title="Directions" icon="navigation" variant="secondary" onPress={() => openDirections({ address: current.propertyAddress })} fullWidth />
+                <Button title="Directions" icon="navigation" variant="secondary" size="lg" style={styles.squared} onPress={() => openDirections({ address: current.propertyAddress })} fullWidth />
                 {!isLead ? (
-                  <InlineNotice icon="eye" tone="info" text="You're on this route's crew. The route lead marks arrivals, finishes stops and adds photos." />
-                ) : groupStatus(currentGroup) === 'pending' ? (
-                  <Button title="I'm Here" icon="map-pin" loading={busy} onPress={() => act(() => arriveGroup(currentGroup), 'Can\'t start this stop')} fullWidth />
+                  <InlineNotice icon="eye" tone="info" text="You're on this route's crew. The route lead marks arrivals, completes stops and adds photos." />
+                ) : primaryActionFor(groupStatus(currentGroup)) === 'arrive' ? (
+                  <Button title="I'm Here" icon="map-pin" size="lg" style={styles.squared} loading={busy} onPress={() => act(() => arriveGroup(currentGroup), 'Can\'t start this stop')} fullWidth />
                 ) : (
                   <>
+                    {/* The database requires the stop's photos before it can be completed, so they are added here, between arriving and completing. */}
                     <Button
-                      title={current.mediaCount ? `Add photos (${current.mediaCount} added)` : 'Add photos'}
+                      title={addedCount ? `Add photos (${addedCount} added)` : 'Add photos'}
                       icon="camera"
                       variant="secondary"
+                      size="lg"
+                      style={styles.squared}
                       disabled={busy}
                       onPress={async () => {
                         const drafts = await pickSnowMedia();
-                        if (drafts.length) act(() => addCompletionMedia(route.companyId, current.id, drafts), 'Couldn\'t add the photos');
+                        if (!drafts.length) return;
+                        // Instant: the photos are queued and upload in the background, so there is nothing to wait for here.
+                        const res = await addCompletionMedia(route.companyId, current.id, drafts);
+                        if (!res.ok) showMessage("Couldn't add the photos", res.error);
                       }}
                       fullWidth
                     />
+                    <SnowUploadStatus uploading={uploading} failed={failedJobs} />
                     <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Anything the owner should know" />
                     {needMedia > 0 ? (
                       <Text style={[typeScale.caption, { color: colors.warning }]}>
-                        Add {needMedia} more {needMedia === 1 ? 'photo' : 'photos'} before finishing this stop.
+                        Add {needMedia} more {needMedia === 1 ? 'photo' : 'photos'} before completing this stop.
                       </Text>
                     ) : null}
                     <Button
-                      title="Finish Stop"
-                      icon="check"
+                      title="Complete Stop"
+                      icon="check-circle"
+                      size="lg"
+                      style={styles.squared}
                       loading={busy}
-                      disabled={needMedia > 0}
-                      onPress={async () => { if (await act(() => finishGroup(currentGroup), 'Can\'t finish yet')) setNote(''); }}
+                      disabled={needMedia > 0 || failedJobs.length > 0}
+                      onPress={async () => { if (await act(() => finishGroup(currentGroup), 'Can\'t complete yet')) setNote(''); }}
                       fullWidth
                     />
                   </>
@@ -241,17 +285,25 @@ export function MyRouteScreen() {
               {groups.map((g, i) => {
                 const s = g[0];
                 const status = groupStatus(g);
+                const word = stopStatusWord(status, working && g === currentGroup);
                 return (
                 <View key={s.id} style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
-                  <Text style={[typeScale.labelLarge, { color: colors.textTertiary, width: 22 }]}>{i + 1}</Text>
+                  <View style={[styles.numberMarker, { backgroundColor: colors.backgroundTertiary }]} accessible accessibilityLabel={`Stop ${i + 1}`}>
+                    <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>{i + 1}</Text>
+                  </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]} numberOfLines={1}>{s.propertyName}</Text>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{s.propertyName}</Text>
                     <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
                     {route.services.length > 1 ? <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{servicesText(groupServices(g), svcLabel)}</Text> : null}
                     {s.ownerNote ? <Text style={[typeScale.caption, { color: colors.primary }]} numberOfLines={2}>{s.ownerNote}</Text> : null}
                   </View>
-                  {status === 'completed' ? <Icon name="check-circle" size={18} color={colors.success} /> : (
-                    <StatusBadge label={STOP_STATUS_LABEL[status]} status={STOP_TONE[status]} />
+                  {word === 'Completed' ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                      <Icon name="check-circle" size={18} color={colors.success} />
+                      <Text style={[typeScale.labelLarge, { color: colors.success }]}>Completed</Text>
+                    </View>
+                  ) : (
+                    <StatusBadge label={word} status={word === 'Arrived' ? 'info' : word === 'Skipped' ? 'warning' : 'neutral'} />
                   )}
                 </View>
                 );
@@ -296,6 +348,11 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, padding: spacing.lg },
   backToCurrent: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
   historyHeader: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.sm, marginLeft: spacing.sm },
+  clockLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  clockDot: { width: 8, height: 8, borderRadius: 4 },
+  squared: { borderRadius: radius.md },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
+  numberMarker: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   chip: { borderRadius: radius.lg, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },
   group: { borderRadius: radius.lg, overflow: 'hidden' },

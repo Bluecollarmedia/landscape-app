@@ -42,8 +42,9 @@ export default function NewCustomerScreen() {
     }
     setSaving(true);
     try {
-      await addCustomer({ firstName, lastName, email: trimmedEmail, phone });
-      router.back();
+      const id = await addCustomer({ firstName, lastName, email: trimmedEmail, phone });
+      // Straight to the new customer's page with their private link already made, ready to text or copy.
+      router.replace(`/(owner)/customers/${id}?justAdded=1` as any);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "The customer couldn't be added.";
       if (Platform.OS === 'web') alert(msg); else Alert.alert("Couldn't add the customer", msg);

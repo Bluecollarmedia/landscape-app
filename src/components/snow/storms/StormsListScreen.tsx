@@ -16,13 +16,13 @@ import { useSnowStorms } from '@/hooks/useSnowStorms';
 import { SERVICE_LABEL, STORM_STATUS_LABEL } from '@/data/snowStorms';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import type { SnowStorm } from '@/types/snow';
+import { SERVICE_ICON, type SnowStorm } from '@/types/snow';
+import { shortWhen } from '@/lib/snowFormat';
 
-export const SERVICE_ICON = { plowing: 'truck', shoveling: 'users', salting: 'droplet' } as const;
 export const STATUS_TONE = { draft: 'neutral', dispatched: 'info', ended: 'success' } as const;
 
 function when(storm: SnowStorm): string {
-  const fmt = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const fmt = shortWhen;
   if (storm.status === 'ended' && storm.endedAt) return `Ended ${fmt(storm.endedAt)}`;
   if (storm.status === 'dispatched' && storm.lastReopenedAt) return `Reopened ${fmt(storm.lastReopenedAt)}`;
   if (storm.status === 'dispatched' && storm.dispatchedAt) return `Dispatched ${fmt(storm.dispatchedAt)}`;
@@ -90,8 +90,8 @@ export function StormsListScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.header}>
-          <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]} accessibilityRole="header">Storms</Text>
-          <Button title="Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
+          <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1, flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} accessibilityRole="header">Storms</Text>
+          <View style={{ flexShrink: 0, marginLeft: spacing.md }}><Button title="Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} /></View>
         </View>
 
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.lg }} /> : null}

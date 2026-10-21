@@ -1,11 +1,15 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCustomers } from '@/hooks/useCustomers';
-import { StatusBadge, Avatar, ProgressBar, EmptyState } from '@/components/ui';
+import { StatusBadge, Avatar, ProgressBar, EmptyState, Switch } from '@/components/ui';
+import { db, rpc, refresh, rowsOf, updateRow } from '@/data/store';
+import { accessErrorText, portalAccessView, turnOffText } from '@/lib/customerAccess';
+import { CustomerPropertiesCard } from '@/components/properties/CustomerPropertiesCard';
+import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
@@ -18,7 +22,7 @@ const projectStatusBadge = (status: string): { label: string; status: 'success' 
 };
 
 export default function CustomerDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, justAdded } = useLocalSearchParams<{ id: string; justAdded?: string }>();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -51,15 +55,49 @@ export default function CustomerDetailScreen() {
     ? { label: 'Invited', status: 'info' as const }
     : { label: 'Inactive', status: 'neutral' as const };
 
-  const portalInfo = c.member.status === 'active'
-    ? { label: 'Portal Active', status: 'success' as const }
-    : c.member.status === 'invited'
-    ? { label: 'Invite Pending', status: 'info' as const }
-    : { label: 'No Access', status: 'neutral' as const };
+  const portal = portalAccessView(c.member.status);
+  const [savingAccess, setSavingAccess] = useState(false);
+
+  /** The owner decides: turn this customer's access on or off. Off asks first; it keeps all their records. */
+  async function changeAccess(next: boolean) {
+    const apply = async () => {
+      setSavingAccess(true);
+      try {
+        if (db.demo) {
+          updateRow('company_members', c.member.id, { status: next ? (rowsOf('people').find((x) => x.id === p.id)?.userId ? 'active' : 'invited') : 'inactive' });
+        } else {
+          const { error } = await rpc('set_customer_portal_access', { p_person_id: p.id, p_enabled: next });
+          if (error) throw new Error(error.message);
+          await refresh('people', 'company_members');
+        }
+      } catch (e) {
+        const msg = accessErrorText(e);
+        if (Platform.OS === 'web') alert(msg); else Alert.alert("Couldn't change access", msg);
+      } finally {
+        setSavingAccess(false);
+      }
+    };
+    if (next) { await apply(); return; }
+    const t = turnOffText(p.firstName);
+    if (Platform.OS === 'web') { if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`${t.title}\n\n${t.message}`)) await apply(); return; }
+    Alert.alert(t.title, t.message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Turn Off', style: 'destructive', onPress: () => { void apply(); } }]);
+  }
 
   function handleCall() {
     if (!p.phone) return;
     Linking.openURL(`tel:${p.phone.replace(/[^\d+]/g, '')}`);
+  }
+
+  /** One Add button, two choices: a project, or a maintenance property. Either form opens already knowing this customer. */
+  function addForCustomer() {
+    const project = () => router.push(`/(owner)/project-new?customerId=${p.id}` as any);
+    const maintenance = () => router.push(`/(owner)/maintenance-property-edit?customerId=${p.id}` as any);
+    if (Platform.OS === 'web') { project(); return; }
+    Alert.alert(`Add for ${p.firstName}`, undefined, [
+      { text: 'Add project', onPress: project },
+      { text: 'Add maintenance property', onPress: maintenance },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   function handleEmail() {
@@ -112,6 +150,15 @@ export default function CustomerDetailScreen() {
             </View>
           </View>
 
+          <CustomerPropertiesCard customerId={p.id} firstName={p.firstName} />
+
+          {/* Login: a private one-time link */}
+          <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700', marginBottom: spacing.sm }]}>Customer Login</Text>
+            <CustomerInviteCard personId={p.id} firstName={p.firstName} phone={p.phone} autoMake={justAdded === '1'} />
+          </View>
+
+
           {/* Projects */}
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>
             <View style={styles.sectionHeaderRow}>
@@ -120,10 +167,12 @@ export default function CustomerDetailScreen() {
               </Text>
               <Pressable
                 style={[styles.addProjectBtn, { backgroundColor: colors.backgroundTertiary }]}
-                onPress={() => router.push(`/(owner)/project-new?customerId=${p.id}` as any)}
+                onPress={addForCustomer}
+                accessibilityRole="button"
+                accessibilityLabel="Add a project or a maintenance property for this customer"
               >
                 <Icon name="plus" size={14} color={colors.textSecondary} />
-                <Text style={[typeScale.labelSmall, { color: colors.textSecondary, fontWeight: '600', marginLeft: 4 }]}>Add Project</Text>
+                <Text style={[typeScale.labelSmall, { color: colors.textSecondary, fontWeight: '600', marginLeft: 4 }]}>Add</Text>
               </Pressable>
             </View>
 
@@ -208,11 +257,15 @@ export default function CustomerDetailScreen() {
             </View>
 
             <View style={[styles.accountRow, { marginTop: spacing.sm }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Icon name="eye" size={14} color={colors.textTertiary} />
-                <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>Portal access</Text>
+              <View style={{ flex: 1, paddingRight: spacing.md }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name="eye" size={14} color={colors.textTertiary} />
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>Portal access</Text>
+                  <View style={{ marginLeft: spacing.sm }}><StatusBadge label={portal.label} status={portal.tone} /></View>
+                </View>
+                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>{portal.note}</Text>
               </View>
-              <StatusBadge label={portalInfo.label} status={portalInfo.status} />
+              <Switch value={portal.on} disabled={savingAccess} onValueChange={changeAccess} accessibilityLabel={`Portal access for ${p.firstName}`} />
             </View>
           </View>
         </View>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert, Keyboard } from 'react-native';
 import { Switch } from '@/components/ui/Switch';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
@@ -17,8 +17,7 @@ import { attachImage } from '@/data/actions';
 import { useCompanySetup, SETUP_STEPS } from '@/hooks/useCompanySetup';
 import { useTrucks } from '@/hooks/useTrucks';
 import { usePayroll, useNotifications } from '@/hooks/useOperations';
-import { useTeamCode, useJoinRequests } from '@/hooks/useOnboarding';
-import { inviteMessage, textInvite, copyText } from '@/lib/invite';
+import { usePendingInvites } from '@/hooks/useInvites';
 import { EVENT_LABELS, ALL_EVENTS } from '@/lib/notificationEvents';
 import { getCompanyImageUri, getWorkerHeaderImageUri } from '@/lib/projectImages';
 import { HeaderPhotoField } from '@/components/media/HeaderPhotoField';
@@ -210,48 +209,17 @@ function TrucksStep() {
 
 function WorkersStep() {
   const { colors } = useTheme();
-  const { activeCode } = useTeamCode();
-  const { pendingRequests } = useJoinRequests();
-  const [invName, setInvName] = useState('');
-  const [invPhone, setInvPhone] = useState('');
-  const [copied, setCopied] = useState(false);
+  const router = useRouter();
+  const { invites } = usePendingInvites();
   const workers = db.members.filter((m) => m.role === 'worker' && m.status === 'active' && m.person);
-
-  async function handleText() {
-    if (!activeCode) return;
-    await textInvite(inviteMessage(activeCode.code, db.company?.name, invName), invPhone);
-    if (Platform.OS === 'web') alert('Invite message copied. Paste it into a text to your worker.');
-    setInvName(''); setInvPhone('');
-  }
-
-  async function handleCopy() {
-    if (!activeCode) return;
-    await copyText(activeCode.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   return (
     <>
-      <Card title="Team code" style={styles.section}>
-        <Pressable onPress={handleCopy} style={[styles.codeBox, { backgroundColor: colors.primarySurface }]}>
-          <Text style={[typeScale.displaySmall, { color: colors.primary, fontWeight: '700', letterSpacing: 2 }]}>
-            {activeCode?.code ?? '—'}
-          </Text>
-          <Text style={[typeScale.caption, { color: copied ? semantic.success : colors.textSecondary, marginTop: 4 }]}>
-            {copied ? 'Copied!' : 'Tap to copy'}
-          </Text>
-        </Pressable>
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-          Each worker downloads the app, taps Join a Team, and enters this code. You approve them under More → Pending Requests.
+      <Card title="Add a worker" style={styles.section}>
+        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.md }]}>
+          Type a name and a phone number. You get a private link to text or copy. It works once, and the worker sets up their own login from it.
         </Text>
-      </Card>
-      <Card title="Text an invite" style={styles.section}>
-        <View style={styles.form}>
-          <Input label="Name (optional)" placeholder="Worker's name" value={invName} onChangeText={setInvName} icon="user" />
-          <Input label="Phone (optional)" placeholder="(555) 555-0100" value={invPhone} onChangeText={setInvPhone} keyboardType="phone-pad" icon="phone" />
-          <Button title="Send Text Invite" onPress={handleText} icon="message-circle" variant="secondary" fullWidth disabled={!activeCode} />
-        </View>
+        <Button title="Add Worker" onPress={() => router.push('/(owner)/worker-new' as any)} icon="user-plus" fullWidth />
       </Card>
       <Card title={`On your team (${workers.length})`} style={styles.section}>
         {workers.length === 0 ? (
@@ -264,9 +232,9 @@ function WorkersStep() {
             </Text>
           </View>
         ))}
-        {pendingRequests.length > 0 && (
+        {invites.length > 0 && (
           <Text style={[typeScale.caption, { color: semantic.warning, marginTop: spacing.sm }]}>
-            {pendingRequests.length} waiting for your approval in More → Pending Requests.
+            {invites.length} link{invites.length === 1 ? '' : 's'} sent, waiting for the worker to sign up.
           </Text>
         )}
       </Card>
@@ -318,7 +286,7 @@ function PayRatesStep({ onGoToWorkers }: { onGoToWorkers: () => void }) {
               size="sm"
               variant={changed ? 'primary' : 'ghost'}
               disabled={!changed}
-              onPress={() => setHourlyRate(w.personId, parsed)}
+              onPress={() => { Keyboard.dismiss(); setHourlyRate(w.personId, parsed); }}
             />
           </View>
         );

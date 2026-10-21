@@ -31,9 +31,9 @@ const banner = read('src/components/customer/AnnouncementBanner.tsx');
 check('8 the customer banner shows unread messages to customers until dismissed, and dismissing only marks it read',
   /eventType === 'announcement_posted' && n\.status === 'unread'/.test(banner) && /\.to === 'customers'/.test(banner) && /markRead\(n\.id\)/.test(banner) && !/deleteRow/.test(banner));
 check('9 the banner is on the customer home screen', /<AnnouncementBanner \/>/.test(read('app/(customer)/(tabs)/index.tsx')));
-check('10 entry points: Announcements (landscaping owner) and the Snow More tab, both opening the same screen',
-  /announcements\/customers/.test(read('app/(owner)/(tabs)/more/announcements/index.tsx')) && /message-customers/.test(read('app/snow/owner/(tabs)/more.tsx')) && /name="message-customers"/.test(read('app/snow/owner/_layout.tsx'))
-  && /MessageCustomersScreen/.test(read('app/(owner)/(tabs)/more/announcements/customers.tsx')) && /MessageCustomersScreen/.test(read('app/snow/owner/message-customers.tsx')));
+check('10 entry points: the one Announcements page (landscaping owner) and the Snow More tab both reach the customer message form',
+  /MessageCustomersPanel/.test(read('app/(owner)/(tabs)/more/announcements/index.tsx')) && /message-customers/.test(read('app/snow/owner/(tabs)/more.tsx')) && /name="message-customers"/.test(read('app/snow/owner/_layout.tsx'))
+  && /export function MessageCustomersPanel/.test(read('src/components/announcements/MessageCustomersScreen.tsx')) && /MessageCustomersScreen/.test(read('app/snow/owner/message-customers.tsx')));
 check('11 workers\' announcements never show customer messages', /startsWith\('customers_'\)/.test(read('src/hooks/useAnnouncements.ts')));
 const sql = read('supabase/updates/055_customer_announcements.sql');
 check('12 the database: owner/admin only, only people with an account, one notification each, customers cannot read the list',

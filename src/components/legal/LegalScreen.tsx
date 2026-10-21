@@ -9,13 +9,14 @@ import { spacing, radius } from '@/theme/spacing';
 import { BUSINESS, LEGAL_DOCS, type LegalDoc } from '@/legal/legalContent';
 
 /** Shows one of the legal pages. Works signed in or out, in the app and on the web. */
-export function LegalScreen({ slug }: { slug: LegalDoc['slug'] }) {
+export function LegalScreen({ slug, onClose }: { slug: LegalDoc['slug']; /** Set when shown as a pop-up: Back closes it instead of navigating. */ onClose?: () => void }) {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const doc = LEGAL_DOCS[slug];
 
   function goBack() {
+    if (onClose) { onClose(); return; }
     if (router.canGoBack()) router.back();
     else router.replace('/');
   }

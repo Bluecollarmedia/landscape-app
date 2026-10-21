@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Platform, Alert, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useRouter } from 'expo-router';
@@ -215,6 +215,9 @@ function PayrollCard({
     }
     onSetRate(Math.round(rate * 100) / 100);
     setRateDraft('');
+    // Saved: put the keyboard away and fold this worker's card back up.
+    Keyboard.dismiss();
+    onToggle();
   }
 
   const [targetDraft, setTargetDraft] = useState('');
@@ -227,6 +230,7 @@ function PayrollCard({
     }
     onSetTarget(Math.round(rate * 100) / 100);
     setTargetDraft('');
+    Keyboard.dismiss();
   }
 
   const ot = estimate.overtime;

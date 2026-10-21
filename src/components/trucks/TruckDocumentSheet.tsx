@@ -1,10 +1,10 @@
 /**
- * Add a document for a truck: choose what it is (insurance, registration, inspection, other), give it a title, optionally an
- * expiry date, then choose the file: a PDF from Files, or take / choose a photo. Used on the truck's page (uploads right away) and
- * when adding a new truck (the pick is kept and uploaded once the truck is saved).
+ * Add insurance for a truck: choose the file (a PDF from Files, or take / choose a photo), give it a title and, optionally, the date it
+ * runs out. Used on the truck's page (uploads right away) and when adding a new truck (the pick is kept and uploaded once the truck
+ * is saved). Other records (maintenance, repairs, registration ...) use TruckRecordSheet.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Platform, Alert, ActivityIndicator, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { Icon } from '@/components/ui/Icon';
@@ -12,7 +12,7 @@ import { Button, Input, DateField } from '@/components/ui';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { useTheme } from '@/providers/ThemeProvider';
 import { pickImage } from '@/lib/pickImage';
-import { DOC_KINDS, formatSize, isAllowedDocument, suggestedTitle, typeFromName, type DocKind } from '@/lib/truckDocs';
+import { formatSize, isAllowedDocument, suggestedTitle, typeFromName, type DocKind } from '@/lib/truckDocs';
 import type { DocumentInput } from '@/data/truckFiles';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -29,7 +29,7 @@ interface Picked { uri: string; name: string; mimeType: string; size?: number }
 export function TruckDocumentSheet({ visible, onClose, onSubmit }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [kind, setKind] = useState<DocKind>('insurance');
+  const kind: DocKind = 'insurance';
   const [title, setTitle] = useState('');
   const [titleTouched, setTitleTouched] = useState(false);
   const [expiresOn, setExpiresOn] = useState('');
@@ -38,7 +38,7 @@ export function TruckDocumentSheet({ visible, onClose, onSubmit }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (visible) { setKind('insurance'); setTitle(''); setTitleTouched(false); setExpiresOn(''); setFile(null); setBusy(false); setError(null); }
+    if (visible) { setTitle(''); setTitleTouched(false); setExpiresOn(''); setFile(null); setBusy(false); setError(null); }
   }, [visible]);
 
   function take(p: Picked) {
@@ -82,7 +82,7 @@ export function TruckDocumentSheet({ visible, onClose, onSubmit }: Props) {
     setError(null);
     const err = await onSubmit({ kind, title: title.trim() || suggestedTitle(kind, file.name), uri: file.uri, name: file.name, mimeType: file.mimeType, size: file.size, expiresOn: expiresOn || undefined });
     setBusy(false);
-    if (err) setError(err); else onClose();
+    if (err) setError(err); else { Keyboard.dismiss(); onClose(); }
   }
 
   return (
@@ -91,23 +91,10 @@ export function TruckDocumentSheet({ visible, onClose, onSubmit }: Props) {
         <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
           <View style={[styles.handle, { backgroundColor: colors.borderLight }]} />
           <View style={styles.head}>
-            <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>Add document</Text>
+            <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>Add insurance</Text>
             <Pressable onPress={onClose} disabled={busy} hitSlop={10}><Text style={[typeScale.bodySmall, { color: colors.textSecondary, fontWeight: '600' }]}>Cancel</Text></Pressable>
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 520 }} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}>
-            <View style={styles.chips}>
-              {DOC_KINDS.map((k) => {
-                const on = k.key === kind;
-                return (
-                  <Pressable key={k.key} onPress={() => { setKind(k.key); if (!titleTouched && file) setTitle(suggestedTitle(k.key, file.name)); }} accessibilityRole="button" accessibilityState={{ selected: on }}
-                    style={[styles.chip, { backgroundColor: on ? colors.primary : colors.backgroundTertiary }]}>
-                    <Icon name={k.icon} size={14} color={on ? '#FFFFFF' : colors.textSecondary} />
-                    <Text style={[typeScale.labelLarge, { color: on ? '#FFFFFF' : colors.textSecondary }]}>{k.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
             <View style={[styles.fileBox, { borderColor: file ? colors.primary : colors.border, backgroundColor: colors.backgroundSecondary }]}>
               {file ? (
                 <View style={styles.fileRow}>
@@ -132,11 +119,11 @@ export function TruckDocumentSheet({ visible, onClose, onSubmit }: Props) {
               )}
             </View>
 
-            <Input label="Title" value={title} onChangeText={(t) => { setTitle(t); setTitleTouched(true); }} placeholder={kind === 'insurance' ? 'For example: Insurance 2026' : 'For example: Registration'} />
+            <Input label="Title" value={title} onChangeText={(t) => { setTitle(t); setTitleTouched(true); }} placeholder="For example: Insurance 2026" />
             <DateField label="Expires (optional)" value={expiresOn} onChange={setExpiresOn} onClear={() => setExpiresOn('')} placeholder="Select date" />
 
             {error ? <Text style={[typeScale.bodySmall, { color: colors.error }]}>{error}</Text> : null}
-            <Button title={busy ? 'Uploading…' : 'Add Document'} icon="upload" onPress={submit} loading={busy} disabled={busy} fullWidth size="lg" />
+            <Button title={busy ? 'Uploading…' : 'Add Insurance'} icon="upload" onPress={submit} loading={busy} disabled={busy} fullWidth size="lg" />
             {busy ? <ActivityIndicator color={colors.primary} /> : null}
           </ScrollView>
         </Pressable>

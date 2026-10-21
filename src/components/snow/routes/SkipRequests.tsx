@@ -13,12 +13,13 @@
  * enforced by the database; these screens just call it and show the result.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Keyboard } from 'react-native';
 import { Button, InlineNotice, Input } from '@/components/ui';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { decideSkip, listRouteSkips, requestSkip, skipHistory, withdrawSkip } from '@/data/snowSkips';
 import type { SnowSkipRequest } from '@/types/snow';
+import { shortWhen } from '@/lib/snowFormat';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -43,6 +44,7 @@ export function LeadSkipPanel({ visitId, disabled, onChanged }: { visitId: strin
     const res = await requestSkip(visitId, reason);
     setBusy(false);
     if (!res.ok) return showMessage('Couldn\'t send the request', res.error);
+    Keyboard.dismiss();
     setAsking(false);
     setReason('');
     await refresh();
@@ -152,7 +154,7 @@ function SkipDecisionCard({ request, stopName, leadName, onDecided }: {
       <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{stopName}</Text>
       <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>&ldquo;{request.reason}&rdquo;</Text>
       <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-        {leadName ? `${leadName} · ` : ''}{new Date(request.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+        {leadName ? `${leadName} · ` : ''}{shortWhen(request.createdAt)}
       </Text>
       <Input
         label="Note to the lead (optional)"

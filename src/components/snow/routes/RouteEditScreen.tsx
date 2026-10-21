@@ -4,12 +4,12 @@
  * the order is saved in one database call (update 025). Working layout in
  * the existing app style; no approved mockup yet.
  */
-import { crewChoices, crewCountLabel, nextCrew } from '@/lib/snowCrew';
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { crewAfterLeadChange, crewChoices, nextCrew, routeTeam, type TeamMember } from '@/lib/snowCrew';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, PressableScale, ScreenHeader, StatusBadge, Switch } from '@/components/ui';
+import { Avatar, Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, PressableScale, ScreenHeader, StatusBadge, Switch } from '@/components/ui';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
@@ -19,6 +19,7 @@ import {
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
 import { OwnerSkipRequests } from './SkipRequests';
+import { AddPropertiesSheet } from './AddPropertiesSheet';
 import { flattenGroups, groupStatus, groupStops, isGroupClosed, isGroupUntouched, servicesText, servicesToAdd } from '@/lib/snowStopGroups';
 import type { SnowService } from '@/types/snow';
 import { typeScale } from '@/theme/typography';
@@ -27,16 +28,17 @@ import { spacing, radius } from '@/theme/spacing';
 
 export const STOP_TONE = { pending: 'neutral', arrived: 'info', completed: 'success', skipped: 'warning' } as const;
 
-export function RouteEditScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  return <RouteEditor routeId={id} />;
-}
-
 /**
- * The route's settings and stops. On its own screen it has a header and a Done button; `embedded` (inside the storm screen) shows
- * just the content: the storm is the route, so there is no route name, template or cancel here.
+ * The route's settings and stops, edited right on the storm screen: crew, crew lead, ordered properties, notes, Save as template and
+ * Cancel route. There is no second screen for the same route.
  */
-export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { routeId?: string; embedded?: boolean; onDragActive?: (active: boolean) => void }) {
+export function RouteEditor({ routeId: id, embedded = true, onDragActive, refreshToken, onRouteCancelled }: {
+  routeId?: string; embedded?: boolean; onDragActive?: (active: boolean) => void;
+  /** Bumped by the storm screen when realtime changes arrive, so the embedded editor never goes stale. */
+  refreshToken?: number;
+  /** The route was cancelled: the storm screen reloads its list. */
+  onRouteCancelled?: () => void;
+}) {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -49,7 +51,6 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
   const [name, setName] = useState('');
   const [pickLead, setPickLead] = useState(false);
   const [pickStops, setPickStops] = useState(false);
-  const [chosen, setChosen] = useState<string[]>([]);
   const [doNext, setDoNext] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [leadLoad, setLeadLoad] = useState<Record<string, string[]>>({});
@@ -83,6 +84,12 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
   }, [id]);
 
   useEffect(() => { reload(); }, [reload]);
+  const firstToken = useRef(true);
+  useEffect(() => {
+    if (firstToken.current) { firstToken.current = false; return; }
+    if (refreshToken !== undefined && !dragging) reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken]);
 
   async function save(patch: Parameters<typeof updateRoute>[1]) {
     if (!route) return;
@@ -120,6 +127,33 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     reload();
   }
 
+  /** Makes one of the team the lead. The database takes them off the crew list; the old lead stays on the route as crew. */
+  async function chooseLead(personId: string) {
+    if (!route) return;
+    setBusy(true);
+    const old = route.leadPersonId;
+    const res = await updateRoute(route.id, { leadPersonId: personId });
+    if (res.ok && old && old !== personId) {
+      const again = await setRouteCrew(route.id, crewAfterLeadChange(crew.map((c) => c.personId), old, personId));
+      if (!again.ok) showMessage("Couldn't keep the old lead on the crew", again.error);
+    }
+    setBusy(false);
+    setPickLead(false);
+    if (!res.ok) showMessage("Couldn't save", res.error);
+    reload();
+  }
+
+  /** Takes one person off the route: a crew member leaves the crew; the lead leaves the route (nobody leads it until one is chosen). */
+  async function removeMember(m: TeamMember) {
+    if (!route) return;
+    if (!m.lead) return changeCrew(m.personId, false);
+    setBusy(true);
+    const res = await updateRoute(route.id, { leadPersonId: null });
+    setBusy(false);
+    if (!res.ok) showMessage("Couldn't remove them", res.error);
+    reload();
+  }
+
   async function move(index: number, delta: -1 | 1) {
     if (!route) return;
     const groups = groupStops(route.stops);
@@ -150,11 +184,11 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     }, true);
   }
 
-  async function onAddStops() {
-    if (!route || !chosen.length) return;
+  async function onAddStops(ids: string[]) {
+    if (!route || !ids.length) return;
     setBusy(true);
     // A route that does several services makes one visit per service the property offers.
-    const items = chosen.map((pid) => ({
+    const items = ids.map((pid) => ({
       propertyId: pid,
       services: route.services.length > 1 ? (servicesToAdd(route.services, eligible.find((e) => e.propertyId === pid)?.services, route.service) as SnowService[]) : undefined,
     }));
@@ -165,9 +199,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     }
     setBusy(false);
     if (!res.ok) showMessage('Couldn\'t add every stop', res.error);
-    setChosen([]);
     setDoNext(false);
-    setPickStops(false);
     reload();
   }
 
@@ -180,23 +212,12 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
       res.ok ? `"${route.name}" can be added to the next ${SERVICE_LABEL[route.service].toLowerCase()} storm.` : res.error);
   }
 
-  /** Everything on this screen saves as it changes; Done also saves a name still being typed, then closes. */
-  async function done() {
-    if (route && name.trim() && name.trim() !== route.name) {
-      setBusy(true);
-      const res = await updateRoute(route.id, { name });
-      setBusy(false);
-      if (!res.ok) return showMessage("Couldn't save", res.error);
-    }
-    router.back();
-  }
-
   function onCancelRoute() {
     if (!route) return;
     confirmAction(`Cancel ${route.name}?`, 'Its lead stops seeing it. Work already done stays recorded.', 'Cancel route', async () => {
       const res = await cancelRoute(route.id);
       if (!res.ok) return showMessage('Couldn\'t cancel the route', res.error);
-      router.back();
+      onRouteCancelled?.();
     }, true);
   }
 
@@ -208,6 +229,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
 
   async function saveStop() {
     if (!detailStop || !route) return;
+    Keyboard.dismiss();
     setBusy(true);
     let failure: string | null = null;
     for (const [i, v] of detailStop.entries()) {
@@ -226,27 +248,13 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     reload();
   }
 
-  if (loading) {
-    if (embedded) return <LoadingSpinner />;
-    return (
-      <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-        <ScreenHeader title="Route" />
-        <LoadingSpinner />
-      </View>
-    );
-  }
-  if (!route) {
-    if (embedded) return <InlineNotice icon="alert-circle" tone="error" text={error ?? 'This route is not available.'} />;
-    return (
-      <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-        <ScreenHeader title="Route" />
-        <EmptyState icon="map" title="Route not available" description={error ?? 'It may have been removed.'} />
-      </View>
-    );
-  }
+  if (loading) return <LoadingSpinner />;
+  if (!route) return <InlineNotice icon="alert-circle" tone="error" text={error ?? 'This route is not available.'} />;
 
   const editable = !route.cancelled && route.stormStatus !== 'ended';
   const leadName = leads.find((l) => l.personId === route.leadPersonId)?.name;
+  const team = routeTeam(route.leadPersonId, leadName, crew);
+  const crewPeople = crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId));
   // A property can be on a route more than once (repeat passes), so every
   // eligible property stays pickable; we just show how many visits it has.
   const visitsOn = new Map<string, number>();
@@ -270,11 +278,6 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
         ) : null}
 
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
-        {!route.cancelled && !embedded ? (
-          <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-            Changes save as you make them. Tap Done when you are finished.
-          </Text>
-        ) : null}
         {route.cancelled ? <InlineNotice icon="slash" tone="warning" text="This route was cancelled." style={{ marginBottom: spacing.md }} /> : null}
 
         {route.stormStatus === 'dispatched' ? (
@@ -283,196 +286,233 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
           </View>
         ) : null}
 
-        <View style={[styles.card, { backgroundColor: colors.surface, gap: spacing.md }]}>
-          <Pressable onPress={() => editable && setPickLead(!pickLead)} style={styles.inline} accessibilityRole="button">
-            <View style={{ flex: 1 }}>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew lead</Text>
-              <Text style={[typeScale.bodyLarge, { color: leadName ? colors.textPrimary : colors.warning }]}>{leadName ?? 'Assign a crew lead'}</Text>
-              {route.leadPersonId && leadLoad[route.leadPersonId] ? (
-                <Text style={[typeScale.caption, { color: colors.warning }]}>
-                  Also leads {leadLoad[route.leadPersonId].join(', ')}. That's allowed; check the timing.
-                </Text>
-              ) : null}
-            </View>
-            {editable ? <Icon name={pickLead ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} /> : null}
-          </Pressable>
-          {pickLead ? (
-            leads.length ? (
-              <View style={[styles.group, { borderColor: colors.borderLight }]}>
-                {leads.map((l, i) => (
-                  <Pressable
-                    key={l.personId}
-                    style={[styles.row, i > 0 && sep]}
-                    onPress={() => { setPickLead(false); save({ leadPersonId: l.personId }); }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{l.name}</Text>
-                      {leadLoad[l.personId] ? (
-                        <Text style={[typeScale.caption, { color: colors.warning }]}>Already leads {leadLoad[l.personId].join(', ')}</Text>
+        <SetupCard
+          n={1}
+          icon="users"
+          title="Crew"
+          sub="Select the crew for this route."
+          pill={team.length ? `${team.length} ${team.length === 1 ? 'member' : 'members'}` : 'None yet'}
+          onPress={editable ? () => setPickCrew(!pickCrew) : undefined}
+          open={pickCrew}
+        >
+          {team.length ? (
+            <View style={styles.avatarWrap}>
+              {team.map((m) => {
+                const [first, ...rest] = m.name.split(' ');
+                const short = rest.length ? `${first} ${rest[rest.length - 1][0]}.` : first;
+                return (
+                  <View key={m.personId} style={styles.avatarCell}>
+                    <View>
+                      <Avatar firstName={first} lastName={rest.join(' ')} size={48} />
+                      {editable ? (
+                        <Pressable
+                          onPress={() => removeMember(m)}
+                          disabled={busy}
+                          hitSlop={8}
+                          style={[styles.avatarX, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${m.name}`}
+                        >
+                          <Icon name="x" size={11} color={colors.textSecondary} />
+                        </Pressable>
                       ) : null}
                     </View>
-                    {l.personId === route.leadPersonId ? <Icon name="check" size={18} color={colors.primary} /> : null}
+                    <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 4 }]} numberOfLines={1}>{short}</Text>
+                    {m.lead ? <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '700' }]}>Lead</Text> : null}
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>No crew selected. Tap Add Crew.</Text>
+          )}
+          {pickCrew ? (
+            crewPeople.length ? (
+              <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.md }]}>
+                {crewPeople.map((l, i) => (
+                  <Pressable key={l.personId} style={[styles.row, i > 0 && sep]} onPress={() => changeCrew(l.personId, true)} accessibilityRole="button">
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{l.name}</Text>
+                    <Icon name="plus" size={18} color={colors.primary} />
                   </Pressable>
                 ))}
               </View>
             ) : (
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                Nobody on the snow team does {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} yet.
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>
+                {leads.length === 0
+                  ? `Nobody on the snow team does ${servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} yet.`
+                  : `No one else on the snow team does ${servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')}.`}
               </Text>
             )
           ) : null}
-          <View>
-            <View style={styles.inline}>
-              <View style={{ flex: 1 }}>
-                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew · optional</Text>
-                <Text style={[typeScale.bodyLarge, { color: crew.length ? colors.textPrimary : colors.textTertiary }]}>{crewCountLabel(crew.length)}</Text>
-              </View>
-              {editable ? <Button title={pickCrew ? 'Close' : 'Add Crew'} size="sm" variant="secondary" icon={pickCrew ? 'x' : 'plus'} disabled={busy} onPress={() => setPickCrew(!pickCrew)} /> : null}
-            </View>
-            {crew.map((c) => (
-              <View key={c.personId} style={[styles.inline, { paddingVertical: spacing.xs }]}>
-                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{c.name}</Text>
-                {editable ? <Button title="Remove" size="sm" variant="ghost" disabled={busy} onPress={() => changeCrew(c.personId, false)} /> : null}
-              </View>
-            ))}
-            {pickCrew ? (
-              crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).length ? (
-                <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.sm }]}>
-                  {crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).map((l, i) => (
-                    <Pressable key={l.personId} style={[styles.row, i > 0 && sep]} onPress={() => changeCrew(l.personId, true)} accessibilityRole="button">
-                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{l.name}</Text>
-                      <Icon name="plus" size={18} color={colors.primary} />
-                    </Pressable>
-                  ))}
-                </View>
-              ) : (
-                <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-                  No one else on the snow team does {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')}.
-                </Text>
-              )
-            ) : null}
-          </View>
-        </View>
+          {editable && !pickCrew ? <Button title="Add Crew" icon="plus" variant="secondary" size="sm" disabled={busy} onPress={() => setPickCrew(true)} style={{ marginTop: spacing.md, alignSelf: 'flex-start' }} /> : null}
+        </SetupCard>
 
-        <View style={[styles.inline, styles.label]}>
-          <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>Properties</Text>
-          {groups.length ? (
-            <>
+        <SetupCard
+          n={2}
+          icon="user"
+          title="Crew Lead"
+          sub="Select a crew lead for this route."
+          pill={team.length ? `${team.length} available` : undefined}
+          onPress={editable && team.length > 0 ? () => setPickLead(!pickLead) : undefined}
+          open={pickLead}
+        >
+          {team.length === 0 ? (
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>Add crew members first.</Text>
+          ) : (
+            <Pressable
+              onPress={() => editable && setPickLead(!pickLead)}
+              style={[styles.leadRow, { backgroundColor: colors.primarySurface }]}
+              accessibilityRole="button"
+              accessibilityLabel="Select crew lead"
+            >
+              {route.leadPersonId ? (
+                <Avatar firstName={(leadName ?? 'Crew').split(' ')[0]} lastName={(leadName ?? '').split(' ').slice(1).join(' ')} size={44} />
+              ) : (
+                <View style={[styles.leadEmpty, { borderColor: colors.border }]}><Icon name="user" size={20} color={colors.textTertiary} /></View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: route.leadPersonId ? colors.textPrimary : colors.textTertiary, fontWeight: '700' }]} numberOfLines={1}>
+                  {route.leadPersonId ? (leadName ?? 'Crew lead') : 'Select crew lead'}
+                </Text>
+                {route.leadPersonId ? <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew Lead</Text> : null}
+                {route.leadPersonId && leadLoad[route.leadPersonId] ? (
+                  <Text style={[typeScale.caption, { color: colors.warning }]}>Also leads {leadLoad[route.leadPersonId].join(', ')}. That's allowed; check the timing.</Text>
+                ) : null}
+              </View>
+              {editable ? <Icon name={pickLead ? 'chevron-up' : 'chevron-right'} size={18} color={colors.textTertiary} /> : null}
+            </Pressable>
+          )}
+          {pickLead ? (
+            <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.md }]}>
+              {team.map((m, i) => (
+                <Pressable key={m.personId} style={[styles.row, i > 0 && sep]} onPress={() => chooseLead(m.personId)} accessibilityRole="button">
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{m.name}</Text>
+                    {leadLoad[m.personId] && !m.lead ? (
+                      <Text style={[typeScale.caption, { color: colors.warning }]}>Already leads {leadLoad[m.personId].join(', ')}</Text>
+                    ) : null}
+                  </View>
+                  {m.lead ? <Icon name="check" size={18} color={colors.primary} /> : null}
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+        </SetupCard>
+
+        <SetupCard
+          n={3}
+          icon="map-pin"
+          title="Properties"
+          sub="Add properties to this route."
+          pill={`${groups.length} ${groups.length === 1 ? 'property' : 'properties'}`}
+          onPress={editable ? () => setPickStops(true) : undefined}
+        >
+          {groups.length && route.stormStatus !== 'draft' ? (
+            <View style={[styles.inline, { marginTop: spacing.md }]}>
               <StatusBadge label={`Open ${openCount}`} status="info" />
               <StatusBadge label={`Closed ${groups.length - openCount}`} status="success" />
-            </>
+            </View>
           ) : null}
-        </View>
-        {groups.length ? (
-          <View style={[styles.group, { backgroundColor: colors.surface, borderColor: 'transparent' }]}>
-            <ReorderableList
-              items={groups}
-              keyOf={(g) => g[0].id}
-              rowHeight={STOP_ROW_HEIGHT}
-              canDrag={(g) => editable && isGroupUntouched(g)}
-              onReorder={applyOrder}
-              onDragActive={(a) => { setDragging(a); onDragActive?.(a); }}
-              renderRow={(g, i, handle) => {
-                const s = g[0];
-                const movable = editable && isGroupUntouched(g);
-                const status = groupStatus(g);
-                return (
-                  <View style={[styles.row, { flex: 1 }, i > 0 && sep]}>
-                    {handle ?? <View style={{ width: 32 }} />}
-                    <Text style={[typeScale.labelLarge, { color: colors.textTertiary, width: 18 }]}>{i + 1}</Text>
-                    <Pressable
-                      style={{ flex: 1, gap: 2 }}
-                      onPress={() => openStop(g)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${s.propertyName}: photos and notes`}
-                    >
-                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{s.propertyName}</Text>
-                      <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
-                      <View style={styles.inline}>
-                        <Icon name="camera" size={12} color={stopNeedsPhotos(s, route) ? colors.primary : colors.textTertiary} />
-                        <Text style={[typeScale.caption, { color: stopNeedsPhotos(s, route) ? colors.primary : colors.textTertiary }]} numberOfLines={1}>{several ? `${servicesText(g.map((x) => x.service ?? route.service), svcLabel)} · ` : ''}{stopNeedsPhotos(s, route) ? 'Photos required' : 'No photos required'}</Text>
-                        {s.ownerNote ? <><Icon name="file-text" size={12} color={colors.primary} /><Text style={[typeScale.caption, { color: colors.primary }]} numberOfLines={1}>Note</Text></> : null}
+          {groups.length ? (
+            <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.md }]}>
+              <ReorderableList
+                items={groups}
+                keyOf={(g) => g[0].id}
+                rowHeight={STOP_ROW_HEIGHT}
+                canDrag={(g) => editable && isGroupUntouched(g)}
+                onReorder={applyOrder}
+                onDragActive={(a) => { setDragging(a); onDragActive?.(a); }}
+                renderRow={(g, i, handle) => {
+                  const s = g[0];
+                  const movable = editable && isGroupUntouched(g);
+                  const status = groupStatus(g);
+                  const live = route.stormStatus === 'dispatched';
+                  // The address is the second line. The service is only named when the route does several (one service is already the
+                  // route's title); a camera shows only when photos ARE required and a note icon when one is set, and nothing is written out when photos are not needed.
+                  const where = [s.propertyAddress, several ? servicesText(g.map((x) => x.service ?? route.service), svcLabel) : null].filter(Boolean).join(' · ');
+                  const needsPhotos = stopNeedsPhotos(s, route);
+                  return (
+                    <View style={[styles.stopRow, i > 0 && sep]}>
+                      <View style={[styles.stopNo, { borderColor: colors.border }]}>
+                        <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{i + 1}</Text>
                       </View>
-                    </Pressable>
-                    {movable ? (
-                      <View style={styles.inline}>
-                        <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} />
-                        <IconTap icon="arrow-up" label="Move up" disabled={i === 0} onPress={() => move(i, -1)} color={colors.textSecondary} />
-                        <IconTap icon="arrow-down" label="Move down" disabled={i === groups.length - 1} onPress={() => move(i, 1)} color={colors.textSecondary} />
-                        <IconTap icon="x" label="Remove stop" onPress={() => onRemove(g)} color={colors.error} />
+                      <View style={[styles.stopThumb, { backgroundColor: colors.primarySurface }]}>
+                        <Icon name="home" size={20} color={colors.primary} />
                       </View>
-                    ) : (
-                      <StatusBadge label={STOP_STATUS_LABEL[status]} status={STOP_TONE[status]} />
-                    )}
-                  </View>
-                );
-              }}
-            />
-          </View>
-        ) : (
-          <Text style={[typeScale.bodySmall, styles.help, { color: colors.textSecondary }]}>No properties yet. Tap Add Property below.</Text>
-        )}
-
-        {editable ? (
-          pickStops ? (
-            <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md }]}>
-              {addable.length ? addable.map((p, i) => {
-                const on = chosen.includes(p.propertyId);
-                return (
-                  <Pressable
-                    key={p.propertyId}
-                    style={[styles.row, { paddingHorizontal: 0 }, i > 0 && sep]}
-                    onPress={() => setChosen(on ? chosen.filter((x) => x !== p.propertyId) : [...chosen, p.propertyId])}
-                  >
-                    <Icon name={on ? 'check-square' : 'square'} size={20} color={on ? colors.primary : colors.textTertiary} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{p.name}</Text>
-                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{p.address}</Text>
-                      {visitsOn.get(p.propertyId) ? (
-                        <Text style={[typeScale.caption, { color: colors.primary }]}>
-                          Already on this route ×{visitsOn.get(p.propertyId)}. Adding it again makes another visit.
-                        </Text>
-                      ) : null}
+                      <Pressable
+                        style={{ flex: 1, gap: 2 }}
+                        onPress={() => openStop(g)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${s.propertyName}: photos and notes`}
+                      >
+                        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{s.propertyName}</Text>
+                        <View style={styles.inline}>
+                          <Text style={[typeScale.caption, { color: colors.textSecondary, flexShrink: 1 }]} numberOfLines={1}>{where}</Text>
+                          {needsPhotos ? <Icon name="camera" size={12} color={colors.primary} /> : null}
+                          {s.ownerNote ? <Icon name="file-text" size={12} color={colors.primary} /> : null}
+                        </View>
+                      </Pressable>
+                      {movable ? (
+                        <View style={styles.inline}>
+                          {live ? <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} /> : null}
+                          <IconTap icon="x" label="Remove stop" onPress={() => onRemove(g)} color={colors.textTertiary} />
+                          {handle ?? null}
+                        </View>
+                      ) : (
+                        <StatusBadge label={STOP_STATUS_LABEL[status]} status={STOP_TONE[status]} />
+                      )}
                     </View>
-                  </Pressable>
-                );
-              }) : (
-                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                  No property offers {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} yet.
-                </Text>
-              )}
-              {route.stormStatus === 'dispatched' && route.stops.length > 0 ? (
-                <View style={[styles.inline, { marginTop: spacing.md }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Do these next</Text>
-                    <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                      Puts them right after the stop the lead is on, ahead of stops not yet started.
-                    </Text>
-                  </View>
-                  <Switch value={doNext} onValueChange={setDoNext} accessibilityLabel="Do these next" />
-                </View>
-              ) : null}
-              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
-                <Button title="Cancel" variant="ghost" onPress={() => { setPickStops(false); setChosen([]); }} />
-                <Button title={chosen.length ? `Add ${chosen.length}` : 'Add'} disabled={!chosen.length} loading={busy} onPress={onAddStops} />
-              </View>
+                  );
+                }}
+              />
             </View>
           ) : (
-            <Button title="Add Property" icon="plus" variant={embedded ? 'primary' : 'secondary'} onPress={() => setPickStops(true)} style={{ marginTop: spacing.md }} fullWidth size={embedded ? 'lg' : undefined} />
-          )
-        ) : null}
+            <View style={styles.empty}>
+              <View>
+                <Icon name="home" size={44} color={colors.textTertiary} />
+                <View style={styles.snowBadge}><Icon name="cloud-snow" size={20} color={colors.textTertiary} /></View>
+              </View>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginTop: spacing.md }]}>No properties added yet</Text>
+              {editable ? <Button title="Add Property" icon="plus" onPress={() => setPickStops(true)} style={{ marginTop: spacing.lg }} /> : null}
+            </View>
+          )}
 
-        {!embedded ? (
-        <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
-          {route.stops.length && !several ? (
-            <Button title="Save as template" icon="copy" variant="secondary" onPress={onSaveTemplate} disabled={busy} fullWidth />
+          {editable && groups.length ? (
+            <Button title="Add Property" icon="plus" variant="secondary" size="sm" onPress={() => setPickStops(true)} style={{ marginTop: spacing.md, alignSelf: 'flex-start' }} />
           ) : null}
-          {editable ? <Button title="Cancel route" variant="ghost" onPress={onCancelRoute} disabled={busy} fullWidth /> : null}
-        </View>
+        </SetupCard>
+
+        {editable ? (
+          <View style={[styles.inline, { marginTop: spacing.md, justifyContent: 'center', gap: spacing.lg }]}>
+            {route.stops.length && !several ? (
+              <Pressable onPress={onSaveTemplate} disabled={busy} hitSlop={8} accessibilityRole="button" accessibilityLabel="Save this route as a template">
+                <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Save as template</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={onCancelRoute} disabled={busy} hitSlop={8} accessibilityRole="button" accessibilityLabel="Cancel this route">
+              <Text style={[typeScale.labelSmall, { color: colors.textTertiary }]}>Cancel route</Text>
+            </Pressable>
+          </View>
         ) : null}
 
         {embedded && route.stops.length ? (
           <Text style={[typeScale.caption, styles.help, { color: colors.textTertiary, marginTop: spacing.xs }]}>Tap a property to set photos and add a note for it.</Text>
+        ) : null}
+
+        {editable ? (
+          <AddPropertiesSheet
+            visible={pickStops}
+            onClose={() => setPickStops(false)}
+            properties={addable}
+            services={route.services}
+            serviceLabel={svcLabel}
+            visitsOn={visitsOn}
+            busy={busy}
+            showDoNext={route.stormStatus === 'dispatched' && route.stops.length > 0}
+            doNext={doNext}
+            onDoNext={setDoNext}
+            onAdd={onAddStops}
+          />
         ) : null}
 
         <Modal visible={renaming} transparent animationType="fade" onRequestClose={() => setRenaming(false)}>
@@ -481,7 +521,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
               <Input label="Route name" value={renameText} onChangeText={setRenameText} autoFocus />
               <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
                 <Button title="Cancel" variant="ghost" onPress={() => setRenaming(false)} />
-                <Button title="Save" icon="check" disabled={!renameText.trim()} onPress={() => { setRenaming(false); if (renameText.trim() && renameText.trim() !== route.name) save({ name: renameText }); }} />
+                <Button title="Save" icon="check" disabled={!renameText.trim()} onPress={() => { Keyboard.dismiss(); setRenaming(false); if (renameText.trim() && renameText.trim() !== route.name) save({ name: renameText }); }} />
               </View>
             </View>
           </KeyboardAvoidingView>
@@ -510,40 +550,7 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
     </>
   );
 
-  if (embedded) return <View>{body}</View>;
-
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader
-        title={route.name}
-        subtitle={`${route.stormName} · ${servicesText(route.services, svcLabel)}`}
-        right={
-          <View style={styles.inline}>
-            <IconTap icon="edit-2" label="Rename route" onPress={() => { setRenameText(route.name); setRenaming(true); }} color={colors.textSecondary} />
-          <PressableScale
-            onPress={done}
-            disabled={busy}
-            scaleTo={0.92}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Done"
-            style={[styles.done, { backgroundColor: colors.primary, opacity: busy ? 0.6 : 1 }]}
-          >
-            <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary }]}>Done</Text>
-          </PressableScale>
-          </View>
-        }
-      />
-      <ScrollView
-        scrollEnabled={!dragging}
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
-        keyboardShouldPersistTaps="handled"
-      >
-      {body}
-      </ScrollView>
-    </View>
-  );
+  return <View>{body}</View>;
 }
 
 function IconTap({ icon, label, onPress, disabled, color }: { icon: React.ComponentProps<typeof Icon>['name']; label: string; onPress: () => void; disabled?: boolean; color: string }) {
@@ -554,18 +561,59 @@ function IconTap({ icon, label, onPress, disabled, color }: { icon: React.Compon
   );
 }
 
+/** One numbered setup card: number, icon, title and a count pill; tapping the header opens that section's selection. */
+function SetupCard({ n, icon, title, sub, pill, onPress, open, children }: {
+  n: number; icon: React.ComponentProps<typeof Icon>['name']; title: string; sub: string; pill?: string; onPress?: () => void; open?: boolean; children?: React.ReactNode;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.card, styles.setupCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+      <Pressable onPress={onPress} disabled={!onPress} style={styles.setupHead} accessibilityRole="button" accessibilityLabel={`${title}: ${sub}`}>
+        <View style={[styles.sectionNo, { backgroundColor: colors.primarySurface }]}>
+          <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>{n}</Text>
+        </View>
+        <Icon name={icon} size={26} color={colors.textTertiary} />
+        <View style={{ flex: 1 }}>
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '800' }]}>{title}</Text>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]} numberOfLines={2}>{sub}</Text>
+        </View>
+        {pill ? (
+          <View style={[styles.pill, { backgroundColor: colors.primarySurface }]}>
+            <Text style={[typeScale.labelSmall, { color: colors.primary, fontWeight: '700' }]}>{pill}</Text>
+          </View>
+        ) : null}
+        {onPress ? <Icon name={open ? 'chevron-up' : 'chevron-right'} size={18} color={colors.textTertiary} /> : null}
+      </Pressable>
+      {children}
+    </View>
+  );
+}
+
 /** Every stop row is this tall so a dragged row can slide between its neighbours. */
-const STOP_ROW_HEIGHT = 72;
+const STOP_ROW_HEIGHT = 68;
 
 const styles = StyleSheet.create({
   done: { height: 44, paddingHorizontal: spacing.lg, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   screen: { flex: 1 },
   card: { borderRadius: radius.lg, padding: spacing.lg },
-  label: { marginLeft: spacing.sm, marginBottom: spacing.sm, marginTop: spacing.xl },
   help: { marginHorizontal: spacing.sm },
   group: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 52 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  setupCard: { borderWidth: StyleSheet.hairlineWidth, marginTop: spacing.md },
+  setupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  pill: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full },
+  avatarWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
+  avatarCell: { width: 64, alignItems: 'center' },
+  avatarX: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  leadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, marginTop: spacing.md },
+  leadEmpty: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  stopRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md },
+  stopNo: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  stopThumb: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  sectionNo: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  empty: { alignItems: 'center', paddingVertical: spacing.xl },
+  snowBadge: { position: 'absolute', right: -14, top: -10 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   modalCard: { width: '100%', maxWidth: 420, borderRadius: radius.xl, padding: spacing.xl },
 });

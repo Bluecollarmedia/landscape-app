@@ -18,6 +18,7 @@ import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { SplashScreen } from '@/components/branding/SplashScreen';
 import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { applyPendingSignup } from '@/data/pendingSignup';
 import { useModeAccess } from '@/hooks/useModeAccess';
 import { WorkerModeToggle } from '@/components/snow/WorkerModeToggle';
 import { installGlobalErrorHandler } from '@/lib/errorReporting';
@@ -30,13 +31,18 @@ function RootNavigator() {
   const segments = useSegments();
   const router = useRouter();
   const [splashDone, setSplashDone] = useState(false);
-  // The approval page (/approve/<token>), the legal pages (/legal/privacy, terms, support) and the password reset page are public:
+  // The approval page (/approve/<token>), the invite page (/invite/<token>), the legal pages (/legal/privacy, terms, support) the password reset page and the email-link landing page (auth-callback) are public:
   // no sign-in, no redirects.
-  const isPublicPage = ['approve', 'legal', 'reset-password'].includes((segments as string[])[0]);
+  const isPublicPage = ['approve', 'invite', 'legal', 'reset-password', 'auth-callback'].includes((segments as string[])[0]);
   const { shell } = useModeAccess(user?.role);
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
   usePrefetchKeyImages();
+
+  // Photo, birthday, hoodie and ID set aside while the account waited for email confirmation are saved on first sign-in.
+  useEffect(() => {
+    if (appState === 'active' && isAuthenticated && user?.email) applyPendingSignup(user.email);
+  }, [appState, isAuthenticated, user?.email]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -58,30 +64,14 @@ function RootNavigator() {
       return;
     }
 
-    // The setup hub links to the create-company / join-team / project-code
-    // screens, which also work for an already-signed-in user.
-    const setupScreens = ['create-company', 'join-team', 'customer-access'];
+    // The setup hub links to the create-company screen, which also works for an already-signed-in user.
+    const setupScreens = ['create-company'];
     const onSetupScreen = inAuthGroup && setupScreens.includes((segments as string[])[1] ?? '');
 
     if (appState === 'onboarding') {
       // Signed in but not part of a company yet.
       if (!inOnboardingGroup && !onSetupScreen) {
         router.replace('/(onboarding)/setup');
-      }
-      return;
-    }
-
-    if (appState === 'pending_approval') {
-      if (!inOnboardingGroup || (segments as string[])[1] !== 'pending-approval') {
-        router.replace('/(onboarding)/pending-approval');
-      }
-      return;
-    }
-
-    if (appState === 'declined') {
-      // A declined person may try again with a new code.
-      if (!inOnboardingGroup && !onSetupScreen) {
-        router.replace('/(onboarding)/declined');
       }
       return;
     }
@@ -95,9 +85,11 @@ function RootNavigator() {
       const target =
         shell === 'snow' ? `/snow/${role}` : shell === 'snow_notice' ? '/snow/notice' : `/(${role})`;
       const s1 = (segments as string[])[1];
+      // Legal & Support opens inside the Snow area (so Back returns to Settings): it is part of whichever Snow shell they are in.
+      const inLegal = s1 === 'legal-support';
       const onTarget =
-        shell === 'snow' ? currentGroup === 'snow' && s1 === role
-        : shell === 'snow_notice' ? currentGroup === 'snow' && s1 === 'notice'
+        shell === 'snow' ? currentGroup === 'snow' && (s1 === role || inLegal)
+        : shell === 'snow_notice' ? currentGroup === 'snow' && (s1 === 'notice' || inLegal)
         : currentGroup === `(${role})`;
       if (inAuthGroup || inOnboardingGroup || !onTarget) {
         router.replace(target as any);

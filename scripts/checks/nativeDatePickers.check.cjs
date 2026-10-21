@@ -26,7 +26,7 @@ for (const f of files) {
 check('1 no text field asks for a typed date or time', typed.length === 0, typed.join(' | '));
 
 // 2. The fields that used to be typed now use the shared DateField.
-check('2 Edit Profile and sign-up birthdays use DateField, set to start in 1990 and never in the future', ['src/components/account/EditProfileScreen.tsx', 'app/(auth)/join-team.tsx'].every((f) => { const s = read(f); return /<DateField[\s\S]*?Birthday[\s\S]*?initialPickerDate="1990-01-01"/.test(s) && /maximumDate=/.test(s); }));
+check('2 Edit Profile and sign-up birthdays use DateField, set to start in 1990 and never in the future', ['src/components/account/EditProfileScreen.tsx', 'app/invite/[token].tsx'].every((f) => { const s = read(f); return /<DateField[\s\S]*?Birthday[\s\S]*?initialPickerDate="1990-01-01"/.test(s) && /maximumDate=/.test(s); }));
 check('3 project start / est. end dates use DateField; end date cannot be before the start', (() => { const s = read('app/(owner)/project-new.tsx'); return /<DateField\s+label="Start Date"/.test(s) && /<DateField\s+label="Est\. End Date"/.test(s) && /minimumDate=\{startDate \|\| undefined\}/.test(s) && /endDate < k\) setEndDate\(''\)/.test(s); })());
 
 // 4. The shared component picks the native picker on each platform.

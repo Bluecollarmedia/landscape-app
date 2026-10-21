@@ -5,7 +5,8 @@
  * only shared media for their own properties.
  */
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { discardSnowUpload, signedSnowMediaUrls, uploadSnowMedia } from '@/lib/snowMedia';
+import { signedSnowMediaUrls } from '@/lib/snowMedia';
+import { SNOW_OWNER_MEDIA_TARGET } from '@/data/snowMediaTargets';
 import type { SnowMediaDraft } from '@/data/snowProperties';
 import type { SnowService } from '@/types/snow';
 
@@ -91,32 +92,31 @@ export async function loadCustomerSnowUpdates(): Promise<Result<CustomerSnowUpda
 }
 
 /**
- * Owner/admin: add photos or videos to a completed stop (update 032). Each
- * file counts once it is both uploaded and saved; the owner added it, so it
- * starts approved, and it is still not shared with the customer until sent.
- * Returns how many were saved.
+ * Owner/admin: add photos or videos to a completed stop (update 032). They join the shared background queue, so this returns at once;
+ * each file counts once it is both uploaded and saved. The owner added it, so it starts approved, and it is still not shared with the
+ * customer until sent. Returns how many were queued.
  */
 export async function addOwnerMedia(companyId: string, visitId: string, drafts: SnowMediaDraft[]): Promise<Result<number>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  let saved = 0;
+  const { queueMedia } = require('@/lib/mediaQueueRuntime') as typeof import('@/lib/mediaQueueRuntime');
   for (const d of drafts) {
-    let key: string | null = null;
-    try {
-      key = await uploadSnowMedia(d.uri, `${companyId}/completion/${visitId}`, d.mimeType);
-      const { error } = await supabase.rpc('snow_owner_add_media', {
-        p_visit_id: visitId,
-        p_kind: d.mediaType === 'video' ? 'video' : 'photo',
-        p_file_key: key,
-        p_size_bytes: d.sizeBytes ?? null,
-      });
-      if (error) throw new Error(message(error, "Couldn't save the photo."));
-      saved += 1;
-    } catch (e) {
-      if (key) await discardSnowUpload(key);
-      return saved ? ok(saved) : fail(e instanceof Error ? e.message : 'Upload failed.');
-    }
+    queueMedia({
+      kind: d.mediaType === 'video' ? 'video' : 'image', sourceUri: d.uri, mimeType: d.mimeType, bytesIn: d.sizeBytes,
+      folder: `${companyId}/completion/${visitId}`, target: { type: SNOW_OWNER_MEDIA_TARGET, payload: { visitId } },
+    });
   }
-  return ok(saved);
+  return ok(drafts.length);
+}
+
+/** Last step of a queued owner photo: the file is stored, so save it on the stop. Safe to repeat (the database ignores a file it already has). */
+export async function saveOwnerMediaRecord(job: { kind: string; bytesOut?: number; bytesIn?: number; target: { payload: Record<string, unknown> } }, key: string): Promise<void> {
+  const { error } = await supabase.rpc('snow_owner_add_media', {
+    p_visit_id: String(job.target.payload.visitId),
+    p_kind: job.kind === 'video' ? 'video' : 'photo',
+    p_file_key: key,
+    p_size_bytes: job.bytesOut ?? job.bytesIn ?? null,
+  });
+  if (error) throw new Error(message(error, "Couldn't save the photo."));
 }
 
 /**

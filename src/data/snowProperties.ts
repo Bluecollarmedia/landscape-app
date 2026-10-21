@@ -10,7 +10,8 @@
  */
 
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { discardSnowUpload, snowReferenceFolder, uploadSnowMedia } from '@/lib/snowMedia';
+import { snowReferenceFolder } from '@/lib/snowMedia';
+import { SNOW_REFERENCE_TARGET } from '@/data/snowMediaTargets';
 import type {
   SnowPropertyContact, SnowPropertyService, SnowReferenceMedia, SnowService, SnowServiceInstructions,
   SnowServiceReference,
@@ -63,6 +64,17 @@ export interface SnowPropertyDetails {
 }
 
 /** Owner/admin view of one property's details. Returns only what the database lets the caller see. */
+/** Customer contact names for every property in the company, primary contact first. Used to search and filter by customer. */
+export async function loadPropertyContactNames(): Promise<Result<Record<string, string[]>>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data, error } = await supabase.from('snow_property_contacts').select('property_id, name, is_primary, sort_order').is('removed_at', null)
+    .order('is_primary', { ascending: false }).order('sort_order');
+  if (error) return fail(message(error, 'Couldn\'t load customers.'));
+  const out: Record<string, string[]> = {};
+  for (const r of (data ?? []) as { property_id: string; name: string }[]) (out[r.property_id] ??= []).push(r.name);
+  return ok(out);
+}
+
 export async function loadSnowPropertyDetails(propertyId: string): Promise<Result<SnowPropertyDetails>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const [contacts, services] = await Promise.all([
@@ -194,14 +206,6 @@ export async function updateContact(contact: SnowPropertyContact, patch: Partial
   return error ? fail(message(error, 'Couldn\'t save the contact.')) : ok(undefined);
 }
 
-/** Removes a contact from the property. The row is kept (removed_at) for history. */
-export async function removeContact(contactId: string): Promise<Result> {
-  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const { error } = await supabase.from('snow_property_contacts')
-    .update({ removed_at: new Date().toISOString() }).eq('id', contactId);
-  return error ? fail(message(error, 'Couldn\'t remove the contact.')) : ok(undefined);
-}
-
 // ── Services ────────────────────────────────────────────────────────────────
 
 /** Adds a service to the property, or turns a previously stopped one back on. */
@@ -252,30 +256,33 @@ export interface SnowMediaDraft {
 }
 
 /**
- * Uploads and saves reference photos/videos for a service, one at a time.
- * A file only counts as saved once both the upload and the database row
- * succeed; a half-finished upload is cleaned up. Returns what was saved and
- * a message for anything that wasn't.
+ * Adds reference photos/videos for a service. They join the shared background queue (compress -> upload -> save the record), so this
+ * returns at once and the screen can say they are uploading; a file only counts once both the upload and the database row succeed,
+ * and a failure stays in the queue as Failed with Retry. Returns how many were queued.
  */
-export async function addReferenceMedia(companyId: string, propertyServiceId: string, drafts: SnowMediaDraft[]): Promise<{ saved: SnowReferenceMedia[]; errors: string[] }> {
-  const saved: SnowReferenceMedia[] = [];
-  const errors: string[] = [];
-  if (!isSupabaseConfigured) return { saved, errors: [NOT_CONNECTED] };
+export async function addReferenceMedia(companyId: string, propertyServiceId: string, drafts: SnowMediaDraft[]): Promise<{ queued: number; errors: string[] }> {
+  if (!isSupabaseConfigured) return { queued: 0, errors: [NOT_CONNECTED] };
+  const { queueMedia } = require('@/lib/mediaQueueRuntime') as typeof import('@/lib/mediaQueueRuntime');
   for (const d of drafts) {
-    let key: string | undefined;
-    try {
-      key = await uploadSnowMedia(d.uri, snowReferenceFolder(companyId, propertyServiceId), d.mimeType);
-      const { data, error } = await supabase.from('snow_reference_media')
-        .insert(toDb({ companyId, propertyServiceId, mediaType: d.mediaType, fileKey: key, sizeBytes: d.sizeBytes, caption: d.caption?.trim() || undefined }))
-        .select().single();
-      if (error) throw new Error(message(error, 'Couldn\'t save the file.'));
-      saved.push(fromDb<SnowReferenceMedia>(data));
-    } catch (err) {
-      if (key) await discardSnowUpload(key);
-      errors.push(err instanceof Error ? err.message : String(err));
-    }
+    queueMedia({
+      kind: d.mediaType === 'video' ? 'video' : 'image', sourceUri: d.uri, mimeType: d.mimeType, bytesIn: d.sizeBytes,
+      folder: snowReferenceFolder(companyId, propertyServiceId),
+      target: { type: SNOW_REFERENCE_TARGET, payload: { companyId, propertyServiceId, mediaType: d.mediaType, caption: d.caption?.trim() || undefined } },
+    });
   }
-  return { saved, errors };
+  return { queued: drafts.length, errors: [] };
+}
+
+/** Last step of a queued reference photo: the file is stored, so save its row. Safe to repeat (a file that already has a row is left alone). */
+export async function saveReferenceRecord(job: { bytesOut?: number; bytesIn?: number; target: { payload: Record<string, unknown> } }, key: string): Promise<void> {
+  const p = job.target.payload;
+  const existing = await supabase.from('snow_reference_media').select('id').eq('file_key', key).maybeSingle();
+  if (existing.data) return;
+  const { error } = await supabase.from('snow_reference_media').insert(toDb({
+    companyId: p.companyId, propertyServiceId: p.propertyServiceId, mediaType: p.mediaType, fileKey: key,
+    sizeBytes: job.bytesOut ?? job.bytesIn, caption: p.caption,
+  }));
+  if (error) throw new Error(message(error, "Couldn't save the file."));
 }
 
 /**

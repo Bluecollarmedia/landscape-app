@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, StyleSheet, Alert, Platform, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -96,6 +96,7 @@ export default function CustomerProjectScreen() {
 
   function handleSubmitRequest() {
     if (!reqTitle.trim()) return;
+    Keyboard.dismiss();
     submitRequest({ title: reqTitle.trim(), description: reqDescription.trim() || undefined, category: reqCategory });
     const companyName = db.company?.name ?? 'Brighton Lawn + Landscape';
     const sentMsg = `Your ${categoryOptions.find(c => c.key === reqCategory)?.label ?? reqCategory} has been sent to ${companyName}. They'll review it shortly.`;

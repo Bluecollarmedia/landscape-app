@@ -14,37 +14,13 @@
 /** Snow services. Each is a separate permission on the snow team. */
 export type SnowService = 'plowing' | 'shoveling' | 'salting';
 
+/** The one place the services are named and drawn. Every screen reads these (two spellings of "Shoveling" used to exist). */
+export const SERVICE_LABEL: Record<SnowService, string> = { plowing: 'Plowing', shoveling: 'Shoveling / Sidewalks', salting: 'Salting' };
+export const SERVICE_ICON = { plowing: 'truck', shoveling: 'users', salting: 'droplet' } as const;
+
 export const SNOW_SERVICES: SnowService[] = ['plowing', 'shoveling', 'salting'];
 
-export interface SnowSettings {
-  companyId: string;
-  /** Lead must tap "I'm Here" before a visit can be completed. */
-  requireArrivalBeforeCompletion: boolean;
-  updatedBy?: string;
-  updatedAt: string;
-}
-
 export type SnowPropertyStatus = 'active' | 'inactive';
-
-export interface SnowProperty {
-  id: string;
-  companyId: string;
-  name: string;
-  address: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  latitude?: number;
-  longitude?: number;
-  /** Text for the maps app when the address alone isn't right. */
-  mapDestination?: string;
-  notes?: string;
-  status: SnowPropertyStatus;
-  deactivatedAt?: string;
-  createdBy?: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 /** draft → dispatched → ended; reopening sets it back to dispatched. */
 export type StormStatus = 'draft' | 'dispatched' | 'ended';
@@ -94,19 +70,6 @@ export interface SnowRoute {
   updatedAt: string;
 }
 
-export interface SnowRouteLeadAssignment {
-  id: string;
-  companyId: string;
-  stormId: string;
-  routeId: string;
-  personId: string;
-  assignedBy?: string;
-  assignedAt: string;
-  /** Set when the lead was replaced. Open row = current lead. */
-  endedAt?: string;
-  endedBy?: string;
-}
-
 /** completed and skipped are final; skipped never counts as done. */
 export type SnowVisitStatus = 'pending' | 'arrived' | 'completed' | 'skipped';
 
@@ -140,25 +103,6 @@ export interface SnowVisit {
 }
 
 export type SnowMediaKind = 'photo' | 'video';
-
-/** Uploaded during a storm as proof of the work. Not reference media. */
-export interface SnowCompletionMedia {
-  id: string;
-  companyId: string;
-  stormId: string;
-  routeId: string;
-  visitId: string;
-  propertyId: string;
-  service: SnowService;
-  kind: SnowMediaKind;
-  fileKey: string;
-  fileUrl: string;
-  sizeBytes?: number;
-  durationS?: number;
-  uploadedBy?: string;
-  capturedAt?: string;
-  createdAt: string;
-}
 
 export type SnowSkipRequestStatus = 'pending' | 'approved' | 'denied' | 'withdrawn';
 

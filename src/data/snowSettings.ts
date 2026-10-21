@@ -44,3 +44,22 @@ export async function setRequireArrival(companyId: string, on: boolean): Promise
 /** What the owner is told before turning the arrival rule off. */
 export const ARRIVAL_OFF_WARNING =
   "Workers will be able to finish a stop without tapping I'm Here. Arrival times, and the customer's \"crew arrived\" message, depend on that tap, so they may be missing.";
+
+/**
+ * Does a completed stop's photos go to the customer by themselves (update 87)? On unless the owner turns it off. If the database does not
+ * have the setting yet, it behaves as before (the owner reviews and sends), so we report off.
+ */
+export async function loadAutoShare(companyId: string): Promise<Result<boolean>> {
+  if (!isSupabaseConfigured) return { ok: false, error: NOT_CONNECTED };
+  const { data, error } = await supabase.from('snow_settings').select('auto_share_with_customers').eq('company_id', companyId).maybeSingle();
+  if (error) return /auto_share_with_customers|column/i.test(error.message) ? { ok: true, data: false } : { ok: false, error: error.message };
+  return { ok: true, data: data?.auto_share_with_customers ?? true };
+}
+
+export async function setAutoShare(companyId: string, on: boolean): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: false, error: NOT_CONNECTED };
+  const { data, error } = await supabase.from('snow_settings').update({ auto_share_with_customers: on }).eq('company_id', companyId).select('company_id');
+  if (error) return { ok: false, error: /auto_share_with_customers|column/i.test(error.message) ? 'This needs the next app update to be installed first.' : error.message };
+  if (!data?.length) return { ok: false, error: 'Only the owner or an admin can change this.' };
+  return { ok: true, data: undefined };
+}

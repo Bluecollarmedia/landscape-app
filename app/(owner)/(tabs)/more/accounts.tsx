@@ -12,6 +12,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { useAccounts, type Account, type AccountStatus } from '@/hooks/useAccounts';
+import { CollapsibleFilters } from '@/components/ui/CollapsibleFilters';
 import { haptics } from '@/lib/haptics';
 
 type RoleFilter = 'all' | 'owner' | 'worker' | 'customer' | 'none';
@@ -25,9 +26,7 @@ const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', wor
 
 const STATUS_BADGE: Record<AccountStatus, { label: string; status: 'success' | 'warning' | 'error' | 'neutral' }> = {
   active: { label: 'Active', status: 'success' },
-  pending: { label: 'Waiting', status: 'warning' },
   removed: { label: 'Removed', status: 'error' },
-  declined: { label: 'Declined', status: 'neutral' },
   not_joined: { label: 'Not joined', status: 'neutral' },
 };
 
@@ -128,7 +127,7 @@ export default function AccountsScreen() {
     const badge = STATUS_BADGE[a.status];
     // Owners (and you) can't be changed from here.
     const locked = a.isMe || a.role === 'owner';
-    const canRemove = !locked && (a.status === 'active' || a.status === 'pending');
+    const canRemove = !locked && a.status === 'active';
     const canRestore = !locked && a.status === 'removed';
 
     return (
@@ -175,7 +174,7 @@ export default function AccountsScreen() {
 
             {a.status === 'removed' && (
               <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-                Access removed {formatDate(a.removedAt)}. They can't use the app until you reactivate them (Team Access) or approve a new join request.
+                Access removed {formatDate(a.removedAt)}. They can't use the app until you reactivate them (Team Access) or send them a new invite link.
               </Text>
             )}
 
@@ -205,7 +204,7 @@ export default function AccountsScreen() {
   const sheetCopy = pending && target ? {
     remove: {
       icon: 'user-x', title: `Remove ${fullName(target)}?`,
-      body: 'They keep their login but can’t use the app. To get back in they’ll need you to restore them here or approve a new join request.',
+      body: 'They keep their login but can’t use the app. To get back in they’ll need you to restore them here or send them a new invite link.',
       button: 'Remove Access',
     },
     restore: {
@@ -240,42 +239,36 @@ export default function AccountsScreen() {
       >
         <SearchBar value={query} onChangeText={setQuery} placeholder="Search name, email or phone" />
 
-        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textTertiary }]}>ROLE</Text>
-        <FilterChips<RoleFilter>
-          selected={role}
-          onSelect={setRole}
-          options={[
-            { key: 'all', label: 'All', count: accounts.length },
-            { key: 'owner', label: 'Owners', count: roleCount('owner') },
-            { key: 'worker', label: 'Workers', count: roleCount('worker') },
-            { key: 'customer', label: 'Customers', count: roleCount('customer') },
-            { key: 'none', label: 'No role', count: roleCount('none') },
-          ]}
-        />
-
-        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textTertiary }]}>STATUS</Text>
-        <FilterChips<StatusFilter>
-          selected={status}
-          onSelect={setStatus}
-          options={[
-            { key: 'all', label: 'All' },
-            { key: 'active', label: 'Active', count: statusCount('active') },
-            { key: 'pending', label: 'Waiting', count: statusCount('pending') },
-            { key: 'removed', label: 'Removed', count: statusCount('removed') },
-            { key: 'declined', label: 'Declined', count: statusCount('declined') },
-            { key: 'not_joined', label: 'Not joined', count: statusCount('not_joined') },
-          ]}
-        />
-
-        <Text style={[typeScale.overline, styles.filterLabel, { color: colors.textTertiary }]}>SORT</Text>
-        <FilterChips<SortKey>
-          selected={sort}
-          onSelect={setSort}
-          options={[
-            { key: 'newest', label: 'Newest' },
-            { key: 'oldest', label: 'Oldest' },
-            { key: 'name', label: 'Name A–Z' },
-            { key: 'last_active', label: 'Last sign-in' },
+        <CollapsibleFilters
+          groups={[
+            {
+              key: 'role', label: 'Role', selected: role, onSelect: (k) => setRole(k as RoleFilter), defaultKey: 'all',
+              options: [
+                { key: 'all', label: 'All', count: accounts.length },
+                { key: 'owner', label: 'Owners', count: roleCount('owner') },
+                { key: 'worker', label: 'Workers', count: roleCount('worker') },
+                { key: 'customer', label: 'Customers', count: roleCount('customer') },
+                { key: 'none', label: 'No role', count: roleCount('none') },
+              ],
+            },
+            {
+              key: 'status', label: 'Status', selected: status, onSelect: (k) => setStatus(k as StatusFilter), defaultKey: 'all',
+              options: [
+                { key: 'all', label: 'All' },
+                { key: 'active', label: 'Active', count: statusCount('active') },
+                { key: 'removed', label: 'Removed', count: statusCount('removed') },
+                { key: 'not_joined', label: 'Not joined', count: statusCount('not_joined') },
+              ],
+            },
+            {
+              key: 'sort', label: 'Sort', selected: sort, onSelect: (k) => setSort(k as SortKey), defaultKey: 'newest',
+              options: [
+                { key: 'newest', label: 'Newest' },
+                { key: 'oldest', label: 'Oldest' },
+                { key: 'name', label: 'Name A–Z' },
+                { key: 'last_active', label: 'Last sign-in' },
+              ],
+            },
           ]}
         />
 

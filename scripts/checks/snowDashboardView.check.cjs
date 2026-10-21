@@ -138,5 +138,9 @@ check('27 the screen uses the existing route/storm links (snowDashboardHref) for
 check('28 needs-attention and the existing storm-plan action are still on the screen', /Needs attention/.test(screen) && /storm-new/.test(screen) && /snowDashboardHref\(item\.target\)/.test(screen));
 check('29 the screen has a loading, an unavailable and an error state', /state\.kind === 'loading'/.test(screen) && /state\.kind === 'unavailable'/.test(screen) && /state\.kind === 'error'/.test(screen));
 check('30 no fake data: no hard-coded storm name or crew names from the mock-up', !/First Big Storm|Crew 1|Lead: David|Joshua|Aaron/.test(screen));
+const crewRow = screen.slice(screen.indexOf('function CrewRowView'), screen.indexOf('function OtherStormCard'));
+const heroCard = screen.slice(screen.indexOf('function ActiveStormCard'), screen.indexOf('function CrewsSection'));
+const crewsSection = screen.slice(screen.indexOf('function CrewsSection'), screen.indexOf('function CrewRowView'));
+check('31 on the active storm the crew rows and the storm card are read-only: the one way in is "View all" under Crews', !/Pressable/.test(crewRow) && !/Pressable/.test(heroCard) && !/onOpenRoute/.test(crewsSection) && /View all/.test(crewsSection));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

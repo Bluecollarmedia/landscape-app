@@ -1,6 +1,6 @@
 import { LegalSection } from '@/components/legal/LegalSection';
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -56,8 +56,6 @@ export default function SettingsScreen() {
     { label: 'Worker', state: 'active', role: 'worker' },
     { label: 'Customer', state: 'active', role: 'customer' },
     { label: 'Welcome', state: 'unauthenticated' },
-    { label: 'Pending', state: 'pending_approval' },
-    { label: 'Declined', state: 'declined' },
   ];
 
   function handleDevSwitch(item: typeof devStates[0]) {
@@ -80,7 +78,12 @@ export default function SettingsScreen() {
       >
         <Text style={[typeScale.displaySmall, styles.title, { color: colors.textPrimary }]}>Settings</Text>
 
-        <View style={[styles.hero, { backgroundColor: colors.backgroundTertiary, borderColor: colors.border }]}>
+        <Pressable
+          onPress={() => router.push('/(owner)/edit-profile' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Edit your profile and photo"
+          style={[styles.hero, { backgroundColor: colors.backgroundTertiary, borderColor: colors.border }]}
+        >
           {user?.avatarUrl ? (
             <Avatar firstName={user?.firstName ?? 'O'} lastName={user?.lastName ?? ''} size={66} uri={user.avatarUrl} />
           ) : (
@@ -113,17 +116,7 @@ export default function SettingsScreen() {
             </View>
           </View>
           <Icon name="chevron-right" size={20} color={colors.textSecondary} />
-        </View>
-
-        <SettingsGroup title="Account">
-          <SettingsRow
-            icon="camera"
-            tint={tileColors.green}
-            title="Edit Profile & Photo"
-            subtitle="Your name, phone and picture"
-            onPress={() => router.push('/(owner)/edit-profile' as any)}
-          />
-        </SettingsGroup>
+        </Pressable>
 
         <SettingsGroup title="Company">
           {!db.demo && (

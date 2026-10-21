@@ -1,22 +1,25 @@
 /**
- * Worker invites by text message (no email service needed).
+ * Private invite links (supabase/updates/078_invite_links.sql), sent by text message (no email service needed).
  *
- * Opens the phone's Messages app with the team code filled in. The worker
- * downloads the app, taps "Join a Team", enters the code, and the owner
- * approves them under Pending Requests.
+ * The owner types a name and a phone number, then either copies the link or opens the phone's Messages app with the text and
+ * link filled in. The link works once and expires after 7 days; tapping it opens the sign-up page for that one person.
  */
 
 import { Linking, Platform, Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { config } from '@/lib/config';
 
-export function inviteMessage(code: string, companyName?: string, workerName?: string, workerType: 'landscaping' | 'maintenance' = 'landscaping'): string {
-  const hi = workerName?.trim() ? `Hi ${workerName.trim().split(' ')[0]}! ` : '';
+/** The link people tap. On the web the page is /invite/<token>; without a web address the app's own link scheme is used. */
+export function inviteLinkUrl(token: string): string {
+  return config.webUrl ? `${config.webUrl}/invite/${token}` : `brighton-lawn://invite/${token}`;
+}
+
+export function inviteMessage(url: string, companyName?: string, personName?: string, kind: 'worker' | 'customer' = 'worker'): string {
+  const hi = personName?.trim() ? `Hi ${personName.trim().split(' ')[0]}! ` : '';
   const company = companyName?.trim() || 'our company';
-  const as = workerType === 'maintenance' ? ' as a maintenance worker' : '';
-  return (
-    `${hi}You're invited to join ${company}${as} on the Brighton Lawn + Landscape app. ` +
-    `Open the app, tap "Join a Team" and enter this code: ${code}`
-  );
+  return kind === 'customer'
+    ? `${hi}${company} invited you to see your project on the Brighton Lawn + Landscape app. This private link works once: ${url}`
+    : `${hi}You're invited to join ${company} on the Brighton Lawn + Landscape app. Tap this private link to set up your login (it works once): ${url}`;
 }
 
 /** Opens Messages with the invite filled in (to `phone` if given). Falls back to the share sheet. */

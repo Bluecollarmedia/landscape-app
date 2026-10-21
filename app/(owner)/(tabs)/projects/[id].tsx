@@ -1,7 +1,7 @@
-import { copyText } from '@/lib/invite';
+import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { IssuesSection } from '@/components/issues/IssuesSection';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform, Alert, Linking, Keyboard } from 'react-native';
 import { Switch } from '@/components/ui/Switch';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
@@ -253,7 +253,6 @@ export default function ProjectDetailScreen() {
   const [editingResponseFor, setEditingResponseFor] = useState<string | null>(null);
   const [responseDraft, setResponseDraft] = useState('');
   const [responseNote, setResponseNote] = useState('');
-  const [codeCopied, setCodeCopied] = useState(false);
   const [accessVersion, setAccessVersion] = useState(0);
   const [activityExpanded, setActivityExpanded] = useState<Record<string, boolean>>({});
   // Clear this project's activity for a period (update 51, owner/admin)
@@ -323,6 +322,7 @@ export default function ProjectDetailScreen() {
 
   function handleSaveNotes() {
     updateProject({ notes: notesDraft.trim() || undefined });
+    Keyboard.dismiss();
     setEditingNotes(false);
   }
 
@@ -742,7 +742,7 @@ export default function ProjectDetailScreen() {
                 {i > 0 && <Divider style={{ marginHorizontal: spacing.md }} />}
                 <Pressable
                   style={styles.teamRow}
-                  onPress={() => router.push(`/(owner)/workers/${member.personId}`)}
+                  onPress={() => router.push(`/(owner)/workers/${member.personId}` as any)}
                 >
                   <Avatar
                     firstName={member.person?.firstName ?? '?'}
@@ -1516,6 +1516,7 @@ export default function ProjectDetailScreen() {
   function handleSaveCustomerDesc() {
     if (!reviewPhoto) return;
     updatePhoto(reviewPhoto.id, { customerDescription: customerDesc });
+    Keyboard.dismiss();
     setEditingCustomerDesc(false);
   }
 
@@ -1694,6 +1695,7 @@ export default function ProjectDetailScreen() {
 
   function handlePostUpdate() {
     if (!updateTitle.trim()) return;
+    Keyboard.dismiss();
     postUpdate({ title: updateTitle.trim(), body: updateBody.trim(), isCustomerVisible: updateVisible });
     setUpdateTitle('');
     setUpdateBody('');
@@ -1952,7 +1954,7 @@ export default function ProjectDetailScreen() {
                         autoFocus
                       />
                       <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm }}>
-                        <Button title="Save" onPress={() => { editRequestResponse(req.id, responseDraft); setEditingResponseFor(null); }} size="sm" icon="check" style={{ flex: 1 }} />
+                        <Button title="Save" onPress={() => { Keyboard.dismiss(); editRequestResponse(req.id, responseDraft); setEditingResponseFor(null); }} size="sm" icon="check" style={{ flex: 1 }} />
                         <Button title="Cancel" onPress={() => setEditingResponseFor(null)} variant="secondary" size="sm" style={{ flex: 1 }} />
                       </View>
                     </View>
@@ -2147,17 +2149,6 @@ export default function ProjectDetailScreen() {
     );
   }
 
-  async function handleCopyCode(code: string) {
-    if (!code) return;
-    try {
-      await copyText(code);
-    } catch {
-      return;
-    }
-    setCodeCopied(true);
-    setTimeout(() => setCodeCopied(false), 2000);
-  }
-
   /** Asks first on every platform (these actions cut a customer off or invalidate a shared code). */
   function confirmThen(title: string, message: string, action: string, run: () => void) {
     if (Platform.OS === 'web') {
@@ -2179,18 +2170,6 @@ ${message}`)) run();
       'Remove Access',
       async () => {
         await customerAccess.revokeAccess(p.id);
-        setAccessVersion((v) => v + 1);
-      },
-    );
-  }
-
-  function handleRegenerateCode() {
-    confirmThen(
-      'Make a new code?',
-      'The old code will stop working and any existing claim will be removed.',
-      'New Code',
-      async () => {
-        await customerAccess.regenerateCode(p.id);
         setAccessVersion((v) => v + 1);
       },
     );
@@ -2223,86 +2202,27 @@ ${message}`)) run();
     return (
       <View style={styles.sectionContent}>
         {/* Customer Access */}
-        {access && access.code && (
+        {p.customer && (
           <View style={[styles.settingsCardBlock, { backgroundColor: colors.surface }, shadow.sm]}>
             <View style={styles.settingsCardHeader}>
               <View style={[styles.settingsCardIcon, { backgroundColor: '#E9E9EC' }]}>
                 <Icon name="user" size={16} color="#5B5B63" />
               </View>
               <View style={{ marginLeft: spacing.sm, flex: 1 }}>
-                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Customer Access</Text>
-                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Manage customer access to this project.</Text>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Customer Login</Text>
+                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Send {p.customer.firstName} a private link to see this project.</Text>
               </View>
             </View>
-            <Divider style={{ marginBottom: spacing.xs }} />
-
-            <View style={styles.settingsDetailRow}>
-              <View style={{ flex: 1, marginRight: spacing.sm }}>
-                <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Project Code</Text>
-                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Share this code with your customer.</Text>
-              </View>
+            <Divider style={{ marginBottom: spacing.sm }} />
+            <CustomerInviteCard personId={p.customer.id} firstName={p.customer.firstName} phone={p.customer.phone} />
+            {access?.claimedBy && (
               <Pressable
-                onPress={() => handleCopyCode(access.code)}
-                style={[styles.codeChip, { backgroundColor: colors.surfacePressed }]}
+                onPress={handleRevokeAccess}
+                style={[styles.revokeRow, { backgroundColor: semantic.errorLight, marginTop: spacing.md }]}
               >
-                <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontFamily: Platform.OS === 'web' ? 'monospace' : undefined, letterSpacing: 1 }]}>
-                  {access.code}
-                </Text>
-                <Icon name={codeCopied ? 'check' : 'copy'} size={14} color={codeCopied ? semantic.success : colors.textSecondary} style={{ marginLeft: spacing.xs }} />
-              </Pressable>
-            </View>
-            <Divider style={{ marginVertical: spacing.xs }} />
-
-            <View style={styles.settingsDetailRow}>
-              <View style={{ flex: 1, marginRight: spacing.sm }}>
-                <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Status</Text>
-                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Current access status.</Text>
-              </View>
-              {access.claimedBy ? (
-                <StatusBadge label="Claimed" status="success" />
-              ) : (
-                <StatusBadge label="Unclaimed" status="warning" />
-              )}
-            </View>
-
-            {access.claimedBy && (
-              <>
-                <Divider style={{ marginVertical: spacing.xs }} />
-                <View style={styles.settingsDetailRow}>
-                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Customer Email</Text>
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{access.claimedByEmail ?? 'Unknown'}</Text>
-                </View>
-                <Divider style={{ marginVertical: spacing.xs }} />
-                <View style={styles.settingsDetailRow}>
-                  <View>
-                    <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Claimed</Text>
-                    <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Date the customer claimed access.</Text>
-                  </View>
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                    {access.claimedAt ? formatDate(access.claimedAt) : '—'}
-                  </Text>
-                </View>
-
-                <Pressable
-                  onPress={handleRevokeAccess}
-                  style={[styles.revokeRow, { backgroundColor: semantic.errorLight }]}
-                >
-                  <Icon name="user-x" size={15} color={semantic.error} />
-                  <Text style={[typeScale.labelLarge, { color: semantic.error, fontWeight: '700', marginLeft: spacing.xs }]}>
-                    Revoke Access
-                  </Text>
-                </Pressable>
-              </>
-            )}
-
-            {!access.claimedBy && (
-              <Pressable
-                onPress={handleRegenerateCode}
-                style={[styles.outlineBtn, { backgroundColor: colors.backgroundTertiary, marginTop: spacing.sm }]}
-              >
-                <Icon name="refresh-cw" size={14} color={colors.textSecondary} />
-                <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-                  Regenerate Code
+                <Icon name="user-x" size={15} color={semantic.error} />
+                <Text style={[typeScale.labelLarge, { color: semantic.error, fontWeight: '700', marginLeft: spacing.xs }]}>
+                  Revoke Access
                 </Text>
               </Pressable>
             )}
@@ -3099,29 +3019,9 @@ ${message}`)) run();
                       </Text>
                     </Pressable>
                   ) : (
-                    <>
-                      <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.lg }]}>
-                        Share this project code with {p.customer.firstName} to set up their portal access.
-                      </Text>
-                      <Pressable
-                        onPress={() => handleCopyCode(access?.code ?? '')}
-                        style={[styles.codeChip, { backgroundColor: colors.surfacePressed, marginTop: spacing.sm, alignSelf: 'flex-start' }]}
-                      >
-                        <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontFamily: Platform.OS === 'web' ? 'monospace' : undefined, letterSpacing: 1 }]}>
-                          {access?.code}
-                        </Text>
-                        <Icon name={codeCopied ? 'check' : 'copy'} size={14} color={codeCopied ? semantic.success : colors.textSecondary} style={{ marginLeft: spacing.xs }} />
-                      </Pressable>
-                      <Pressable
-                        onPress={handleRegenerateCode}
-                        style={[styles.outlineBtn, { backgroundColor: colors.backgroundTertiary, marginTop: spacing.md }]}
-                      >
-                        <Icon name="refresh-cw" size={14} color={colors.textSecondary} />
-                        <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-                          Generate New Code
-                        </Text>
-                      </Pressable>
-                    </>
+                    <View style={{ marginTop: spacing.lg }}>
+                      <CustomerInviteCard personId={p.customer.id} firstName={p.customer.firstName} phone={p.customer.phone} />
+                    </View>
                   )}
                 </ScrollView>
               );

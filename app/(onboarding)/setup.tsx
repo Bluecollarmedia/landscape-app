@@ -60,17 +60,6 @@ export default function SetupScreen() {
         </Text>
 
         <View style={styles.actions}>
-          <Pressable
-            style={[styles.option, { backgroundColor: brand.primarySurface }]}
-            onPress={() => router.push('/(auth)/join-team' as any)}
-          >
-            <Icon name="users" size={20} color={colors.primary} />
-            <View style={styles.optionText}>
-              <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Join a Team</Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>I have a team code or Snow code from my employer</Text>
-            </View>
-          </Pressable>
-
           {canCreateCompany && (
             <Pressable
               style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
@@ -84,20 +73,10 @@ export default function SetupScreen() {
             </Pressable>
           )}
 
-          <Pressable
-            style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
-            onPress={() => router.push('/(auth)/customer-access' as any)}
-          >
-            <Icon name="key" size={20} color={brand.accent} />
-            <View style={styles.optionText}>
-              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>I Have a Project Code</Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>I'm a customer</Text>
-            </View>
-          </Pressable>
         </View>
 
         <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center', marginTop: spacing.xl }]}>
-          Were you invited by email? Ask the owner to check they used {user?.email ?? 'this email'}, then tap Check Again.
+          Joining a team, or a customer? Open the private link your employer texted you. Ask them for a new one if it doesn't work.
         </Text>
       </View>
 

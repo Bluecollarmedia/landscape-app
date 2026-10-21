@@ -7,7 +7,8 @@ import { useMemo } from 'react';
 import { db, useDb, insertRow, updateRow, deleteRow, rowsOf } from '@/data/store';
 import { uploadImage, removeMedia } from '@/lib/media';
 import { isAllowedDocument, noteProblem, suggestedTitle, type DocKind } from '@/lib/truckDocs';
-import type { TruckDocument, TruckNote } from '@/types/truck';
+import { maintenanceProblem } from '@/lib/truckMaintenance';
+import type { TruckDocument, TruckNote, TruckMaintenance } from '@/types/truck';
 
 export type Result = { ok: true } | { ok: false; error: string };
 
@@ -78,6 +79,39 @@ export function useTruckDocuments(truckId: string | undefined): TruckDocument[] 
   const v = useDb();
   return useMemo(
     () => (rowsOf('truck_documents') as unknown as TruckDocument[]).filter((d) => d.truckId === truckId).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [truckId, v],
+  );
+}
+
+export interface MaintenanceInput { title: string; servicedOn: string; dueOn?: string; notes?: string }
+
+export function addTruckMaintenance(truckId: string, input: MaintenanceInput): Result {
+  const problem = maintenanceProblem(input);
+  if (problem) return { ok: false, error: problem };
+  insertRow('truck_maintenance', {
+    truckId, title: input.title.trim(), servicedOn: input.servicedOn, dueOn: input.dueOn || undefined,
+    notes: input.notes?.trim() || undefined, createdBy: db.personId,
+  });
+  return { ok: true };
+}
+
+export function updateTruckMaintenance(id: string, input: MaintenanceInput): Result {
+  const problem = maintenanceProblem(input);
+  if (problem) return { ok: false, error: problem };
+  updateRow('truck_maintenance', id, {
+    title: input.title.trim(), servicedOn: input.servicedOn, dueOn: input.dueOn || null, notes: input.notes?.trim() || null,
+  });
+  return { ok: true };
+}
+
+export const deleteTruckMaintenance = (id: string) => deleteRow('truck_maintenance', id);
+
+/** One truck's maintenance log, newest service first. */
+export function useTruckMaintenance(truckId: string | undefined): TruckMaintenance[] {
+  const v = useDb();
+  return useMemo(
+    () => (rowsOf('truck_maintenance') as unknown as TruckMaintenance[]).filter((m) => m.truckId === truckId).slice()
+      .sort((a, b) => b.servicedOn.localeCompare(a.servicedOn) || b.createdAt.localeCompare(a.createdAt)),
     [truckId, v],
   );
 }

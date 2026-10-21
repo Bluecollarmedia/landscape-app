@@ -88,7 +88,7 @@ serve(async (req: Request) => {
       db.from('projects').select('name, customer_id').eq('id', doc.project_id).maybeSingle(),
       db.from('companies').select('name, email').eq('id', doc.company_id).maybeSingle(),
     ]);
-    // The document's own customer first (an invoice can bill someone other than the project's customer), else the project's.
+    // The customer the DOCUMENT was made for (what the customer sees in it; an invoice can bill someone other than the project's customer), not whoever the project points at now.
     const customerId = doc.customer_id ?? project?.customer_id;
     const { data: customer } = customerId
       ? await db.from('people').select('email, first_name, last_name').eq('id', customerId).maybeSingle()

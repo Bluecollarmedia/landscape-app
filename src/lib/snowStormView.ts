@@ -1,5 +1,8 @@
-// Small display helpers for the Storm Details screen (pure, no network).
-import type { SnowStorm } from '@/types/snow';
+// Small display helpers for the storm screens (pure, no network).
+import { snowStatus } from '@/theme/colors';
+
+/** Badge colours per storm state, from the Snow palette. Used by every screen that shows a storm's state. */
+export const STORM_PILL = { draft: snowStatus.scheduled, dispatched: snowStatus.dispatched, ended: snowStatus.completed } as const;
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -10,27 +13,4 @@ export function longWhen(iso?: string): string {
   if (Number.isNaN(d.getTime())) return '';
   const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   return `${MONTHS[d.getMonth()]} ${d.getDate()} at ${time}`;
-}
-
-export interface HistoryEvent { key: string; label: string; when: string }
-
-/** The storm's timeline, oldest first, from its real stored dates. */
-export function historyEvents(storm: Pick<SnowStorm, 'status' | 'createdAt' | 'dispatchedAt' | 'endedAt' | 'reopenedCount' | 'lastReopenedAt'>): HistoryEvent[] {
-  const out: HistoryEvent[] = [{ key: 'created', label: 'Created', when: longWhen(storm.createdAt) }];
-  if (storm.dispatchedAt) out.push({ key: 'dispatched', label: 'Dispatched', when: longWhen(storm.dispatchedAt) });
-  if (storm.reopenedCount > 0) {
-    out.push({
-      key: 'reopened',
-      label: storm.reopenedCount === 1 ? 'Reopened' : `Reopened ${storm.reopenedCount} times, last`,
-      when: longWhen(storm.lastReopenedAt),
-    });
-  }
-  if (storm.endedAt) out.push({ key: 'ended', label: storm.status === 'ended' ? 'Ended' : 'Last ended', when: longWhen(storm.endedAt) });
-  return out;
-}
-
-/** "1 route", "2 routes", "0 routes". */
-export function routeCountLabel(n: number | undefined): string {
-  const c = n ?? 0;
-  return `${c} ${c === 1 ? 'route' : 'routes'}`;
 }

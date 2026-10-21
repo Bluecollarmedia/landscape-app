@@ -89,22 +89,6 @@ export async function skipHistory(visitId: string): Promise<Result<SnowSkipReque
   return error ? fail(error.message) : ok((data ?? []).map(toRequest));
 }
 
-/** The open request on a visit, if any (for a "Skip requested" badge). */
-export async function getPendingSkip(visitId: string): Promise<Result<SnowSkipRequest | undefined>> {
-  const res = await skipHistory(visitId);
-  return res.ok ? ok(res.data.find((r) => r.status === 'pending')) : res;
-}
-
-/** Owner: requests waiting for a decision, oldest first (Needs Attention).
- * Pass a storm id to limit it to one storm. */
-export async function listPendingSkips(stormId?: string): Promise<Result<SnowSkipRequest[]>> {
-  if (isDemo()) return ok([]);
-  let q = supabase.from('snow_skip_requests').select('*').eq('status', 'pending').order('created_at');
-  if (stormId) q = q.eq('storm_id', stormId);
-  const { data, error } = await q;
-  return error ? fail(error.message) : ok((data ?? []).map(toRequest));
-}
-
 /** Every request on one route, newest first (owner, or the route's lead). */
 export async function listRouteSkips(routeId: string): Promise<Result<SnowSkipRequest[]>> {
   if (isDemo()) return ok([]);

@@ -3,6 +3,7 @@ import { db, useDb } from '@/data/store';
 import { eligibleMaintenanceCrew, maintenanceCrew, maintenanceWorkers } from '@/data/maintenance';
 import { compareUrgency, propertyDue } from '@/lib/maintenanceSchedule';
 import { todayKey } from '@/lib/ids';
+import { worksOnMaintenance } from '@/lib/workerAreas';
 import type {
   MaintenanceContract, MaintenanceDayAttendance, MaintenanceEvent, MaintenanceRouteDetail,
   MaintenanceServiceRule, MaintenanceStopDetail, MaintenanceStopService, PropertyDueInfo,
@@ -145,6 +146,6 @@ export function useMaintenanceWorkers() {
 export function useIsMaintenanceWorker(): boolean {
   const v = useDb();
   return useMemo(() => db.members.some(
-    (m) => m.personId === db.personId && m.role === 'worker' && m.status === 'active' && m.workerType === 'maintenance',
+    (m) => m.personId === db.personId && m.role === 'worker' && m.status === 'active' && worksOnMaintenance(m),
   ), [v]);
 }

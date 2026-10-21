@@ -3,8 +3,9 @@ import { db, useDb } from '@/data/store';
 import { maintenanceCrew, maintenanceWorkers, eligibleMaintenanceCrew, setMaintenanceCrew } from '@/data/maintenance';
 import type { CompanyMember } from '@/types/company';
 import type { WorkerType } from '@/types/maintenance';
+import { worksOnMaintenance } from '@/lib/workerAreas';
 
-export { setWorkerType } from '@/data/maintenance';
+export { setWorkerAreas } from '@/data/maintenance';
 
 /** A member's worker type. Missing (older rows) means landscaping. */
 export function workerTypeOf(member?: Pick<CompanyMember, 'workerType'>): WorkerType {
@@ -16,7 +17,7 @@ export function workerTypeOf(member?: Pick<CompanyMember, 'workerType'>): Worker
 export function isMaintenanceWorker(personId?: string): boolean {
   if (!personId) return false;
   const m = db.members.find((x) => x.personId === personId);
-  return !!m && m.role === 'worker' && m.status === 'active' && workerTypeOf(m) === 'maintenance';
+  return !!m && m.role === 'worker' && m.status === 'active' && worksOnMaintenance(m);
 }
 
 /** The Maintenance Crew, for the crew and worker screens. Route screens use

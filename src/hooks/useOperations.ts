@@ -1,3 +1,4 @@
+import { landscapingNotifications } from '@/lib/notificationScope';
 import { useMemo, useCallback } from 'react';
 import type {
   WorkSession,
@@ -443,7 +444,8 @@ export function useAttendance() {
 export function useNotifications() {
   const v = useDb();
   // Only this person's own notifications (the store already filters by recipient).
-  const notifications = useMemo<AppNotification[]>(() => db.notifications, [v]);
+  // Snow alerts live in the same table but belong to Snow Mode: they never show in the landscaping list, bell number or banner.
+  const notifications = useMemo<AppNotification[]>(() => landscapingNotifications(db.notifications), [v]);
   const preferences = useMemo<NotificationPreference[]>(() => db.notificationPreferences, [v]);
 
   const unreadCount = useMemo(
@@ -457,14 +459,15 @@ export function useNotifications() {
 
   const markAllRead = useCallback(() => {
     const now = new Date().toISOString();
-    for (const n of db.notifications) {
+    for (const n of landscapingNotifications(db.notifications)) {
       if (n.status === 'unread') updateRow('app_notifications', n.id, { status: 'read', readAt: now });
     }
   }, []);
 
   /** Removes this person's notifications from their notification center (read and unread). Only the notification records go. */
   const clearAll = useCallback(() => {
-    for (const n of [...db.notifications]) deleteRow('app_notifications', n.id);
+    // Only the landscaping ones: clearing this list must not remove Snow alerts.
+    for (const n of [...landscapingNotifications(db.notifications)]) deleteRow('app_notifications', n.id);
   }, []);
 
   const getCompanyDefault = useCallback(

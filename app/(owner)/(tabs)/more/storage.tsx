@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, TextInput, ScrollView, StyleSheet, Pressable, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -50,6 +50,7 @@ export default function StorageScreen() {
     if (!customValid) return;
     haptics.success();
     setLimitGb(customGb);
+    Keyboard.dismiss();
   }
 
   if (loading && !info) {
@@ -256,7 +257,7 @@ export default function StorageScreen() {
                 <TextInput
                   value={maxText}
                   onChangeText={(t) => setMaxText(t.replace(/[^0-9]/g, '').slice(0, 3))}
-                  onSubmitEditing={() => { if (typedMax) { haptics.success(); setMaxMb(typedMax); setMaxText(''); } }}
+                  onSubmitEditing={() => { if (typedMax) { haptics.success(); setMaxMb(typedMax); setMaxText(''); Keyboard.dismiss(); } }}
                   keyboardType="number-pad"
                   returnKeyType="done"
                   placeholder={`Other, 1 to ${SERVER_MAX_FILE_MB}`}
@@ -267,7 +268,7 @@ export default function StorageScreen() {
                 <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>MB</Text>
               </View>
               <PressScale
-                onPress={typedMax ? () => { haptics.success(); setMaxMb(typedMax); setMaxText(''); } : undefined}
+                onPress={typedMax ? () => { haptics.success(); setMaxMb(typedMax); setMaxText(''); Keyboard.dismiss(); } : undefined}
                 disabled={!typedMax}
                 style={[styles.customSave, { backgroundColor: typedMax ? colors.primary : colors.backgroundTertiary }]}
                 accessibilityLabel="Save max file size"

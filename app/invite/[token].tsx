@@ -26,6 +26,7 @@ import { uploadImage } from '@/lib/media';
 import { saveBirthdayForCurrentUser } from '@/data/birthday';
 import { saveDetailsForCurrentUser } from '@/data/workerDetails';
 import { useProfilePhoto } from '@/hooks/useProfilePhoto';
+import { PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePhoto';
 import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
 import { localDateKey } from '@/lib/ids';
 import { typeScale } from '@/theme/typography';
@@ -87,6 +88,17 @@ export default function InviteScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const photo = useProfilePhoto(setPhotoUri, setError);
+  // Same choices as every other sign-up photo: take one, choose one, or remove it. The sheet must be gone before iOS opens the picker.
+  function choosePhoto() {
+    const pick = (source: ProfilePhotoSource) => photo.pick(source, { afterSheetMs: PICKER_AFTER_SHEET_MS });
+    if (Platform.OS === 'web') { pick('library'); return; }
+    Alert.alert('Profile photo', undefined, [
+      { text: 'Take Photo', onPress: () => pick('camera') },
+      { text: 'Choose from Library', onPress: () => pick('library') },
+      ...(photoUri ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: () => setPhotoUri(null) }] : []),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -226,7 +238,7 @@ export default function InviteScreen() {
               <View style={styles.photoSection}>
                 <Pressable
                   style={[styles.photoUpload, { borderColor: photoUri ? colors.primary : colors.border, backgroundColor: photoUri ? colors.primarySurface : colors.surface }]}
-                  onPress={() => photo.pick('library')}
+                  onPress={choosePhoto}
                   accessibilityRole="button"
                   accessibilityLabel="Add a profile photo"
                 >

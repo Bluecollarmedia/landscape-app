@@ -4,7 +4,7 @@
  * the order is saved in one database call (update 025). Working layout in
  * the existing app style; no approved mockup yet.
  */
-import { crewAfterLeadChange, crewChoices, nextCrew, routeTeam, stopsAddedLabel, type TeamMember } from '@/lib/snowCrew';
+import { crewAfterLeadChange, crewChoices, nextCrew, routeTeam, type TeamMember } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -312,24 +312,45 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
           </View>
         ) : null}
 
-        <SectionHeader n={1} title="Crew" sub="Choose who’s working this route." />
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, borderWidth: StyleSheet.hairlineWidth }]}>
-          <View style={styles.inline}>
-            <Icon name="users" size={26} color={colors.textTertiary} />
-            <View style={{ flex: 1, marginLeft: spacing.xs }}>
-              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>Crew members</Text>
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{team.length ? `${team.length} selected` : 'No crew selected'}</Text>
+        <SetupCard
+          n={1}
+          icon="users"
+          title="Crew"
+          sub="Select the crew for this route."
+          pill={team.length ? `${team.length} ${team.length === 1 ? 'member' : 'members'}` : 'None yet'}
+          onPress={editable ? () => setPickCrew(!pickCrew) : undefined}
+          open={pickCrew}
+        >
+          {team.length ? (
+            <View style={styles.avatarWrap}>
+              {team.map((m) => {
+                const [first, ...rest] = m.name.split(' ');
+                const short = rest.length ? `${first} ${rest[rest.length - 1][0]}.` : first;
+                return (
+                  <View key={m.personId} style={styles.avatarCell}>
+                    <View>
+                      <Avatar firstName={first} lastName={rest.join(' ')} size={48} />
+                      {editable ? (
+                        <Pressable
+                          onPress={() => removeMember(m)}
+                          disabled={busy}
+                          hitSlop={8}
+                          style={[styles.avatarX, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${m.name}`}
+                        >
+                          <Icon name="x" size={11} color={colors.textSecondary} />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 4 }]} numberOfLines={1}>{short}</Text>
+                  </View>
+                );
+              })}
             </View>
-            {editable ? <Button title={pickCrew ? 'Close' : 'Add Crew'} size="sm" variant="secondary" icon={pickCrew ? 'x' : 'plus'} disabled={busy} onPress={() => setPickCrew(!pickCrew)} /> : null}
-          </View>
-          {team.map((m) => (
-            <View key={m.personId} style={[styles.inline, { paddingTop: spacing.md }]}>
-              <Avatar firstName={m.name.split(' ')[0]} lastName={m.name.split(' ').slice(1).join(' ')} size={32} />
-              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>{m.name}</Text>
-              {m.lead ? <StatusBadge label="Lead" status="info" /> : null}
-              {editable ? <Button title="Remove" size="sm" variant="ghost" disabled={busy} onPress={() => removeMember(m)} /> : null}
-            </View>
-          ))}
+          ) : (
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>No crew selected. Tap Add Crew.</Text>
+          )}
           {pickCrew ? (
             crewPeople.length ? (
               <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.md }]}>
@@ -348,31 +369,44 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
               </Text>
             )
           ) : null}
-        </View>
+          {editable && !pickCrew ? <Button title="Add Crew" icon="plus" variant="secondary" size="sm" disabled={busy} onPress={() => setPickCrew(true)} style={{ marginTop: spacing.md, alignSelf: 'flex-start' }} /> : null}
+        </SetupCard>
 
-        <SectionHeader n={2} title="Crew lead" sub="Choose who can manage stops and make on-site decisions." />
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, borderWidth: StyleSheet.hairlineWidth, paddingVertical: spacing.md }]}>
-          <Pressable
-            onPress={() => editable && team.length > 0 && setPickLead(!pickLead)}
-            style={styles.inline}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !editable || team.length === 0 }}
-            accessibilityLabel="Select crew lead"
-          >
-            <Icon name="user" size={22} color={colors.textTertiary} />
-            <View style={{ flex: 1, marginLeft: spacing.xs }}>
-              <Text style={[typeScale.bodyLarge, { color: leadName || route.leadPersonId ? colors.textPrimary : colors.textTertiary }]}>
-                {route.leadPersonId ? (leadName ?? 'Crew lead') : 'Select crew lead'}
-              </Text>
-              {team.length === 0 ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Add crew members first.</Text> : null}
-              {route.leadPersonId && leadLoad[route.leadPersonId] ? (
-                <Text style={[typeScale.caption, { color: colors.warning }]}>
-                  Also leads {leadLoad[route.leadPersonId].join(', ')}. That's allowed; check the timing.
+        <SetupCard
+          n={2}
+          icon="user"
+          title="Crew Lead"
+          sub="Select a crew lead for this route."
+          pill={team.length ? `${team.length} available` : undefined}
+          onPress={editable && team.length > 0 ? () => setPickLead(!pickLead) : undefined}
+          open={pickLead}
+        >
+          {team.length === 0 ? (
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>Add crew members first.</Text>
+          ) : (
+            <Pressable
+              onPress={() => editable && setPickLead(!pickLead)}
+              style={[styles.leadRow, { backgroundColor: colors.primarySurface }]}
+              accessibilityRole="button"
+              accessibilityLabel="Select crew lead"
+            >
+              {route.leadPersonId ? (
+                <Avatar firstName={(leadName ?? 'Crew').split(' ')[0]} lastName={(leadName ?? '').split(' ').slice(1).join(' ')} size={44} />
+              ) : (
+                <View style={[styles.leadEmpty, { borderColor: colors.border }]}><Icon name="user" size={20} color={colors.textTertiary} /></View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: route.leadPersonId ? colors.textPrimary : colors.textTertiary, fontWeight: '700' }]} numberOfLines={1}>
+                  {route.leadPersonId ? (leadName ?? 'Crew lead') : 'Select crew lead'}
                 </Text>
-              ) : null}
-            </View>
-            {editable && team.length > 0 ? <Icon name={pickLead ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} /> : null}
-          </Pressable>
+                {route.leadPersonId ? <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew Lead</Text> : null}
+                {route.leadPersonId && leadLoad[route.leadPersonId] ? (
+                  <Text style={[typeScale.caption, { color: colors.warning }]}>Also leads {leadLoad[route.leadPersonId].join(', ')}. That's allowed; check the timing.</Text>
+                ) : null}
+              </View>
+              {editable ? <Icon name={pickLead ? 'chevron-up' : 'chevron-right'} size={18} color={colors.textTertiary} /> : null}
+            </Pressable>
+          )}
           {pickLead ? (
             <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.md }]}>
               {team.map((m, i) => (
@@ -388,134 +422,132 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
               ))}
             </View>
           ) : null}
-        </View>
+        </SetupCard>
 
-        <SectionHeader
+        <SetupCard
           n={3}
+          icon="map-pin"
           title="Properties"
-          sub="Add the properties this route will service."
-          right={groups.length ? (
-            <>
+          sub="Add properties to this route."
+          pill={`${groups.length} ${groups.length === 1 ? 'property' : 'properties'}`}
+          onPress={editable ? () => setPickStops(true) : undefined}
+        >
+          {groups.length && route.stormStatus !== 'draft' ? (
+            <View style={[styles.inline, { marginTop: spacing.md }]}>
               <StatusBadge label={`Open ${openCount}`} status="info" />
               <StatusBadge label={`Closed ${groups.length - openCount}`} status="success" />
-            </>
+            </View>
           ) : null}
-        />
-        {groups.length ? (
-          <View style={[styles.group, { backgroundColor: colors.surface, borderColor: 'transparent' }]}>
-            <ReorderableList
-              items={groups}
-              keyOf={(g) => g[0].id}
-              rowHeight={STOP_ROW_HEIGHT}
-              canDrag={(g) => editable && isGroupUntouched(g)}
-              onReorder={applyOrder}
-              onDragActive={(a) => { setDragging(a); onDragActive?.(a); }}
-              renderRow={(g, i, handle) => {
-                const s = g[0];
-                const movable = editable && isGroupUntouched(g);
-                const status = groupStatus(g);
-                return (
-                  <View style={[styles.row, { flex: 1 }, i > 0 && sep]}>
-                    {handle ?? <View style={{ width: 32 }} />}
-                    <Text style={[typeScale.labelLarge, { color: colors.textTertiary, width: 18 }]}>{i + 1}</Text>
+          {groups.length ? (
+            <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.md }]}>
+              <ReorderableList
+                items={groups}
+                keyOf={(g) => g[0].id}
+                rowHeight={STOP_ROW_HEIGHT}
+                canDrag={(g) => editable && isGroupUntouched(g)}
+                onReorder={applyOrder}
+                onDragActive={(a) => { setDragging(a); onDragActive?.(a); }}
+                renderRow={(g, i, handle) => {
+                  const s = g[0];
+                  const movable = editable && isGroupUntouched(g);
+                  const status = groupStatus(g);
+                  const live = route.stormStatus === 'dispatched';
+                  const detail = [
+                    servicesText(g.map((x) => x.service ?? route.service), svcLabel),
+                    stopNeedsPhotos(s, route) ? 'Photos required' : null,
+                    s.ownerNote ? 'Note' : null,
+                  ].filter(Boolean).join(' · ');
+                  return (
+                    <View style={[styles.stopRow, i > 0 && sep]}>
+                      <View style={[styles.stopNo, { borderColor: colors.border }]}>
+                        <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{i + 1}</Text>
+                      </View>
+                      <View style={[styles.stopThumb, { backgroundColor: colors.primarySurface }]}>
+                        <Icon name="home" size={20} color={colors.primary} />
+                      </View>
+                      <Pressable
+                        style={{ flex: 1, gap: 2 }}
+                        onPress={() => openStop(g)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${s.propertyName}: photos and notes`}
+                      >
+                        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{s.propertyName}</Text>
+                        <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{detail}</Text>
+                      </Pressable>
+                      {movable ? (
+                        <View style={styles.inline}>
+                          {live ? <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} /> : null}
+                          <IconTap icon="x" label="Remove stop" onPress={() => onRemove(g)} color={colors.textTertiary} />
+                          {handle ?? null}
+                        </View>
+                      ) : (
+                        <StatusBadge label={STOP_STATUS_LABEL[status]} status={STOP_TONE[status]} />
+                      )}
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          ) : !pickStops ? (
+            <View style={styles.empty}>
+              <View>
+                <Icon name="home" size={44} color={colors.textTertiary} />
+                <View style={styles.snowBadge}><Icon name="cloud-snow" size={20} color={colors.textTertiary} /></View>
+              </View>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginTop: spacing.md }]}>No properties added yet</Text>
+              {editable ? <Button title="Add Property" icon="plus" onPress={() => setPickStops(true)} style={{ marginTop: spacing.lg }} /> : null}
+            </View>
+          ) : null}
+
+          {editable ? (
+            pickStops ? (
+              <View style={{ marginTop: spacing.md }}>
+                {addable.length ? addable.map((p, i) => {
+                  const on = chosen.includes(p.propertyId);
+                  return (
                     <Pressable
-                      style={{ flex: 1, gap: 2 }}
-                      onPress={() => openStop(g)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${s.propertyName}: photos and notes`}
+                      key={p.propertyId}
+                      style={[styles.row, { paddingHorizontal: 0 }, i > 0 && sep]}
+                      onPress={() => setChosen(on ? chosen.filter((x) => x !== p.propertyId) : [...chosen, p.propertyId])}
                     >
-                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{s.propertyName}</Text>
-                      <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{s.propertyAddress}</Text>
-                      <View style={styles.inline}>
-                        <Icon name="camera" size={12} color={stopNeedsPhotos(s, route) ? colors.primary : colors.textTertiary} />
-                        <Text style={[typeScale.caption, { color: stopNeedsPhotos(s, route) ? colors.primary : colors.textTertiary }]} numberOfLines={1}>{several ? `${servicesText(g.map((x) => x.service ?? route.service), svcLabel)} · ` : ''}{stopNeedsPhotos(s, route) ? 'Photos required' : 'No photos required'}</Text>
-                        {s.ownerNote ? <><Icon name="file-text" size={12} color={colors.primary} /><Text style={[typeScale.caption, { color: colors.primary }]} numberOfLines={1}>Note</Text></> : null}
+                      <Icon name={on ? 'check-square' : 'square'} size={20} color={on ? colors.primary : colors.textTertiary} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{p.name}</Text>
+                        <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{p.address}</Text>
+                        {visitsOn.get(p.propertyId) ? (
+                          <Text style={[typeScale.caption, { color: colors.primary }]}>
+                            Already on this route ×{visitsOn.get(p.propertyId)}. Adding it again makes another visit.
+                          </Text>
+                        ) : null}
                       </View>
                     </Pressable>
-                    {movable ? (
-                      <View style={styles.inline}>
-                        <IconTap icon="chevrons-up" label="Move to next" disabled={i === firstPending} onPress={() => moveToNext(i)} color={colors.textSecondary} />
-                        <IconTap icon="arrow-up" label="Move up" disabled={i === 0} onPress={() => move(i, -1)} color={colors.textSecondary} />
-                        <IconTap icon="arrow-down" label="Move down" disabled={i === groups.length - 1} onPress={() => move(i, 1)} color={colors.textSecondary} />
-                        <IconTap icon="x" label="Remove stop" onPress={() => onRemove(g)} color={colors.error} />
-                      </View>
-                    ) : (
-                      <StatusBadge label={STOP_STATUS_LABEL[status]} status={STOP_TONE[status]} />
-                    )}
-                  </View>
-                );
-              }}
-            />
-          </View>
-        ) : !pickStops ? (
-          <View style={[styles.card, styles.empty, { backgroundColor: colors.surface, borderColor: colors.borderLight, borderWidth: StyleSheet.hairlineWidth }]}>
-            <View>
-              <Icon name="home" size={44} color={colors.textTertiary} />
-              <View style={styles.snowBadge}><Icon name="cloud-snow" size={20} color={colors.textTertiary} /></View>
-            </View>
-            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginTop: spacing.md }]}>No properties added yet</Text>
-            {editable ? <Button title="Add Property" icon="plus" onPress={() => setPickStops(true)} style={{ marginTop: spacing.lg }} /> : null}
-          </View>
-        ) : null}
-
-        {editable ? (
-          pickStops ? (
-            <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md }]}>
-              {addable.length ? addable.map((p, i) => {
-                const on = chosen.includes(p.propertyId);
-                return (
-                  <Pressable
-                    key={p.propertyId}
-                    style={[styles.row, { paddingHorizontal: 0 }, i > 0 && sep]}
-                    onPress={() => setChosen(on ? chosen.filter((x) => x !== p.propertyId) : [...chosen, p.propertyId])}
-                  >
-                    <Icon name={on ? 'check-square' : 'square'} size={20} color={on ? colors.primary : colors.textTertiary} />
+                  );
+                }) : (
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                    No property offers {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} yet. Turn the service on for a property first.
+                  </Text>
+                )}
+                {route.stormStatus === 'dispatched' && route.stops.length > 0 ? (
+                  <View style={[styles.inline, { marginTop: spacing.md }]}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{p.name}</Text>
-                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{p.address}</Text>
-                      {visitsOn.get(p.propertyId) ? (
-                        <Text style={[typeScale.caption, { color: colors.primary }]}>
-                          Already on this route ×{visitsOn.get(p.propertyId)}. Adding it again makes another visit.
-                        </Text>
-                      ) : null}
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Do these next</Text>
+                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                        Puts them right after the stop the lead is on, ahead of stops not yet started.
+                      </Text>
                     </View>
-                  </Pressable>
-                );
-              }) : (
-                <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                  No property offers {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} yet.
-                </Text>
-              )}
-              {route.stormStatus === 'dispatched' && route.stops.length > 0 ? (
-                <View style={[styles.inline, { marginTop: spacing.md }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Do these next</Text>
-                    <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                      Puts them right after the stop the lead is on, ahead of stops not yet started.
-                    </Text>
+                    <Switch value={doNext} onValueChange={setDoNext} accessibilityLabel="Do these next" />
                   </View>
-                  <Switch value={doNext} onValueChange={setDoNext} accessibilityLabel="Do these next" />
+                ) : null}
+                <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
+                  <Button title="Cancel" variant="ghost" onPress={() => { setPickStops(false); setChosen([]); }} />
+                  <Button title={chosen.length ? `Add ${chosen.length}` : 'Add'} disabled={!chosen.length} loading={busy} onPress={onAddStops} />
                 </View>
-              ) : null}
-              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
-                <Button title="Cancel" variant="ghost" onPress={() => { setPickStops(false); setChosen([]); }} />
-                <Button title={chosen.length ? `Add ${chosen.length}` : 'Add'} disabled={!chosen.length} loading={busy} onPress={onAddStops} />
               </View>
-            </View>
-          ) : (
-            groups.length ? <Button title="Add Property" icon="plus" variant="secondary" onPress={() => setPickStops(true)} style={{ marginTop: spacing.md }} fullWidth /> : null
-          )
-        ) : null}
-
-        <View style={[styles.card, styles.inline, { backgroundColor: colors.surface, borderColor: colors.borderLight, borderWidth: StyleSheet.hairlineWidth, marginTop: spacing.md, paddingVertical: spacing.md }]}>
-          <Icon name="map-pin" size={20} color={colors.textTertiary} />
-          <View style={{ flex: 1 }}>
-            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{stopsAddedLabel(groups.length)}</Text>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-              Only properties with {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} turned on can be added.
-            </Text>
-          </View>
-        </View>
+            ) : (
+              groups.length ? <Button title="Add Property" icon="plus" variant="secondary" size="sm" onPress={() => setPickStops(true)} style={{ marginTop: spacing.md, alignSelf: 'flex-start' }} /> : null
+            )
+          ) : null}
+        </SetupCard>
 
         {!embedded ? (
         <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
@@ -609,24 +641,36 @@ function IconTap({ icon, label, onPress, disabled, color }: { icon: React.Compon
   );
 }
 
-function SectionHeader({ n, title, sub, right }: { n: number; title: string; sub: string; right?: React.ReactNode }) {
+/** One numbered setup card: number, icon, title and a count pill; tapping the header opens that section's selection. */
+function SetupCard({ n, icon, title, sub, pill, onPress, open, children }: {
+  n: number; icon: React.ComponentProps<typeof Icon>['name']; title: string; sub: string; pill?: string; onPress?: () => void; open?: boolean; children?: React.ReactNode;
+}) {
   const { colors } = useTheme();
   return (
-    <View style={styles.sectionHead}>
-      <View style={[styles.sectionNo, { backgroundColor: colors.primarySurface }]}>
-        <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>{n}</Text>
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '800' }]}>{title}</Text>
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{sub}</Text>
-      </View>
-      {right ? <View style={styles.inline}>{right}</View> : null}
+    <View style={[styles.card, styles.setupCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+      <Pressable onPress={onPress} disabled={!onPress} style={styles.setupHead} accessibilityRole="button" accessibilityLabel={`${title}: ${sub}`}>
+        <View style={[styles.sectionNo, { backgroundColor: colors.primarySurface }]}>
+          <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>{n}</Text>
+        </View>
+        <Icon name={icon} size={26} color={colors.textTertiary} />
+        <View style={{ flex: 1 }}>
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '800' }]}>{title}</Text>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]} numberOfLines={2}>{sub}</Text>
+        </View>
+        {pill ? (
+          <View style={[styles.pill, { backgroundColor: colors.primarySurface }]}>
+            <Text style={[typeScale.labelSmall, { color: colors.primary, fontWeight: '700' }]}>{pill}</Text>
+          </View>
+        ) : null}
+        {onPress ? <Icon name={open ? 'chevron-up' : 'chevron-right'} size={18} color={colors.textTertiary} /> : null}
+      </Pressable>
+      {children}
     </View>
   );
 }
 
 /** Every stop row is this tall so a dragged row can slide between its neighbours. */
-const STOP_ROW_HEIGHT = 72;
+const STOP_ROW_HEIGHT = 68;
 
 const styles = StyleSheet.create({
   done: { height: 44, paddingHorizontal: spacing.lg, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
@@ -637,9 +681,19 @@ const styles = StyleSheet.create({
   group: { borderRadius: radius.lg, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 52 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl, marginBottom: spacing.sm },
+  setupCard: { borderWidth: StyleSheet.hairlineWidth, marginTop: spacing.md },
+  setupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  pill: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full },
+  avatarWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
+  avatarCell: { width: 64, alignItems: 'center' },
+  avatarX: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  leadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, marginTop: spacing.md },
+  leadEmpty: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  stopRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md },
+  stopNo: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  stopThumb: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   sectionNo: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', paddingVertical: spacing['2xl'] },
+  empty: { alignItems: 'center', paddingVertical: spacing.xl },
   snowBadge: { position: 'absolute', right: -14, top: -10 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   modalCard: { width: '100%', maxWidth: 420, borderRadius: radius.xl, padding: spacing.xl },

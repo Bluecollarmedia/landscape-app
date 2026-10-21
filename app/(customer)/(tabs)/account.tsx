@@ -1,5 +1,4 @@
 import { LegalSection } from '@/components/legal/LegalSection';
-import { useMyMaintenanceProperties } from '@/data/maintenanceCustomer';
 import React from 'react';
 import { View, Text, Linking, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,7 +23,6 @@ export default function CustomerAccountScreen() {
   const { user, signOut, switchDevRole } = useAuth();
   useDb();
   const hasSnow = useHasSnow();
-  const myMaintenance = useMyMaintenanceProperties();
   const insets = useSafeAreaInsets();
 
   return (
@@ -53,20 +51,7 @@ export default function CustomerAccountScreen() {
         </Pressable>
       </ListSection>
 
-      {myMaintenance.length > 0 ? (
-        <ListSection title="Maintenance">
-          <ListRow
-            icon="repeat"
-            iconColor={colors.primary}
-            title="Maintenance updates"
-            subtitle="Recent visits to your property, with photos we've shared"
-            showChevron
-            onPress={() => router.push('/(customer)/maintenance-updates')}
-          />
-        </ListSection>
-      ) : null}
-
-      {/* The Snow screen opens from the Snow card on Home (one way in); here are the customer's own Snow notification switches. */}
+      {/* Snow and Maintenance updates open from their cards on Home (one way in each), so Account has no rows for them. Here are the customer's own Snow notification switches. */}
       {hasSnow ? <SnowNotifyChoices /> : null}
 
       <ListSection title="Your Project Team">

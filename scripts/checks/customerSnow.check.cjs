@@ -55,7 +55,7 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
   check('20 photos open in the full-screen viewer, and the screen has NO notification switches', /TaskMediaViewer/.test(screen) && !/<Switch/.test(screen) && !/Notification settings/.test(screen));
   check('21 the route opens the new screen', /CustomerSnowScreen/.test(read('app/(customer)/snow-updates.tsx')));
   const acct = read('app/(customer)/(tabs)/account.tsx');
-  check('22 Account has the Snow notification switches; its duplicate "Snow updates" row is gone', /<SnowNotifyChoices \/>/.test(acct) && !/title="Snow updates"/.test(acct));
+  check('22 Account has the Snow notification switches; its duplicate "Snow updates" and "Maintenance updates" rows are gone (Home is the one way in)', /<SnowNotifyChoices \/>/.test(acct) && !/title="Snow updates"/.test(acct) && !/title="Maintenance updates"/.test(acct) && /maintenance-updates/.test(home));
   const sw = read('src/components/snow/customer/SnowNotifyChoices.tsx');
   check('23 the switches are Crew arrives and Service finished, save at once, and go back if saving fails', /Crew arrives/.test(sw) && /Service finished/.test(sw) && /saveNotifyChoices\(/.test(sw) && /setChoices\(before\)/.test(sw));
   check('24 the landscaping screens (project card, project screen) were not touched by this change', /ActiveCard/.test(home) && /No active projects right now/.test(home));

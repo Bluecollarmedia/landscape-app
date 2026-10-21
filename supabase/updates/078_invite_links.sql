@@ -400,8 +400,11 @@ begin
         update public.people set
           user_id = new.id,
           email = coalesce(new.email, ''),
-          first_name = coalesce(nullif(btrim(meta->>'first_name'), ''), first_name),
-          last_name = coalesce(nullif(btrim(meta->>'last_name'), ''), last_name),
+          -- A worker can correct their own name here. A customer keeps the name the owner typed (the form only fills in a part the owner left empty).
+          first_name = case when inv.kind = 'customer' then coalesce(nullif(btrim(first_name), ''), nullif(btrim(meta->>'first_name'), ''), first_name)
+                            else coalesce(nullif(btrim(meta->>'first_name'), ''), first_name) end,
+          last_name = case when inv.kind = 'customer' then coalesce(nullif(btrim(last_name), ''), nullif(btrim(meta->>'last_name'), ''), last_name)
+                           else coalesce(nullif(btrim(meta->>'last_name'), ''), last_name) end,
           phone = coalesce(nullif(btrim(meta->>'phone'), ''), phone)
         where id = inv.person_id and user_id is null
         returning id into pid;

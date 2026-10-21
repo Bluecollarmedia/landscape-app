@@ -114,6 +114,9 @@ export default function InviteScreen() {
   }, [token]);
 
   const isWorker = info?.kind !== 'customer';
+  // A customer's name is whatever the owner typed: shown here, kept as it is. (A part the owner left empty can still be filled in.)
+  const firstLocked = info?.kind === 'customer' && !!info?.firstName?.trim();
+  const lastLocked = info?.kind === 'customer' && !!info?.lastName?.trim();
 
   async function goHome() {
     await refreshContext();
@@ -238,8 +241,7 @@ export default function InviteScreen() {
           </View>
         ) : (
           <View style={styles.form}>
-            {isWorker ? (
-              <View style={styles.photoSection}>
+            <View style={styles.photoSection}>
                 <Pressable
                   style={[styles.photoUpload, { borderColor: photoUri ? colors.primary : colors.border, backgroundColor: photoUri ? colors.primarySurface : colors.surface }]}
                   onPress={choosePhoto}
@@ -250,11 +252,10 @@ export default function InviteScreen() {
                 </Pressable>
                 <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>Profile photo (optional)</Text>
               </View>
-            ) : null}
 
             <View style={styles.row}>
-              <Input label="First Name *" placeholder="First name" value={firstName} onChangeText={setFirstName} containerStyle={{ flex: 1 }} />
-              <Input label="Last Name" placeholder="Last name" value={lastName} onChangeText={setLastName} containerStyle={{ flex: 1 }} />
+              <Input label="First Name *" placeholder="First name" value={firstName} onChangeText={setFirstName} editable={!firstLocked} containerStyle={{ flex: 1 }} />
+              <Input label="Last Name" placeholder="Last name" value={lastName} onChangeText={setLastName} editable={!lastLocked} containerStyle={{ flex: 1 }} />
             </View>
             <Input label={isWorker ? 'Phone *' : 'Phone'} placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
             <Input label="Email *" placeholder="you@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />

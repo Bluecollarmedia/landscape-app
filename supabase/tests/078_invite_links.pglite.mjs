@@ -102,6 +102,20 @@ check('10 the customer\'s private link attaches her login to her own record: her
   && (await one(`select customer_id from public.projects where id = $1`, [projC])).customer_id === cust.person_id
   && (await one(`select status from public.company_members where person_id = $1 and company_id = $2`, [cust.person_id, coA])).status === 'active');
 
+// the customer keeps the name the owner typed; a different sign-up email is fine
+const cn = (await rpc(owner.u, `select public.add_customer('Dan', 'Dealer', 'dan@x.test', '7325550606') as x`)).v;
+const cni = (await rpc(owner.u, `select public.invite_send($1::uuid) as x`, [cn.person_id])).v;
+const dan = await signUp('someone.else@x.test', { first_name: 'Daniel', last_name: 'Dealerman', invite_token: cni.token });
+const danRow = await one(`select first_name, last_name, email, user_id from public.people where id = $1`, [cn.person_id]);
+check('10b a customer keeps the name the owner typed (Dan Dealer stays, even if the form says Daniel Dealerman), and signing up with a different email still links them', dan.person.id === cn.person_id && danRow.first_name === 'Dan' && danRow.last_name === 'Dealer' && danRow.user_id !== null && danRow.email === 'someone.else@x.test', JSON.stringify(danRow));
+const ev = (await rpc(owner.u, `select public.add_customer('Eve', '', '', '7325550707') as x`));
+if (ev.ok) {
+  const evi = (await rpc(owner.u, `select public.invite_send($1::uuid) as x`, [ev.v.person_id])).v;
+  await signUp('eve@x.test', { first_name: 'Evelyn', last_name: 'Fox', invite_token: evi.token });
+  const evRow = await one(`select first_name, last_name from public.people where id = $1`, [ev.v.person_id]);
+  check('10c a part of the name the owner left empty is filled in from the sign-up form (first name stays Eve, last name Fox)', evRow.first_name === 'Eve' && evRow.last_name === 'Fox', JSON.stringify(evRow));
+}
+
 // ── 6. someone who already has a login ──
 const existing = await login('existing@x.test', 'Existing');
 await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1,$2,'customer','active')`, [coB, existing.pid]);

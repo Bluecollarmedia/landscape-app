@@ -127,14 +127,12 @@ function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
 }) {
   const { colors } = useTheme();
   const v = useDb();
-  const [editing, setEditing] = useState<string | 'new' | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
 
   // The property's customer: the linked account, else the main contact. Every property has one.
   const customer = contacts.find((x) => x.personId) ?? contacts.find((x) => x.isPrimary);
-  const others = contacts.filter((x) => x.id !== customer?.id);
   const customers = useMemo(
     () => db.members
       .filter((m) => m.role === 'customer' && m.status !== 'inactive' && m.person)
@@ -199,22 +197,6 @@ function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
         )}
       </View>
 
-      <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>OTHER CONTACTS</Text>
-      <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
-        {others.length === 0 && editing !== 'new' ? (
-          <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>A property manager, a tenant or anyone else the crew may need to reach.</Text>
-        ) : null}
-        {others.map((o) => editing === o.id ? (
-          <ContactForm key={o.id} companyId={companyId} propertyId={propertyId} contact={o} onDone={() => { setEditing(null); onChanged(); }} onCancel={() => setEditing(null)} />
-        ) : (
-          <ContactRow key={o.id} contact={o} onEdit={() => setEditing(o.id)} />
-        ))}
-        {editing === 'new' ? (
-          <ContactForm companyId={companyId} propertyId={propertyId} onDone={() => { setEditing(null); onChanged(); }} onCancel={() => setEditing(null)} />
-        ) : (
-          <Button title="Add Contact" icon="plus" variant="ghost" size="sm" onPress={() => setEditing('new')} style={{ alignSelf: 'flex-start', marginTop: spacing.xs }} />
-        )}
-      </View>
     </>
   );
 }
@@ -239,58 +221,6 @@ function ContactRow({ contact, onEdit, customer }: { contact: SnowPropertyContac
       </View>
       <Icon name={customer ? 'repeat' : 'edit-2'} size={16} color={colors.textTertiary} />
     </Pressable>
-  );
-}
-
-function ContactForm({ companyId, propertyId, contact, makePrimary, onDone, onCancel }: {
-  companyId: string; propertyId: string; contact?: SnowPropertyContact; makePrimary?: boolean;
-  onDone: () => void; onCancel: () => void;
-}) {
-  const { colors } = useTheme();
-  const [form, setForm] = useState<ContactInput>({
-    name: contact?.name ?? '',
-    title: contact?.title ?? '',
-    phone: contact?.phone ?? '',
-    email: contact?.email ?? '',
-    personId: contact?.personId,
-    isPrimary: contact?.isPrimary ?? false,
-  });
-  const [busy, setBusy] = useState(false);
-  const set = (patch: Partial<ContactInput>) => setForm((f) => ({ ...f, ...patch }));
-
-  async function save() {
-    setBusy(true);
-    const res = contact ? await updateContact(contact, { ...form, personId: form.personId ?? '' }) : await addContact(companyId, propertyId, form);
-    setBusy(false);
-    if (!res.ok) return notify('Not Saved', res.error);
-    haptics.success();
-    onDone();
-  }
-
-  function remove() {
-    if (!contact) return;
-    confirmAction('Remove Contact', `Remove ${contact.name} from this property?${contact.personId ? ' Their customer app will stop showing it.' : ''}`, 'Remove', async () => {
-      const res = await removeContact(contact.id);
-      if (!res.ok) return notify('Not Removed', res.error);
-      haptics.destructive();
-      onDone();
-    });
-  }
-
-  return (
-    <View style={[styles.form, { borderColor: colors.border }]}>
-      <Input label="Name" value={form.name} onChangeText={(name) => set({ name })} placeholder="Jordan Smith" autoCapitalize="words" />
-      <Input label="Role (optional)" value={form.title} onChangeText={(title) => set({ title })} placeholder="Property manager" autoCapitalize="words" />
-      <Input label="Phone (optional)" value={form.phone} onChangeText={(phone) => set({ phone })} keyboardType="phone-pad" />
-      <Input label="Email (optional)" value={form.email} onChangeText={(email) => set({ email })} keyboardType="email-address" autoCapitalize="none" />
-
-      <View style={styles.formButtons}>
-        {contact && <Button title="Remove" variant="ghost" size="sm" onPress={remove} />}
-        <View style={{ flex: 1 }} />
-        <Button title="Cancel" variant="ghost" size="sm" onPress={onCancel} />
-        <Button title="Save" size="sm" loading={busy} disabled={!form.name.trim()} onPress={save} />
-      </View>
-    </View>
   );
 }
 

@@ -284,9 +284,40 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
         ) : null}
 
         <View style={[styles.card, { backgroundColor: colors.surface, gap: spacing.md }]}>
+          <View>
+            <View style={styles.inline}>
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew</Text>
+                <Text style={[typeScale.bodyLarge, { color: crew.length ? colors.textPrimary : colors.textTertiary }]}>{crewCountLabel(crew.length)}</Text>
+              </View>
+              {editable ? <Button title={pickCrew ? 'Close' : 'Add Crew'} size="sm" variant="secondary" icon={pickCrew ? 'x' : 'plus'} disabled={busy} onPress={() => setPickCrew(!pickCrew)} /> : null}
+            </View>
+            {crew.map((c) => (
+              <View key={c.personId} style={[styles.inline, { paddingVertical: spacing.xs }]}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{c.name}</Text>
+                {editable ? <Button title="Remove" size="sm" variant="ghost" disabled={busy} onPress={() => changeCrew(c.personId, false)} /> : null}
+              </View>
+            ))}
+            {pickCrew ? (
+              crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).length ? (
+                <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.sm }]}>
+                  {crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).map((l, i) => (
+                    <Pressable key={l.personId} style={[styles.row, i > 0 && sep]} onPress={() => changeCrew(l.personId, true)} accessibilityRole="button">
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{l.name}</Text>
+                      <Icon name="plus" size={18} color={colors.primary} />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+                  No one else on the snow team does {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')}.
+                </Text>
+              )
+            ) : null}
+          </View>
           <Pressable onPress={() => editable && setPickLead(!pickLead)} style={styles.inline} accessibilityRole="button">
             <View style={{ flex: 1 }}>
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew lead</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew lead: who runs the route</Text>
               <Text style={[typeScale.bodyLarge, { color: leadName ? colors.textPrimary : colors.warning }]}>{leadName ?? 'Assign a crew lead'}</Text>
               {route.leadPersonId && leadLoad[route.leadPersonId] ? (
                 <Text style={[typeScale.caption, { color: colors.warning }]}>
@@ -321,37 +352,6 @@ export function RouteEditor({ routeId: id, embedded = false, onDragActive }: { r
               </Text>
             )
           ) : null}
-          <View>
-            <View style={styles.inline}>
-              <View style={{ flex: 1 }}>
-                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew · optional</Text>
-                <Text style={[typeScale.bodyLarge, { color: crew.length ? colors.textPrimary : colors.textTertiary }]}>{crewCountLabel(crew.length)}</Text>
-              </View>
-              {editable ? <Button title={pickCrew ? 'Close' : 'Add Crew'} size="sm" variant="secondary" icon={pickCrew ? 'x' : 'plus'} disabled={busy} onPress={() => setPickCrew(!pickCrew)} /> : null}
-            </View>
-            {crew.map((c) => (
-              <View key={c.personId} style={[styles.inline, { paddingVertical: spacing.xs }]}>
-                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{c.name}</Text>
-                {editable ? <Button title="Remove" size="sm" variant="ghost" disabled={busy} onPress={() => changeCrew(c.personId, false)} /> : null}
-              </View>
-            ))}
-            {pickCrew ? (
-              crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).length ? (
-                <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.sm }]}>
-                  {crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId)).map((l, i) => (
-                    <Pressable key={l.personId} style={[styles.row, i > 0 && sep]} onPress={() => changeCrew(l.personId, true)} accessibilityRole="button">
-                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{l.name}</Text>
-                      <Icon name="plus" size={18} color={colors.primary} />
-                    </Pressable>
-                  ))}
-                </View>
-              ) : (
-                <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-                  No one else on the snow team does {servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')}.
-                </Text>
-              )
-            ) : null}
-          </View>
         </View>
 
         <View style={[styles.inline, styles.label]}>

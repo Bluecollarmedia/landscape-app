@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, LoadingSpinner, ProgressBar, ScreenHeader } from '@/components/ui';
 import { SnowPill } from '@/components/snow/SnowPill';
 import { snowStatus } from '@/theme/colors';
-import { historyEvents, routeCountLabel } from '@/lib/snowStormView';
+import { routeCountLabel } from '@/lib/snowStormView';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -179,7 +179,6 @@ export function StormDetailScreen() {
   const tone = STORM_PILL[storm.status];
   const servicesText = servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x]);
   const liveRoutes = routes.filter((r) => !r.cancelled);
-  const history = historyEvents(storm);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -246,22 +245,6 @@ export function StormDetailScreen() {
                   : `${eligible} ${eligible === 1 ? 'property offers' : 'properties offer'} ${servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x].toLowerCase())}.`}
               </Text>
             ) : null}
-          </View>
-
-          <Text style={[typeScale.headingSmall, styles.sectionTitle, { color: colors.textPrimary }]}>History</Text>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {history.map((e, i) => (
-              <View key={e.key} style={styles.historyRow}>
-                <View style={styles.timeline}>
-                  <View style={[styles.marker, { backgroundColor: colors.primary }]} />
-                  {i < history.length - 1 ? <View style={[styles.line, { backgroundColor: colors.border }]} /> : null}
-                </View>
-                <Text style={[typeScale.bodyLarge, { flex: 1, paddingBottom: i < history.length - 1 ? spacing.md : 0 }]}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: '700' }}>{e.label}</Text>
-                  <Text style={{ color: colors.textSecondary }}>{`  ${e.when}`}</Text>
-                </Text>
-              </View>
-            ))}
           </View>
 
           <View style={{ marginTop: spacing.xl, gap: spacing.md }}>

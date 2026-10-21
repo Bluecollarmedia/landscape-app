@@ -16,8 +16,8 @@ import { db, useDb } from '@/data/store';
 import { useTheme } from '@/providers/ThemeProvider';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
-  addOwnerMedia, loadCustomerSnowUpdates, loadReviewQueue, reviewMedia, sendCustomerUpdate, withdrawMedia,
-  type CustomerSnowUpdate, type ReviewMedia, type ReviewStop,
+  addOwnerMedia, loadReviewQueue, reviewMedia, sendCustomerUpdate, withdrawMedia,
+  type ReviewMedia, type ReviewStop,
 } from '@/data/snowMediaReview';
 import { shortWhen } from '@/lib/snowFormat';
 import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
@@ -201,44 +201,6 @@ export function SnowMediaReviewScreen() {
 }
 
 /** Customer: Account → Snow updates. */
-export function CustomerSnowUpdatesScreen() {
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-  const [updates, setUpdates] = useState<CustomerSnowUpdate[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const reload = useCallback(async () => {
-    const res = await loadCustomerSnowUpdates();
-    setLoading(false);
-    if (!res.ok) return setError(res.error);
-    setError(null);
-    setUpdates(res.data);
-  }, []);
-  useEffect(() => { reload(); }, [reload]);
-
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Snow updates" />
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
-      >
-        {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
-        {loading ? <LoadingSpinner /> : !updates.length ? (
-          <EmptyState icon="cloud-snow" title="No snow updates yet" description="When your property is plowed, shoveled or salted, you'll see it here with photos." />
-        ) : updates.map((u) => (
-          <View key={u.visitId} style={[styles.card, { backgroundColor: colors.surface, marginBottom: spacing.md, gap: spacing.sm }]}>
-            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{SERVICE_LABEL[u.service]} done</Text>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{u.propertyName} · {when(u.completedAt)}</Text>
-            {u.media.length ? <View style={styles.thumbs}>{u.media.map((m) => <Thumb key={m.id} m={m} />)}</View> : null}
-          </View>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   card: { borderRadius: radius.lg, padding: spacing.lg },

@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { ScreenContainer } from '@/components/layout';
 import { Avatar, ListSection, ListRow } from '@/components/ui';
 import { Icon } from '@/components/ui/Icon';
+import { SnowNotifyChoices } from '@/components/snow/customer/SnowNotifyChoices';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import { db, useDb } from '@/data/store';
@@ -65,18 +66,8 @@ export default function CustomerAccountScreen() {
         </ListSection>
       ) : null}
 
-      {hasSnow ? (
-        <ListSection title="Snow">
-          <ListRow
-            icon="cloud-snow"
-            iconColor={colors.primary}
-            title="Snow updates"
-            subtitle="Plowing, shoveling and salting at your property, with photos"
-            showChevron
-            onPress={() => router.push('/(customer)/snow-updates')}
-          />
-        </ListSection>
-      ) : null}
+      {/* The Snow screen opens from the Snow card on Home (one way in); here are the customer's own Snow notification switches. */}
+      {hasSnow ? <SnowNotifyChoices /> : null}
 
       <ListSection title="Your Project Team">
         <ListRow

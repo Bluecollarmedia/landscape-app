@@ -12,6 +12,7 @@ import { peopleWhoDoAll } from '@/lib/snowStopGroups';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { SnowService } from '@/types/snow';
 import type { SnowMediaDraft } from '@/data/snowProperties';
+import { SNOW_COMPLETION_TARGET } from '@/data/snowMediaTargets';
 
 export type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 const ok = <T,>(data: T): Result<T> => ({ ok: true, data });
@@ -404,8 +405,7 @@ export async function addCompletionMedia(companyId: string, visitId: string, dra
   return ok(drafts.length);
 }
 
-/** The queue's name for a Snow stop photo or video. */
-export const SNOW_COMPLETION_TARGET = 'snow_completion';
+export { SNOW_COMPLETION_TARGET };
 
 /** Last step of a queued Snow photo: the file is stored, so save its record on the stop. Safe to repeat (the database ignores a file it already has). */
 export async function saveCompletionRecord(job: { kind: string; bytesIn?: number; bytesOut?: number; target: { payload: Record<string, unknown> } }, key: string): Promise<void> {

@@ -17,7 +17,9 @@ import { pickSnowMedia } from '@/components/snow/pickSnowMedia';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { openDirections } from '@/lib/maps';
-import { mediaQueue, useMediaJobs, waitForMediaJobs } from '@/lib/mediaQueueRuntime';
+import { useMediaJobs, waitForMediaJobs } from '@/lib/mediaQueueRuntime';
+import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
+import { snowUploadState } from '@/hooks/useSnowUploads';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
   addCompletionMedia, arriveAtStop, finishStop, loadMyRoutes, loadRoute, SNOW_COMPLETION_TARGET, STOP_STATUS_LABEL,
@@ -67,7 +69,7 @@ export function MyRouteScreen() {
 
   // Photos upload in the background. When one finishes saving, refresh so the stop's photo count is the real one.
   const mediaJobs = useMediaJobs();
-  const savedPhotos = mediaJobs.filter((j) => j.target.type === SNOW_COMPLETION_TARGET && j.status === 'uploaded').length;
+  const savedPhotos = snowUploadState(mediaJobs, SNOW_COMPLETION_TARGET, () => true).saved;
   useEffect(() => { if (savedPhotos > 0) reload(); }, [savedPhotos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function act(run: () => Promise<{ ok: boolean; error?: string }>, failTitle: string) {
@@ -97,9 +99,7 @@ export function MyRouteScreen() {
   const groupServices = (g: RouteStop[]) => g.map((v) => v.service ?? route!.service);
   // Photos are added once for the stop, on its first visit. Ones still uploading count as added: they are saved on the phone and
   // keep going in the background; ones that failed do not count until they are retried.
-  const stopJobs = current ? mediaJobs.filter((j) => j.target.type === SNOW_COMPLETION_TARGET && j.target.payload.visitId === current.id) : [];
-  const uploading = stopJobs.filter((j) => j.status === 'preparing' || j.status === 'uploading');
-  const failedJobs = stopJobs.filter((j) => j.status === 'failed');
+  const { uploading, failed: failedJobs } = snowUploadState(mediaJobs, SNOW_COMPLETION_TARGET, (p) => !!current && p.visitId === current.id);
   const addedCount = (current?.mediaCount ?? 0) + uploading.length;
   const needMedia = route && current && stopNeedsPhotos(current, route) ? Math.max(0, route.minMedia - addedCount) : 0;
 
@@ -216,22 +216,7 @@ export function MyRouteScreen() {
                       }}
                       fullWidth
                     />
-                    {uploading.length ? (
-                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                        {uploading.length === 1 ? '1 photo is' : `${uploading.length} photos are`} uploading in the background. You can keep going.
-                      </Text>
-                    ) : null}
-                    {failedJobs.map((j) => (
-                      <View key={j.id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                        <Text style={[typeScale.caption, { color: colors.warning, flex: 1 }]} numberOfLines={2}>A photo didn't upload{j.error ? `: ${j.error}` : '.'}</Text>
-                        <Pressable onPress={() => mediaQueue.retry(j.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retry the photo upload">
-                          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Retry</Text>
-                        </Pressable>
-                        <Pressable onPress={() => { void mediaQueue.cancel(j.id); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Remove the photo">
-                          <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>Remove</Text>
-                        </Pressable>
-                      </View>
-                    ))}
+                    <SnowUploadStatus uploading={uploading} failed={failedJobs} />
                     <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Anything the owner should know" />
                     {needMedia > 0 ? (
                       <Text style={[typeScale.caption, { color: colors.warning }]}>

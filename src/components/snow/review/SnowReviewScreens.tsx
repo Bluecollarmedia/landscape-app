@@ -20,6 +20,9 @@ import {
   type CustomerSnowUpdate, type ReviewMedia, type ReviewStop,
 } from '@/data/snowMediaReview';
 import { shortWhen } from '@/lib/snowFormat';
+import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
+import { useSnowUploads } from '@/hooks/useSnowUploads';
+import { SNOW_OWNER_MEDIA_TARGET } from '@/data/snowMediaTargets';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -55,6 +58,9 @@ export function SnowMediaReviewScreen() {
     setStops(res.data);
   }, []);
   useEffect(() => { reload(); }, [reload]);
+  // Photos the owner adds upload in the background; when one finishes saving, refresh the list.
+  const { saved: savedOwnerPhotos } = useSnowUploads(SNOW_OWNER_MEDIA_TARGET, () => true);
+  useEffect(() => { if (savedOwnerPhotos > 0) reload(); }, [savedOwnerPhotos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function review(m: ReviewMedia, status: 'approved' | 'hidden') {
     setBusy(m.id);
@@ -95,17 +101,16 @@ export function SnowMediaReviewScreen() {
     if (!db.companyId) return;
     const drafts = await pickSnowMedia();
     if (!drafts.length) return;
-    setBusy(s.visitId);
+    // Instant: queued, then uploaded in the background (shown under the button).
     const res = await addOwnerMedia(db.companyId, s.visitId, drafts);
-    setBusy(null);
     if (!res.ok) showMessage("Couldn't add the photo", res.error);
-    reload();
   }
 
   const waiting = stops.filter((s) => !s.notified);
   const sent = stops.filter((s) => s.notified);
 
   function StopCard({ s }: { s: ReviewStop }) {
+    const { uploading, failed } = useSnowUploads(SNOW_OWNER_MEDIA_TARGET, (p) => p.visitId === s.visitId);
     const pending = s.media.some((m) => m.status === 'pending');
     const newlyApproved = s.media.some((m) => m.status === 'approved' && !m.shared);
     return (
@@ -156,6 +161,7 @@ export function SnowMediaReviewScreen() {
           disabled={busy === s.visitId}
           onPress={() => addPhotos(s)}
         />
+        <SnowUploadStatus uploading={uploading} failed={failed} />
         {!s.notified || newlyApproved ? (
           <Button
             title={s.notified ? 'Share newly approved photos' : 'Send to customer'}

@@ -1,5 +1,5 @@
 // Run: node scripts/checks/snowPhotoQueue.check.cjs
-// Snow stop photos use the shared background queue: adding them returns at once (nothing spins), they upload and save in the
+// Every Snow photo (a lead's stop photos, an owner's property reference photos, an owner's photos in Photo review) uses the shared background queue: adding them returns at once (nothing spins), they upload and save in the
 // background, a failure shows Retry/Remove, and Finish Stop waits (a little) for photos that are still uploading.
 const fs = require('fs');
 const path = require('path');
@@ -43,14 +43,33 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const routes = read('src/data/snowRoutes.ts');
   const runtime = read('src/lib/mediaQueueRuntime.ts');
   const screen = read('src/components/snow/routes/MyRouteScreen.tsx');
-  const add = routes.slice(routes.indexOf('export async function addCompletionMedia'), routes.indexOf('export const SNOW_COMPLETION_TARGET'));
+  const add = routes.slice(routes.indexOf('export async function addCompletionMedia'), routes.indexOf('export { SNOW_COMPLETION_TARGET }'));
   check('6 addCompletionMedia only queues: no upload or record call inside it, so it cannot spin', /queueMedia\(/.test(add) && !/await uploadSnowMedia|supabase\.rpc|await /.test(add.replace('export async function', '')), add.slice(0, 200));
-  check('7 the queue sends Snow photos to the private snow bucket and saves them with the stop RPC', /uploadSnowMedia\(uri, job\.folder/.test(runtime) && /saveCompletionRecord/.test(runtime) && /snow_add_completion_media/.test(routes) && /discardSnowUpload/.test(runtime));
+  const targets = read('src/data/snowMediaTargets.ts');
+  check('7 the queue sends every Snow photo to the private snow bucket, and cleans up a stored one with the Snow remover', /isSnowTarget\(job\.target\.type\)/.test(runtime) && /uploadSnowMedia\(uri, job\.folder/.test(runtime) && /completeSnowTarget/.test(runtime) && /isSnowKey\(key\)/.test(runtime) && /discardSnowUpload/.test(runtime));
   check('8 the stop screen does not wait on the upload when photos are added', !/act\(\(\) => addCompletionMedia/.test(screen) && /await addCompletionMedia\(/.test(screen));
-  check('9 the stop screen says photos are uploading in the background and offers Retry and Remove on a failure', /uploading in the background/.test(screen) && /mediaQueue\.retry/.test(screen) && /mediaQueue\.cancel/.test(screen));
+  const status = read('src/components/snow/SnowUploadStatus.tsx');
+  check('9 the stop screen shows the background status, which says photos are uploading and offers Retry and Remove on a failure', /<SnowUploadStatus uploading=\{uploading\} failed=\{failedJobs\}/.test(screen) && /uploading in the background/.test(status) && /mediaQueue\.retry/.test(status) && /mediaQueue\.cancel/.test(status));
   check('10 photos still uploading count as added; failed ones block Finish Stop until retried or removed', /addedCount = \(current\?\.mediaCount \?\? 0\) \+ uploading\.length/.test(screen) && /needMedia > 0 \|\| failedJobs\.length > 0/.test(screen));
   check('11 Finish Stop waits (up to 90 s) for photos still uploading, then says so plainly instead of spinning', /waitForMediaJobs\(uploading\.map/.test(screen) && /90_000/.test(screen) && /still uploading/.test(screen));
-  check('12 the queue name is shared, not retyped', /SNOW_COMPLETION_TARGET/.test(screen) && /snow_completion/.test(runtime));
+  check('12 the three queue names live in one place and are not retyped', /snow_completion/.test(targets) && /snow_reference/.test(targets) && /snow_owner_media/.test(targets) && !/'snow_completion'|'snow_reference'|'snow_owner_media'/.test(runtime + screen));
+
+  // The owner's property reference photos
+  const props = read('src/data/snowProperties.ts');
+  const propScreen = read('app/(owner)/snow-property.tsx');
+  const addRef = props.slice(props.indexOf('export async function addReferenceMedia'), props.indexOf('export async function saveReferenceRecord'));
+  check('13 reference photos only queue (no upload or record call inside addReferenceMedia), so adding them cannot spin', /queueMedia\(/.test(addRef) && !/uploadSnowMedia|supabase\./.test(addRef));
+  check('14 a reference photo\'s record is saved once the file is stored, and a file that already has a row is not saved twice', /snow_reference_media/.test(props) && /\.eq\('file_key', key\)/.test(props) && /completeSnowTarget/.test(targets) && /saveReferenceRecord/.test(targets));
+  check('15 the property screen no longer blocks while reference photos upload, and shows the background status with Retry/Remove', !/setUploading/.test(propScreen) && /SnowUploadStatus/.test(propScreen) && /useSnowUploads\(SNOW_REFERENCE_TARGET/.test(propScreen) && /onAdd=\{add\}/.test(propScreen));
+
+  // The owner's photos in Photo review
+  const review = read('src/data/snowMediaReview.ts');
+  const reviewScreen = read('src/components/snow/review/SnowReviewScreens.tsx');
+  const addOwner = review.slice(review.indexOf('export async function addOwnerMedia'), review.indexOf('export async function saveOwnerMediaRecord'));
+  check('16 owner photos only queue (no upload or record call inside addOwnerMedia)', /queueMedia\(/.test(addOwner) && !/uploadSnowMedia|supabase\./.test(addOwner));
+  check('17 Photo review does not hold the stop busy while owner photos upload, and shows the background status', !/setBusy\(s\.visitId\);\s*const res = await addOwnerMedia/.test(reviewScreen) && /SnowUploadStatus/.test(reviewScreen) && /useSnowUploads\(SNOW_OWNER_MEDIA_TARGET/.test(reviewScreen));
+  check('18 the stop screen calls its upload hook before any early return (rules of hooks): one useMediaJobs at the top, the split after', screen.indexOf('useMediaJobs()') > -1 && screen.indexOf('useMediaJobs()') < screen.indexOf('if (loading)') && screen.indexOf('snowUploadState(mediaJobs, SNOW_COMPLETION_TARGET, (p)') > screen.indexOf('if (loading)'));
+
   console.log(bad ? `\n${bad} failed` : '\nall passed');
   process.exit(bad ? 1 : 0);
 })();

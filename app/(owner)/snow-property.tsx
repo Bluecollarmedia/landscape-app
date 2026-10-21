@@ -16,6 +16,9 @@ import { CustomerPicker } from '@/components/customers/CustomerPicker';
 import { TaskMediaStrip, TaskMediaViewer } from '@/components/tasks/TaskMedia';
 import { snowMediaItems } from '@/components/snow/SnowReference';
 import { notify, pickSnowMedia } from '@/components/snow/pickSnowMedia';
+import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
+import { useSnowUploads } from '@/hooks/useSnowUploads';
+import { SNOW_REFERENCE_TARGET } from '@/data/snowMediaTargets';
 import { confirmAction } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
@@ -256,7 +259,9 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
   const [saving, setSaving] = useState(false);
   // Saved instructions show as a short read-only summary; the text box only opens while you are writing.
   const [editing, setEditing] = useState(false);
-  const [uploading, setUploading] = useState(0);
+  // Reference photos upload in the background (shared queue); this screen only shows how many are on their way and any that failed.
+  const { uploading, failed, saved } = useSnowUploads(SNOW_REFERENCE_TARGET, (p) => p.propertyServiceId === ps.id);
+  useEffect(() => { if (saved > 0) onChanged(); }, [saved]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showHistory, setShowHistory] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const items = useMemo(() => snowMediaItems(current.media, mediaUrls), [current.media, mediaUrls]);
@@ -291,14 +296,10 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
   async function add() {
     const drafts = await pickSnowMedia();
     if (drafts.length === 0) return;
-    setUploading(drafts.length);
-    const { saved, errors } = await addReferenceMedia(companyId, ps.id, drafts);
-    setUploading(0);
-    if (saved.length > 0) haptics.success();
-    if (errors.length > 0) {
-      notify(errors.length === 1 ? 'A file wasn\'t saved' : `${errors.length} files weren't saved`, errors[0]);
-    }
-    onChanged();
+    // Instant: queued, then uploaded in the background.
+    const { queued, errors } = await addReferenceMedia(companyId, ps.id, drafts);
+    if (queued > 0) haptics.success();
+    if (errors.length > 0) notify("The files weren't added", errors[0]);
   }
 
   function retire(mediaId: string) {
@@ -374,14 +375,10 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
       <TaskMediaStrip
         items={items}
         onOpen={setOpen}
-        onAdd={uploading ? undefined : add}
+        onAdd={add}
         onRemove={retire}
       />
-      {uploading > 0 && (
-        <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-          Uploading {uploading === 1 ? '1 file' : `${uploading} files`}…
-        </Text>
-      )}
+      <SnowUploadStatus uploading={uploading} failed={failed} />
       <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
         Shown to the route lead for {SNOW_SERVICE_LABELS[ps.service].toLowerCase()} only. Not shared with the customer.
         {removed > 0 ? ` ${removed} removed ${removed === 1 ? 'item is' : 'items are'} kept for past visits.` : ''}

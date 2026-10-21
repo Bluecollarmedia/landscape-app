@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Directory, Paths } from 'expo-file-system';
 import { MediaQueue, PermanentError, type MediaJob, type NewJob } from './mediaQueue';
 import { prepareImage, prepareVideo } from './mediaCompress';
+import { isSnowKey, isSnowTarget } from '@/data/snowMediaTargets';
 
 const KEY = 'mediaQueue.v1';
 const QDIR = '/media-queue/';
@@ -53,8 +54,8 @@ export const mediaQueue = new MediaQueue({
     // A pending item belongs to the company it was picked in: never send it under a different sign-in.
     const { db } = require('@/data/store') as typeof import('@/data/store');
     if (db.companyId && !job.folder.startsWith(`${db.companyId}/`)) throw new PermanentError('This photo belongs to a different account, so it was not uploaded.');
-    if (job.target.type === 'snow_completion') {
-      // Snow stop photos live in the private snow-media bucket, not the public one.
+    if (isSnowTarget(job.target.type)) {
+      // Snow photos live in the private snow-media bucket, not the public one.
       const { uploadSnowMedia } = require('./snowMedia') as typeof import('./snowMedia');
       const snowMime = job.kind === 'video' ? (job.useOriginal ? job.mimeType : 'video/mp4') : (uri === job.sourceUri ? job.mimeType : 'image/jpeg');
       return { url: '', key: await uploadSnowMedia(uri, job.folder, snowMime) };
@@ -65,9 +66,9 @@ export const mediaQueue = new MediaQueue({
   },
 
   complete: async (job, uploaded) => {
-    if (job.target.type === 'snow_completion') {
-      const { saveCompletionRecord } = require('@/data/snowRoutes') as typeof import('@/data/snowRoutes');
-      await saveCompletionRecord(job, uploaded.key);
+    if (isSnowTarget(job.target.type)) {
+      const { completeSnowTarget } = require('@/data/snowMediaTargets') as typeof import('@/data/snowMediaTargets');
+      await completeSnowTarget(job, uploaded.key);
       return;
     }
     const { completeMediaTarget } = require('@/data/mediaTargets') as typeof import('@/data/mediaTargets');
@@ -75,7 +76,7 @@ export const mediaQueue = new MediaQueue({
   },
 
   removeStored: async (key) => {
-    if (key.includes('/completion/')) {
+    if (isSnowKey(key)) {
       const { discardSnowUpload } = require('./snowMedia') as typeof import('./snowMedia');
       await discardSnowUpload(key);
       return;

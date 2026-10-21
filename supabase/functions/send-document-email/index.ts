@@ -69,7 +69,7 @@ serve(async (req: Request) => {
 
     const { data: doc } = await db
       .from(kind === 'quote' ? 'quotes' : 'change_orders')
-      .select('id, number, total, share_token, project_id, company_id, status, sent_at')
+      .select('id, number, total, share_token, project_id, company_id, customer_id, status, sent_at')
       .eq('id', id).maybeSingle();
     if (!doc) return reply({ error: 'not_found' }, 404);
 
@@ -83,8 +83,10 @@ serve(async (req: Request) => {
       db.from('projects').select('name, customer_id').eq('id', doc.project_id).maybeSingle(),
       db.from('companies').select('name, email').eq('id', doc.company_id).maybeSingle(),
     ]);
-    const { data: customer } = project?.customer_id
-      ? await db.from('people').select('email, first_name, last_name').eq('id', project.customer_id).maybeSingle()
+    // The customer the DOCUMENT was made for (what the customer sees in it), not whoever the project points at now.
+    const customerId = doc.customer_id ?? project?.customer_id;
+    const { data: customer } = customerId
+      ? await db.from('people').select('email, first_name, last_name').eq('id', customerId).maybeSingle()
       : { data: null };
 
     const typed = typeof body.email === 'string' ? body.email.trim() : '';

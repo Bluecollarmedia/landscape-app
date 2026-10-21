@@ -19,6 +19,7 @@ import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { openDirections } from '@/lib/maps';
 import { useMediaJobs, waitForMediaJobs } from '@/lib/mediaQueueRuntime';
 import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
+import { SnowClockInCard } from '@/components/snow/time/SnowClockInCard';
 import { snowUploadState } from '@/hooks/useSnowUploads';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
@@ -137,6 +138,7 @@ export function MyRouteScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>My Route</Text>
+        <SnowClockInCard />
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
 
         {historyId ? (

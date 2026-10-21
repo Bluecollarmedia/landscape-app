@@ -6,6 +6,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Icon, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
 import { CollapsibleFilters } from '@/components/ui/CollapsibleFilters';
@@ -37,6 +38,8 @@ function useShifts() {
     setShifts(res.data);
   }, []);
   useEffect(() => { reload(); }, [reload]);
+  // Tabs stay mounted: when the person comes back to this screen (for example after clocking in on the Route page), read it again.
+  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
   return { shifts, error, loading, reload, setShifts };
 }
 

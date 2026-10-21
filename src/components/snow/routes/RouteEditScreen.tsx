@@ -318,6 +318,7 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
                       ) : null}
                     </View>
                     <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 4 }]} numberOfLines={1}>{short}</Text>
+                    {m.lead ? <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '700' }]}>Lead</Text> : null}
                   </View>
                 );
               })}

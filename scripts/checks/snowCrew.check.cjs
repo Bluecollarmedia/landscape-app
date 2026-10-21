@@ -96,6 +96,12 @@ const routeRow = (id, status) => ({ id, name: `R-${id}`, service: 'plowing', cre
   check('16 choosing a new lead keeps the old lead on the route as crew and takes the new one off the crew list', JSON.stringify(crewLib.crewAfterLeadChange(['a', 'c'], 'b', 'a')) === JSON.stringify(['c', 'b']) && JSON.stringify(crewLib.crewAfterLeadChange(['a'], undefined, 'a')) === '[]');
   check('18 a draft explains what is missing before it can go out', crewLib.dispatchGaps([{ stops: 0 }]).join('|') === 'Choose a crew lead|Add at least one property' && crewLib.dispatchGaps([{ leadPersonId: 'a', stops: 2 }]).length === 0);
 
+  // Promoting a crew member to lead: they stay on the route (shown first, labelled Lead), the old lead stays as crew.
+  const after = crewLib.crewAfterLeadChange(['bo', 'cy'], 'al', 'bo');
+  const teamAfter = crewLib.routeTeam('bo', 'Bo', after.map((id) => ({ personId: id, name: id })));
+  check('19 making a crew member the lead keeps them on the route and keeps the old lead as crew', teamAfter.map((m) => m.personId).join() === 'bo,cy,al' && teamAfter[0].lead === true && teamAfter.filter((m) => m.lead).length === 1, JSON.stringify(teamAfter));
+  check('20 the crew row labels who the lead is', /m\.lead \? <Text[^>]*>Lead<\/Text>/.test(read('src/components/snow/routes/RouteEditScreen.tsx')));
+
   console.log(bad ? `\n${bad} failed` : '\nall passed');
   process.exit(bad ? 1 : 0);
 })();

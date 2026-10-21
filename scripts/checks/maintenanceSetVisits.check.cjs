@@ -40,9 +40,11 @@ check('12 the label reads well', ms.frequencyLabel(rule) === '6 visits · Jul 19
 check('13 the older kinds still work: every 14 days from the first service', (() => { const r = ms.serviceDue({ id: 'r2', isActive: true, frequency: 'every_n_days', intervalDays: 14, startsOn: '2026-07-19', priorCompletedCount: 0 }, contract, { isActive: true }, [], { onDate: '2026-07-19' }); return r.status === 'due'; })());
 
 const editor = read('app/(owner)/maintenance-property-edit.tsx');
-check('14 the editor offers "Set number of visits", spreads from the season dates, and lets any single date be changed, added or removed',
-  /key: 'fixed_dates', label: 'Set number of visits'/.test(editor) && /spreadDates\(next\.spreadFrom \?\? seasonStart, next\.spreadTo \?\? seasonEnd/.test(editor) && /Add a date/.test(editor) && /Remove visit/.test(editor) && /seasonStart=\{seasonStart\}/.test(editor));
-check('15 saving keeps the exact dates and sets the count from them', /scheduledDates: fixed \? fixedDates : undefined/.test(editor) && /fixed \? fixedDates\.length/.test(editor));
+const addScreen = read('app/(owner)/maintenance-service-add.tsx');
+const draftLib = read('src/lib/maintenanceServiceDraft.ts');
+check('14 the Add Service screen offers "Set number of visits", spreads from the season dates, and lets any single date be changed, added or removed',
+  /key: 'fixed_dates', label: 'Set number of visits'/.test(draftLib) && /spreadForDraft\(next, seasonStart, seasonEnd\)/.test(addScreen) && /Add a date/.test(addScreen) && /Remove visit/.test(addScreen));
+check('15 saving keeps the exact dates and sets the count from them', /scheduledDates/.test(draftLib) && /seasonQuantity: String\(dates\.length\)/.test(addScreen));
 const data = read('src/data/maintenance.ts');
 check('16 saving refuses a set-visits service with no dates, and the store carries the dates', /Add at least one visit date/.test(data) && /'scheduledDates'/.test(read('src/data/store.ts')) && fs.existsSync(path.join(__dirname, '../../supabase/updates/059_maintenance_set_visits.sql')));
 console.log(bad ? '\n' + bad + ' failed' : '\nall passed');

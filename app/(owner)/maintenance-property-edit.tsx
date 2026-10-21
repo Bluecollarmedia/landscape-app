@@ -28,151 +28,23 @@ import { useMaintenanceProperty } from '@/hooks/useMaintenance';
 import { db } from '@/data/store';
 import {
   createProperty, updateProperty, createContract, updateContract,
-  addServiceRule, updateServiceRule, ruleProblem, type ServiceRuleInput,
+  addServiceRule, updateServiceRule, ruleProblem,
 } from '@/data/maintenance';
 import { frequencyLabel } from '@/lib/maintenanceSchedule';
 import { todayKey } from '@/lib/ids';
 import { haptics } from '@/lib/haptics';
 import type { AddressParts } from '@/lib/address';
-import { spreadDates, cleanDates } from '@/lib/serviceDates';
-import { SERVICE_TYPES, type MaintenanceServiceRule, type ServiceFrequency } from '@/types/maintenance';
+import { cleanDates } from '@/lib/serviceDates';
+import {
+  FREQUENCIES, LEGACY_FREQUENCY_LABELS, newDraft, draftFromRule, draftToInput, spreadForDraft, toInt, type ServiceDraft,
+} from '@/lib/maintenanceServiceDraft';
+import { SERVICE_TYPES, type MaintenanceServiceRule } from '@/types/maintenance';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
 function notify(title: string, msg: string) {
   if (Platform.OS === 'web') alert(msg);
   else Alert.alert(title, msg);
-}
-
-// ── Service drafts ──────────────────────────────────────────────────────────
-
-interface ServiceDraft {
-  key: string;
-  /** Set for saved rules. */
-  id?: string;
-  serviceType: string;
-  label: string;
-  frequency: ServiceFrequency;
-  intervalDays: string;
-  startsOn?: string;
-  windowStart?: string;
-  windowEnd?: string;
-  /** For "Set number of visits": the exact dates, and the span they were spread across. */
-  scheduledDates: string[];
-  spreadFrom?: string;
-  spreadTo?: string;
-  seasonQuantity: string;
-  priorCompletedCount: string;
-  lastCompletedOn?: string;
-  requiresPhotos: boolean;
-  /** One checklist item per line. */
-  checklist: string;
-  instructions: string;
-  isActive: boolean;
-}
-
-const FREQUENCIES: { key: ServiceFrequency; label: string }[] = [
-  { key: 'weekly', label: 'Every week' },
-  { key: 'biweekly', label: 'Every 2 weeks' },
-  { key: 'every_n_days', label: 'Every N days' },
-  { key: 'fixed_dates', label: 'Set number of visits' },
-  { key: 'seasonal_window', label: 'Once, in a date range' },
-  { key: 'as_needed', label: 'As needed' },
-];
-
-/**
- * Starting values when the owner picks a service type. Only suggestions to
- * save typing; every field stays editable per property.
- */
-function suggestedFor(type: string, year: string): Partial<ServiceDraft> {
-  switch (type) {
-    case 'lawn_cut': return { frequency: 'weekly' };
-    case 'spring_cleanup': return { frequency: 'seasonal_window', windowStart: `${year}-04-01`, windowEnd: `${year}-05-15` };
-    case 'fall_cleanup': return { frequency: 'seasonal_window', windowStart: `${year}-10-15`, windowEnd: `${year}-11-30` };
-    case 'shrub_trim': return { frequency: 'seasonal_window', windowStart: `${year}-07-01`, windowEnd: `${year}-07-31` };
-    case 'fertilization': return { frequency: 'seasonal_window', windowStart: `${year}-10-01`, windowEnd: `${year}-11-15` };
-    case 'mulch': return { frequency: 'seasonal_window', windowStart: `${year}-04-15`, windowEnd: `${year}-05-31` };
-    default: return { frequency: 'as_needed' };
-  }
-}
-
-let draftSeq = 0;
-const nextKey = () => `draft-${++draftSeq}`;
-
-function newDraft(type: string, year: string): ServiceDraft {
-  const t = SERVICE_TYPES.find((s) => s.key === type);
-  return {
-    key: nextKey(),
-    serviceType: type,
-    label: t && type !== 'other' ? t.label : '',
-    frequency: 'weekly',
-    intervalDays: '',
-    scheduledDates: [],
-    seasonQuantity: '',
-    priorCompletedCount: '',
-    requiresPhotos: false,
-    checklist: '',
-    instructions: '',
-    isActive: true,
-    ...suggestedFor(type, year),
-  };
-}
-
-function draftFromRule(r: MaintenanceServiceRule): ServiceDraft {
-  return {
-    key: r.id,
-    id: r.id,
-    serviceType: r.serviceType,
-    label: r.label,
-    frequency: r.frequency,
-    intervalDays: r.intervalDays != null ? String(r.intervalDays) : '',
-    startsOn: r.startsOn,
-    windowStart: r.windowStart,
-    windowEnd: r.windowEnd,
-    scheduledDates: cleanDates(r.scheduledDates),
-    spreadFrom: cleanDates(r.scheduledDates)[0],
-    spreadTo: cleanDates(r.scheduledDates).slice(-1)[0],
-    seasonQuantity: r.seasonQuantity != null ? String(r.seasonQuantity) : '',
-    priorCompletedCount: r.priorCompletedCount ? String(r.priorCompletedCount) : '',
-    lastCompletedOn: r.lastCompletedOn,
-    requiresPhotos: r.requiresPhotos,
-    checklist: r.defaultChecklist.join('\n'),
-    instructions: r.instructions ?? '',
-    isActive: r.isActive,
-  };
-}
-
-const toInt = (s: string): number | undefined => {
-  const n = parseInt(s.replace(/[^\d]/g, ''), 10);
-  return Number.isFinite(n) ? n : undefined;
-};
-
-function draftToInput(d: ServiceDraft, sortOrder: number): ServiceRuleInput {
-  const window = d.frequency === 'seasonal_window';
-  const fixed = d.frequency === 'fixed_dates';
-  const fixedDates = fixed ? cleanDates(d.scheduledDates) : [];
-  const repeating = d.frequency === 'weekly' || d.frequency === 'biweekly' || d.frequency === 'every_n_days';
-  return {
-    serviceType: d.serviceType,
-    label: d.label.trim(),
-    frequency: d.frequency,
-    // Clear fields that don't apply to the chosen frequency, so an old value
-    // can't quietly change the due date.
-    intervalDays: d.frequency === 'every_n_days' ? toInt(d.intervalDays) : undefined,
-    startsOn: repeating ? d.startsOn : undefined,
-    windowStart: window ? d.windowStart : undefined,
-    windowEnd: window ? d.windowEnd : undefined,
-    scheduledDates: fixed ? fixedDates : undefined,
-    // For a set number of visits the count is always the number of saved dates.
-    seasonQuantity: d.frequency === 'as_needed' ? undefined : fixed ? fixedDates.length : toInt(d.seasonQuantity),
-    priorCompletedCount: toInt(d.priorCompletedCount) ?? 0,
-    lastCompletedOn: d.lastCompletedOn,
-    requiresPhotos: d.requiresPhotos,
-    defaultChecklist: d.checklist.split('\n').map((s) => s.trim()).filter(Boolean),
-    instructions: d.instructions.trim() || undefined,
-    isActive: d.isActive,
-    sortOrder,
-  };
 }
 
 // ── Screen ──────────────────────────────────────────────────────────────────
@@ -257,7 +129,7 @@ export default function MaintenancePropertyEditScreen() {
   }
 
   function addService(type: string) {
-    const d = newDraft(type, seasonYear);
+    const d = newDraft(type, seasonStart, seasonEnd);
     setServices((prev) => [...prev, d]);
     setOpenKey(d.key);
     setAddingType(false);
@@ -525,10 +397,10 @@ function ServiceEditor({ draft: d, onChange, onRemove, seasonStart, seasonEnd }:
   const window = d.frequency === 'seasonal_window';
   const fixed = d.frequency === 'fixed_dates';
 
-  /** Changing the number of visits or the first/last date works out the dates again, evenly. */
+  /** Changing the number of visits works out the dates again, evenly across the season. */
   function respread(patch: Partial<ServiceDraft>) {
     const next = { ...d, ...patch };
-    const dates = spreadDates(next.spreadFrom ?? seasonStart, next.spreadTo ?? seasonEnd, toInt(next.seasonQuantity) ?? 0);
+    const dates = spreadForDraft(next, seasonStart, seasonEnd);
     onChange({ ...patch, ...(dates.length ? { scheduledDates: dates } : {}) });
   }
   function setDates(dates: string[]) {
@@ -542,14 +414,14 @@ function ServiceEditor({ draft: d, onChange, onRemove, seasonStart, seasonEnd }:
       <View style={styles.pad}>
         <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: 6 }]}>How often</Text>
         <View style={styles.chipWrap}>
-          {FREQUENCIES.map((f) => {
+          {[...FREQUENCIES, ...(LEGACY_FREQUENCY_LABELS[d.frequency] ? [{ key: d.frequency, label: LEGACY_FREQUENCY_LABELS[d.frequency] as string }] : [])].map((f) => {
             const on = d.frequency === f.key;
             return (
               <Pressable
                 key={f.key}
                 onPress={() => {
                   haptics.select();
-                  if (f.key === 'fixed_dates') respread({ frequency: f.key, spreadFrom: d.spreadFrom ?? seasonStart, spreadTo: d.spreadTo ?? seasonEnd });
+                  if (f.key === 'fixed_dates') respread({ frequency: f.key, seasonQuantity: d.seasonQuantity || '1' });
                   else onChange({ frequency: f.key });
                 }}
                 style={[styles.chip, { backgroundColor: on ? colors.primary : colors.surface, borderColor: on ? colors.primary : colors.border }]}
@@ -575,10 +447,8 @@ function ServiceEditor({ draft: d, onChange, onRemove, seasonStart, seasonEnd }:
       {fixed && (
         <>
           <InputRow label="Number of visits" value={d.seasonQuantity} onChangeText={(t) => respread({ seasonQuantity: t })} keyboardType="number-pad" placeholder="6" suffix="visits" />
-          <DateRow label="First visit" value={d.spreadFrom ?? seasonStart} onChange={(k) => respread({ spreadFrom: k })} />
-          <DateRow label="Last visit" value={d.spreadTo ?? seasonEnd} onChange={(k) => respread({ spreadTo: k })} minimumDate={d.spreadFrom ?? seasonStart} />
           <Text style={[typeScale.caption, { color: colors.textTertiary, paddingHorizontal: spacing.md, paddingBottom: spacing.xs }]}>
-            The visits are spread evenly from the first to the last date (they start from the Season dates above unless you change them). Change the number or either date and they are worked out again. You can also change any single date below, or add your own.
+            The visits are spread evenly across the season. Change the number and they are worked out again. You can also change any single date below, or add your own.
           </Text>
           {d.scheduledDates.map((date, i) => (
             <View key={`${i}-${date}`} style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -591,7 +461,7 @@ function ServiceEditor({ draft: d, onChange, onRemove, seasonStart, seasonEnd }:
             </View>
           ))}
           <Pressable
-            onPress={() => setDates([...d.scheduledDates, d.scheduledDates.slice(-1)[0] ?? d.spreadTo ?? seasonEnd ?? d.spreadFrom ?? seasonStart ?? todayKey()])}
+            onPress={() => setDates([...d.scheduledDates, d.scheduledDates.slice(-1)[0] ?? seasonEnd ?? seasonStart ?? todayKey()])}
             style={styles.removeRow}
             accessibilityRole="button"
           >

@@ -63,8 +63,6 @@ export function DeleteCompanyRow() {
   const heads: string[] = [];
   if (preview) {
     if (preview.days_awaiting_approval > 0) heads.push(`${preview.days_awaiting_approval} workday(s) still wait for your approval. They will be deleted with the company.`);
-    if (preview.pending_join_requests + preview.pending_snow_requests > 0) heads.push(`${preview.pending_join_requests + preview.pending_snow_requests} join request(s) are waiting. They will be cancelled.`);
-    if (preview.open_codes > 0) heads.push(`${preview.open_codes} invitation code(s) will stop working.`);
   }
 
   function close() {

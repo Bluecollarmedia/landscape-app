@@ -16,7 +16,7 @@ const time = read('src/components/snow/time/SnowTimeScreens.tsx');
 
 check('1 the Route tab is first and shown to every Snow worker (no hiding it for non-leads)', /name: 'index', title: 'Route'/.test(layout) && !/hidden/.test(layout) && !/isLead/.test(layout));
 check('2 the Route tab no longer sends non-leads to the Time Clock', !/Redirect/.test(index) && /MyRouteScreen/.test(index));
-check('3 the Route page shows the clock-in card right under its title', /My Route<\/Text>\s*<SnowClockInCard \/>/.test(route));
+check('3 the Route page shows the clock-in card right under its header (and in the empty state when there is no route)', /<\/View>\s*<SnowClockInCard \/>/.test(route) && (route.match(/<SnowClockInCard \/>/g) || []).length === 2);
 check('4 the card offers Clock In when allowed, and only a status line once clocked in', /Clock in for the storm/.test(card) && /Clocked in since/.test(card) && /clockInNow/.test(card));
 check('5 the card has no Clock Out button (clocking out lives in the Time Clock tab only)', !/clockOut/.test(card) && !/Clock Out/.test(card.replace(/Clock out in the Time Clock tab/g, '')));
 check('6 the card shows nothing when the worker cannot clock in (not on a dispatched route)', /if \(!allowed\) return null/.test(card));

@@ -26,5 +26,8 @@ check('10 mode switch uses the existing logic', has('useModeSwitch()') && /expor
 check('11 bottom padding clears the tab bar', has('useTabBarClearance()') && has('paddingBottom: tabBarClearance'));
 check('12 rows have accessibility labels', has('accessibilityRole="button"') && has('accessibilityLabel={subtitle'));
 check('13 no new dependencies', !/expo-linear-gradient|expo-blur/.test(src));
+const act = require('fs').readFileSync(require('path').join(__dirname, '../../app/(owner)/snow-activity.tsx'), 'utf8');
+check('14 the Snow Activity filters start folded up: one period button and one Filters button, and each panel opens only when tapped',
+  /setPanel\(panel === 'period' \? null : 'period'\)/.test(act) && /setPanel\(panel === 'filters' \? null : 'filters'\)/.test(act) && /\{panel === 'period' \? \(/.test(act) && /\{panel === 'filters' \? \(/.test(act));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

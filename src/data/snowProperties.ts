@@ -63,6 +63,17 @@ export interface SnowPropertyDetails {
 }
 
 /** Owner/admin view of one property's details. Returns only what the database lets the caller see. */
+/** Customer contact names for every property in the company, primary contact first. Used to search and filter by customer. */
+export async function loadPropertyContactNames(): Promise<Result<Record<string, string[]>>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data, error } = await supabase.from('snow_property_contacts').select('property_id, name, is_primary, sort_order').is('removed_at', null)
+    .order('is_primary', { ascending: false }).order('sort_order');
+  if (error) return fail(message(error, 'Couldn\'t load customers.'));
+  const out: Record<string, string[]> = {};
+  for (const r of (data ?? []) as { property_id: string; name: string }[]) (out[r.property_id] ??= []).push(r.name);
+  return ok(out);
+}
+
 export async function loadSnowPropertyDetails(propertyId: string): Promise<Result<SnowPropertyDetails>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const [contacts, services] = await Promise.all([

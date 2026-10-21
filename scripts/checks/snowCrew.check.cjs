@@ -92,6 +92,12 @@ const routeRow = (id, status) => ({ id, name: `R-${id}`, service: 'plowing', cre
   c = await loadRouteCrew('r1');
   check('14 before update 41 the crew list is simply empty (no error shown)', c.ok && c.data.length === 0);
 
+  const team = crewLib.routeTeam('b', 'Bea', [{ personId: 'a', name: 'Amy' }, { personId: 'b', name: 'Bea' }]);
+  check('15 the team is the lead first, then the crew, with no repeats; the lead is always one of the team', team.length === 2 && team[0].lead && team[0].personId === 'b' && !team[1].lead);
+  check('16 choosing a new lead keeps the old lead on the route as crew and takes the new one off the crew list', JSON.stringify(crewLib.crewAfterLeadChange(['a', 'c'], 'b', 'a')) === JSON.stringify(['c', 'b']) && JSON.stringify(crewLib.crewAfterLeadChange(['a'], undefined, 'a')) === '[]');
+  check('17 the stop count reads "0 stops added" / "1 stop added" / "5 stops added"', crewLib.stopsAddedLabel(0) === '0 stops added' && crewLib.stopsAddedLabel(1) === '1 stop added' && crewLib.stopsAddedLabel(5) === '5 stops added');
+  check('18 a draft explains what is missing before it can go out', crewLib.dispatchGaps([{ stops: 0 }]).join('|') === 'Choose a crew lead|Add at least one property' && crewLib.dispatchGaps([{ leadPersonId: 'a', stops: 2 }]).length === 0);
+
   console.log(bad ? `\n${bad} failed` : '\nall passed');
   process.exit(bad ? 1 : 0);
 })();

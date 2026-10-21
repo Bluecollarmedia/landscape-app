@@ -43,3 +43,33 @@ export function crewTag(n: number): string {
 export function roleFor(roles: Map<string, RouteRole> | null, routeId: string): RouteRole {
   return roles?.get(routeId) ?? 'lead';
 }
+
+export interface TeamMember { personId: string; name: string; lead: boolean }
+
+/** Everyone working the route: the lead (when there is one) first, then the crew. The lead is always one of the team. */
+export function routeTeam(leadPersonId: string | undefined, leadName: string | undefined, crew: PersonChoice[]): TeamMember[] {
+  const out: TeamMember[] = [];
+  if (leadPersonId) out.push({ personId: leadPersonId, name: leadName || 'Crew lead', lead: true });
+  for (const c of crew) if (c.personId !== leadPersonId) out.push({ personId: c.personId, name: c.name, lead: false });
+  return out;
+}
+
+/** The crew list after `newLead` becomes the lead: the old lead stays on the route as crew, the new lead leaves the crew list. */
+export function crewAfterLeadChange(crewIds: string[], oldLead: string | undefined, newLead: string): string[] {
+  const next = crewIds.filter((id) => id !== newLead);
+  if (oldLead && oldLead !== newLead && !next.includes(oldLead)) next.push(oldLead);
+  return next;
+}
+
+/** "No stops", "1 stop", "5 stops added". */
+export function stopsAddedLabel(n: number): string {
+  return `${n} ${n === 1 ? 'stop' : 'stops'} added`;
+}
+
+/** What is still missing before a draft storm can go out (the database still has the final say). */
+export function dispatchGaps(routes: { leadPersonId?: string; stops: number }[]): string[] {
+  const gaps: string[] = [];
+  if (routes.length === 0 || routes.some((r) => !r.leadPersonId)) gaps.push('Choose a crew lead');
+  if (routes.length === 0 || routes.some((r) => r.stops === 0)) gaps.push('Add at least one property');
+  return gaps;
+}

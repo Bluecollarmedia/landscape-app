@@ -69,9 +69,9 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
   check('11 if the photo table is not there, counts still work (0 photos)', counts2.ok && counts2.data.media === 0);
 
   // wiring
-  const settings = read('src/components/snow/settings/SnowSettingsScreen.tsx');
+  const settings = read('app/snow/owner/(tabs)/more.tsx');
   const screen = read('src/components/snow/storms/ManageStormsScreen.tsx');
-  check('12 Snow settings has a Manage storms row that opens the screen', /title="Manage storms"/.test(settings) && /manage-storms/.test(settings) && /manage-storms/.test(read('app/snow/owner/_layout.tsx')) && fs.existsSync(path.join(__dirname, '../../app/snow/owner/manage-storms.tsx')));
+  check('12 Snow More has a Manage storms row that opens the screen', /title="Manage storms"/.test(settings) && /manage-storms/.test(settings) && /manage-storms/.test(read('app/snow/owner/_layout.tsx')) && fs.existsSync(path.join(__dirname, '../../app/snow/owner/manage-storms.tsx')));
   check('13 the screen lists every status and every storm has a Delete button that asks first with the real counts', /loadStorms\(\)/.test(screen) && /loadStormCounts/.test(screen) && /confirmAction\(c\.title, c\.message, c\.confirm/.test(screen) && /accessibilityLabel=\{`Delete \$\{s\.name\}`\}/.test(screen));
   check('14 it is not on the dashboard', !/Manage storms|manage-storms/.test(read('src/components/snow/dashboard/SnowDashboardScreen.tsx')));
   console.log(bad ? `\n${bad} failed` : '\nall passed');

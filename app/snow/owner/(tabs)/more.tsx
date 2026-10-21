@@ -1,7 +1,8 @@
 /**
- * Snow Mode More (Owner). The header is one bundled picture (snow-mode-more-header.png: the green leaf, the blue "Snow Mode"
- * wordmark, the "More" title and the snowy evergreens). Everything under it is real, working controls in grouped white cards.
- * Destinations, the alert switch, the mode switch, legal pages, Sign Out and Delete Account are the same ones as before.
+ * Snow Mode More (Owner): the ONE place for every Snow setting. The header is one bundled picture (snow-mode-more-header.png: the
+ * green leaf, the blue "Snow Mode" wordmark, the "More" title and the snowy evergreens). Everything under it is real, working
+ * controls in grouped white cards: the rules and alerts, customer messages, records, storm management, your profile and mode,
+ * legal pages, Sign Out and Delete Account. Team and Properties have their own tabs, so they are not repeated here.
  */
 import React from 'react';
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, useWindowDimensions } from 'react-native';
@@ -10,7 +11,8 @@ import { Icon } from '@/components/ui/Icon';
 import { ListSection } from '@/components/ui';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useModeSwitch } from '@/components/snow/ModeSwitchRow';
-import { OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
+import { OwnerCustomerMessages, OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
+import { StopRuleToggle } from '@/components/snow/settings/StopRuleToggle';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -55,9 +57,18 @@ export default function SnowOwnerMoreScreen() {
         />
 
         <View style={{ paddingTop: headerHeight * (1 - HEADER_OVERLAP), paddingHorizontal: spacing.lg }}>
-          <Group title="Settings">
-            <Row icon="settings" title="Snow settings" subtitle="Stop rule, alerts, team and customers" onPress={() => router.push('/snow/owner/settings')} />
-          </Group>
+          {db.companyId ? (
+            <Group title="Rules">
+              <StopRuleToggle companyId={db.companyId} />
+            </Group>
+          ) : null}
+
+          {db.companyId ? (
+            <Group title="Alerts">
+              <OwnerStopAlertsToggle companyId={db.companyId} bare />
+              <OwnerCustomerMessages />
+            </Group>
+          ) : null}
 
           <Group title="Records">
             <Row icon="activity" title="Activity log" subtitle="Everything that happened, by storm, route and person" onPress={() => router.push('/snow/owner/activity')} />
@@ -66,17 +77,14 @@ export default function SnowOwnerMoreScreen() {
             <Row icon="camera" title="Photo review" subtitle="Approve photos and send updates to customers" onPress={() => router.push('/snow/owner/review')} />
           </Group>
 
-          {db.companyId ? (
-            <Group title="Alerts">
-              <OwnerStopAlertsToggle companyId={db.companyId} bare />
-            </Group>
-          ) : null}
+          <Group title="Storms">
+            <Row icon="trash-2" title="Manage storms" subtitle="Delete any storm, even an ended one" onPress={() => router.push('/snow/owner/manage-storms' as any)} />
+          </Group>
 
-          {mode.canSwitch ? (
-            <Group title="Mode">
-              <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} />
-            </Group>
-          ) : null}
+          <Group title="You">
+            <Row icon="user" title="Your profile and photo" onPress={() => router.push('/snow/owner/edit-profile' as any)} />
+            {mode.canSwitch ? <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} /> : null}
+          </Group>
 
           <Group title="Legal & Support">
             <Row compact icon="shield" title="Privacy Policy" onPress={() => router.push('/legal/privacy' as any)} />

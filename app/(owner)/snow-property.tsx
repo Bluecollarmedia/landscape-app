@@ -11,7 +11,8 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
-import { Button, Icon, Input, LoadingSpinner } from '@/components/ui';
+import { Button, Icon, Input, LoadingSpinner, SearchBar } from '@/components/ui';
+import { QuickAddCustomer } from '@/components/customers/QuickAddCustomer';
 import { TaskMediaStrip, TaskMediaViewer } from '@/components/tasks/TaskMedia';
 import { snowMediaItems } from '@/components/snow/SnowReference';
 import { notify, pickSnowMedia } from '@/components/snow/pickSnowMedia';
@@ -125,37 +126,91 @@ function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
   companyId: string; propertyId: string; contacts: SnowPropertyContact[]; onChanged: () => void;
 }) {
   const { colors } = useTheme();
+  const v = useDb();
   const [editing, setEditing] = useState<string | 'new' | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // The property's customer: the linked account, else the main contact. Every property has one.
+  const customer = contacts.find((x) => x.personId) ?? contacts.find((x) => x.isPrimary);
+  const others = contacts.filter((x) => x.id !== customer?.id);
+  const customers = useMemo(
+    () => db.members
+      .filter((m) => m.role === 'customer' && m.status !== 'inactive' && m.person)
+      .sort((x, y) => `${x.person!.lastName} ${x.person!.firstName}`.localeCompare(`${y.person!.lastName} ${y.person!.firstName}`)),
+    [v],
+  );
+  const q = query.trim().toLowerCase();
+  const shown = q ? customers.filter((m) => `${m.person!.firstName} ${m.person!.lastName} ${m.person!.email}`.toLowerCase().includes(q)) : customers;
+
+  /** Puts an existing customer on this property (their name, phone and email come from their record; nothing is typed). */
+  async function linkCustomer(personId: string) {
+    const m = db.members.find((x) => x.personId === personId);
+    if (!m?.person || busy) return;
+    const p = m.person;
+    const input: ContactInput = {
+      name: `${p.firstName} ${p.lastName}`.trim() || p.email, title: '', phone: p.phone ?? '', email: p.email ?? '', personId, isPrimary: true,
+    };
+    setBusy(true);
+    const res = customer ? await updateContact(customer, input) : await addContact(companyId, propertyId, input);
+    setBusy(false);
+    if (!res.ok) return notify('Not Saved', res.error);
+    haptics.success();
+    setChoosing(false);
+    setQuery('');
+    onChanged();
+  }
 
   return (
     <>
-      <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>CONTACTS</Text>
+      <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>CUSTOMER</Text>
       <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
-        {contacts.length === 0 && editing !== 'new' && (
-          <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>
-            No contacts yet. Add the customer or property manager.
-          </Text>
-        )}
-        {contacts.map((c) => editing === c.id ? (
-          <ContactForm
-            key={c.id}
-            companyId={companyId}
-            propertyId={propertyId}
-            contact={c}
-            onDone={() => { setEditing(null); onChanged(); }}
-            onCancel={() => setEditing(null)}
-          />
+        {customer && !choosing ? (
+          <>
+            <ContactRow contact={customer} onEdit={() => setChoosing(true)} customer />
+            <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+              {customer.personId ? 'They see this property and its completed snow services in their app.' : 'Not linked to a customer account yet. Tap to choose the customer.'}
+            </Text>
+          </>
         ) : (
-          <ContactRow key={c.id} contact={c} onEdit={() => setEditing(c.id)} />
+          <>
+            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{customer ? 'Change the customer' : 'Choose the customer'}</Text>
+            {customers.length > 5 ? <SearchBar value={query} onChangeText={setQuery} placeholder="Search your customers" style={{ marginTop: spacing.sm }} /> : null}
+            {shown.slice(0, 40).map((m, i) => (
+              <Pressable
+                key={m.personId}
+                onPress={() => linkCustomer(m.personId)}
+                disabled={busy}
+                style={[styles.pickRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }, busy && { opacity: 0.5 }]}
+                accessibilityRole="button"
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{`${m.person!.firstName} ${m.person!.lastName}`.trim() || m.person!.email}</Text>
+                  {m.person!.phone || m.person!.email ? <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{[m.person!.phone, m.person!.email].filter(Boolean).join(' · ')}</Text> : null}
+                </View>
+                {customer?.personId === m.personId ? <Icon name="check" size={18} color={colors.primary} /> : null}
+              </Pressable>
+            ))}
+            {customers.length === 0 ? <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>No customers yet. Add one below.</Text> : null}
+            <QuickAddCustomer onAdded={linkCustomer} />
+            {customer ? <Button title="Cancel" variant="ghost" size="sm" onPress={() => { setChoosing(false); setQuery(''); }} style={{ alignSelf: 'flex-start' }} /> : null}
+          </>
+        )}
+      </View>
+
+      <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>OTHER CONTACTS</Text>
+      <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
+        {others.length === 0 && editing !== 'new' ? (
+          <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>A property manager, a tenant or anyone else the crew may need to reach.</Text>
+        ) : null}
+        {others.map((o) => editing === o.id ? (
+          <ContactForm key={o.id} companyId={companyId} propertyId={propertyId} contact={o} onDone={() => { setEditing(null); onChanged(); }} onCancel={() => setEditing(null)} />
+        ) : (
+          <ContactRow key={o.id} contact={o} onEdit={() => setEditing(o.id)} />
         ))}
         {editing === 'new' ? (
-          <ContactForm
-            companyId={companyId}
-            propertyId={propertyId}
-            makePrimary={contacts.length === 0}
-            onDone={() => { setEditing(null); onChanged(); }}
-            onCancel={() => setEditing(null)}
-          />
+          <ContactForm companyId={companyId} propertyId={propertyId} onDone={() => { setEditing(null); onChanged(); }} onCancel={() => setEditing(null)} />
         ) : (
           <Button title="Add Contact" icon="plus" variant="ghost" size="sm" onPress={() => setEditing('new')} style={{ alignSelf: 'flex-start', marginTop: spacing.xs }} />
         )}
@@ -164,16 +219,16 @@ function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
   );
 }
 
-function ContactRow({ contact, onEdit }: { contact: SnowPropertyContact; onEdit: () => void }) {
+function ContactRow({ contact, onEdit, customer }: { contact: SnowPropertyContact; onEdit: () => void; customer?: boolean }) {
   const { colors } = useTheme();
   const reach = [contact.phone, contact.email].filter(Boolean).join(' · ');
-  const tags = [contact.isPrimary && 'Main contact', contact.personId && 'Has the customer app'].filter(Boolean).join(' · ');
+  const tags = customer ? (contact.personId ? 'Customer account linked' : '') : [contact.isPrimary && 'Main contact'].filter(Boolean).join(' · ');
   return (
     <Pressable
       onPress={onEdit}
       style={({ pressed }) => [styles.contactRow, pressed && { opacity: 0.7 }]}
       accessibilityRole="button"
-      accessibilityLabel={`Edit ${contact.name}`}
+      accessibilityLabel={customer ? `Change the customer, now ${contact.name}` : `Edit ${contact.name}`}
     >
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
@@ -182,7 +237,7 @@ function ContactRow({ contact, onEdit }: { contact: SnowPropertyContact; onEdit:
         {!!reach && <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{reach}</Text>}
         {!!tags && <Text style={[typeScale.caption, { color: colors.primary }]}>{tags}</Text>}
       </View>
-      <Icon name="edit-2" size={16} color={colors.textTertiary} />
+      <Icon name={customer ? 'repeat' : 'edit-2'} size={16} color={colors.textTertiary} />
     </Pressable>
   );
 }
@@ -192,18 +247,13 @@ function ContactForm({ companyId, propertyId, contact, makePrimary, onDone, onCa
   onDone: () => void; onCancel: () => void;
 }) {
   const { colors } = useTheme();
-  const v = useDb();
-  const customers = useMemo(
-    () => db.members.filter((m) => m.role === 'customer' && m.status !== 'inactive' && m.person),
-    [v],
-  );
   const [form, setForm] = useState<ContactInput>({
     name: contact?.name ?? '',
     title: contact?.title ?? '',
     phone: contact?.phone ?? '',
     email: contact?.email ?? '',
     personId: contact?.personId,
-    isPrimary: contact?.isPrimary ?? !!makePrimary,
+    isPrimary: contact?.isPrimary ?? false,
   });
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<ContactInput>) => setForm((f) => ({ ...f, ...patch }));
@@ -233,32 +283,6 @@ function ContactForm({ companyId, propertyId, contact, makePrimary, onDone, onCa
       <Input label="Role (optional)" value={form.title} onChangeText={(title) => set({ title })} placeholder="Property manager" autoCapitalize="words" />
       <Input label="Phone (optional)" value={form.phone} onChangeText={(phone) => set({ phone })} keyboardType="phone-pad" />
       <Input label="Email (optional)" value={form.email} onChangeText={(email) => set({ email })} keyboardType="email-address" autoCapitalize="none" />
-
-      <Pressable
-        onPress={() => set({ isPrimary: !form.isPrimary })}
-        style={styles.checkRow}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: !!form.isPrimary }}
-      >
-        <Icon name={form.isPrimary ? 'check-square' : 'square'} size={20} color={form.isPrimary ? colors.primary : colors.textTertiary} />
-        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Main contact</Text>
-      </Pressable>
-
-      <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>Customer app account</Text>
-      <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-        Linking an account lets this customer see the property and its completed snow services in their app.
-      </Text>
-      <View style={styles.chips}>
-        <Chip label="None" selected={!form.personId} onPress={() => set({ personId: undefined })} />
-        {customers.map((m) => (
-          <Chip
-            key={m.personId}
-            label={`${m.person!.firstName} ${m.person!.lastName}`.trim() || m.person!.email}
-            selected={form.personId === m.personId}
-            onPress={() => set({ personId: m.personId })}
-          />
-        ))}
-      </View>
 
       <View style={styles.formButtons}>
         {contact && <Button title="Remove" variant="ghost" size="sm" onPress={remove} />}
@@ -461,6 +485,7 @@ function ServiceReferenceEditor({ companyId, ps, details, mediaUrls, onChanged }
 }
 
 const styles = StyleSheet.create({
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, minHeight: 52 },
   screen: { flex: 1 },
   backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { marginTop: spacing.xl, marginBottom: spacing.xs, marginLeft: spacing.md },

@@ -26,8 +26,8 @@ check('8 terms: Apple clause and governing law', /third-party beneficiaries/.tes
 check('9 support: email, phone, report, delete account', /Report/.test(text(SUPPORT)) && /Delete Account/.test(text(SUPPORT)));
 check('10 no unfinished placeholders', !/TODO|TBD|lorem|\[[A-Za-z ]+\]|XXX|example\.com/i.test(all));
 check('11 the three in-app screens exist', ['privacy', 'terms', 'support'].every((s) => fs.existsSync(path.join(root, `app/legal/${s}.tsx`))));
-check('12 legal routes are public in the root layout', /\['approve', 'legal', 'reset-password'\]/.test(read('app/_layout.tsx')));
-check('13 sign-up screens require agreeing to the terms', ['signup', 'create-company', 'join-team', 'customer-access'].every((f) => /TERMS_REQUIRED_MESSAGE/.test(read(`app/(auth)/${f}.tsx`)) && /<TermsAgreement/.test(read(`app/(auth)/${f}.tsx`))));
+check('12 legal routes are public in the root layout', /\['approve', 'invite', 'legal', 'reset-password'\]/.test(read('app/_layout.tsx')));
+check('13 sign-up screens (including the private invite page) require agreeing to the terms', ['app/(auth)/signup.tsx', 'app/(auth)/create-company.tsx', 'app/invite/[token].tsx'].every((f) => /TERMS_REQUIRED_MESSAGE/.test(read(f)) && /<TermsAgreement/.test(read(f))));
 check('14 every settings screen has the legal rows', ['app/(worker)/(tabs)/settings.tsx', 'app/(customer)/(tabs)/account.tsx', 'app/(owner)/(tabs)/more/settings.tsx', 'src/components/snow/SnowWorkerSettings.tsx', 'src/components/snow/settings/SnowSettingsScreen.tsx', 'app/snow/notice.tsx'].every((f) => /<LegalSection \/>/.test(read(f))) && ['/legal/privacy', '/legal/terms', '/legal/support'].every((r) => read('app/snow/owner/(tabs)/more.tsx').includes(r)));
 check('15 Delete Account is reachable in every role, including the Snow screens', ['app/(worker)/(tabs)/settings.tsx', 'app/(customer)/(tabs)/account.tsx', 'app/(owner)/(tabs)/more/settings.tsx', 'src/components/snow/SnowWorkerSettings.tsx', 'src/components/snow/settings/SnowSettingsScreen.tsx', 'app/snow/notice.tsx', 'app/snow/owner/(tabs)/more.tsx'].every((f) => /<DeleteAccountRow \/>/.test(read(f))));
 let webOk = true, webMsg = '';

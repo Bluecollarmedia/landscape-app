@@ -160,10 +160,8 @@ export interface SignUpIntent {
     state?: string;
     zip?: string;
   };
-  teamCode?: string;
-  /** Snow signup code: files a Snow access request (supabase/updates/023_snow_onboarding.sql). */
-  snowCode?: string;
-  projectCode?: string;
+  /** A private one-time invite link (supabase/updates/078_invite_links.sql): the database attaches the new login to the person the owner added. */
+  inviteToken?: string;
 }
 
 export interface SignUpResult {
@@ -273,20 +271,6 @@ async function resolveContext(): Promise<Resolution | null> {
       appState: 'active', onboardingStep: 'ready', memberRole: 'worker', companyId: snow.member.companyId,
       modeAccess: { landscaping: false, snow: true },
     };
-  }
-  const jr = ctx.join_request;
-  const sr = snow?.request;
-  if (jr?.status === 'pending') {
-    return { user, appState: 'pending_approval', onboardingStep: 'pending_approval', pendingCompanyName: jr.company_name, pendingRequestId: jr.id, pendingKind: 'team' };
-  }
-  if (sr?.status === 'pending') {
-    return { user, appState: 'pending_approval', onboardingStep: 'pending_approval', pendingCompanyName: sr.companyName, pendingRequestId: sr.id, pendingKind: 'snow' };
-  }
-  if (jr?.status === 'declined') {
-    return { user, appState: 'declined', onboardingStep: 'declined', pendingCompanyName: jr.company_name, pendingRequestId: jr.id, pendingKind: 'team' };
-  }
-  if (sr?.status === 'declined') {
-    return { user, appState: 'declined', onboardingStep: 'declined', pendingCompanyName: sr.companyName, pendingRequestId: sr.id, pendingKind: 'snow' };
   }
   return { user, appState: 'onboarding', onboardingStep: 'join_team_code' };
 }
@@ -449,9 +433,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (c.state) metadata.company_state = c.state;
         if (c.zip) metadata.company_zip = c.zip;
       }
-      if (intent?.teamCode) metadata.team_code = intent.teamCode;
-      if (intent?.snowCode) metadata.snow_code = intent.snowCode;
-      if (intent?.projectCode) metadata.project_code = intent.projectCode;
+      if (intent?.inviteToken) metadata.invite_token = intent.inviteToken;
 
       const { data, error } = await supabase.auth.signUp({ email, password, options: { data: metadata } });
       if (error) throw error;

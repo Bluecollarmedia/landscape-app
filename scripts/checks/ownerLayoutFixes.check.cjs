@@ -12,6 +12,6 @@ const dash = read('app/(owner)/(tabs)/index.tsx');
 check('4 Dashboard scrolls to the top whenever it is focused and when its tab is tapped again', /useFocusEffect\(toTop\)/.test(dash) && /addListener\('tabPress'/.test(dash) && /<ScrollView ref=\{scrollRef\}/.test(dash));
 const tr = read('app/(owner)/(tabs)/more/trucks/index.tsx');
 check('5 Trucks has no entrance bounce', !/FadeInItem/.test(tr));
-const js = read('app/(owner)/(tabs)/more/join-settings.tsx');
-check('6 the Join Settings code card appears with no bounce', !/ZoomIn/.test(js) && !/key=\{activeCode\.code\} entering/.test(js));
+const aw = read('app/(owner)/worker-new.tsx');
+check('6 the Add Worker link card appears with no bounce', !/ZoomIn/.test(aw) && !/entering=/.test(aw));
 console.log(bad ? `\n${bad} failed` : '\nall passed'); process.exit(bad ? 1 : 0);

@@ -139,7 +139,7 @@ export default function MaintenancePropertyScreen() {
           )}
         </ListSection>
 
-        <CustomerAccessSection propertyId={p.id} propertyName={p.name} linked={!!p.customer} />
+        <CustomerAccessSection propertyId={p.id} customer={p.customer} />
 
         {(!!p.accessNotes || !!p.notes) && (
           <ListSection title="NOTES">

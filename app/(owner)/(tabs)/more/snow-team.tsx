@@ -1,8 +1,7 @@
 /**
  * Snow Team (owner)
  *
- * The separate Snow signup code, Snow access requests, and who is on the
- * snow team with which services. Functional layout only; the approved Snow
+ * Who is on the snow team and which services each person works. Workers are added from your team (no codes, no requests). Functional layout only; the approved Snow
  * Mode design will restyle it later.
  *
  * Everything here goes through the database functions in
@@ -95,49 +94,6 @@ function PersonLine({ first, last, email, phone, avatarUrl, note }: {
   );
 }
 
-function RequestCard({ req, onApprove, onDecline, onRemove }: {
-  req: SnowAccessRequest;
-  onApprove: (s: SnowService[]) => Promise<void>;
-  onDecline: () => void;
-  onRemove: () => void;
-}) {
-  const { colors } = useTheme();
-  const [services, setServices] = useState<SnowService[]>([]);
-  const [busy, setBusy] = useState(false);
-  const notes = [
-    `Requested ${formatDate(req.createdAt)}`,
-    req.landscapingRole ? 'Already on the landscaping team' : 'Snow only',
-    req.codeStillActive ? null : 'Used an old code',
-  ].filter(Boolean).join(' · ');
-
-  return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
-      <PersonLine first={req.firstName} last={req.lastName} email={req.email} phone={req.phone} avatarUrl={req.avatarUrl} note={notes} />
-      <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.md }]}>Snow work they can do</Text>
-      <ServicePicker value={services} onChange={setServices} />
-      <View style={styles.actionsRow}>
-        <Button
-          title="Approve"
-          icon="check"
-          size="sm"
-          disabled={services.length === 0}
-          loading={busy}
-          onPress={async () => {
-            setBusy(true);
-            try { await onApprove(services); } finally { setBusy(false); }
-          }}
-        />
-        <Button title="Decline" icon="x" size="sm" variant="secondary" onPress={onDecline} />
-        <Button title="Remove" size="sm" variant="ghost" onPress={onRemove} />
-      </View>
-      {services.length === 0 && (
-        <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>Pick at least one service to approve.</Text>
-      )}
-    </View>
-  );
-}
-
-/** An existing landscaping worker the owner can give Snow access without a signup request. */
 function ExistingWorkerCard({ first, last, email, phone, onGrant }: {
   first: string; last: string; email: string; phone?: string;
   onGrant: (s: SnowService[]) => Promise<void>;
@@ -224,12 +180,8 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
   const tabBarClearance = useTabBarClearance();
   const { colors } = useTheme();
   const admin = useSnowOnboardingAdmin();
-  const [showHistory, setShowHistory] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [showCodeTools, setShowCodeTools] = useState(false);
   const [showAddWorkers, setShowAddWorkers] = useState(false);
-  const [historyPages, setHistoryPages] = useState(1);
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** A green note at the top so it is clear the change went through (the card itself moves away). */
@@ -240,7 +192,6 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
   }
   const dbVersion = useDb();
 
-  const history = admin.requests.filter((r) => r.status === 'declined' || r.status === 'removed' || r.status === 'approved');
   const active = admin.members.filter((m) => m.status === 'active');
   const revoked = admin.members.filter((m) => m.status === 'revoked');
   const offerWorkers = useMemo(
@@ -248,7 +199,6 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [dbVersion, admin.members],
   );
-  const historyPage = pageOf(history, historyPages);
 
   async function run(p: Promise<{ ok: boolean; error?: string }>, success?: () => void) {
     const res = await p;
@@ -257,61 +207,6 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
     } else {
       showError((res as { error: string }).error);
     }
-  }
-
-  function handleRegenerate() {
-    confirmAction(
-      admin.code ? 'Make a new Snow code?' : 'Turn on the Snow code?',
-      admin.code ? 'The current code stops working right away. Requests already waiting stay here for you to review.' : 'People can use the new code to ask for snow access. You still approve each one.',
-      admin.code ? 'New Code' : 'Turn On',
-      () => run(admin.regenerateCode(), () => haptics.success()),
-    );
-  }
-
-  function handleDisable() {
-    confirmAction(
-      'Turn off the Snow code?',
-      'Nobody can send a new snow request until you make a new code. Requests already waiting stay here.',
-      'Turn Off',
-      () => run(admin.disableCode()),
-    );
-  }
-
-  async function handleCopy() {
-    if (!admin.code) return;
-    await Clipboard.setStringAsync(admin.code);
-    haptics.light();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  function handleShare() {
-    if (!admin.code) return;
-    Share.share({ message: `Join the Brighton snow team: open the Brighton Lawn + Landscape app, tap "Join the Snow Team" and enter ${admin.code}` }).catch(() => {});
-  }
-
-  function handleDecline(req: SnowAccessRequest) {
-    const go = (reason?: string) => run(admin.decline(req, reason));
-    if (Platform.OS === 'web') {
-      const reason = prompt(`Decline ${req.firstName}'s snow request? Reason (optional):`);
-      if (reason !== null) go(reason || undefined);
-    } else if (Platform.OS === 'ios') {
-      Alert.prompt('Decline snow request?', `${req.firstName} will see that it wasn't approved. Reason (optional):`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Decline', style: 'destructive', onPress: (reason?: string) => go(reason || undefined) },
-      ]);
-    } else {
-      confirmAction('Decline snow request?', `${req.firstName} will see that it wasn't approved.`, 'Decline', () => go());
-    }
-  }
-
-  function handleRemove(req: SnowAccessRequest) {
-    confirmAction(
-      'Remove this request?',
-      `Clears ${req.firstName}'s request from the list without approving it. They can ask again with the current code.`,
-      'Remove',
-      () => run(admin.remove(req)),
-    );
   }
 
   function handleRevoke(m: SnowMember) {
@@ -325,7 +220,7 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Snow Team" subtitle="Who can work snow, and who is waiting" hideBack={asTab} />
+      <ScreenHeader title="Snow Team" subtitle="Who works on snow, and which services" hideBack={asTab} />
       <ScrollView
         // Always clear the floating tab bar (also when opened from More), so the last row can be reached.
         contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance + spacing.lg }]}
@@ -341,24 +236,6 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
           </View>
         ) : (
           <>
-            {/* Requests */}
-            <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>
-              REQUESTS{admin.pending.length ? ` (${admin.pending.length})` : ''}
-            </Text>
-            {admin.pending.length === 0 ? (
-              <Text style={[typeScale.bodySmall, styles.empty, { color: colors.textSecondary }]}>No snow requests waiting.</Text>
-            ) : (
-              admin.pending.map((r) => (
-                <RequestCard
-                  key={r.id}
-                  req={r}
-                  onApprove={(s) => run(admin.approve(r, s), () => { haptics.success(); flashSaved(`Saved. ${r.firstName} ${r.lastName} was approved for Snow.`); })}
-                  onDecline={() => handleDecline(r)}
-                  onRemove={() => handleRemove(r)}
-                />
-              ))
-            )}
-
             {/* Team */}
             <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>
               SNOW TEAM{active.length ? ` (${active.length})` : ''}
@@ -399,77 +276,6 @@ export function SnowTeamScreen({ asTab = false }: { asTab?: boolean }) {
               </>
             )}
 
-            {/* New workers: the Snow code, kept small */}
-            <Text style={[typeScale.overline, styles.sectionTitle, { color: colors.textTertiary }]}>NEW WORKERS</Text>
-            <View style={[styles.card, { backgroundColor: colors.surface, paddingVertical: spacing.md }]}>
-              {admin.code ? (
-                <>
-                  <View style={styles.codeRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Snow signup code</Text>
-                      <Text selectable style={[typeScale.labelLarge, { color: colors.textPrimary, letterSpacing: 1.5 }]}>{admin.code}</Text>
-                    </View>
-                    <Button title={copied ? 'Copied' : 'Copy'} size="sm" variant="secondary" icon={copied ? 'check' : 'copy'} onPress={handleCopy} />
-                    <Button title="Share" size="sm" variant="secondary" icon="share" onPress={handleShare} />
-                  </View>
-                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
-                    For people who are not on your team yet. A code only sends a request; nobody gets in until you approve them.
-                  </Text>
-                  <Pressable onPress={() => setShowCodeTools((v) => !v)} style={{ marginTop: spacing.sm }} accessibilityRole="button">
-                    <Text style={[typeScale.labelSmall, { color: colors.primary }]}>{showCodeTools ? 'Hide code options' : 'Code options'}</Text>
-                  </Pressable>
-                  {showCodeTools && (
-                    <View style={styles.actionsRow}>
-                      <Button title="New Code" size="sm" variant="ghost" icon="refresh-cw" onPress={handleRegenerate} />
-                      <Button title="Turn Off" size="sm" variant="ghost" onPress={handleDisable} />
-                    </View>
-                  )}
-                </>
-              ) : (
-                <View style={styles.codeRow}>
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1 }]}>No Snow code is on. Nobody new can send a request.</Text>
-                  <Button title="Make a Snow Code" size="sm" icon="plus" onPress={handleRegenerate} />
-                </View>
-              )}
-            </View>
-
-            {/* History */}
-            {history.length > 0 && (
-              <Pressable onPress={() => setShowHistory((v) => !v)} style={styles.historyToggle} accessibilityRole="button">
-                <Text style={[typeScale.labelSmall, { color: colors.primary }]}>
-                  {showHistory ? 'Hide past requests' : `Show past requests (${history.length})`}
-                </Text>
-              </Pressable>
-            )}
-            {showHistory &&
-              historyPage.shown.map((r) => (
-                <View key={r.id} style={[styles.card, { backgroundColor: colors.surface }]}>
-                  <View style={styles.memberTop}>
-                    <View style={{ flex: 1 }}>
-                      <PersonLine
-                        first={r.firstName}
-                        last={r.lastName}
-                        email={r.email}
-                        avatarUrl={r.avatarUrl}
-                        note={[
-                          formatDate(r.reviewedAt ?? r.createdAt),
-                          r.status === 'approved' ? r.grantedServices.map(snowServiceLabel).join(', ') : null,
-                          r.declineReason ? `“${r.declineReason}”` : null,
-                        ].filter(Boolean).join(' · ')}
-                      />
-                    </View>
-                    <StatusBadge
-                      label={r.status === 'approved' ? 'Approved' : r.status === 'declined' ? 'Declined' : 'Removed'}
-                      status={r.status === 'approved' ? 'success' : r.status === 'declined' ? 'error' : 'neutral'}
-                    />
-                  </View>
-                </View>
-              ))}
-            {showHistory && historyPage.more > 0 && (
-              <Pressable onPress={() => setHistoryPages((n) => n + 1)} style={styles.historyToggle} accessibilityRole="button">
-                <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Show {Math.min(historyPage.more, 10)} more ({historyPage.more} left)</Text>
-              </Pressable>
-            )}
           </>
         )}
       </ScrollView>

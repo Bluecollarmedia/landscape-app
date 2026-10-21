@@ -16,6 +16,7 @@ import { db, insertRow, insertRows, updateRow, deleteRow, rowsOf, rpc, refresh, 
 import { emitTimeChanged, isTimeTrackingOn, lastMyDay, timeRpc } from './timeTracking';
 import { localDateKey, todayKey } from '@/lib/ids';
 import { cleanDates } from '@/lib/serviceDates';
+import { worksOnLandscaping, worksOnMaintenance } from '@/lib/workerAreas';
 import type { GpsResult } from '@/lib/location';
 import type { PersonSummary } from '@/types/company';
 import type {
@@ -34,7 +35,7 @@ const fail = (error: string): Result<never> => ({ ok: false, error });
 /** Active workers the owner classified as maintenance workers. */
 export function maintenanceWorkers(): PersonSummary[] {
   return db.members
-    .filter((m) => m.role === 'worker' && m.status === 'active' && m.workerType === 'maintenance' && m.person)
+    .filter((m) => m.role === 'worker' && m.status === 'active' && worksOnMaintenance(m) && m.person)
     .map((m) => m.person!);
 }
 
@@ -91,23 +92,24 @@ export function placeInMaintenanceCrew(personId: string, workerType: WorkerType)
   }
 }
 
-/** Owner/admin only. Explicit reclassification of a worker. A plain row update
- * can't change the type; the set_worker_type RPC (supabase/updates/019) does,
- * and writes it to the membership audit log. */
-export async function setWorkerType(personId: string, workerType: WorkerType): Promise<Result> {
+/** Owner/admin only. Chooses which areas a worker works on (Landscaping, Maintenance). A plain row update can't change them;
+ * the set_worker_areas function (supabase/updates/078) does, and writes it to the membership audit log. */
+export async function setWorkerAreas(personId: string, areas: { landscaping: boolean; maintenance: boolean }): Promise<Result> {
   const m = db.members.find((x) => x.personId === personId && x.role === 'worker');
-  if (!m) return fail('Only workers can be classified.');
-  const from: WorkerType = m.workerType ?? 'landscaping';
-  if (from === workerType) return ok(undefined);
+  if (!m) return fail('Only workers have areas.');
+  if (worksOnLandscaping(m) === areas.landscaping && worksOnMaintenance(m) === areas.maintenance) return ok(undefined);
   if (isDemo()) {
-    updateRow('company_members', m.id, { workerType });
-    placeInMaintenanceCrew(personId, workerType);
+    updateRow('company_members', m.id, {
+      worksLandscaping: areas.landscaping, worksMaintenance: areas.maintenance,
+      workerType: areas.maintenance && !areas.landscaping ? 'maintenance' : 'landscaping',
+    });
+    placeInMaintenanceCrew(personId, areas.maintenance ? 'maintenance' : 'landscaping');
     insertRow('membership_audit_log', {
-      eventType: 'worker_type_changed', actorId: db.personId, targetId: personId, metadata: { from, to: workerType },
+      eventType: 'worker_areas_changed', actorId: db.personId, targetId: personId, metadata: { ...areas },
     });
     return ok(undefined);
   }
-  const { error } = await rpc('set_worker_type', { p_person_id: personId, p_type: workerType });
+  const { error } = await rpc('set_worker_areas', { p_person_id: personId, p_landscaping: areas.landscaping, p_maintenance: areas.maintenance });
   await refresh('company_members', 'crew_members');
   return error ? fail(error.message) : ok(undefined);
 }

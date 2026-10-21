@@ -30,9 +30,9 @@ function RootNavigator() {
   const segments = useSegments();
   const router = useRouter();
   const [splashDone, setSplashDone] = useState(false);
-  // The approval page (/approve/<token>), the legal pages (/legal/privacy, terms, support) and the password reset page are public:
+  // The approval page (/approve/<token>), the invite page (/invite/<token>), the legal pages (/legal/privacy, terms, support) and the password reset page are public:
   // no sign-in, no redirects.
-  const isPublicPage = ['approve', 'legal', 'reset-password'].includes((segments as string[])[0]);
+  const isPublicPage = ['approve', 'invite', 'legal', 'reset-password'].includes((segments as string[])[0]);
   const { shell } = useModeAccess(user?.role);
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
@@ -58,30 +58,14 @@ function RootNavigator() {
       return;
     }
 
-    // The setup hub links to the create-company / join-team / project-code
-    // screens, which also work for an already-signed-in user.
-    const setupScreens = ['create-company', 'join-team', 'customer-access'];
+    // The setup hub links to the create-company screen, which also works for an already-signed-in user.
+    const setupScreens = ['create-company'];
     const onSetupScreen = inAuthGroup && setupScreens.includes((segments as string[])[1] ?? '');
 
     if (appState === 'onboarding') {
       // Signed in but not part of a company yet.
       if (!inOnboardingGroup && !onSetupScreen) {
         router.replace('/(onboarding)/setup');
-      }
-      return;
-    }
-
-    if (appState === 'pending_approval') {
-      if (!inOnboardingGroup || (segments as string[])[1] !== 'pending-approval') {
-        router.replace('/(onboarding)/pending-approval');
-      }
-      return;
-    }
-
-    if (appState === 'declined') {
-      // A declined person may try again with a new code.
-      if (!inOnboardingGroup && !onSetupScreen) {
-        router.replace('/(onboarding)/declined');
       }
       return;
     }

@@ -1,5 +1,5 @@
 /**
- * Snow worker Settings: your profile (photo, name, phone: yours to edit), your
+ * Snow worker Settings: your profile card (one tap opens photo, name and phone: yours to edit), your
  * account (email, role) and the snow services the owner has given you (the
  * owner's to change, so they are read-only here), and Sign Out. No owner
  * controls. Services come from get_my_snow_access (update 020).
@@ -7,7 +7,7 @@
 import { LegalSection } from '@/components/legal/LegalSection';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { ListSection } from '@/components/ui';
-import { displayName, formatPhone, profileNudge, roleLabel } from '@/lib/snowWorkerProfile';
+import { displayName, profileNudge, roleLabel } from '@/lib/snowWorkerProfile';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -97,13 +97,9 @@ export function SnowWorkerSettings() {
           </View>
           <Icon name="chevron-right" size={18} color={colors.textTertiary} />
         </Pressable>
-        {nudge ? <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: -spacing.md, marginBottom: spacing.xl, marginHorizontal: spacing.sm }]}>{nudge}</Text> : null}
-
-        <SettingsGroup title="Your profile" footer="Your name, phone and photo are yours to change. The office sees them.">
-          <SettingsRow icon="camera" title={user?.avatarUrl ? 'Change profile photo' : 'Add a profile photo'} onPress={editProfile} />
-          <SettingsRow icon="user" title="Name" value={displayName(user)} onPress={editProfile} />
-          <SettingsRow icon="phone" title="Phone" value={formatPhone(user?.phone) || 'Add'} onPress={editProfile} />
-        </SettingsGroup>
+        <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: -spacing.md, marginBottom: spacing.xl, marginHorizontal: spacing.sm }]}>
+          {nudge ?? 'Tap to change your name, phone or photo. The office sees them.'}
+        </Text>
 
         <SettingsGroup title="Your account" footer="Your email is your sign-in. Ask the office if it needs to change.">
           <SettingsRow icon="mail" title="Email" value={user?.email ?? ''} />

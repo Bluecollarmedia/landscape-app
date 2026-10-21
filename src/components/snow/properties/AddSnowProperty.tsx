@@ -5,13 +5,13 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Button, Icon, Input, InlineNotice, SearchBar } from '@/components/ui';
-import { QuickAddCustomer } from '@/components/customers/QuickAddCustomer';
+import { Button, Icon, Input } from '@/components/ui';
+import { CustomerPicker } from '@/components/customers/CustomerPicker';
 import { showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCustomers } from '@/hooks/useCustomers';
 import { ensureProperty, enableSnowForProperty, useCustomerProperties } from '@/data/properties';
-import { db, rowsOf, updateRow } from '@/data/store';
+import { db, isDemo, rowsOf, updateRow } from '@/data/store';
 import { knownPlacesFor, normalizeAddress, type KnownPlace } from '@/lib/snowExisting';
 import { formatAddress } from '@/lib/address';
 import { applyStreetInput } from '@/lib/address';
@@ -23,20 +23,13 @@ const EMPTY = { name: '', address: '', city: '', state: '', zip: '' };
 export function AddSnowProperty({ onCancel, onDone, snowPropertyIds = [] }: { onCancel: () => void; onDone: (snowPropertyId: string) => void; /** Shared property ids that already have a Snow record. */ snowPropertyIds?: string[] }) {
   const { colors } = useTheme();
   const { allCustomers } = useCustomers();
-  const [query, setQuery] = useState('');
   const [customerId, setCustomerId] = useState<string | undefined>();
   const [newMode, setNewMode] = useState(false);
   const shared = useCustomerProperties(customerId);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
 
-  const customers = useMemo(
-    () => allCustomers.slice().sort((a, b) => `${a.person.lastName} ${a.person.firstName}`.localeCompare(`${b.person.lastName} ${b.person.firstName}`)),
-    [allCustomers],
-  );
-  const q = query.trim().toLowerCase();
-  const shown = q ? customers.filter((c) => `${c.person.firstName} ${c.person.lastName} ${c.person.email}`.toLowerCase().includes(q)) : customers;
-  const customer = customers.find((c) => c.person.id === customerId);
+  const customer = allCustomers.find((c) => c.person.id === customerId);
   const set = (k: keyof typeof EMPTY) => (v: string) => setForm({ ...form, [k]: v });
 
   // Their addresses the app already knows from landscaping projects and Maintenance that are not saved properties yet.
@@ -45,6 +38,13 @@ export function AddSnowProperty({ onCancel, onDone, snowPropertyIds = [] }: { on
     const have = new Set(shared.map((p) => normalizeAddress(p.address)));
     return knownPlacesFor(customerId, db.projects, rowsOf('maintenance_properties') as { id: string }[]).filter((k) => !have.has(normalizeAddress(k.address)));
   }, [customerId, shared]);
+
+  /** Demo mode has no live database, and a half-made property would be left behind: say so before anything is written. */
+  function demoBlocked(): boolean {
+    if (!isDemo()) return false;
+    showMessage('Demo mode', 'Snow properties need the live database.');
+    return true;
+  }
 
   async function finish(pid: string) {
     const res = await enableSnowForProperty(pid);
@@ -56,14 +56,14 @@ export function AddSnowProperty({ onCancel, onDone, snowPropertyIds = [] }: { on
 
   /** A saved property: Snow turns on for it. */
   async function importShared(p: { id: string }) {
-    if (saving) return;
+    if (saving || demoBlocked()) return;
     setSaving(true);
     await finish(p.id);
   }
 
   /** An address from a landscaping project or Maintenance: saved once as the customer's property, then Snow turns on for it. */
   async function importPlace(place: KnownPlace) {
-    if (saving || !customerId) return;
+    if (saving || !customerId || demoBlocked()) return;
     setSaving(true);
     const made = await ensureProperty(customerId, { address: place.address, city: place.city, state: place.state, zip: place.zip });
     if (!made.ok) { setSaving(false); return showMessage("Couldn't import the property", made.missing ? 'This needs the latest database update (79).' : made.error); }
@@ -73,7 +73,7 @@ export function AddSnowProperty({ onCancel, onDone, snowPropertyIds = [] }: { on
   }
 
   async function saveNew() {
-    if (!customerId) return;
+    if (!customerId || demoBlocked()) return;
     if (!form.address.trim()) return showMessage('Add the address', 'Enter the street address so the crew can find the property.');
     setSaving(true);
     const made = await ensureProperty(customerId, { name: form.name, address: form.address, city: form.city, state: form.state, zip: form.zip });
@@ -97,23 +97,7 @@ export function AddSnowProperty({ onCancel, onDone, snowPropertyIds = [] }: { on
         </View>
       ) : (
         <>
-          {customers.length > 5 ? <SearchBar value={query} onChangeText={setQuery} placeholder="Search your customers" /> : null}
-          {shown.slice(0, 40).map((c, i) => (
-            <Pressable
-              key={c.person.id}
-              onPress={() => { setCustomerId(c.person.id); setNewMode(false); }}
-              style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}
-              accessibilityRole="button"
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{`${c.person.firstName} ${c.person.lastName}`.trim()}</Text>
-                {c.person.email ? <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{c.person.email}</Text> : null}
-              </View>
-              <Icon name="chevron-right" size={18} color={colors.textTertiary} />
-            </Pressable>
-          ))}
-          {customers.length === 0 ? <InlineNotice icon="info" tone="info" text="No customers yet. Add the first one below." style={{ marginBottom: spacing.sm }} /> : null}
-          <QuickAddCustomer onAdded={(id) => { setCustomerId(id); setNewMode(false); }} />
+          <CustomerPicker onPick={(id) => { setCustomerId(id); setNewMode(false); }} />
         </>
       )}
 

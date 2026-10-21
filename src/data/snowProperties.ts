@@ -205,14 +205,6 @@ export async function updateContact(contact: SnowPropertyContact, patch: Partial
   return error ? fail(message(error, 'Couldn\'t save the contact.')) : ok(undefined);
 }
 
-/** Removes a contact from the property. The row is kept (removed_at) for history. */
-export async function removeContact(contactId: string): Promise<Result> {
-  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
-  const { error } = await supabase.from('snow_property_contacts')
-    .update({ removed_at: new Date().toISOString() }).eq('id', contactId);
-  return error ? fail(message(error, 'Couldn\'t remove the contact.')) : ok(undefined);
-}
-
 // ── Services ────────────────────────────────────────────────────────────────
 
 /** Adds a service to the property, or turns a previously stopped one back on. */

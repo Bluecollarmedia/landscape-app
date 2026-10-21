@@ -12,8 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, LoadingSpinner, ProgressBar, ScreenHeader } from '@/components/ui';
 import { SnowPill } from '@/components/snow/SnowPill';
-import { snowStatus } from '@/theme/colors';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
+import { STORM_PILL } from '@/lib/snowStormView';
 import { useTheme } from '@/providers/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
@@ -30,9 +30,6 @@ import { RouteEditor } from '@/components/snow/routes/RouteEditScreen';
 
 /** The winter header picture, bundled with the app (made by scripts/make-storm-header.py from assets/source/snow-panorama.jpg). */
 const STORM_HEADER_IMAGE = require('../../../../assets/images/snow-storm-header.jpg');
-
-/** Badge colours per storm state, from the Snow palette. */
-const STORM_PILL = { draft: snowStatus.scheduled, dispatched: snowStatus.dispatched, ended: snowStatus.completed } as const;
 
 export function StormDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

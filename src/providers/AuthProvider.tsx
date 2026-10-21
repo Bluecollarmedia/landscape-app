@@ -22,7 +22,7 @@ import { unregisterForPush } from '@/lib/push';
 import { syncMaterialReminders } from '@/lib/materialReminders';
 import type { AuthState, UserProfile, UserRole } from '@/types';
 import type { OnboardingStep } from '@/types/onboarding';
-import { fetchMySnowAccess } from '@/hooks/useSnowOnboarding';
+import { fetchMySnowAccess } from '@/hooks/useSnowTeam';
 
 // ── Extended auth state ─────────────────────────────────────────
 

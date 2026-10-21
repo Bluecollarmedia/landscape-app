@@ -19,10 +19,11 @@ import {
   addOwnerMedia, loadCustomerSnowUpdates, loadReviewQueue, reviewMedia, sendCustomerUpdate, withdrawMedia,
   type CustomerSnowUpdate, type ReviewMedia, type ReviewStop,
 } from '@/data/snowMediaReview';
+import { shortWhen } from '@/lib/snowFormat';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
-const when = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const when = shortWhen;
 
 function Thumb({ m, children }: { m: { kind: string; url?: string }; children?: React.ReactNode }) {
   const { colors } = useTheme();

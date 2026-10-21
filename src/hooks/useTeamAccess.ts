@@ -101,7 +101,7 @@ export function useTeamAccess() {
 export interface AdminPermissions { team: boolean; invites: boolean; snow_access: boolean; time_corrections: boolean; pay_rates: boolean }
 export const ADMIN_POWERS: { key: keyof AdminPermissions; label: string; hint: string }[] = [
   { key: 'team', label: 'Team members', hint: 'Deactivate, reactivate and change the modes people work in.' },
-  { key: 'invites', label: 'Invitations and requests', hint: 'Team codes, Snow codes, approving or declining join requests.' },
+  { key: 'invites', label: 'Invites', hint: 'Adding workers and customers and sending their private links.' },
   { key: 'snow_access', label: 'Snow access', hint: 'Give, change or remove snow services.' },
   { key: 'time_corrections', label: 'Time corrections', hint: 'Correct and approve workdays and property times.' },
   { key: 'pay_rates', label: 'Pay rates', hint: 'See and change hourly rates and overtime terms.' },

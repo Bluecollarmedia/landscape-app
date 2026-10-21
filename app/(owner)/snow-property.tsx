@@ -11,11 +11,12 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
-import { Button, Icon, Input, LoadingSpinner, SearchBar } from '@/components/ui';
-import { QuickAddCustomer } from '@/components/customers/QuickAddCustomer';
+import { Button, Icon, LoadingSpinner } from '@/components/ui';
+import { CustomerPicker } from '@/components/customers/CustomerPicker';
 import { TaskMediaStrip, TaskMediaViewer } from '@/components/tasks/TaskMedia';
 import { snowMediaItems } from '@/components/snow/SnowReference';
 import { notify, pickSnowMedia } from '@/components/snow/pickSnowMedia';
+import { confirmAction } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -24,24 +25,13 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { db, useDb } from '@/data/store';
 import { useSnowPropertyDetails } from '@/hooks/useSnowPropertyDetails';
 import {
-  addContact, addReferenceMedia, addService, referenceAsOf, removeContact, retireReferenceMedia, saveInstructions,
+  addContact, addReferenceMedia, addService, referenceAsOf, retireReferenceMedia, saveInstructions,
   setServiceActive, updateContact, type ContactInput, type SnowPropertyDetails,
 } from '@/data/snowProperties';
 import {
   SNOW_SERVICES, SNOW_SERVICE_ICONS, SNOW_SERVICE_LABELS,
   type SnowPropertyContact, type SnowPropertyService, type SnowService,
 } from '@/types/snowProperty';
-
-function confirmAction(title: string, message: string, action: string, run: () => void) {
-  if (Platform.OS === 'web') {
-    if (confirm(`${title}\n\n${message}`)) run();
-    return;
-  }
-  Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: action, style: 'destructive', onPress: run },
-  ]);
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -128,20 +118,10 @@ function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
   const { colors } = useTheme();
   const v = useDb();
   const [choosing, setChoosing] = useState(false);
-  const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
 
   // The property's customer: the linked account, else the main contact. Every property has one.
   const customer = contacts.find((x) => x.personId) ?? contacts.find((x) => x.isPrimary);
-  const customers = useMemo(
-    () => db.members
-      .filter((m) => m.role === 'customer' && m.status !== 'inactive' && m.person)
-      .sort((x, y) => `${x.person!.lastName} ${x.person!.firstName}`.localeCompare(`${y.person!.lastName} ${y.person!.firstName}`)),
-    [v],
-  );
-  const q = query.trim().toLowerCase();
-  const shown = q ? customers.filter((m) => `${m.person!.firstName} ${m.person!.lastName} ${m.person!.email}`.toLowerCase().includes(q)) : customers;
-
   /** Puts an existing customer on this property (their name, phone and email come from their record; nothing is typed). */
   async function linkCustomer(personId: string) {
     const m = db.members.find((x) => x.personId === personId);
@@ -156,7 +136,6 @@ function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
     if (!res.ok) return notify('Not Saved', res.error);
     haptics.success();
     setChoosing(false);
-    setQuery('');
     onChanged();
   }
 
@@ -174,25 +153,8 @@ function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
         ) : (
           <>
             <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{customer ? 'Change the customer' : 'Choose the customer'}</Text>
-            {customers.length > 5 ? <SearchBar value={query} onChangeText={setQuery} placeholder="Search your customers" style={{ marginTop: spacing.sm }} /> : null}
-            {shown.slice(0, 40).map((m, i) => (
-              <Pressable
-                key={m.personId}
-                onPress={() => linkCustomer(m.personId)}
-                disabled={busy}
-                style={[styles.pickRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }, busy && { opacity: 0.5 }]}
-                accessibilityRole="button"
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{`${m.person!.firstName} ${m.person!.lastName}`.trim() || m.person!.email}</Text>
-                  {m.person!.phone || m.person!.email ? <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{[m.person!.phone, m.person!.email].filter(Boolean).join(' · ')}</Text> : null}
-                </View>
-                {customer?.personId === m.personId ? <Icon name="check" size={18} color={colors.primary} /> : null}
-              </Pressable>
-            ))}
-            {customers.length === 0 ? <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>No customers yet. Add one below.</Text> : null}
-            <QuickAddCustomer onAdded={linkCustomer} />
-            {customer ? <Button title="Cancel" variant="ghost" size="sm" onPress={() => { setChoosing(false); setQuery(''); }} style={{ alignSelf: 'flex-start' }} /> : null}
+            <CustomerPicker onPick={linkCustomer} checkedId={customer?.personId ?? undefined} disabled={busy} />
+            {customer ? <Button title="Cancel" variant="ghost" size="sm" onPress={() => setChoosing(false)} style={{ alignSelf: 'flex-start' }} /> : null}
           </>
         )}
       </View>
@@ -223,21 +185,6 @@ function ContactRow({ contact, onEdit, customer }: { contact: SnowPropertyContac
     </Pressable>
   );
 }
-
-function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.chip, { backgroundColor: selected ? colors.primary : colors.backgroundTertiary }]}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-    >
-      <Text style={[typeScale.labelSmall, { color: selected ? colors.textOnPrimary : colors.textPrimary }]} numberOfLines={1}>{label}</Text>
-    </Pressable>
-  );
-}
-
 // ── Services ────────────────────────────────────────────────────────────────
 
 function ServiceCard({ companyId, propertyId, service, details, mediaUrls, onChanged }: {
@@ -421,11 +368,6 @@ const styles = StyleSheet.create({
   sectionTitle: { marginTop: spacing.xl, marginBottom: spacing.xs, marginLeft: spacing.md },
   card: { borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.md, gap: spacing.sm },
   contactRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  form: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, marginVertical: spacing.xs },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs, minHeight: 44 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, maxWidth: 220, minHeight: 36, justifyContent: 'center' },
-  formButtons: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   serviceHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
   instructions: { minHeight: 110, borderWidth: 1.5, borderRadius: radius.lg, padding: spacing.md },
   versionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

@@ -111,7 +111,7 @@ export function SnowWorkerSettings() {
         </SettingsGroup>
 
         {error ? (
-          <InlineNotice icon="alert-circle" tone="warning" text="Couldn't load your snow team access. Pull to refresh or try again later." style={{ marginBottom: spacing.xl }} />
+          <InlineNotice icon="alert-circle" tone="warning" text="Couldn't load your snow team access. Close and reopen this screen, or try again later." style={{ marginBottom: spacing.xl }} />
         ) : null}
 
         {access ? (

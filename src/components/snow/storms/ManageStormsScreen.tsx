@@ -14,13 +14,12 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { deleteStormForGood, loadStormCounts, loadStorms, SERVICE_LABEL, STORM_STATUS_LABEL } from '@/data/snowStorms';
 import { deleteConfirmation } from '@/lib/snowStormDelete';
 import { servicesLabel, stormServices } from '@/lib/snowServices';
-import { longWhen } from '@/lib/snowStormView';
+import { longWhen, STORM_PILL } from '@/lib/snowStormView';
 import { snowStatus } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { SnowStorm } from '@/types/snow';
 
-const PILL = { draft: snowStatus.scheduled, dispatched: snowStatus.dispatched, ended: snowStatus.completed } as const;
 
 export function ManageStormsScreen() {
   const { colors } = useTheme();
@@ -79,7 +78,7 @@ export function ManageStormsScreen() {
         ) : (
           <View style={{ gap: spacing.sm }}>
             {storms.map((s) => {
-              const tone = PILL[s.status];
+              const tone = STORM_PILL[s.status];
               const when = s.status === 'ended' && s.endedAt ? `Ended ${longWhen(s.endedAt)}` : s.dispatchedAt ? `Dispatched ${longWhen(s.dispatchedAt)}` : `Created ${longWhen(s.createdAt)}`;
               return (
                 <View key={s.id} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>

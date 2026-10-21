@@ -33,7 +33,7 @@ check('10 the lead starts and finishes every visit at a property together, photo
   /arriveGroup\(currentGroup\)/.test(mine) && /finishGroup\(currentGroup\)/.test(mine) && /finishStop\(v\.id, first \? note : undefined\)/.test(mine) && /stopNeedsPhotos\(current, route\)/.test(mine) && /addCompletionMedia\(route\.companyId, current\.id/.test(mine));
 const storm = read('src/components/snow/storms/StormDetailScreen.tsx');
 check('11 a storm with several services makes ONE route for all of them (older databases fall back to one per service)',
-  /createRoute\(s\.data\.storm\.id, \{ name: s\.data\.storm\.name, service: services\[0\], services,/.test(storm) && /one route per service/.test(storm));
+  /createRoute\(st\.id, \{ name: st\.name, service: services\[0\], services,/.test(storm) && /one route per service/.test(storm));
 const data = read('src/data/snowRoutes.ts');
 check('12 the data layer reads services tolerantly (no update 61 yet) and adds a visit per service',
   /select\(`\$\{routeCols\}, services`\)/.test(data) && /build\(`\$\{base\}, services`\)/.test(data) && /\.\.\.\(service \? \{ service \} : \{\}\)/.test(data));

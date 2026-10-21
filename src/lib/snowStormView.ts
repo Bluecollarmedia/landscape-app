@@ -1,5 +1,8 @@
-// Small display helpers for the Storm Details screen (pure, no network).
-import type { SnowStorm } from '@/types/snow';
+// Small display helpers for the storm screens (pure, no network).
+import { snowStatus } from '@/theme/colors';
+
+/** Badge colours per storm state, from the Snow palette. Used by every screen that shows a storm's state. */
+export const STORM_PILL = { draft: snowStatus.scheduled, dispatched: snowStatus.dispatched, ended: snowStatus.completed } as const;
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 

@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useDb } from '@/data/store';
 import { setWorkerAreas } from '@/data/maintenance';
-import { useSnowOnboardingAdmin, SNOW_SERVICES, type SnowService } from '@/hooks/useSnowOnboarding';
+import { useSnowOnboardingAdmin, SNOW_SERVICES, type SnowService } from '@/hooks/useSnowTeam';
 import { worksOnLandscaping, worksOnMaintenance } from '@/lib/workerAreas';
 import { haptics } from '@/lib/haptics';
 import { typeScale } from '@/theme/typography';

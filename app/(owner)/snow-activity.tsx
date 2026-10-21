@@ -17,6 +17,7 @@ import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { EmptyState, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { SERVICE_LABEL as SNOW_SERVICE_LABEL } from '@/types/snow';
+import { shortWhen } from '@/lib/snowFormat';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -40,9 +41,7 @@ const FILTERS: { kind: SnowFilterKind; label: string; field: Exclude<keyof SnowA
 
 const SERVICE_LABEL: Record<string, string> = SNOW_SERVICE_LABEL;
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-}
+const formatTime = shortWhen;
 
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });

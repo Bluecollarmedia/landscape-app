@@ -17,11 +17,12 @@ import { SERVICE_LABEL, STORM_STATUS_LABEL } from '@/data/snowStorms';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { SERVICE_ICON, type SnowStorm } from '@/types/snow';
+import { shortWhen } from '@/lib/snowFormat';
 
 export const STATUS_TONE = { draft: 'neutral', dispatched: 'info', ended: 'success' } as const;
 
 function when(storm: SnowStorm): string {
-  const fmt = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const fmt = shortWhen;
   if (storm.status === 'ended' && storm.endedAt) return `Ended ${fmt(storm.endedAt)}`;
   if (storm.status === 'dispatched' && storm.lastReopenedAt) return `Reopened ${fmt(storm.lastReopenedAt)}`;
   if (storm.status === 'dispatched' && storm.dispatchedAt) return `Dispatched ${fmt(storm.dispatchedAt)}`;

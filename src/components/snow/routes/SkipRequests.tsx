@@ -19,6 +19,7 @@ import { confirmAction, showMessage } from '@/components/financials/ActionSheet'
 import { useTheme } from '@/providers/ThemeProvider';
 import { decideSkip, listRouteSkips, requestSkip, skipHistory, withdrawSkip } from '@/data/snowSkips';
 import type { SnowSkipRequest } from '@/types/snow';
+import { shortWhen } from '@/lib/snowFormat';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -152,7 +153,7 @@ function SkipDecisionCard({ request, stopName, leadName, onDecided }: {
       <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{stopName}</Text>
       <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>&ldquo;{request.reason}&rdquo;</Text>
       <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-        {leadName ? `${leadName} · ` : ''}{new Date(request.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+        {leadName ? `${leadName} · ` : ''}{shortWhen(request.createdAt)}
       </Text>
       <Input
         label="Note to the lead (optional)"

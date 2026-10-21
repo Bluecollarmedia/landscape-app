@@ -1,24 +1,17 @@
 /**
  * Snow notification settings (supabase/updates/031).
  *
- *  • OwnerCustomerMessages: the OWNER decides when customers are messaged (crew arrives, service finished), once for every
- *    property. Customers do not choose; the choice is saved per property through snow_set_notify_prefs (logged as staff).
- *  • OwnerStopAlertsToggle: the owner's own "alert me when a stop is done"
- *    switch. Independent of customer preferences; turning it off never stops
- *    the visit, dashboard or activity log from recording the work.
- *
- * Delivery wording comes from describeDelivery: "sent" means a provider
- * accepted it, never that it arrived.
+ *  • OwnerCustomerMessages: the OWNER decides when customers are messaged (crew arrives, service finished), once for
+ *    every property, in Snow Settings. Customers do not choose. Saved per property through snow_set_notify_prefs (logged).
+ *  • OwnerStopAlertsToggle: the owner's own "alert me when a stop is done" switch. Independent of customer messages;
+ *    turning it off never stops the visit, dashboard or activity log from recording the work.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Icon, InlineNotice, LoadingSpinner, Switch } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
-import {
-  describeDelivery, loadAllNotifyPrefs, loadMySnowProperties, loadNotifyPrefs, loadOwnerStopAlerts,
-  loadSnowNotifications, setNotifyPrefs, setOwnerStopAlerts,
-} from '@/data/snowNotifications';
-import type { SnowNotification, SnowNotifyPrefs } from '@/types/snowNotifications';
+import { loadAllNotifyPrefs, loadOwnerStopAlerts, setNotifyPrefs, setOwnerStopAlerts } from '@/data/snowNotifications';
+import type { SnowNotifyPrefs } from '@/types/snowNotifications';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -37,7 +30,7 @@ const prefsOf = (p?: SnowNotifyPrefs | null): Prefs => ({
  * The owner decides when customers get a message (crew arrives, service finished), once for every property. It is applied to each
  * property through snow_set_notify_prefs (logged as "Changed by staff"); customers do not choose.
  */
-export function OwnerCustomerMessages({ bare }: { bare?: boolean }) {
+export function OwnerCustomerMessages() {
   const { colors } = useTheme();
   const [prefs, setPrefs] = useState<Record<string, Prefs> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,17 +52,15 @@ export function OwnerCustomerMessages({ bare }: { bare?: boolean }) {
     const before = prefs;
     setPrefs(Object.fromEntries(Object.entries(prefs).map(([id, p]) => [id, { ...p, ...patch }])));
     setSaving(true);
-    let failure: string | null = null;
-    for (const id of ids) {
-      const res = await setNotifyPrefs(id, patch);
-      if (!res.ok) { failure = res.error; break; }
-    }
+    // One write per property, together (there is no bulk call).
+    const sent = await Promise.all(ids.map((id) => setNotifyPrefs(id, patch)));
+    const failed = sent.find((res) => !res.ok) as { ok: false; error: string } | undefined;
     setSaving(false);
-    if (failure) { setPrefs(before); setError(failure); } else setError(null);
+    if (failed) { setPrefs(before); setError(failed.error); } else setError(null);
   }
 
   return (
-    <View style={bare ? styles.bare : [styles.card, { backgroundColor: colors.surface }]}>
+    <View style={[styles.card, { backgroundColor: colors.surface }]}>
       {error ? <InlineNotice icon="alert-circle" tone="error" text={error} /> : null}
       {!prefs ? <LoadingSpinner /> : ids.length === 0 ? (
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Add a Snow property first. Then you choose here when its customer is messaged.</Text>
@@ -81,7 +72,6 @@ export function OwnerCustomerMessages({ bare }: { bare?: boolean }) {
             value={everyone('notifyOnArrival')}
             disabled={saving}
             onChange={(on) => change({ notifyOnArrival: on })}
-            icon={bare ? 'map-pin' : undefined}
           />
           <ToggleRow
             title="Message the customer when the service is finished"
@@ -89,7 +79,6 @@ export function OwnerCustomerMessages({ bare }: { bare?: boolean }) {
             value={everyone('notifyOnCompletion')}
             disabled={saving}
             onChange={(on) => change({ notifyOnCompletion: on })}
-            icon={bare ? 'check-circle' : undefined}
           />
         </>
       )}
@@ -159,9 +148,7 @@ function ToggleRow({ title, subtitle, value, disabled, onChange, icon }: {
 }
 
 const styles = StyleSheet.create({
-  label: { marginLeft: spacing.sm, marginTop: spacing.md },
   card: { borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
   bare: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.xs },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingTop: spacing.sm },
-  statusLine: { flexDirection: 'row', alignItems: 'center' },
 });

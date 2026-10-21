@@ -7,7 +7,6 @@
  */
 import { useMemo } from 'react';
 import { db, insertRow, rowsOf, rpc, refresh, updateRow, useDb, isDemo } from '@/data/store';
-import { createProperty } from '@/data/maintenance';
 import type { Property } from '@/types/property';
 
 export interface PropertyFields {
@@ -41,12 +40,6 @@ export function useCustomerProperties(customerId?: string): Property[] {
 export function useAllProperties(): Property[] {
   const v = useDb();
   return useMemo(() => (rowsOf('properties') as unknown as Property[]).filter((p) => p.isActive !== false), [v]);
-}
-
-/** "Oak Plaza · 12 Oak St" or just the address. */
-export function propertyLabel(p: Pick<Property, 'name' | 'address' | 'city'>): string {
-  const place = [p.address, p.city].filter(Boolean).join(', ');
-  return p.name ? `${p.name} · ${place}` : place;
 }
 
 const MISSING = /does not exist|schema cache|could not find the function|not found in the schema/i;
@@ -115,10 +108,3 @@ export function customerNameOf(personId?: string): string {
   return p ? `${p.firstName} ${p.lastName}`.trim() : '';
 }
 
-/** Turns Maintenance on for a property: a Maintenance record linked to it (address and customer come from the property). Returns its id. */
-export function enableMaintenanceForProperty(p: Property): string {
-  return createProperty({
-    name: p.name || p.address, customerId: p.customerId, propertyId: p.id, address: p.address, city: p.city, state: p.state, zip: p.zip,
-    latitude: p.latitude, longitude: p.longitude,
-  }).id;
-}

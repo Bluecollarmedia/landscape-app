@@ -6,7 +6,7 @@ const path = require('path');
 const root = path.join(__dirname, '../..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const m = { exports: {} };
-new Function('module', 'exports', ts.transpileModule(read('src/lib/snowStormView.ts'), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports);
+new Function('module', 'exports', 'require', ts.transpileModule(read('src/lib/snowStormView.ts'), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports, () => ({ snowStatus: {} }));
 const { longWhen } = m.exports;
 
 let bad = 0;

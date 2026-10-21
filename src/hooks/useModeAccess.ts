@@ -23,7 +23,7 @@ import { useWorkerModeChoice } from '@/hooks/useWorkerModeChoice';
  *   Owner/admin               landscaping owner app    snow owner app
  *   Landscaping-only worker   landscaping app          "Snow Mode is on" notice
  *   Worker with snow access   landscaping app          snow worker app (a small toggle lets them step back to
- *                                                       landscaping; update 62 gives every worker snow access
+ *                                                       landscaping; snow access is per worker (Snow Team)
  *                                                       when Snow Mode is switched on, until the owner removes it)
  *   Snow-only worker          snow worker app          snow worker app
  *   Customer                  landscaping app          landscaping app (snow

@@ -150,7 +150,7 @@ export function MyRouteScreen() {
         ) : null}
 
         {!route ? (
-          <EmptyState icon="navigation" title="No active route" description="When the owner dispatches a storm and makes you a route lead, your stops show up here. Finished storms are under Past work below." />
+          <EmptyState icon="navigation" title="No active route" description="When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are under Past work below." />
         ) : (
           <>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>

@@ -3,11 +3,10 @@ import { AppState } from 'react-native';
 import { loadMyRoutes } from '@/data/snowRoutes';
 
 /**
- * Does this snow worker lead any route? null while unknown. Route screens are
- * only for leads: the database already shows a worker only the routes they
- * lead, so this just decides whether the Route tab is worth showing. It checks
- * again every minute and when the app comes back to the front, so a worker the
- * owner has just made a lead sees the tab without signing out.
+ * Is this snow worker on any route (as its lead, or since update 41 as crew)? null while unknown. The database already
+ * limits which routes a worker sees; this just decides whether the Route tab is worth showing. It checks again every
+ * minute and when the app comes back to the front, so a worker the owner just put on a route sees the tab without
+ * signing out.
  */
 export function useIsRouteLead(): boolean | null {
   const [lead, setLead] = useState<boolean | null>(null);

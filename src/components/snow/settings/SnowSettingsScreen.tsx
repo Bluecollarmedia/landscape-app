@@ -12,12 +12,13 @@ import { LegalSection } from '@/components/legal/LegalSection';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { ListSection } from '@/components/ui';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassIconButton, InlineNotice, Switch } from '@/components/ui';
 import { SettingsGroup, SettingsRow } from '@/components/settings/SettingsList';
 import { ModeSwitchRow } from '@/components/snow/ModeSwitchRow';
+import { confirmAction } from '@/components/financials/ActionSheet';
 import { OwnerCustomerMessages, OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -60,14 +61,7 @@ export function SnowSettingsScreen() {
   function change(next: boolean) {
     if (next) return save(true);
     // Turning the rule off changes what the crew can do, so it is confirmed first.
-    if (Platform.OS === 'web') {
-      if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`Turn off "I'm Here" rule?\n\n${ARRIVAL_OFF_WARNING}`)) save(false);
-      return;
-    }
-    Alert.alert("Turn off the \"I'm Here\" rule?", ARRIVAL_OFF_WARNING, [
-      { text: 'Keep it on', style: 'cancel' },
-      { text: 'Turn off', style: 'destructive', onPress: () => save(false) },
-    ]);
+    confirmAction('Turn off the "I\'m Here" rule?', ARRIVAL_OFF_WARNING, 'Turn off', () => save(false), true);
   }
 
   return (

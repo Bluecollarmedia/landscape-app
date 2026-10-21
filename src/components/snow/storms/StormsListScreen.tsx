@@ -16,9 +16,8 @@ import { useSnowStorms } from '@/hooks/useSnowStorms';
 import { SERVICE_LABEL, STORM_STATUS_LABEL } from '@/data/snowStorms';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import type { SnowStorm } from '@/types/snow';
+import { SERVICE_ICON, type SnowStorm } from '@/types/snow';
 
-export const SERVICE_ICON = { plowing: 'truck', shoveling: 'users', salting: 'droplet' } as const;
 export const STATUS_TONE = { draft: 'neutral', dispatched: 'info', ended: 'success' } as const;
 
 function when(storm: SnowStorm): string {

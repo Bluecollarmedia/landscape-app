@@ -17,7 +17,7 @@ import { uuid } from '@/lib/ids';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { SNOW_SERVICES, type SnowService } from '@/types/snow';
-import { SERVICE_ICON } from './StormsListScreen';
+import { SERVICE_ICON } from '@/types/snow';
 
 const SERVICE_HINT: Record<SnowService, string> = {
   plowing: 'Lots and driveways',

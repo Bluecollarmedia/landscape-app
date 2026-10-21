@@ -1,25 +1,9 @@
-/**
- * Snow property details (supabase/updates/022): contacts, the services a
- * property gets, and each service's versioned instructions and reference
- * photos/videos. The property itself (name, address) is the snow foundation's
- * snow_properties row.
- */
-
 import type { SnowService } from './snow';
+export type { SnowService };
+export { SNOW_SERVICES } from './snow';
+export { SERVICE_LABEL as SNOW_SERVICE_LABELS } from './snow';
 
-export { SNOW_SERVICES, type SnowService } from './snow';
-
-export const SNOW_SERVICE_LABELS: Record<SnowService, string> = {
-  plowing: 'Plowing',
-  shoveling: 'Shoveling / Sidewalks',
-  salting: 'Salting',
-};
-
-export const SNOW_SERVICE_ICONS: Record<SnowService, 'truck' | 'user' | 'droplet'> = {
-  plowing: 'truck',
-  shoveling: 'user',
-  salting: 'droplet',
-};
+export { SERVICE_ICON as SNOW_SERVICE_ICONS } from './snow';
 
 export interface SnowPropertyContact {
   id: string;

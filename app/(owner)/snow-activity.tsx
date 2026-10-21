@@ -16,6 +16,7 @@ import { Icon } from '@/components/ui/Icon';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { EmptyState, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
+import { SERVICE_LABEL as SNOW_SERVICE_LABEL } from '@/types/snow';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -36,7 +37,8 @@ const FILTERS: { kind: SnowFilterKind; label: string; field: Exclude<keyof SnowA
   { kind: 'action', label: 'Action', field: 'action' },
 ];
 
-const SERVICE_LABEL: Record<string, string> = { plowing: 'Plowing', shoveling: 'Shoveling', salting: 'Salting' };
+
+const SERVICE_LABEL: Record<string, string> = SNOW_SERVICE_LABEL;
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -396,7 +398,6 @@ export default function SnowActivityScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.md },
   dayHeader: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xs },
   filterBar: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm, alignItems: 'center' },
   chip: {

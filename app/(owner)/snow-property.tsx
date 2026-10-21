@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { Button, Icon, LoadingSpinner } from '@/components/ui';
 import { CustomerPicker } from '@/components/customers/CustomerPicker';
+import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { TaskMediaStrip, TaskMediaViewer } from '@/components/tasks/TaskMedia';
 import { snowMediaItems } from '@/components/snow/SnowReference';
 import { notify, pickSnowMedia } from '@/components/snow/pickSnowMedia';
@@ -115,6 +116,8 @@ export default function SnowPropertyScreen() {
 
 // ── Contacts ────────────────────────────────────────────────────────────────
 
+const firstNameOf = (full: string) => (full ?? '').trim().split(/\s+/)[0] ?? '';
+
 function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
   companyId: string; propertyId: string; contacts: SnowPropertyContact[]; onChanged: () => void;
 }) {
@@ -152,6 +155,10 @@ function ContactsSection({ companyId, propertyId, contacts, onChanged }: {
             <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
               {customer.personId ? 'They see this property and its completed snow services in their app.' : 'Not linked to a customer account yet. Tap to choose the customer.'}
             </Text>
+            {/* Their one private link, right here in Snow Mode: it covers everything on their customer record, not just this property. */}
+            {customer.personId ? (
+              <CustomerInviteCard personId={customer.personId} firstName={firstNameOf(customer.name)} phone={customer.phone} />
+            ) : null}
           </>
         ) : (
           <>

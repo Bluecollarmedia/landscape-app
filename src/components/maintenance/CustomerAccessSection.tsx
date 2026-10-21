@@ -1,47 +1,22 @@
 /**
- * Owner: how the customer of one maintenance property gets in. The customer gets a private one-time link
- * (supabase/updates/078_invite_links.sql) and, once signed up, sees this property's finished visits and the photos you share.
- * "Remove access" unlinks them from the property.
+ * Owner: how the customer of one maintenance property gets in. The customer gets ONE private one-time link
+ * (supabase/updates/078_invite_links.sql) that covers everything on their customer record, and once signed up sees this property's
+ * finished visits and the photos you share. To change or clear the customer of a property, edit the property (its Customer row);
+ * to stop a customer using the app at all, turn off their Portal access on their customer page.
  */
-import React, { useState } from 'react';
-import { Alert, Platform, View, Text } from 'react-native';
-import { ListSection, ListRow } from '@/components/ui';
+import React from 'react';
+import { View, Text } from 'react-native';
+import { ListSection } from '@/components/ui';
 import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
-import { isSupabaseConfigured } from '@/lib/supabase';
-import { regenerateMaintenanceCode } from '@/data/maintenanceCodes';
 import { useTheme } from '@/providers/ThemeProvider';
-import { haptics } from '@/lib/haptics';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 
-function confirmThen(title: string, msg: string, action: string, run: () => void) {
-  if (Platform.OS === 'web') {
-    if (confirm(msg)) run();
-  } else {
-    Alert.alert(title, msg, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: run }]);
-  }
-}
-
-function tell(title: string, msg: string) {
-  if (Platform.OS === 'web') alert(`${title}\n\n${msg}`);
-  else Alert.alert(title, msg);
-}
-
-export function CustomerAccessSection({ propertyId, customer }: {
-  propertyId: string;
+export function CustomerAccessSection({ customer }: {
   /** The customer linked to this property, if any. */
   customer?: { id: string; firstName: string; phone?: string };
 }) {
   const { colors } = useTheme();
-  const [busy, setBusy] = useState(false);
-
-  async function removeAccess() {
-    setBusy(true);
-    const res = await regenerateMaintenanceCode(propertyId, true);
-    setBusy(false);
-    if (!res.ok) return tell('Couldn’t remove access', res.error);
-    haptics.success();
-  }
 
   return (
     <ListSection title="CUSTOMER LOGIN">
@@ -52,20 +27,6 @@ export function CustomerAccessSection({ propertyId, customer }: {
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Link a customer to this property to send them a login link.</Text>
         )}
       </View>
-      {customer && isSupabaseConfigured && (
-        <ListRow
-          icon="user-x"
-          title="Remove Customer’s Access"
-          subtitle="Unlinks the customer from this property"
-          destructive
-          onPress={() => confirmThen(
-            'Remove access?',
-            'The customer will no longer see this property’s visits or photos.',
-            'Remove',
-            () => { if (!busy) removeAccess(); },
-          )}
-        />
-      )}
     </ListSection>
   );
 }

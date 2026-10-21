@@ -3,7 +3,7 @@
 --
 -- Message Customers shows a small count on each group button ("Snow · 12"). The count has to be exactly who the message reaches, so
 -- the "who is in this group" query now lives in ONE helper, used by both the send and the count.
---  • _customer_audience(company, audience): the people with an account in that group (same rules as update 55).
+--  • _customer_audience(company, audience): the people with an account in that group (same rules as update 55, and not customers whose access was turned off).
 --  • customer_message_reach(): owner/admin only; returns how many people each group reaches right now. Changes nothing.
 --  • send_customer_announcement(...) is unchanged for the owner; it just calls the helper.
 -- ============================================================================
@@ -28,7 +28,9 @@ returns uuid[] language sql stable security definer set search_path = public as 
      where cm.company_id = p_company and cm.role = 'customer' and cm.status = 'active' and p_audience = 'customers_all'
   ) r
   join public.people pe on pe.id = r.pid and pe.user_id is not null
-  where r.pid is not null;
+  where r.pid is not null
+    -- A customer whose access the owner turned off (update 84) is not messaged.
+    and not exists (select 1 from public.company_members x where x.company_id = p_company and x.person_id = r.pid and x.role = 'customer' and x.status = 'inactive');
 $$;
 revoke all on function public._customer_audience(uuid, text) from public, anon, authenticated;
 

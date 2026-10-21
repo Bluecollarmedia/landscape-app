@@ -104,55 +104,7 @@ function demoChanged() {
   listeners.forEach((l) => l());
 }
 
-function randomSnowCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = 'SNOW-';
-  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
-
-// ── Applicant side ──────────────────────────────────────────────
-
-/** Checks a Snow code. Works before sign-in. */
-export async function lookupSnowCode(code: string): Promise<{ valid: boolean; companyName?: string }> {
-  const trimmed = code.trim();
-  if (!trimmed) return { valid: false };
-  if (!isSupabaseConfigured) {
-    return demo.code && trimmed.toUpperCase() === demo.code ? { valid: true, companyName: 'Brighton Lawn + Landscape' } : { valid: false };
-  }
-  const { data, error } = await supabase.rpc('lookup_snow_code', { p_code: trimmed });
-  if (error || !data) return { valid: false };
-  const r = data as { valid: boolean; company_name?: string };
-  return { valid: !!r.valid, companyName: r.company_name };
-}
-
-/**
- * One code box for everything: works out whether a code is a team code or a Snow code (the DATABASE decides, so a phone can't
- * turn one into the other). Works before sign-in. Says only whether it works, the company name and the kind.
- */
-export async function lookupAnyCode(code: string): Promise<{ valid: boolean; kind?: 'team' | 'snow'; companyName?: string; workerType?: string }> {
-  const trimmed = code.trim();
-  if (!trimmed) return { valid: false };
-  if (!isSupabaseConfigured) {
-    if (demo.code && trimmed.toUpperCase() === demo.code) return { valid: true, kind: 'snow', companyName: 'Brighton Lawn + Landscape' };
-    return { valid: false };
-  }
-  const { data, error } = await supabase.rpc('lookup_any_code', { p_code: trimmed });
-  if (error || !data) return { valid: false };
-  const r = data as { valid: boolean; kind?: 'team' | 'snow'; company_name?: string; worker_type?: string };
-  return { valid: !!r.valid, kind: r.kind, companyName: r.company_name, workerType: r.worker_type };
-}
-
-/** Files a Snow access request for the signed-in person (safe to repeat). */
-export async function requestSnowAccess(code: string): Promise<Result> {
-  if (!isSupabaseConfigured) return { ok: true };
-  const { data, error } = await supabase.rpc('request_snow_access', { p_code: code.trim() });
-  if (error) return { ok: false, error: friendly(error.message) };
-  const r = data as { success: boolean; error?: string };
-  if (r?.success) return { ok: true };
-  if (r?.error === 'already_member') return { ok: false, error: 'You’re already on the snow team.' };
-  return { ok: false, error: 'That Snow code doesn’t work anymore. Ask the owner for the current one.' };
-}
+// ── The signed-in person's standing ──
 
 export async function fetchMySnowStatus(): Promise<MySnowStatus | null> {
   if (!isSupabaseConfigured) return null;
@@ -173,12 +125,6 @@ export async function fetchMySnowStatus(): Promise<MySnowStatus | null> {
       ? { companyId: d.member.company_id, status: d.member.status, services: d.member.services ?? [] }
       : null,
   };
-}
-
-export async function withdrawMySnowRequest(): Promise<Result> {
-  if (!isSupabaseConfigured) return { ok: true };
-  const { error } = await supabase.rpc('withdraw_my_snow_request');
-  return error ? { ok: false, error: friendly(error.message) } : { ok: true };
 }
 
 /** The signed-in person's snow standing, for a screen that shows it. */
@@ -237,38 +183,26 @@ function mapMember(m: any): SnowMember {
 }
 
 /**
- * Everything the owner's Snow Team screen needs: the current code, every
- * request, and the snow team. Each action calls the database and then
+ * Everything the owner's Snow Team screen needs: the snow team and what each person can do. Each action calls the database and then
  * reloads, so the screen always shows what was actually saved.
  */
 export function useSnowOnboardingAdmin() {
-  const [code, setCode] = useState<string | null>(null);
-  const [requests, setRequests] = useState<SnowAccessRequest[]>([]);
   const [members, setMembers] = useState<SnowMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!isSupabaseConfigured) {
-      setCode(demo.code);
-      setRequests(demo.requests.slice());
       setMembers(demo.members.slice());
       setLoading(false);
       return;
     }
     try {
-      const [codeRes, reqRes, memRes] = await Promise.all([
-        supabase.from('snow_signup_codes').select('code').eq('is_active', true).maybeSingle(),
-        supabase.rpc('list_snow_access_requests'),
-        supabase.rpc('list_snow_members'),
-      ]);
-      const err = codeRes.error ?? reqRes.error ?? memRes.error;
-      if (err) {
-        setLoadError(friendly(err.message));
+      const memRes = await supabase.rpc('list_snow_members');
+      if (memRes.error) {
+        setLoadError(friendly(memRes.error.message));
       } else {
         setLoadError(null);
-        setCode((codeRes.data as { code: string } | null)?.code ?? null);
-        setRequests(((reqRes.data as any[]) ?? []).map(mapRequest));
         setMembers(((memRes.data as any[]) ?? []).map(mapMember));
       }
     } catch (e: any) {
@@ -300,59 +234,6 @@ export function useSnowOnboardingAdmin() {
       return error ? { ok: false, error: friendly(error.message) } : { ok: true };
     },
     [reload],
-  );
-
-  const regenerateCode = useCallback(
-    () =>
-      call('regenerate_snow_signup_code', {}, () => {
-        demo.code = randomSnowCode();
-        demo.requests.forEach((r) => (r.codeStillActive = false));
-      }),
-    [call],
-  );
-
-  const disableCode = useCallback(
-    () =>
-      call('disable_snow_signup_code', {}, () => {
-        demo.code = null;
-        demo.requests.forEach((r) => (r.codeStillActive = false));
-      }),
-    [call],
-  );
-
-  const approve = useCallback(
-    (req: SnowAccessRequest, services: SnowService[]) => {
-      if (services.length === 0) return Promise.resolve<Result>({ ok: false, error: 'Pick at least one snow service.' });
-      return call('approve_snow_access_request', { p_request_id: req.id, p_services: services }, () => {
-        const r = demo.requests.find((x) => x.id === req.id);
-        if (!r || r.status !== 'pending') return;
-        Object.assign(r, { status: 'approved', grantedServices: services, reviewedAt: new Date().toISOString() });
-        demo.members = demo.members.filter((m) => m.personId !== r.personId);
-        demo.members.push({
-          personId: r.personId, firstName: r.firstName, lastName: r.lastName, email: r.email, phone: r.phone,
-          services, status: 'active', approvedAt: new Date().toISOString(), landscapingRole: r.landscapingRole,
-        });
-      });
-    },
-    [call],
-  );
-
-  const decline = useCallback(
-    (req: SnowAccessRequest, reason?: string) =>
-      call('decline_snow_access_request', { p_request_id: req.id, p_reason: reason ?? null }, () => {
-        const r = demo.requests.find((x) => x.id === req.id);
-        if (r?.status === 'pending') Object.assign(r, { status: 'declined', declineReason: reason, reviewedAt: new Date().toISOString() });
-      }),
-    [call],
-  );
-
-  const remove = useCallback(
-    (req: SnowAccessRequest) =>
-      call('remove_snow_access_request', { p_request_id: req.id }, () => {
-        const r = demo.requests.find((x) => x.id === req.id);
-        if (r?.status === 'pending') Object.assign(r, { status: 'removed', reviewedAt: new Date().toISOString() });
-      }),
-    [call],
   );
 
   const setServices = useCallback(
@@ -390,10 +271,5 @@ export function useSnowOnboardingAdmin() {
     [call],
   );
 
-  const pending = requests.filter((r) => r.status === 'pending');
-
-  return {
-    code, requests, pending, members, loading, loadError, reload,
-    regenerateCode, disableCode, approve, decline, remove, setServices, revoke, grantAccess,
-  };
+  return { members, loading, loadError, reload, setServices, revoke, grantAccess };
 }

@@ -56,8 +56,6 @@ export default function SettingsScreen() {
     { label: 'Worker', state: 'active', role: 'worker' },
     { label: 'Customer', state: 'active', role: 'customer' },
     { label: 'Welcome', state: 'unauthenticated' },
-    { label: 'Pending', state: 'pending_approval' },
-    { label: 'Declined', state: 'declined' },
   ];
 
   function handleDevSwitch(item: typeof devStates[0]) {

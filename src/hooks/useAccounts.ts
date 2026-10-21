@@ -79,23 +79,6 @@ function demoAccounts(): Account[] {
       isMe: m.personId === db.personId,
     });
   }
-  for (const r of db.joinRequests) {
-    if (!r.person || r.status === 'cancelled') continue;
-    const existing = out.get(r.personId);
-    if (existing && existing.status === 'active') continue;
-    out.set(r.personId, {
-      personId: r.personId,
-      firstName: r.person.firstName,
-      lastName: r.person.lastName,
-      email: r.person.email,
-      phone: r.person.phone,
-      avatarUrl: r.person.profilePhotoUrl,
-      signedUpAt: r.createdAt,
-      role: existing?.role,
-      status: statusOf(existing ? 'inactive' : null, r.status),
-      isMe: false,
-    });
-  }
   return [...out.values()];
 }
 
@@ -130,7 +113,7 @@ export function useAccounts() {
       if (isDemo()) return 'Accounts can’t be changed in demo mode.';
       const { error: rpcError } = await rpc(fn, { p_person_id: personId });
       if (rpcError) return rpcError.message;
-      await Promise.all([load(), refresh('company_members', 'join_requests', 'people')]);
+      await Promise.all([load(), refresh('company_members', 'people')]);
       return '';
     },
     [load],

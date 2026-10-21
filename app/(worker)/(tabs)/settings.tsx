@@ -96,13 +96,6 @@ export default function WorkerSettingsScreen() {
           showChevron
           onPress={() => router.push('/(worker)/my-resources' as any)}
         />
-        <ListRow
-          icon="cloud-snow"
-          title="Snow Team"
-          subtitle="Ask for snow access with a Snow code"
-          showChevron
-          onPress={() => router.push('/(worker)/snow-access' as any)}
-        />
       </ListSection>
 
       <ListSection title="App">

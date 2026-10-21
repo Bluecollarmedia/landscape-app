@@ -57,22 +57,9 @@ export default function WelcomeScreen() {
             />
           )}
 
-          <ChoiceCard
-            icon="users"
-            title="Join a Team"
-            subtitle="Enter the team or Snow code from your employer"
-            onPress={() => router.push('/(auth)/join-team')}
-          />
-
-          <Pressable
-            style={({ pressed }) => [styles.customerLink, pressed && { opacity: 0.6 }]}
-            onPress={() => router.push('/(auth)/customer-access' as any)}
-            hitSlop={8}
-          >
-            <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Customer? </Text>
-            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>View your project</Text>
-            <Icon name="chevron-right" size={16} color={colors.primary} />
-          </Pressable>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
+            Joining a team, or a customer? Open the private link your employer texted you.
+          </Text>
         </View>
       </View>
 

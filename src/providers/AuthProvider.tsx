@@ -8,7 +8,6 @@
  * Supports onboarding states:
  *  - unauthenticated → welcome / sign-in
  *  - authenticated, no membership → onboarding
- *  - authenticated, pending request → pending approval
  *  - authenticated, active membership → role-based routing
  *
  * Who you are and which company you belong to comes from the
@@ -31,12 +30,7 @@ export type AppState =
   | 'loading'
   | 'unauthenticated'
   | 'onboarding'
-  | 'pending_approval'
-  | 'declined'
   | 'active';
-
-/** Which side of the business a waiting or declined request is for. */
-export type PendingKind = 'team' | 'snow';
 
 /** What the signed-in person may use. The company's active mode never grants
  * access by itself; this comes from their landscaping membership and their
@@ -49,22 +43,18 @@ export interface ModeAccess {
 interface ExtendedAuthState extends AuthState {
   appState: AppState;
   onboardingStep: OnboardingStep;
-  pendingCompanyName?: string;
-  pendingRequestId?: string;
   /** The real membership role (admins use the owner screens, so user.role is 'owner' for them). */
   memberRole?: UserRole;
-  /** Set with pending_approval / declined. */
-  pendingKind?: PendingKind;
   modeAccess?: ModeAccess;
 }
 
 // ── Actions ──────────────────────────────────────────────────────
 type AuthAction =
-  | { type: 'RESOLVED'; user: UserProfile; session: AuthState['session']; appState: AppState; onboardingStep: OnboardingStep; pendingCompanyName?: string; pendingRequestId?: string; memberRole?: UserRole; pendingKind?: PendingKind; modeAccess?: ModeAccess }
+  | { type: 'RESOLVED'; user: UserProfile; session: AuthState['session']; appState: AppState; onboardingStep: OnboardingStep; memberRole?: UserRole; modeAccess?: ModeAccess }
   | { type: 'SIGN_OUT' }
   | { type: 'SET_LOADING'; isLoading: boolean }
   | { type: 'UPDATE_PROFILE'; user: UserProfile }
-  | { type: 'SET_APP_STATE'; appState: AppState; onboardingStep?: OnboardingStep; pendingCompanyName?: string; pendingRequestId?: string; pendingKind?: PendingKind }
+  | { type: 'SET_APP_STATE'; appState: AppState; onboardingStep?: OnboardingStep }
   | { type: 'SET_DEV_MODE'; user: UserProfile; session: AuthState['session']; appState: AppState; onboardingStep: OnboardingStep };
 
 // ── Reducer ──────────────────────────────────────────────────────
@@ -78,10 +68,7 @@ function authReducer(state: ExtendedAuthState, action: AuthAction): ExtendedAuth
         session: action.session,
         appState: action.appState,
         onboardingStep: action.onboardingStep,
-        pendingCompanyName: action.pendingCompanyName,
-        pendingRequestId: action.pendingRequestId,
         memberRole: action.memberRole,
-        pendingKind: action.pendingKind,
         modeAccess: action.modeAccess,
       };
     case 'SIGN_OUT':
@@ -92,10 +79,7 @@ function authReducer(state: ExtendedAuthState, action: AuthAction): ExtendedAuth
         session: null,
         appState: 'unauthenticated',
         onboardingStep: 'welcome',
-        pendingCompanyName: undefined,
-        pendingRequestId: undefined,
         memberRole: undefined,
-        pendingKind: undefined,
         modeAccess: undefined,
       };
     case 'SET_LOADING':
@@ -107,9 +91,6 @@ function authReducer(state: ExtendedAuthState, action: AuthAction): ExtendedAuth
         ...state,
         appState: action.appState,
         onboardingStep: action.onboardingStep ?? state.onboardingStep,
-        pendingCompanyName: action.pendingCompanyName ?? state.pendingCompanyName,
-        pendingRequestId: action.pendingRequestId ?? state.pendingRequestId,
-        pendingKind: action.pendingKind ?? state.pendingKind,
       };
     case 'SET_DEV_MODE':
       return {
@@ -119,10 +100,7 @@ function authReducer(state: ExtendedAuthState, action: AuthAction): ExtendedAuth
         session: action.session,
         appState: action.appState,
         onboardingStep: action.onboardingStep,
-        pendingCompanyName: action.onboardingStep === 'pending_approval' ? 'Brighton Lawn + Landscape' : undefined,
-        pendingRequestId: action.onboardingStep === 'pending_approval' ? 'jr1' : undefined,
         memberRole: action.user.role,
-        pendingKind: action.onboardingStep === 'pending_approval' ? 'team' : undefined,
         modeAccess: { landscaping: true, snow: false },
       };
     default:
@@ -160,10 +138,8 @@ export interface SignUpIntent {
     state?: string;
     zip?: string;
   };
-  teamCode?: string;
-  /** Snow signup code: files a Snow access request (supabase/updates/023_snow_onboarding.sql). */
-  snowCode?: string;
-  projectCode?: string;
+  /** A private one-time invite link (supabase/updates/078_invite_links.sql): the database attaches the new login to the person the owner added. */
+  inviteToken?: string;
 }
 
 export interface SignUpResult {
@@ -180,7 +156,7 @@ interface AuthContextValue extends ExtendedAuthState {
   refreshContext: () => Promise<AppState>;
   switchDevRole: (role: UserRole) => void;
   switchDevState: (appState: AppState, onboardingStep?: OnboardingStep) => void;
-  setAppState: (appState: AppState, opts?: { onboardingStep?: OnboardingStep; pendingCompanyName?: string; pendingRequestId?: string; pendingKind?: PendingKind }) => void;
+  setAppState: (appState: AppState, opts?: { onboardingStep?: OnboardingStep }) => void;
   updateProfile: (profile: UserProfile) => void;
 }
 
@@ -215,11 +191,8 @@ interface Resolution {
   user: UserProfile;
   appState: AppState;
   onboardingStep: OnboardingStep;
-  pendingCompanyName?: string;
-  pendingRequestId?: string;
   memberRole?: UserRole;
   companyId?: string;
-  pendingKind?: PendingKind;
   modeAccess?: ModeAccess;
 }
 
@@ -274,21 +247,7 @@ async function resolveContext(): Promise<Resolution | null> {
       modeAccess: { landscaping: false, snow: true },
     };
   }
-  const jr = ctx.join_request;
-  const sr = snow?.request;
-  if (jr?.status === 'pending') {
-    return { user, appState: 'pending_approval', onboardingStep: 'pending_approval', pendingCompanyName: jr.company_name, pendingRequestId: jr.id, pendingKind: 'team' };
-  }
-  if (sr?.status === 'pending') {
-    return { user, appState: 'pending_approval', onboardingStep: 'pending_approval', pendingCompanyName: sr.companyName, pendingRequestId: sr.id, pendingKind: 'snow' };
-  }
-  if (jr?.status === 'declined') {
-    return { user, appState: 'declined', onboardingStep: 'declined', pendingCompanyName: jr.company_name, pendingRequestId: jr.id, pendingKind: 'team' };
-  }
-  if (sr?.status === 'declined') {
-    return { user, appState: 'declined', onboardingStep: 'declined', pendingCompanyName: sr.companyName, pendingRequestId: sr.id, pendingKind: 'snow' };
-  }
-  return { user, appState: 'onboarding', onboardingStep: 'join_team_code' };
+  return { user, appState: 'onboarding', onboardingStep: 'create_company' };
 }
 
 // ── Dev mock users (no Supabase) ────────────────────────────────
@@ -311,12 +270,6 @@ const DEV_USERS: Record<'owner' | 'worker' | 'customer', UserProfile> = {
     avatarUrl: 'https://ui-avatars.com/api/?name=Sarah+Mitchell&background=AB47BC&color=fff&size=128',
     createdAt: '2026-02-15T10:00:00Z', updatedAt: '2026-02-15T10:00:00Z',
   },
-};
-
-const DEV_PENDING_USER: UserProfile = {
-  id: 'pending1', email: 'john.smith@gmail.com', role: 'worker',
-  firstName: 'John', lastName: 'Smith',
-  createdAt: '2026-09-08T09:00:00Z', updatedAt: '2026-09-08T09:00:00Z',
 };
 
 const DEV_SESSION = { accessToken: 'dev', refreshToken: 'dev', expiresAt: 0 };
@@ -348,10 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session: authSession,
       appState: res.appState,
       onboardingStep: res.onboardingStep,
-      pendingCompanyName: res.pendingCompanyName,
-      pendingRequestId: res.pendingRequestId,
       memberRole: res.memberRole,
-      pendingKind: res.pendingKind,
       modeAccess: res.modeAccess,
     });
   }, []);
@@ -449,9 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (c.state) metadata.company_state = c.state;
         if (c.zip) metadata.company_zip = c.zip;
       }
-      if (intent?.teamCode) metadata.team_code = intent.teamCode;
-      if (intent?.snowCode) metadata.snow_code = intent.snowCode;
-      if (intent?.projectCode) metadata.project_code = intent.projectCode;
+      if (intent?.inviteToken) metadata.invite_token = intent.inviteToken;
 
       const { data, error } = await supabase.auth.signUp({ email, password, options: { data: metadata } });
       if (error) throw error;
@@ -502,8 +450,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const switchDevState = useCallback((appState: AppState, onboardingStep?: OnboardingStep) => {
     if (isSupabaseConfigured) return;
-    const step = onboardingStep ?? (appState === 'unauthenticated' ? 'welcome' : appState === 'pending_approval' ? 'pending_approval' : 'ready');
-    const user = appState === 'unauthenticated' ? null : appState === 'pending_approval' ? DEV_PENDING_USER : DEV_USERS.worker;
+    const step = onboardingStep ?? (appState === 'unauthenticated' ? 'welcome' : 'ready');
+    const user = appState === 'unauthenticated' ? null : DEV_USERS.worker;
     dispatch({
       type: 'SET_DEV_MODE',
       user: user ?? DEV_USERS.worker,
@@ -517,15 +465,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setAppState = useCallback(
-    (appState: AppState, opts?: { onboardingStep?: OnboardingStep; pendingCompanyName?: string; pendingRequestId?: string; pendingKind?: PendingKind }) => {
-      dispatch({
-        type: 'SET_APP_STATE',
-        appState,
-        onboardingStep: opts?.onboardingStep,
-        pendingCompanyName: opts?.pendingCompanyName,
-        pendingRequestId: opts?.pendingRequestId,
-        pendingKind: opts?.pendingKind,
-      });
+    (appState: AppState, opts?: { onboardingStep?: OnboardingStep }) => {
+      dispatch({ type: 'SET_APP_STATE', appState, onboardingStep: opts?.onboardingStep });
     },
     [],
   );

@@ -7,6 +7,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useCustomers } from '@/hooks/useCustomers';
 import { StatusBadge, Avatar, ProgressBar, EmptyState } from '@/components/ui';
 import { CustomerPropertiesCard } from '@/components/properties/CustomerPropertiesCard';
+import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
@@ -114,6 +115,13 @@ export default function CustomerDetailScreen() {
           </View>
 
           <CustomerPropertiesCard customerId={p.id} firstName={p.firstName} />
+
+          {/* Login: a private one-time link */}
+          <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700', marginBottom: spacing.sm }]}>Customer Login</Text>
+            <CustomerInviteCard personId={p.id} firstName={p.firstName} phone={p.phone} />
+          </View>
+
 
           {/* Projects */}
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>

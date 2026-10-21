@@ -6,8 +6,6 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useAuth } from '@/providers/AuthProvider';
-import { useJoinRequests } from '@/hooks/useOnboarding';
-import { useSnowOnboardingAdmin } from '@/hooks/useSnowOnboarding';
 import { Avatar, MenuGroup, MenuRow } from '@/components/ui';
 import { useOpenIssueCount } from '@/data/issues';
 import { useOpenReportCount } from '@/data/contentReports';
@@ -21,8 +19,6 @@ export default function MoreScreen() {
   const { user, signOut, memberRole } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { pendingRequests } = useJoinRequests();
-  const { pending: pendingSnow } = useSnowOnboardingAdmin();
   const openIssueCount = useOpenIssueCount();
   const openReportCount = useOpenReportCount();
 
@@ -73,14 +69,12 @@ export default function MoreScreen() {
         </MenuGroup>
 
         <MenuGroup title="TEAM">
-          <MenuRow icon="user-plus" label="Add Worker" subtitle="Invite or share team code" onPress={() => go('/(owner)/worker-new')} />
-          <MenuRow icon="inbox" label="Join Requests" subtitle="Approve people asking to join" count={pendingRequests.length} onPress={() => go('/(owner)/more/pending-requests')} />
+          <MenuRow icon="user-plus" label="Add Worker" subtitle="Name and phone, then send a private link" onPress={() => go('/(owner)/worker-new')} />
           <MenuRow icon="shield" label="Team Access" subtitle="Landscaping and snow access, admins, deactivated workers" onPress={() => go('/(owner)/more/team-access')} />
           {memberRole !== 'admin' && (
             <MenuRow icon="users" label="Accounts" subtitle="Everyone who has signed up" onPress={() => go('/(owner)/more/accounts')} />
           )}
-          <MenuRow icon="cloud-snow" label="Snow Team" subtitle="Snow code, snow requests and access" count={pendingSnow.length} onPress={() => go('/(owner)/more/snow-team')} />
-          <MenuRow icon="sliders" label="Join Settings" subtitle="Team code and invitations" onPress={() => go('/(owner)/more/join-settings')} />
+          <MenuRow icon="cloud-snow" label="Snow Team" subtitle="Who works on snow and which services" onPress={() => go('/(owner)/more/snow-team')} />
         </MenuGroup>
 
         <MenuGroup title="OPERATIONS">

@@ -16,7 +16,7 @@ check('3 the splash still shows for normal pages while loading, but not for publ
 const settings = read('src/components/snow/settings/SnowSettingsScreen.tsx');
 check('4 Snow settings opens Properties and Snow team as their own screens (no hopping to the tab bar)', /router\.push\('\/snow\/owner\/properties-list'/.test(settings) && /router\.push\('\/snow\/owner\/team-list'/.test(settings) && !/router\.(push|navigate)\('\/snow\/owner\/(properties|team)'/.test(settings));
 check('4b those two screens exist and are registered in the Snow owner stack', fs.existsSync(path.join(__dirname, '../../app/snow/owner/properties-list.tsx')) && fs.existsSync(path.join(__dirname, '../../app/snow/owner/team-list.tsx')) && /properties-list/.test(read('app/snow/owner/_layout.tsx')) && /team-list/.test(read('app/snow/owner/_layout.tsx')));
-check('4c profile photos no longer use the built-in crop screen', !/allowsEditing: true/.test(read('src/components/account/EditProfileScreen.tsx')) && !/allowsEditing: true/.test(read('app/(auth)/join-team.tsx')));
+check('4c profile photos no longer use the built-in crop screen', !/allowsEditing: true/.test(read('src/components/account/EditProfileScreen.tsx')) && !/allowsEditing: true/.test(read('app/invite/[token].tsx')));
 
 // No screen outside the tabs may push to a tab route of the same shell.
 const tabsOf = (shell) => fs.readdirSync(path.join(__dirname, '../..', `app/snow/${shell}/(tabs)`)).filter((f) => f.endsWith('.tsx') && !f.startsWith('_')).map((f) => f.replace('.tsx', ''));

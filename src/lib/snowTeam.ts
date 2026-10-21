@@ -1,38 +1,76 @@
 /**
- * Snow Team helpers: which existing landscaping workers the owner can offer
- * Snow access to, and how many past requests to show at a time. Pure functions.
+ * Snow Team helpers (pure). The Snow Team screen is one list of EVERY worker with what each one works in snow:
+ * all services, some, or none. Workers come from the landscaping team; people who only have snow access are listed too.
  */
 
 export interface TeamMemberLike {
   personId: string;
   role: string;
   status: string;
-  person?: { firstName: string; lastName: string; email?: string };
+  person?: { firstName: string; lastName: string; email?: string; phone?: string; avatarUrl?: string };
 }
 
 export interface SnowMemberLike {
   personId: string;
   status: 'active' | 'revoked' | string;
+  services: string[];
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  avatarUrl?: string;
 }
 
-/**
- * Active landscaping workers who are not on the Snow team yet (neither active
- * nor removed; a removed worker is restored from the Snow team list instead).
- * Owners and admins already have every snow service, so they are not offered.
- */
-export function workersToOfferSnow<T extends TeamMemberLike>(members: T[], snowMembers: SnowMemberLike[]): T[] {
-  const onSnow = new Set(snowMembers.map((m) => m.personId));
-  const seen = new Set<string>();
-  return members
-    .filter((m) => m.role === 'worker' && m.status === 'active' && !!m.person && !onSnow.has(m.personId))
-    .filter((m) => (seen.has(m.personId) ? false : (seen.add(m.personId), true)))
-    .sort((a, b) => `${a.person!.lastName} ${a.person!.firstName}`.localeCompare(`${b.person!.lastName} ${b.person!.firstName}`));
+export interface SnowTeamRow {
+  personId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  avatarUrl?: string;
+  /** Snow services this person works now (empty = no snow). */
+  services: string[];
+  /** Also on the landscaping team. */
+  landscaping: boolean;
 }
 
-export const HISTORY_PAGE = 10;
+/** Every active worker plus every person with snow access, one row each, sorted by name. */
+export function snowTeamRows(members: TeamMemberLike[], snowMembers: SnowMemberLike[]): SnowTeamRow[] {
+  const snow = new Map(snowMembers.map((m) => [m.personId, m]));
+  const rows = new Map<string, SnowTeamRow>();
+  for (const m of members) {
+    if (m.role !== 'worker' || m.status !== 'active' || !m.person || rows.has(m.personId)) continue;
+    const s = snow.get(m.personId);
+    rows.set(m.personId, {
+      personId: m.personId, firstName: m.person.firstName, lastName: m.person.lastName, email: m.person.email ?? '',
+      phone: m.person.phone, avatarUrl: m.person.avatarUrl, services: s && s.status === 'active' ? s.services : [], landscaping: true,
+    });
+  }
+  for (const s of snowMembers) {
+    if (rows.has(s.personId)) continue;
+    rows.set(s.personId, {
+      personId: s.personId, firstName: s.firstName ?? '', lastName: s.lastName ?? '', email: s.email ?? '', phone: s.phone,
+      avatarUrl: s.avatarUrl, services: s.status === 'active' ? s.services : [], landscaping: false,
+    });
+  }
+  return [...rows.values()].sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
+}
 
-/** The first `pages` pages of a newest-first list, and whether more remain. */
-export function pageOf<T>(items: T[], pages: number, size = HISTORY_PAGE): { shown: T[]; more: number } {
-  const shown = items.slice(0, pages * size);
-  return { shown, more: items.length - shown.length };
+export type SnowTeamFilter = 'all' | 'snow' | 'none';
+
+export function filterSnowTeam(rows: SnowTeamRow[], query: string, filter: SnowTeamFilter): SnowTeamRow[] {
+  const q = query.toLowerCase().replace(/\s+/g, ' ').trim();
+  return rows.filter((r) => {
+    if (filter === 'snow' && r.services.length === 0) return false;
+    if (filter === 'none' && r.services.length > 0) return false;
+    if (!q) return true;
+    return `${r.firstName} ${r.lastName} ${r.email} ${r.phone ?? ''}`.toLowerCase().includes(q);
+  });
+}
+
+/** "All services", "Plowing, Salting" or "No snow". */
+export function servicesSummary(services: string[], all: string[], label: (s: string) => string): string {
+  if (services.length === 0) return 'No snow';
+  if (all.every((s) => services.includes(s))) return 'All services';
+  return all.filter((s) => services.includes(s)).map(label).join(', ');
 }

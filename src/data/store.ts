@@ -40,7 +40,7 @@ import type { Quote, ChangeOrder, Invoice, FinancialEvent, LineItem, FinancialSe
 import type { MaterialVendor, ProjectMaterial, MaterialPlan } from '@/types/materials';
 import { deriveMaintenance, emptyMaintenanceDb, type MaintenanceDb } from './maintenanceDerive';
 import type {
-  TeamCode, CompanyJoinSettings, CompanyInvitation, JoinRequest, MembershipAuditEvent,
+  MembershipAuditEvent,
   CompanyMembership,
 } from '@/types/onboarding';
 
@@ -58,7 +58,7 @@ interface TableDef {
 const TABLES = {
   companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'storageLimitGb', 'maxFileSizeMb', 'targetPayEnabled', 'activeMode', 'activeModeChangedAt', 'activeModeChangedBy', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
   people: { scope: 'all', cols: ['id', 'userId', 'email', 'firstName', 'lastName', 'avatarUrl', 'phone', 'createdAt', 'updatedAt'] },
-  company_members: { scope: 'company', cols: ['id', 'companyId', 'personId', 'role', 'status', 'workerType', 'joinMethod', 'joinRequestId', 'approvedBy', 'approvedAt', 'deactivatedAt', 'deactivatedBy', 'createdAt', 'updatedAt'] },
+  company_members: { scope: 'company', cols: ['id', 'companyId', 'personId', 'role', 'status', 'workerType', 'worksLandscaping', 'worksMaintenance', 'joinMethod', 'joinRequestId', 'approvedBy', 'approvedAt', 'deactivatedAt', 'deactivatedBy', 'createdAt', 'updatedAt'] },
   projects: { scope: 'company', cols: ['id', 'companyId', 'customerId', 'name', 'taskLeadId', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'status', 'progress', 'startDate', 'estimatedEndDate', 'completedAt', 'notes', 'coverPhotoUrl', 'customerProjectCode', 'customerClaimedBy', 'customerClaimedAt', 'createdAt', 'updatedAt'] },
   project_team: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'addedAt', 'removedAt'] },
   project_tasks: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'title', 'description', 'status', 'sortOrder', 'assignedTo', 'completedAt', 'completedBy', 'createdAt', 'updatedAt'] },
@@ -98,10 +98,6 @@ const TABLES = {
   app_notifications: { scope: 'company', cols: ['id', 'companyId', 'recipientId', 'eventType', 'title', 'body', 'status', 'linkedEntityType', 'linkedEntityId', 'metadata', 'createdAt', 'readAt'] },
   worker_reminders: { scope: 'company', cols: ['id', 'companyId', 'personId', 'assignmentId', 'reminderType', 'title', 'body', 'nextAssignment', 'actions', 'createdAt', 'readAt'] },
   worker_settings: { scope: 'me', pk: 'personId', cols: ['personId', 'navApp', 'notificationsEnabled', 'updatedAt'] },
-  team_codes: { scope: 'company', cols: ['id', 'companyId', 'code', 'workerType', 'isActive', 'createdBy', 'createdAt', 'deactivatedAt'] },
-  company_join_settings: { scope: 'company', pk: 'companyId', cols: ['companyId', 'joinByCodeEnabled', 'directInvitationsEnabled', 'requireEmailVerification', 'currentTeamCodeId'] },
-  company_invitations: { scope: 'company', cols: ['id', 'companyId', 'email', 'name', 'phone', 'type', 'status', 'projectId', 'invitedBy', 'token', 'expiresAt', 'acceptedAt', 'acceptedBy', 'createdAt'] },
-  join_requests: { scope: 'company', cols: ['id', 'companyId', 'personId', 'joinMethod', 'invitationId', 'status', 'requestedRole', 'assignedRole', 'requestedWorkerType', 'assignedWorkerType', 'reviewedBy', 'reviewedAt', 'declineReason', 'createdAt', 'updatedAt'] },
   membership_audit_log: { scope: 'company', cols: ['id', 'companyId', 'eventType', 'actorId', 'targetId', 'metadata', 'createdAt'] },
   // Company Resources. hasSecret/createdBy/updatedBy are set by the database
   // only, so they aren't listed as writable columns. Codes never come through
@@ -240,10 +236,6 @@ export interface Db {
   notifications: AppNotification[];
   workerReminders: WorkerReminder[];
   workerSettings: WorkerSettings;
-  teamCodes: TeamCode[];
-  joinSettings: CompanyJoinSettings;
-  invitations: CompanyInvitation[];
-  joinRequests: JoinRequest[];
   auditEvents: MembershipAuditEvent[];
   /** Newest first. Customers only receive sent/issued ones (database rules). */
   quotes: Quote[];
@@ -311,10 +303,6 @@ export const db: Db = {
   notifications: [],
   workerReminders: [],
   workerSettings: DEFAULT_WORKER_SETTINGS,
-  teamCodes: [],
-  joinSettings: { companyId: '', joinByCodeEnabled: true, directInvitationsEnabled: true, requireEmailVerification: false },
-  invitations: [],
-  joinRequests: [],
   auditEvents: [],
   quotes: [],
   changeOrders: [],
@@ -533,16 +521,6 @@ function derive() {
   const ws = raw.worker_settings.find((s) => s.personId === db.personId);
   db.workerSettings = ws ? { navApp: ws.navApp ?? 'default', notificationsEnabled: ws.notificationsEnabled ?? true } : DEFAULT_WORKER_SETTINGS;
 
-  db.teamCodes = raw.team_codes.slice().sort(byCreated) as TeamCode[];
-  db.joinSettings = (raw.company_join_settings[0] as CompanyJoinSettings) ?? { ...db.joinSettings, companyId: db.companyId };
-  db.invitations = raw.company_invitations.slice().sort((a, b) => byCreated(b, a)) as CompanyInvitation[];
-  db.joinRequests = raw.join_requests
-    .slice()
-    .sort((a, b) => byCreated(b, a))
-    .map((r) => {
-      const p = person(r.personId);
-      return { ...r, person: p ? { ...p, profilePhotoUrl: p.avatarUrl } : undefined } as JoinRequest;
-    });
   db.auditEvents = raw.membership_audit_log.slice().sort((a, b) => byCreated(b, a)) as MembershipAuditEvent[];
 
   // Quotes, change orders, invoices. Postgres numerics can arrive as strings.
@@ -827,10 +805,6 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     raw.app_notifications = [...ops.mockNotifications];
     raw.worker_reminders = [...ops.mockWorkerReminders];
     raw.worker_settings = [{ personId, ...mock.mockWorkerSettings }];
-    raw.team_codes = [onb.mockDeactivatedCode, onb.mockTeamCode, onb.mockMaintenanceTeamCode];
-    raw.company_join_settings = [onb.mockJoinSettings];
-    raw.company_invitations = [...onb.mockInvitations];
-    raw.join_requests = onb.mockJoinRequests.map(({ person, ...r }) => r);
     raw.membership_audit_log = [...onb.mockAuditEvents];
     raw.company_resources = mock.mockResources.map((r) => ({ ...r }));
     raw.resource_access = mock.mockResourceAccess.map((a) => ({ ...a }));
@@ -850,13 +824,8 @@ export function startDemoSession(personId: string, role: SessionRole): void {
     // Sample maintenance properties and a route (labelled as samples).
     const maint = (require('./mockMaintenance') as typeof import('./mockMaintenance')).buildMockMaintenance(mock.mockCompany.id);
     for (const [t, rows] of Object.entries(maint.tables)) raw[t as TableName] = rows;
-    raw.company_members = raw.company_members.map((m) => (maint.maintenanceWorkerIds.includes(m.personId) ? { ...m, workerType: 'maintenance' } : m));
+    raw.company_members = raw.company_members.map((m) => (maint.maintenanceWorkerIds.includes(m.personId) ? { ...m, workerType: 'maintenance', worksLandscaping: false, worksMaintenance: true } : m));
     raw.crews = raw.crews.map((c) => (c.id === 'crew-maint' ? { ...c, isMaintenance: true } : c));
-    for (const r of onb.mockJoinRequests) {
-      if (r.person && !raw.people.some((p) => p.id === r.person!.id)) {
-        raw.people.push({ ...r.person, avatarUrl: r.person.profilePhotoUrl });
-      }
-    }
     db.ready = true;
   }
   emitChange();

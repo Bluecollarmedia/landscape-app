@@ -9,7 +9,8 @@ import { useSchedule } from '@/hooks/useSchedule';
 import { useResources } from '@/hooks/useResources';
 import { StatusBadge, Avatar, EmptyState, CrewLabel } from '@/components/ui';
 import { useCrews } from '@/hooks/useCrews';
-import { workerTypeOf, setWorkerType } from '@/hooks/useMaintenanceCrew';
+import { worksOnMaintenance } from '@/lib/workerAreas';
+import { WorkerAreasCard } from '@/components/team/WorkerAreasCard';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -91,31 +92,8 @@ export default function WorkerDetailScreen() {
   const isActive = w.member.status === 'active';
 
   const crew = crewOf(p.id);
-  const workerType = workerTypeOf(w.member);
-  const isMaint = workerType === 'maintenance';
+  const isMaint = worksOnMaintenance(w.member);
 
-  /** Owner-only, always confirmed: never changes anyone's type silently. */
-  function handleChangeType() {
-    const next = isMaint ? 'landscaping' : 'maintenance';
-    const msg = isMaint
-      ? `${p.firstName} will become a landscaping worker and leave the Maintenance Crew. They won't be listed for maintenance routes.`
-      : `${p.firstName} will become a maintenance worker and can be put on the Maintenance Crew and maintenance routes.`;
-    const run = async () => {
-      haptics.success();
-      const res = await setWorkerType(p.id, next);
-      if (!res.ok) {
-        const error = res.error;
-        if (Platform.OS === 'web') alert(`Couldn't change the worker type: ${error}`);
-        else Alert.alert('Not Changed', error);
-      }
-    };
-    const title = isMaint ? 'Make Landscaping Worker?' : 'Make Maintenance Worker?';
-    if (Platform.OS === 'web') {
-      if (confirm(`${title}\n\n${msg}`)) run();
-    } else {
-      Alert.alert(title, msg, [{ text: 'Cancel', style: 'cancel' }, { text: 'Change', onPress: run }]);
-    }
-  }
   const todayAssignments = schedule.getByWorker(p.id, today);
   const tomorrowAssignments = schedule.getByWorker(p.id, offsetDate(1));
 
@@ -172,7 +150,7 @@ export default function WorkerDetailScreen() {
                   {crew && <CrewLabel name={crew.name} color={crew.color} />}
                 </View>
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-                  {isMaint ? 'Maintenance worker' : 'Worker'} · Hired {formatHiredDate(w.member.createdAt)}
+                  Worker · Hired {formatHiredDate(w.member.createdAt)}
                 </Text>
               </View>
             </View>
@@ -208,26 +186,8 @@ export default function WorkerDetailScreen() {
             {personId ? <OwnerWorkerExtras personId={personId} /> : null}
           </View>
 
-          {/* Worker type */}
-          <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '700' }]}>Worker Type</Text>
-              <Pressable onPress={handleChangeType} hitSlop={8} accessibilityRole="button" accessibilityLabel={isMaint ? 'Change to landscaping worker' : 'Change to maintenance worker'}>
-                <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>Change</Text>
-              </Pressable>
-            </View>
-            <View style={styles.typeRow}>
-              <Icon name={isMaint ? 'repeat' : 'tool'} size={18} color={colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
-                  {isMaint ? 'Maintenance worker' : 'Landscaping worker'}
-                </Text>
-                <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                  {isMaint ? 'Works maintenance routes with the Maintenance Crew' : 'Works landscaping projects and tasks'}
-                </Text>
-              </View>
-            </View>
-          </View>
+          {/* What this worker works on */}
+          <WorkerAreasCard member={w.member} person={p} />
 
           {/* Crew */}
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>

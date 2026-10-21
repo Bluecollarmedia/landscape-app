@@ -1,16 +1,18 @@
 /**
- * Owner: the customer code for one maintenance property. Share it with the
- * customer; they enter it under "Customer? View your project" and see this
- * property's finished visits and the photos you share. Regenerating the code
- * stops the old one working; "Remove access" also unlinks the customer.
+ * Owner: how the customer of one maintenance property gets in. The customer gets a private one-time link
+ * (supabase/updates/078_invite_links.sql) and, once signed up, sees this property's finished visits and the photos you share.
+ * "Remove access" unlinks them from the property.
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, Share } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
+import React, { useState } from 'react';
+import { Alert, Platform, View, Text } from 'react-native';
 import { ListSection, ListRow } from '@/components/ui';
+import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { loadMaintenanceCode, regenerateMaintenanceCode } from '@/data/maintenanceCodes';
+import { regenerateMaintenanceCode } from '@/data/maintenanceCodes';
+import { useTheme } from '@/providers/ThemeProvider';
 import { haptics } from '@/lib/haptics';
+import { typeScale } from '@/theme/typography';
+import { spacing } from '@/theme/spacing';
 
 function confirmThen(title: string, msg: string, action: string, run: () => void) {
   if (Platform.OS === 'web') {
@@ -25,91 +27,42 @@ function tell(title: string, msg: string) {
   else Alert.alert(title, msg);
 }
 
-export function CustomerAccessSection({ propertyId, propertyName, linked }: {
+export function CustomerAccessSection({ propertyId, customer }: {
   propertyId: string;
-  propertyName: string;
-  /** A customer is already linked to this property. */
-  linked: boolean;
+  /** The customer linked to this property, if any. */
+  customer?: { id: string; firstName: string; phone?: string };
 }) {
-  const [code, setCode] = useState<string | null | undefined>(undefined);
-  const [copied, setCopied] = useState(false);
+  const { colors } = useTheme();
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    const res = await loadMaintenanceCode(propertyId);
-    setCode(res.ok ? res.data : null);
-  }, [propertyId]);
-  useEffect(() => { if (isSupabaseConfigured) load(); }, [load]);
-
-  if (!isSupabaseConfigured) return null;
-
-  async function copy() {
-    if (!code) return;
-    await Clipboard.setStringAsync(code);
-    haptics.success();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  async function share() {
-    if (!code) return;
-    const message =
-      `Your Brighton Lawn + Landscape customer code for ${propertyName}: ${code}\n` +
-      `Open the app, tap “Customer? View your project” and enter the code.`;
-    if (Platform.OS === 'web') {
-      await Clipboard.setStringAsync(message);
-      tell('Copied', 'The message with your code is copied. Paste it into a text or email.');
-    } else {
-      await Share.share({ message });
-    }
-  }
-
-  async function renew(revoke: boolean) {
+  async function removeAccess() {
     setBusy(true);
-    const res = await regenerateMaintenanceCode(propertyId, revoke);
+    const res = await regenerateMaintenanceCode(propertyId, true);
     setBusy(false);
-    if (!res.ok) return tell('Couldn’t change the code', res.error);
+    if (!res.ok) return tell('Couldn’t remove access', res.error);
     haptics.success();
-    setCode(res.data);
   }
 
   return (
-    <ListSection
-      title="CUSTOMER ACCESS"
-      footer="Give this code to the property's customer. They enter it under “Customer? View your project” when they sign up, then see their finished visits and the photos you share. No project needed."
-    >
-      <ListRow
-        icon="key"
-        title={code === undefined ? 'Loading…' : code ?? 'No code yet'}
-        subtitle={copied ? 'Copied' : linked ? 'Customer code · a customer is linked' : 'Customer code · tap to copy'}
-        onPress={code ? copy : undefined}
-      />
-      {!!code && <ListRow icon="share" title="Share Code" showChevron onPress={share} />}
-      {!!code && (
-        <ListRow
-          icon="refresh-cw"
-          title="Make a New Code"
-          subtitle="The old code stops working"
-          showChevron
-          onPress={() => confirmThen(
-            'Make a new code?',
-            'The old code will stop working. A customer who is already linked keeps their access until you remove it.',
-            'New Code',
-            () => { if (!busy) renew(false); },
-          )}
-        />
-      )}
-      {linked && (
+    <ListSection title="CUSTOMER LOGIN">
+      <View style={{ padding: spacing.md }}>
+        {customer ? (
+          <CustomerInviteCard personId={customer.id} firstName={customer.firstName} phone={customer.phone} />
+        ) : (
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Link a customer to this property to send them a login link.</Text>
+        )}
+      </View>
+      {customer && isSupabaseConfigured && (
         <ListRow
           icon="user-x"
           title="Remove Customer’s Access"
-          subtitle="Unlinks the customer and makes a new code"
+          subtitle="Unlinks the customer from this property"
           destructive
           onPress={() => confirmThen(
             'Remove access?',
-            'The customer will no longer see this property’s visits or photos. A new code is made.',
+            'The customer will no longer see this property’s visits or photos.',
             'Remove',
-            () => { if (!busy) renew(true); },
+            () => { if (!busy) removeAccess(); },
           )}
         />
       )}

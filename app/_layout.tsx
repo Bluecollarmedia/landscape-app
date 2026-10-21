@@ -18,6 +18,7 @@ import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { SplashScreen } from '@/components/branding/SplashScreen';
 import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { applyPendingSignup } from '@/data/pendingSignup';
 import { useModeAccess } from '@/hooks/useModeAccess';
 import { WorkerModeToggle } from '@/components/snow/WorkerModeToggle';
 import { installGlobalErrorHandler } from '@/lib/errorReporting';
@@ -37,6 +38,11 @@ function RootNavigator() {
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
   usePrefetchKeyImages();
+
+  // Photo, birthday, hoodie and ID set aside while the account waited for email confirmation are saved on first sign-in.
+  useEffect(() => {
+    if (appState === 'active' && isAuthenticated && user?.email) applyPendingSignup(user.email);
+  }, [appState, isAuthenticated, user?.email]);
 
   useEffect(() => {
     if (!isLoading) {

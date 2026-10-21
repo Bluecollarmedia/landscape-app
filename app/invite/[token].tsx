@@ -26,6 +26,7 @@ import { uploadImage } from '@/lib/media';
 import { saveBirthdayForCurrentUser } from '@/data/birthday';
 import { saveDetailsForCurrentUser } from '@/data/workerDetails';
 import { useProfilePhoto } from '@/hooks/useProfilePhoto';
+import { stashPendingSignup } from '@/data/pendingSignup';
 import { PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePhoto';
 import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthday';
 import { localDateKey } from '@/lib/ids';
@@ -161,7 +162,10 @@ export default function InviteScreen() {
     try {
       const result = await signUp(email.trim(), password, { firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() }, { inviteToken: String(token) });
       if (result.needsEmailConfirmation) {
-        say('Check your email', `We sent a confirmation link to ${email.trim()}. Open it, then sign in. ${info?.companyName ?? 'Your employer'} is already expecting you.`);
+        // Not signed in yet, so none of the extras can be saved now: keep them on the phone and save them at first sign-in.
+        await stashPendingSignup({ email: email.trim(), photoUri, birthdayIso: parseBirthday(birthday), hoodieSize: isWorker ? hoodie : null, idUri: isWorker ? idUri : null });
+        const kept = photoUri || parseBirthday(birthday) || (isWorker && (hoodie || idUri));
+        say('Check your email', `We sent a confirmation link to ${email.trim()}. Open it, then sign in. ${info?.companyName ?? 'Your employer'} is already expecting you.${kept ? ' Your photo and details are saved and will be added when you sign in.' : ''}`);
         router.replace('/(auth)/login');
         return;
       }

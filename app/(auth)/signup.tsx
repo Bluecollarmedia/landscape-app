@@ -17,6 +17,7 @@ import { ScreenContainer } from '@/components/layout';
 import { Button, Input } from '@/components/ui';
 import { SignupPhotoPicker } from '@/components/account/SignupPhotoPicker';
 import { saveSignupPhoto } from '@/data/signupPhoto';
+import { stashPendingSignup } from '@/data/pendingSignup';
 import { Icon } from '@/components/ui/Icon';
 import { semantic } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
@@ -76,7 +77,9 @@ export default function SignUpScreen() {
         }
       }
       if (result.needsEmailConfirmation) {
-        const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in.`;
+        // Not signed in yet, so the photo can't be saved now: keep it on the phone and save it when they first sign in.
+        await stashPendingSignup({ email: email.trim(), photoUri });
+        const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in.${photoUri ? ' Your photo is saved and will be added then.' : ''}`;
         if (Platform.OS === 'web') alert(msg);
         else Alert.alert('Check your email', msg);
         router.replace('/(auth)/login');

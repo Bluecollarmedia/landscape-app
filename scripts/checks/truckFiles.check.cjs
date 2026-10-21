@@ -31,11 +31,13 @@ check('7 one form adds AND edits a truck: all fields incl. VIN, color and every 
 check('8 the photo picker has no system crop screen (it crashed on iOS 27)', !/allowsEditing: true/.test(form + read('src/lib/pickImage.ts')) && /pickImage\(source, \{ afterSheetMs: 650 \}\)/.test(form));
 check('9 documents can be added while adding a truck (uploaded once it is saved), owner only', /staged/.test(form) && /addTruckDocument\(id, d\)/.test(form) && /!editing && isOwner/.test(form));
 const detail = read('app/(owner)/(tabs)/more/trucks/[id].tsx');
-check('10 the truck page has a clear Edit Truck button and an edit icon, and routes exist',
-  /title="Edit Truck"/.test(detail) && /accessibilityLabel="Edit this truck"/.test(detail) && fs.existsSync(path.join(__dirname, '../../app/(owner)/(tabs)/more/trucks/edit.tsx')) && /TruckForm/.test(read('app/(owner)/(tabs)/more/trucks/new.tsx')));
+check('10 the truck page has ONE edit control (the pencil at the top right, no second Edit Truck button), and routes exist',
+  !/title="Edit Truck"/.test(detail) && /accessibilityLabel="Edit this truck"/.test(detail) && fs.existsSync(path.join(__dirname, '../../app/(owner)/(tabs)/more/trucks/edit.tsx')) && /TruckForm/.test(read('app/(owner)/(tabs)/more/trucks/new.tsx')));
 check('11 documents and private notes show only for the owner', /\{isOwner && <TruckPrivateSection truckId=\{truck\.id\} \/>\}/.test(detail) && /db\.role === 'owner'/.test(read('src/data/truckFiles.ts')));
 const priv = read('src/components/trucks/TruckPrivateSection.tsx');
-check('12 documents open on tap, show expiry warnings, and can be deleted with a confirmation; notes can be added, edited and deleted',
-  /Linking\.openURL\(d\.fileUrl\)/.test(priv) && /expiryStatus\(d\.expiresOn\)/.test(priv) && /Delete this document\?/.test(priv) && /updateTruckNote/.test(priv) && /deleteTruckNote/.test(priv) && /Only you can see these notes/.test(priv));
+check('12 insurance opens on tap, shows expiry warnings and can be deleted with a confirmation; there are no private notes any more',
+  /Linking\.openURL\(d\.fileUrl\)/.test(priv) && /expiryStatus\(d\.expiresOn\)/.test(priv) && /Delete this insurance\?/.test(priv) && !/Private Notes/.test(priv) && !/TruckNote|useTruckNotes/.test(priv));
+check('13 the card is called Insurance and lists only insurance papers; Maintenance is a separate card',
+  /title="Insurance"/.test(priv) && /d\.kind === 'insurance'/.test(priv) && /title="Maintenance"/.test(priv) && !/Documents & Insurance/.test(priv + form));
 console.log(bad ? '\n' + bad + ' failed' : '\nall passed');
 process.exit(bad ? 1 : 0);

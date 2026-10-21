@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTrucks } from '@/hooks/useTrucks';
-import { Button, Card, StatusBadge, EmptyState, OptimizedImage, GlassIconButton } from '@/components/ui';
+import { Card, StatusBadge, EmptyState, OptimizedImage, GlassIconButton } from '@/components/ui';
 import { TruckPrivateSection } from '@/components/trucks/TruckPrivateSection';
 import { useIsOwner } from '@/data/truckFiles';
 import { typeScale } from '@/theme/typography';
@@ -74,15 +74,6 @@ export default function TruckDetailScreen() {
         <View style={{ marginTop: spacing.md, alignSelf: 'flex-start' }}>
           <StatusBadge label={badge.label} status={badge.status} />
         </View>
-
-        <Button
-          title="Edit Truck"
-          icon="edit-2"
-          variant="secondary"
-          onPress={() => router.push({ pathname: '/(owner)/more/trucks/edit', params: { id: truck.id } } as any)}
-          fullWidth
-          style={{ marginTop: spacing.md }}
-        />
 
         <Card title="Vehicle Info" style={styles.card}>
           {(truck.year || truck.make || truck.model) && (

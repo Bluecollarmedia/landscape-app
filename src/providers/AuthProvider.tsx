@@ -21,6 +21,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { startSession, endSession, startDemoSession, updateRow } from '@/data/store';
 import { unregisterForPush } from '@/lib/push';
 import { syncMaterialReminders } from '@/lib/materialReminders';
+import { syncTruckReminders } from '@/lib/truckReminders';
 import type { AuthState, UserProfile, UserRole } from '@/types';
 import type { OnboardingStep } from '@/types/onboarding';
 import { fetchMySnowStatus, type MySnowStatus } from '@/hooks/useSnowOnboarding';
@@ -470,6 +471,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await unregisterForPush();
       // The next person to sign in on this phone shouldn't get these.
       await syncMaterialReminders([]);
+      await syncTruckReminders([]);
       await supabase.auth.signOut();
     }
     if (loadedFor.current) endSession();

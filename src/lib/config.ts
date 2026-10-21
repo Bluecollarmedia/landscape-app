@@ -11,6 +11,8 @@ export const config = {
   /** Where the web app is hosted (e.g. https://app.brightonlawn.com). Approval
    * links point here; without it the app only shares PDFs. */
   webUrl: (process.env.EXPO_PUBLIC_WEB_URL ?? '').replace(/\/+$/, ''),
+  /** Google Places API (New) key for address suggestions while typing. Empty = suggestions are off (see lib/placesAutocomplete.ts). */
+  googlePlacesKey: (process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? '').trim(),
 
   get isDev() {
     return __DEV__ ?? process.env.NODE_ENV !== 'production';

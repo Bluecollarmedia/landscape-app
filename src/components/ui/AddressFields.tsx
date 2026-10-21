@@ -7,7 +7,9 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { applyStreetInput, type AddressParts } from '@/lib/address';
+import type { PickedPlace } from '@/lib/placesAutocomplete';
 import { verifyAddress, previewOnMap } from '@/lib/maps';
+import { StreetSuggestions } from './StreetSuggestions';
 
 /** Map check state for an address: exact spot found, or the owner chose to keep it as typed. */
 export interface AddressCheck {
@@ -31,7 +33,8 @@ interface AddressFieldsProps {
 
 /**
  * Street / City / State / ZIP. When autofill or a paste drops a whole address
- * into the street field, it's split across all four.
+ * into the street field, it's split across all four. With a Google Places key set, suggestions appear under the street
+ * as you type and one tap fills everything (and the map spot).
  */
 export function AddressFields({ value, onChange, required, streetLabel = 'Street Address', style, check, onCheckChange }: AddressFieldsProps) {
   const star = required ? ' *' : '';
@@ -46,6 +49,12 @@ export function AddressFields({ value, onChange, required, streetLabel = 'Street
     change(applyStreetInput(text, value));
   }
 
+  /** A suggestion was picked: all four fields at once, and the exact map spot is already known. */
+  function handlePicked(place: PickedPlace) {
+    onChange({ address: place.address, city: place.city, state: place.state, zip: place.zip });
+    if (onCheckChange) onCheckChange(place.latitude != null && place.longitude != null ? { latitude: place.latitude, longitude: place.longitude } : {});
+  }
+
   return (
     <View style={[styles.wrap, style]}>
       <Input
@@ -57,6 +66,7 @@ export function AddressFields({ value, onChange, required, streetLabel = 'Street
         textContentType="fullStreetAddress"
         autoComplete="street-address"
       />
+      <StreetSuggestions text={value.address} onPick={handlePicked} />
       <View style={styles.row}>
         <Input
           label={`City${star}`}

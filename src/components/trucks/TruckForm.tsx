@@ -181,7 +181,7 @@ export function TruckForm({ truckId }: { truckId?: string }) {
 
         {!editing && isOwner ? (
           <View style={[styles.docs, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-            <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Documents & Insurance</Text>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Insurance</Text>
             <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Optional. PDFs or photos. Only you can see these.</Text>
             {staged.map((d, i) => (
               <View key={`${d.uri}-${i}`} style={styles.stagedRow}>
@@ -193,7 +193,7 @@ export function TruckForm({ truckId }: { truckId?: string }) {
                 <Pressable onPress={() => setStaged((s) => s.filter((_, j) => j !== i))} hitSlop={10} accessibilityLabel={`Remove ${d.title}`}><Icon name="x" size={18} color={colors.textTertiary} /></Pressable>
               </View>
             ))}
-            <Button title="Add Document" icon="plus" variant="secondary" onPress={() => setDocSheet(true)} fullWidth />
+            <Button title="Add Insurance" icon="plus" variant="secondary" onPress={() => setDocSheet(true)} fullWidth />
           </View>
         ) : null}
 

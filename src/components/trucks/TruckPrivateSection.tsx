@@ -1,22 +1,25 @@
 /**
- * On a truck's page, for the company owner only: the truck's documents (insurance, registration, any PDF or photo, with expiry
- * warnings) and the owner's private dated notes. Nobody else sees this section, and the database refuses to give the data to
- * anyone else either (supabase/updates/056).
+ * On a truck's page, for the company owner only: the truck's Insurance (PDFs or photos, with expiry warnings) and its Maintenance log
+ * (title, date serviced, when it is next due, and what was done; the owner is reminded on the due date). Nobody else sees this section,
+ * and the database refuses to give the data to anyone else either (supabase/updates/056 and 077).
  */
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Linking, Alert, Platform, TextInput } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Linking, Alert, Platform } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { Button, Card } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { TruckDocumentSheet } from './TruckDocumentSheet';
+import { TruckMaintenanceSheet } from './TruckMaintenanceSheet';
 import {
-  addTruckDocument, addTruckNote, deleteTruckNote, removeTruckDocument, updateTruckNote, useTruckDocuments, useTruckNotes,
+  addTruckDocument, addTruckMaintenance, deleteTruckMaintenance, removeTruckDocument, updateTruckMaintenance, useTruckDocuments, useTruckMaintenance,
 } from '@/data/truckFiles';
-import { DOC_KINDS, NOTE_MAX, expiryStatus, formatSize, isPdf, kindLabel } from '@/lib/truckDocs';
+import { expiryStatus, formatSize, isPdf } from '@/lib/truckDocs';
+import { dueInfo, servicedLabel } from '@/lib/truckMaintenance';
+import { localDateKey } from '@/lib/ids';
 import { semantic } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
-import { spacing, radius } from '@/theme/spacing';
-import type { TruckDocument } from '@/types/truck';
+import { spacing } from '@/theme/spacing';
+import type { TruckDocument, TruckMaintenance } from '@/types/truck';
 
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -27,107 +30,97 @@ function confirm(title: string, message: string, action: string, run: () => void
 
 export function TruckPrivateSection({ truckId }: { truckId: string }) {
   const { colors } = useTheme();
-  const docs = useTruckDocuments(truckId);
-  const notes = useTruckNotes(truckId);
-  const [sheet, setSheet] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [noteError, setNoteError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [editText, setEditText] = useState('');
+  // Only insurance papers here; anything saved earlier as another kind of document stays in the database but is not listed.
+  const docs = useTruckDocuments(truckId).filter((d) => d.kind === 'insurance');
+  const log = useTruckMaintenance(truckId);
+  const [insuranceSheet, setInsuranceSheet] = useState(false);
+  const [maintSheet, setMaintSheet] = useState(false);
+  const [editing, setEditing] = useState<TruckMaintenance | null>(null);
+  const today = localDateKey(new Date());
 
   function open(d: TruckDocument) {
     Linking.openURL(d.fileUrl).catch(() => Alert.alert("Couldn't open the file", 'Try again in a moment.'));
   }
 
-  function saveNote() {
-    const r = addTruckNote(truckId, draft);
-    if (!r.ok) { setNoteError(r.error); return; }
-    setDraft('');
-    setNoteError(null);
-  }
-
   return (
     <>
-      <Card title="Documents & Insurance" style={styles.card}>
+      <Card title="Insurance" style={styles.card}>
         <Text style={[typeScale.caption, { color: colors.textTertiary, marginBottom: spacing.sm }]}>
-          Insurance, registration, inspection, any PDF or photo. Only you can see these.
+          Insurance papers as a PDF or photo. Only you can see these.
         </Text>
         {docs.length === 0 ? (
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>No documents yet.</Text>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>No insurance added yet.</Text>
         ) : (
           docs.map((d, i) => {
             const exp = expiryStatus(d.expiresOn);
             const tone = exp.state === 'expired' ? semantic.error : exp.state === 'soon' ? semantic.warning : colors.textTertiary;
-            const icon = DOC_KINDS.find((k) => k.key === d.kind)?.icon ?? 'paperclip';
             return (
-              <View key={d.id} style={[styles.docRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
-                <Pressable onPress={() => open(d)} style={styles.docMain} accessibilityRole="button" accessibilityLabel={`Open ${d.title}`}>
-                  <View style={[styles.docIcon, { backgroundColor: colors.primarySurface }]}>
-                    <Icon name={isPdf(d.contentType, d.title) ? 'file-text' : icon === 'paperclip' ? 'image' : icon} size={18} color={colors.primaryDark} />
+              <View key={d.id} style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                <Pressable onPress={() => open(d)} style={styles.rowMain} accessibilityRole="button" accessibilityLabel={`Open ${d.title}`}>
+                  <View style={[styles.icon, { backgroundColor: colors.primarySurface }]}>
+                    <Icon name={isPdf(d.contentType, d.title) ? 'file-text' : 'image'} size={18} color={colors.primaryDark} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{d.title}</Text>
                     <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>
-                      {[kindLabel(d.kind), isPdf(d.contentType) ? 'PDF' : 'Photo', formatSize(d.sizeBytes), `Added ${when(d.createdAt)}`].filter(Boolean).join(' · ')}
+                      {[isPdf(d.contentType) ? 'PDF' : 'Photo', formatSize(d.sizeBytes), `Added ${when(d.createdAt)}`].filter(Boolean).join(' · ')}
                     </Text>
                     {exp.label ? <Text style={[typeScale.caption, { color: tone, fontWeight: exp.state === 'ok' || exp.state === 'none' ? '400' : '700' }]}>{exp.label}</Text> : null}
                   </View>
                 </Pressable>
-                <Pressable onPress={() => confirm('Delete this document?', `${d.title} will be removed from this truck.`, 'Delete', () => removeTruckDocument(d))} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Delete ${d.title}`}>
+                <Pressable onPress={() => confirm('Delete this insurance?', `${d.title} will be removed from this truck.`, 'Delete', () => removeTruckDocument(d))} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Delete ${d.title}`}>
                   <Icon name="trash-2" size={18} color={colors.textTertiary} />
                 </Pressable>
               </View>
             );
           })
         )}
-        <Button title="Add Document" icon="plus" variant="secondary" onPress={() => setSheet(true)} fullWidth />
+        <Button title="Add Insurance" icon="plus" variant="secondary" onPress={() => setInsuranceSheet(true)} fullWidth />
       </Card>
 
-      <Card title="Private Notes" style={styles.card}>
-        <View style={styles.privateTag}>
-          <Icon name="lock" size={12} color={colors.textTertiary} />
-          <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Only you can see these notes. Workers and admins can't.</Text>
-        </View>
-        <TextInput
-          value={draft}
-          onChangeText={(t) => { setDraft(t.slice(0, NOTE_MAX)); setNoteError(null); }}
-          placeholder="Where things stand: new battery in March, insurance renews in June…"
-          placeholderTextColor={colors.textTertiary}
-          multiline
-          style={[typeScale.bodyLarge, styles.noteInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
-          accessibilityLabel="Add a private note"
-        />
-        {noteError ? <Text style={[typeScale.caption, { color: colors.error }]}>{noteError}</Text> : null}
-        <Button title="Add Note" icon="plus" variant="secondary" onPress={saveNote} disabled={!draft.trim()} fullWidth />
-
-        {notes.map((n, i) => (
-          <View key={n.id} style={[styles.noteRow, { borderTopColor: colors.border }, i === 0 && { marginTop: spacing.md }]}>
-            {editing === n.id ? (
-              <View style={{ flex: 1, gap: spacing.sm }}>
-                <TextInput value={editText} onChangeText={(t) => setEditText(t.slice(0, NOTE_MAX))} multiline autoFocus style={[typeScale.bodyLarge, styles.noteInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]} />
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <Button title="Cancel" variant="ghost" onPress={() => setEditing(null)} style={{ flex: 1 }} />
-                  <Button title="Save" onPress={() => { const r = updateTruckNote(n.id, editText); if (r.ok) setEditing(null); else setNoteError(r.error); }} style={{ flex: 1 }} />
-                </View>
+      <Card title="Maintenance" style={styles.card}>
+        <Text style={[typeScale.caption, { color: colors.textTertiary, marginBottom: spacing.sm }]}>
+          Services done on this truck. Set when the next one is due and you get a reminder that morning. Only you can see this.
+        </Text>
+        {log.length === 0 ? (
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>No maintenance recorded yet.</Text>
+        ) : (
+          log.map((m, i) => {
+            const due = dueInfo(m.dueOn, today);
+            const tone = due.state === 'overdue' ? semantic.error : due.state === 'today' || due.state === 'soon' ? semantic.warning : colors.textTertiary;
+            return (
+              <View key={m.id} style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                <Pressable onPress={() => { setEditing(m); setMaintSheet(true); }} style={styles.rowMain} accessibilityRole="button" accessibilityLabel={`Change ${m.title}`}>
+                  <View style={[styles.icon, { backgroundColor: colors.primarySurface }]}>
+                    <Icon name="tool" size={18} color={colors.primaryDark} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{m.title}</Text>
+                    <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{servicedLabel(m.servicedOn)}</Text>
+                    {due.label ? <Text style={[typeScale.caption, { color: tone, fontWeight: due.state === 'ok' ? '400' : '700' }]}>{due.label}</Text> : null}
+                    {m.notes ? <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]} numberOfLines={3}>{m.notes}</Text> : null}
+                  </View>
+                </Pressable>
+                <Pressable onPress={() => confirm('Delete this record?', `${m.title} will be removed from this truck's maintenance.`, 'Delete', () => deleteTruckMaintenance(m.id))} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Delete ${m.title}`}>
+                  <Icon name="trash-2" size={18} color={colors.textTertiary} />
+                </Pressable>
               </View>
-            ) : (
-              <>
-                <View style={{ flex: 1 }}>
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{n.body}</Text>
-                  <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>{when(n.createdAt)}{n.updatedAt !== n.createdAt && when(n.updatedAt) !== when(n.createdAt) ? ` · edited ${when(n.updatedAt)}` : ''}</Text>
-                </View>
-                <Pressable onPress={() => { setEditing(n.id); setEditText(n.body); }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Edit this note"><Icon name="edit-2" size={16} color={colors.textTertiary} /></Pressable>
-                <Pressable onPress={() => confirm('Delete this note?', 'It will be removed for good.', 'Delete', () => deleteTruckNote(n.id))} hitSlop={10} accessibilityRole="button" accessibilityLabel="Delete this note"><Icon name="trash-2" size={16} color={colors.textTertiary} /></Pressable>
-              </>
-            )}
-          </View>
-        ))}
+            );
+          })
+        )}
+        <Button title="Add Maintenance" icon="plus" variant="secondary" onPress={() => { setEditing(null); setMaintSheet(true); }} fullWidth />
       </Card>
 
       <TruckDocumentSheet
-        visible={sheet}
-        onClose={() => setSheet(false)}
+        visible={insuranceSheet}
+        onClose={() => setInsuranceSheet(false)}
         onSubmit={async (input) => { const r = await addTruckDocument(truckId, input); return r.ok ? null : r.error; }}
+      />
+      <TruckMaintenanceSheet
+        visible={maintSheet}
+        editing={editing}
+        onClose={() => { setMaintSheet(false); setEditing(null); }}
+        onSubmit={(input) => { const r = editing ? updateTruckMaintenance(editing.id, input) : addTruckMaintenance(truckId, input); return r.ok ? null : r.error; }}
       />
     </>
   );
@@ -135,10 +128,7 @@ export function TruckPrivateSection({ truckId }: { truckId: string }) {
 
 const styles = StyleSheet.create({
   card: { marginTop: spacing.lg },
-  docRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  docMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  docIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  privateTag: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
-  noteInput: { minHeight: 72, borderWidth: 1.5, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.sm, textAlignVertical: 'top', marginBottom: spacing.sm },
-  noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  icon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 });

@@ -32,6 +32,8 @@ export function ownerNotificationTarget(n: NotificationLike): OwnerTarget | null
     return `/(owner)/projects/${id}`;
   }
   if (type === 'materials') return `/(owner)/projects/${id}?section=materials`;
+  // A truck's maintenance reminder opens that truck.
+  if (type === 'truck') return `/(owner)/more/trucks/${id}`;
   return null;
 }
 

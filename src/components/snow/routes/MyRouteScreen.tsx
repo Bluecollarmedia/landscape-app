@@ -19,7 +19,7 @@ import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { openDirections } from '@/lib/maps';
 import { useMediaJobs, waitForMediaJobs } from '@/lib/mediaQueueRuntime';
 import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
-import { SnowClockInCard } from '@/components/snow/time/SnowClockInCard';
+import { formatClock } from '@/data/snowShifts';
 import { cardStatusWord, primaryActionFor, routeHeaderLine, routeProgress, splitAddress, stopStatusWord } from '@/lib/snowRouteView';
 import { snowUploadState } from '@/hooks/useSnowUploads';
 import { SERVICE_LABEL } from '@/data/snowStorms';
@@ -35,7 +35,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { SnowService } from '@/types/snow';
 
-export function MyRouteScreen() {
+export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked in (the Route tab only shows this screen once they have). */ clockedInSince?: string } = {}) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
@@ -139,7 +139,15 @@ export function MyRouteScreen() {
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>My Route</Text>
+        {clockedInSince ? (
+          <View style={[styles.clockLine, { backgroundColor: colors.primarySurface }]} accessible accessibilityLabel={`Clocked in since ${formatClock(clockedInSince)}. Clock out in the Time Clock tab.`}>
+            <View style={[styles.clockDot, { backgroundColor: colors.success }]} />
+            <Text style={[typeScale.caption, { color: colors.textSecondary, flex: 1 }]} numberOfLines={2}>
+              <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>Clocked in since {formatClock(clockedInSince)}.</Text> Clock out in the Time Clock tab.
+            </Text>
+          </View>
+        ) : null}
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>My Route</Text>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
 
         {historyId ? (
@@ -171,7 +179,6 @@ export function MyRouteScreen() {
 
         {!route ? (
           <>
-          <SnowClockInCard />
           <EmptyState icon="navigation" title="No active route" description="When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are under Past work below." />
           </>
         ) : (
@@ -183,7 +190,6 @@ export function MyRouteScreen() {
               <ProgressBar progress={progress.percent} height={5} style={{ flex: 1 }} />
               <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{progress.text}</Text>
             </View>
-            <SnowClockInCard />
             {!working ? (
               <InlineNotice icon="info" tone="info" text={route.cancelled ? 'This route was cancelled.' : 'This storm has ended. Nothing more to do here.'} style={{ marginTop: spacing.md }} />
             ) : null}
@@ -342,6 +348,8 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, padding: spacing.lg },
   backToCurrent: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
   historyHeader: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.sm, marginLeft: spacing.sm },
+  clockLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  clockDot: { width: 8, height: 8, borderRadius: 4 },
   squared: { borderRadius: radius.md },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
   numberMarker: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

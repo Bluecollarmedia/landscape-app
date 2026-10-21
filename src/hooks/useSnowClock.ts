@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { canClockIn, clockIn, loadShifts, startOfWeekIso, type SnowShift } from '@/data/snowShifts';
 
 /**
- * A Snow worker's clock state, for any screen that shows it (the Route page's "Clock in for the storm" card and the Time Clock tab). There
+ * A Snow worker's clock state, for any screen that shows it (the Route tab's Clock In gate and the Time Clock tab). There
  * is one clock: whichever screen is showing reads it fresh every time the person comes to it, so the two can never disagree.
  * `open` is the shift they are clocked in on, if any; `allowed` is whether the database would let them clock in right now (on a route in a
  * dispatched storm).
@@ -23,6 +24,15 @@ export function useSnowClock() {
 
   // Tabs stay mounted, so reload each time this screen comes back to the front.
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
+
+  // While not clocked in the owner may put them on a route or dispatch a storm at any moment: look again every minute and whenever the app
+  // comes back to the front, so the right screen appears without anyone reopening the app.
+  useEffect(() => {
+    if (open) return;
+    const timer = setInterval(() => { void refresh(); }, 60_000);
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') void refresh(); });
+    return () => { clearInterval(timer); sub.remove(); };
+  }, [open, refresh]);
 
   /** Clocks in, then reads the clock again. Resolves with an error sentence, or null when it worked. */
   const clockInNow = useCallback(async (): Promise<string | null> => {

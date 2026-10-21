@@ -23,6 +23,8 @@ const signUp = async (email, meta) => {
 
 const owner = await signUp('o@x.test', { first_name: 'Owner', last_name: 'O', company_name: 'Acme Snow' });
 const co = (await one(`select company_id from public.company_members where person_id = $1 and role = 'owner'`, [owner.pid])).company_id;
+// This test is about what the customer sees once an update is SENT, so it uses the manual way (approve, then send). Automatic sending (update 87) has its own test.
+await db.query(`update public.snow_settings set auto_share_with_customers = false where company_id = $1`, [co]);
 const lead = await signUp('lead@x.test', { first_name: 'Lead', last_name: 'L' });
 await db.query(`insert into public.company_members (company_id, person_id, role, status) values ($1,$2,'worker','active')`, [co, lead.pid]);
 await db.query(`insert into public.snow_staff (company_id, person_id, status, granted_at) values ($1,$2,'active',now())`, [co, lead.pid]);

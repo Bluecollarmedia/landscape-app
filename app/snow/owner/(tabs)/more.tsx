@@ -13,6 +13,7 @@ import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useModeSwitch } from '@/components/snow/ModeSwitchRow';
 import { OwnerCustomerMessages, OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
 import { StopRuleToggle } from '@/components/snow/settings/StopRuleToggle';
+import { AutoShareToggle } from '@/components/snow/settings/AutoShareToggle';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -60,6 +61,7 @@ export default function SnowOwnerMoreScreen() {
           {db.companyId ? (
             <Group title="Rules">
               <StopRuleToggle companyId={db.companyId} />
+              <AutoShareToggle companyId={db.companyId} />
             </Group>
           ) : null}
 
@@ -74,7 +76,7 @@ export default function SnowOwnerMoreScreen() {
             <Row icon="activity" title="Activity log" subtitle="Everything that happened, by storm, route and person" onPress={() => router.push('/snow/owner/activity')} />
             <Row icon="clock" title="Snow hours" subtitle="Who clocked in this week, and fix a missed clock-out" onPress={() => router.push('/snow/owner/hours')} />
             <Row icon="send" title="Message customers" subtitle="Send a push notification and banner to customers" onPress={() => router.push('/snow/owner/message-customers')} />
-            <Row icon="camera" title="Photo review" subtitle="Approve photos and send updates to customers" onPress={() => router.push('/snow/owner/review')} />
+            <Row icon="camera" title="Photo review" subtitle="See what customers were sent, and withdraw a photo if needed" onPress={() => router.push('/snow/owner/review')} />
           </Group>
 
           <Group title="Storms">

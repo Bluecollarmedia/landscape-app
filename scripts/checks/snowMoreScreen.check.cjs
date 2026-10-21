@@ -16,7 +16,7 @@ check('3 old placeholder card is gone', !/SnowPlaceholder/.test(src) && !/being 
 check('4 all section titles', ['Rules', 'Alerts', 'Records', 'Storms', 'You', 'Legal & Support', 'Account'].every((t) => has(`title="${t}"`)));
 check('5 settings/records rows, titles and subtitles', [
   'Activity log', 'Everything that happened, by storm, route and person',
-  'Snow hours', 'Who clocked in this week, and fix a missed clock-out', 'Photo review', 'Approve photos and send updates to customers',
+  'Snow hours', 'Who clocked in this week, and fix a missed clock-out', 'Photo review', 'See what customers were sent, and withdraw a photo if needed',
 ].every(has));
 check('6 destinations unchanged', ['/snow/owner/activity', '/snow/owner/hours', '/snow/owner/review', '/snow/owner/message-customers', '/snow/owner/manage-storms', '/snow/owner/edit-profile'].every((r) => has(`router.push('${r}'`)) && !has('/snow/owner/settings'));
 check('7 legal rows', has('Privacy Policy') && has('Terms of Use') && has('Help & Support') && has('/legal/privacy') && has('/legal/terms') && has('/legal/support'));

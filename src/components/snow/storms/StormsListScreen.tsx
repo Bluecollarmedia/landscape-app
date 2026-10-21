@@ -90,8 +90,8 @@ export function StormsListScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.header}>
-          <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]} accessibilityRole="header">Storms</Text>
-          <Button title="Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
+          <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1, flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} accessibilityRole="header">Storms</Text>
+          <View style={{ flexShrink: 0, marginLeft: spacing.md }}><Button title="Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} /></View>
         </View>
 
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.lg }} /> : null}

@@ -83,8 +83,9 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
       >
         {asTab ? null : <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back" />}
         <View style={[styles.titleRow, !asTab && { marginTop: spacing.lg }]}>
-          <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]}>Properties</Text>
-          {!adding ? <Button title="Add" icon="plus" size="sm" onPress={() => setAdding(true)} /> : null}
+          {/* One line always: the title shrinks a little before it would ever wrap, and the button never gets squeezed. */}
+          <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1, flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Properties</Text>
+          {!adding ? <View style={{ flexShrink: 0, marginLeft: spacing.md }}><Button title="Add" icon="plus" size="sm" onPress={() => setAdding(true)} /></View> : null}
         </View>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
 

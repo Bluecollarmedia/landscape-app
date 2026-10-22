@@ -93,28 +93,44 @@ export function useCompanyMode() {
  * function isn't installed yet or the call fails, the answer is "no snow
  * access": a failure never opens Snow Mode.
  */
-function useWorkerSnowAccess(role: UserRole | null | undefined, mode: CompanyMode): Partial<ModeAccess> {
-  const [access, setAccess] = useState<Partial<ModeAccess>>({ snow: false });
+const snowAccessCache = new Map<string, Partial<ModeAccess>>();
+/** If the answer is slower than this, the app stops waiting and carries on as "no snow access" (a later answer still updates it). */
+const SNOW_ACCESS_WAIT_MS = 3000;
+
+function useWorkerSnowAccess(role: UserRole | null | undefined, mode: CompanyMode): { access: Partial<ModeAccess>; ready: boolean } {
+  const [, bump] = useState(0);
   const companyId = db.companyId;
+  const asks = role === 'worker' && isSupabaseConfigured && !!companyId;
 
   useEffect(() => {
-    if (role !== 'worker' || !isSupabaseConfigured || !companyId) {
-      setAccess({ snow: false });
+    if (!asks || !companyId) {
+      // Signed out, or not a worker: forget what was learned so nobody inherits another person's answer.
+      snowAccessCache.clear();
       return;
     }
     let cancelled = false;
+    // Never show the wrong screen while waiting: callers hold off until `ready`, with this as the upper limit on the wait.
+    const giveUp = setTimeout(() => {
+      if (cancelled || snowAccessCache.has(companyId)) return;
+      snowAccessCache.set(companyId, { snow: false });
+      bump((n) => n + 1);
+    }, SNOW_ACCESS_WAIT_MS);
     supabase.rpc('get_my_snow_access').then(({ data, error }) => {
       if (cancelled) return;
       const rows = !error && Array.isArray(data) ? (data as { company_id?: string; landscaping_access?: boolean }[]) : [];
       const mine = rows.find((r) => r.company_id === companyId);
-      setAccess(mine ? { snow: true, landscaping: mine.landscaping_access !== false } : { snow: false });
+      snowAccessCache.set(companyId, mine ? { snow: true, landscaping: mine.landscaping_access !== false } : { snow: false });
+      bump((n) => n + 1);
     });
     return () => {
       cancelled = true;
+      clearTimeout(giveUp);
     };
-  }, [role, mode, companyId]);
+  }, [asks, mode, companyId]);
 
-  return access;
+  if (!asks || !companyId) return { access: { snow: false }, ready: true };
+  const known = snowAccessCache.get(companyId);
+  return { access: known ?? { snow: false }, ready: !!known };
 }
 
 /**
@@ -125,8 +141,12 @@ function useWorkerSnowAccess(role: UserRole | null | undefined, mode: CompanyMod
 export function useModeAccess(role: UserRole | null | undefined, granted?: Partial<ModeAccess>) {
   useDb();
   const mode = companyMode();
-  const looked = useWorkerSnowAccess(role, mode);
+  const { access: looked, ready } = useWorkerSnowAccess(role, mode);
   const access = modeAccessFor(role, { ...looked, ...granted });
-  const { choice, setChoice } = useWorkerModeChoice(db.company?.activeModeChangedAt);
-  return { mode, access, shell: shellFor(role, mode, access, choice), choice, setChoice, canToggle: canToggleMode(role, mode, access) };
+  const { choice, setChoice, loaded } = useWorkerModeChoice(db.company?.activeModeChangedAt);
+  // While Snow Mode is on, a worker's screen depends on two answers that arrive a moment after launch: their snow access, and (when
+  // they can use both) which way they last switched the toggle on this phone. Until both are in, no screen is chosen, so the
+  // "Snow Mode is on" notice or the wrong shell never flashes before the real one.
+  const pending = role === 'worker' && mode === 'snow' && (!ready || (access.snow === true && access.landscaping !== false && !loaded));
+  return { mode, access, shell: shellFor(role, mode, access, choice), pending, choice, setChoice, canToggle: canToggleMode(role, mode, access) };
 }

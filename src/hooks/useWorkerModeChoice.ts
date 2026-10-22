@@ -8,6 +8,8 @@ type Saved = { at: string; choice: WorkerShellChoice } | null;
 
 let saved: Saved = null;
 let started = false;
+/** True once the phone's saved choice (if any) has been read. */
+let loaded = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
@@ -15,8 +17,8 @@ function start() {
   if (started) return;
   started = true;
   AsyncStorage.getItem(KEY)
-    .then((v) => { try { saved = v ? (JSON.parse(v) as Saved) : null; } catch { saved = null; } emit(); })
-    .catch(() => {});
+    .then((v) => { try { saved = v ? (JSON.parse(v) as Saved) : null; } catch { saved = null; } loaded = true; emit(); })
+    .catch(() => { loaded = true; emit(); });
 }
 
 function subscribe(l: () => void) {
@@ -27,11 +29,12 @@ function subscribe(l: () => void) {
 export function useWorkerModeChoice(changedAt: string | undefined) {
   start();
   const snapshot = useSyncExternalStore(subscribe, () => saved, () => saved);
+  const isLoaded = useSyncExternalStore(subscribe, () => loaded, () => loaded);
   const choice = resolveChoice(snapshot, changedAt);
   const setChoice = (next: WorkerShellChoice) => {
     saved = { at: changedAt ?? '', choice: next };
     emit();
     AsyncStorage.setItem(KEY, JSON.stringify(saved)).catch(() => {});
   };
-  return { choice, setChoice };
+  return { choice, setChoice, loaded: isLoaded };
 }

@@ -13,7 +13,7 @@ import * as ExpoSplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { ThemeProvider } from '@/providers/ThemeProvider';
+import { ThemeProvider, useTheme } from '@/providers/ThemeProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { SplashScreen } from '@/components/branding/SplashScreen';
 import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
@@ -34,7 +34,8 @@ function RootNavigator() {
   // The approval page (/approve/<token>), the invite page (/invite/<token>), the legal pages (/legal/privacy, terms, support) the password reset page and the email-link landing page (auth-callback) are public:
   // no sign-in, no redirects.
   const isPublicPage = ['approve', 'invite', 'legal', 'reset-password', 'auth-callback'].includes((segments as string[])[0]);
-  const { shell } = useModeAccess(user?.role);
+  const { shell, pending: shellPending } = useModeAccess(user?.role);
+  const { colors } = useTheme();
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
   usePrefetchKeyImages();
@@ -81,6 +82,8 @@ function RootNavigator() {
       // sees comes from useModeAccess: the company's mode, limited to the
       // modes this person is allowed into (the mode itself grants nothing).
       if (user.role !== 'owner' && user.role !== 'worker' && user.role !== 'customer') return;
+      // A worker's screen depends on answers that arrive a moment after launch: wait, rather than route to the wrong one first.
+      if (shellPending) return;
       const role = user.role;
       const target =
         shell === 'snow' ? `/snow/${role}` : shell === 'snow_notice' ? '/snow/notice' : `/(${role})`;
@@ -95,7 +98,7 @@ function RootNavigator() {
         router.replace(target as any);
       }
     }
-  }, [isLoading, isAuthenticated, user, appState, onboardingStep, segments, splashDone, isPublicPage, shell]);
+  }, [isLoading, isAuthenticated, user, appState, onboardingStep, segments, splashDone, isPublicPage, shell, shellPending]);
 
   const handleSplashFinish = useCallback(() => {
     setSplashDone(true);
@@ -103,6 +106,11 @@ function RootNavigator() {
 
   if (!isPublicPage && (isLoading || !splashDone)) {
     return <SplashScreen onFinish={handleSplashFinish} />;
+  }
+
+  // Signed in, but which screen this worker gets is not known yet (a split second): a plain blank screen, never the wrong one.
+  if (!isPublicPage && shellPending && appState === 'active' && isAuthenticated) {
+    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
   // Same element tree for public and normal pages. If a public page (Privacy, Terms, Support) returned a different

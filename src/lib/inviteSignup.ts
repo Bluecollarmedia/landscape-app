@@ -11,6 +11,7 @@ const REASONS: Record<string, string> = {
   invalid: 'This link can’t be used. Ask for a new one.',
   email_exists: 'An account with this email already exists. Sign in first, then open this link again.',
   weak_password: 'Password must be at least 6 characters.',
+  link_failed: 'This link was just used. If that was you, sign in instead; otherwise ask for a new link.',
 };
 
 /** 'ok' = the login exists (sign in now); 'unavailable' = use the normal sign-up instead; anything else is a message to show. */

@@ -6,8 +6,12 @@
  * ALREADY CONFIRMED, but only when the link is valid, and the existing sign-up trigger (update 78, handle_new_user) attaches the new
  * login to the record the owner made and uses the link up. The app then signs the person in right away.
  *
- * Nobody can use this to make an arbitrary confirmed account: no valid link, no account. People starting their own company still
- * go through the normal sign-up and the normal email confirmation.
+ * Nobody can use this to make an arbitrary confirmed account: no valid link, no account. And a login that did not end up attached to
+ * the invited person's record (for example when two people race on the same link) is deleted again in the same call, so nothing is
+ * ever left dangling. People starting their own company still go through the normal sign-up and the normal email confirmation.
+ *
+ * The invites table is read directly with the service role (its hash is computed here), so this function does not depend on any
+ * function grants.
  *
  * Deploy:  supabase functions deploy invite-signup
  *          (or Supabase dashboard → Edge Functions → Deploy a new function → Via Editor; keep "Enforce JWT verification" ON,
@@ -27,6 +31,12 @@ const reply = (body: unknown, status = 200) =>
 
 const looksLikeEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+
+/** The same one-way hash the database stores (update 78's _invite_hash), computed here. */
+async function tokenHash(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -48,8 +58,14 @@ serve(async (req: Request) => {
   const db = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
   // The link must be valid right now (not used, not cancelled, not expired).
-  const { data: look } = await db.rpc('invite_lookup', { p_token: token });
-  if (!look?.valid) return reply({ error: look?.reason ?? 'invalid' }, 400);
+  const hash = await tokenHash(token);
+  const { data: inv, error: invError } = await db.from('invites')
+    .select('id, person_id, status, expires_at').eq('token_hash', hash).maybeSingle();
+  if (invError) return reply({ error: 'lookup_failed' }, 500);
+  if (!inv) return reply({ error: 'invalid' }, 400);
+  if (inv.status === 'used') return reply({ error: 'used' }, 400);
+  if (inv.status !== 'pending') return reply({ error: 'invalid' }, 400);
+  if (new Date(inv.expires_at) <= new Date()) return reply({ error: 'expired' }, 400);
 
   const { data: made, error } = await db.auth.admin.createUser({
     email,
@@ -68,11 +84,13 @@ serve(async (req: Request) => {
     return reply({ error: 'create_failed' }, 400);
   }
 
-  // The sign-up trigger uses the link up in the same step. If it did not, do not leave a login that is attached to nothing.
-  const { data: after } = await db.rpc('invite_lookup', { p_token: token });
-  if (after?.valid !== false || after?.reason !== 'used') {
+  // The sign-up trigger must have attached THIS login to the invited person's record and used the link up. If it did not (the link
+  // was used by someone else in the same instant, or the record already had a login), the fresh login is removed again: a confirmed
+  // login that belongs to nobody must never be left behind.
+  const { data: attached } = await db.from('people').select('id').eq('user_id', made.user.id).maybeSingle();
+  if (!attached || attached.id !== inv.person_id) {
     await db.auth.admin.deleteUser(made.user.id);
-    return reply({ error: 'link_failed' }, 500);
+    return reply({ error: 'link_failed' }, 409);
   }
   return reply({ ok: true });
 });

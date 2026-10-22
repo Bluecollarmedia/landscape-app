@@ -12,7 +12,7 @@ const layout = read('app/_layout.tsx');
 
 check('1 the toggle names the strip it needs (its height plus a little air)', /export const WORKER_TOGGLE_BAND = HEIGHT \+ 8/.test(toggle));
 check('2 the toggle sits at the top of that strip (just under the status bar)', /top: insets\.top \+ 4/.test(toggle));
-check('3 while the toggle shows, every screen\'s top inset grows by the strip', /SafeAreaInsetsContext\.Provider value=\{showToggle \? \{ \.\.\.insets, top: insets\.top \+ WORKER_TOGGLE_BAND \} : insets\}/.test(layout));
+check('3 while the toggle shows, every screen\'s top inset grows by the strip (memoized, so inset readers only re-render on a real change)', /shiftedInsets = useMemo\(\(\) => \(showToggle \? \{ \.\.\.insets, top: insets\.top \+ WORKER_TOGGLE_BAND \} : insets\), \[showToggle, insets\]\)/.test(layout) && /SafeAreaInsetsContext\.Provider value=\{shiftedInsets\}/.test(layout));
 check('4 the strip is reserved only when the toggle is actually shown (same condition), never on public pages', /const showToggle = !isPublicPage && isAuthenticated && appState === 'active' && canToggle/.test(layout));
 check('5 the toggle itself is drawn OUTSIDE the shifted area, so it keeps the real top edge', /<\/SafeAreaInsetsContext\.Provider>\s*\n\s*\{isPublicPage \? null : <WorkerModeToggle \/>\}/.test(layout));
 console.log(bad ? `\n${bad} failed` : '\nall passed');

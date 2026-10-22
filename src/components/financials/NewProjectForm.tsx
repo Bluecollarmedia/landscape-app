@@ -6,6 +6,7 @@
  */
 
 import { applyStreetInput } from '@/lib/address';
+import { StreetSuggestions } from '@/components/ui/StreetSuggestions';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Button, ListSection, ListRow, SearchBar } from '@/components/ui';
@@ -180,6 +181,7 @@ export function NewProjectForm({ onReady }: { onReady: (projectId: string, creat
           placeholder="Required"
           autoCapitalize="words"
         />
+        <StreetSuggestions text={address} onPick={(pl) => { setAddress(pl.address); setCity(pl.city); setState(pl.state); setZip(pl.zip); }} />
         <InputRow label="City" value={city} onChangeText={setCity} placeholder="Optional" autoCapitalize="words" />
         <InputRow label="State" value={state} onChangeText={setState} placeholder="Optional" autoCapitalize="characters" maxLength={2} />
         <InputRow label="ZIP" value={zip} onChangeText={setZip} placeholder="Optional" keyboardType="number-pad" maxLength={10} />

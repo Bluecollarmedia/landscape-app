@@ -9,7 +9,7 @@ import { showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { db, useDb } from '@/data/store';
 import { ensureProperty, useCustomerProperties } from '@/data/properties';
-import { applyStreetInput } from '@/lib/address';
+import { AddressFields } from '@/components/ui/AddressFields';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
@@ -71,19 +71,11 @@ export function CustomerPropertiesCard({ customerId, firstName }: { customerId: 
       {adding ? (
         <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
           <Input label="Property name (optional)" value={form.name} onChangeText={set('name')} placeholder="Oak Plaza" />
-          <Input
-            label="Street address"
-            value={form.address}
-            onChangeText={(text) => setForm((f) => ({ ...f, ...applyStreetInput(text, f) }))}
-            placeholder="1 Oak St"
-            textContentType="fullStreetAddress"
-            autoComplete="street-address"
+          <AddressFields
+            value={{ address: form.address, city: form.city, state: form.state, zip: form.zip }}
+            onChange={(v) => setForm((f) => ({ ...f, ...v }))}
+            streetLabel="Street address"
           />
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <Input label="City" value={form.city} onChangeText={set('city')} containerStyle={{ flex: 2 }} />
-            <Input label="State" value={form.state} onChangeText={set('state')} containerStyle={{ flex: 1 }} autoCapitalize="characters" />
-            <Input label="ZIP" value={form.zip} onChangeText={set('zip')} containerStyle={{ flex: 1 }} keyboardType="number-pad" />
-          </View>
           <View style={{ flexDirection: 'row', gap: spacing.md }}>
             <Button title="Cancel" variant="ghost" onPress={() => { setAdding(false); setForm(EMPTY); }} />
             <Button title="Save property" loading={saving} onPress={save} />

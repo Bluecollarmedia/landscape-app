@@ -8,6 +8,10 @@
 -- work until this is run.
 -- ============================================================================
 
+-- If this errors with something like "must be owner of table buckets" (newer Supabase projects refuse bucket changes from the
+-- SQL editor), create it by hand instead: Storage -> New bucket -> name it exactly  snow-media  -> keep "Public bucket" OFF.
+-- The select at the end should then list it.
+
 insert into storage.buckets (id, name, public)
 values ('snow-media', 'snow-media', false)
 on conflict (id) do update set public = false;

@@ -50,8 +50,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('8 the stop screen does not wait on the upload when photos are added', !/act\(\(\) => addCompletionMedia/.test(screen) && /await addCompletionMedia\(/.test(screen));
   const status = read('src/components/snow/SnowUploadStatus.tsx');
   check('9 the stop screen shows the background status, which says photos are uploading and offers Retry and Remove on a failure', /<SnowUploadStatus uploading=\{uploading\} failed=\{failedJobs\}/.test(screen) && /uploading in the background/.test(status) && /mediaQueue\.retry/.test(status) && /mediaQueue\.cancel/.test(status));
-  check('10 photos still uploading count as added; failed ones block Finish Stop until retried or removed', /addedCount = \(current\?\.mediaCount \?\? 0\) \+ uploading\.length/.test(screen) && /needMedia > 0 \|\| failedJobs\.length > 0/.test(screen));
-  check('11 Finish Stop waits (up to 90 s) for photos still uploading, then says so plainly instead of spinning', /waitForMediaJobs\(uploading\.map/.test(screen) && /90_000/.test(screen) && /still uploading/.test(screen));
+  check('10 photos still uploading count as added, and NOTHING about photos blocks Finish Stop (the owner\'s rule: a worker never waits on uploads)', /addedCount = \(current\?\.mediaCount \?\? 0\) \+ uploading\.length/.test(screen) && !/disabled=\{needMedia > 0/.test(screen) && !/failedJobs\.length > 0\}/.test(screen.split('title="Complete Stop"')[1] || ''));
+  check('11 Finish Stop does not wait for uploads: it completes at once and the photos keep going in the background', !/waitForMediaJobs\(/.test(screen) && !/90_000/.test(screen) && /never waits for photos/.test(screen));
   check('12 the three queue names live in one place and are not retyped', /snow_completion/.test(targets) && /snow_reference/.test(targets) && /snow_owner_media/.test(targets) && !/'snow_completion'|'snow_reference'|'snow_owner_media'/.test(runtime + screen));
 
   // The owner's property reference photos

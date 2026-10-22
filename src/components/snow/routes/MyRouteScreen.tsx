@@ -104,6 +104,8 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
   // keep going in the background; ones that failed do not count until they are retried.
   const { uploading, failed: failedJobs } = snowUploadState(mediaJobs, SNOW_COMPLETION_TARGET, (p) => !!current && p.visitId === current.id);
   const addedCount = (current?.mediaCount ?? 0) + uploading.length;
+  // Photos for stops already completed (or any other stop) keep uploading in the background; they stay visible here so they can be retried or removed.
+  const elsewhere = snowUploadState(mediaJobs, SNOW_COMPLETION_TARGET, (p) => !current || p.visitId !== current.id);
   const needMedia = route && current && stopNeedsPhotos(current, route) ? Math.max(0, route.minMedia - addedCount) : 0;
 
   /** Starts every visit at this property that has not been started, in order. Stops at the first problem. */
@@ -115,14 +117,11 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
     return { ok: true };
   }
 
-  /** Finishes every visit at this property that is not finished. The note goes on the first one. */
+  /**
+   * Finishes every visit at this property that is not finished. The note goes on the first one. It never waits for photos: any still
+   * uploading keep going in the background and attach to the stop when they finish.
+   */
   async function finishGroup(g: RouteStop[]): Promise<{ ok: boolean; error?: string }> {
-    // The database counts only saved photos, so wait (a little) for the ones still uploading before finishing.
-    if (uploading.length) {
-      const waited = await waitForMediaJobs(uploading.map((j) => j.id), 90_000);
-      if (waited === 'failed') return { ok: false, error: "A photo didn't upload. Tap Retry under the photos, then complete the stop." };
-      if (waited === 'timeout') return { ok: false, error: 'The photos are still uploading. Give it a moment and tap Complete Stop again.' };
-    }
     let first = true;
     for (const v of g.filter((x) => x.status === 'arrived' || x.status === 'pending')) {
       const res = await finishStop(v.id, first ? note : undefined);
@@ -193,6 +192,9 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
             {!working ? (
               <InlineNotice icon="info" tone="info" text={route.cancelled ? 'This route was cancelled.' : 'This storm has ended. Nothing more to do here.'} style={{ marginTop: spacing.md }} />
             ) : null}
+            <View style={{ marginTop: spacing.sm }}>
+              <SnowUploadStatus uploading={elsewhere.uploading} failed={elsewhere.failed} />
+            </View>
 
             {working && current && currentGroup ? (
               <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md, gap: spacing.md }]}>
@@ -241,7 +243,7 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
                     <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Anything the owner should know" />
                     {needMedia > 0 ? (
                       <Text style={[typeScale.caption, { color: colors.warning }]}>
-                        Add {needMedia} more {needMedia === 1 ? 'photo' : 'photos'} before completing this stop.
+                        No photos added yet. You can still complete this stop; add photos first if you can.
                       </Text>
                     ) : null}
                     <Button
@@ -250,7 +252,6 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
                       size="lg"
                       style={styles.squared}
                       loading={busy}
-                      disabled={needMedia > 0 || failedJobs.length > 0}
                       onPress={async () => { if (await act(() => finishGroup(currentGroup), 'Can\'t complete yet')) setNote(''); }}
                       fullWidth
                     />

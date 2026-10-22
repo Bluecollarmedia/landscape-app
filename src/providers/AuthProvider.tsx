@@ -17,6 +17,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useCallback, useRef } from 'react';
 import { Platform } from 'react-native';
 import { AUTH_CALLBACK_URL } from '@/lib/authLink';
+import { createInvitedLogin } from '@/lib/inviteSignup';
 import { properName } from '@/lib/names';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { startSession, endSession, startDemoSession, updateRow } from '@/data/store';
@@ -402,6 +403,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (c.zip) metadata.company_zip = c.zip;
       }
       if (intent?.inviteToken) metadata.invite_token = intent.inviteToken;
+
+      // An invite link is proof enough: the login is made already confirmed (no second email) and the person is signed in at once.
+      // If that function is not available, fall through to the normal sign-up below.
+      if (intent?.inviteToken && !intent.company) {
+        const made = await createInvitedLogin(email, password, profile, intent.inviteToken);
+        if (made === 'ok') {
+          const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+          if (signInError) throw signInError;
+          return { needsEmailConfirmation: false };
+        }
+        if (made !== 'unavailable') throw new Error(made);
+      }
 
       const { data, error } = await supabase.auth.signUp({ email, password, options: { data: metadata, ...(Platform.OS !== 'web' ? { emailRedirectTo: AUTH_CALLBACK_URL } : {}) } });
       if (error) throw error;

@@ -12,6 +12,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.brightonlawn.app",
       "buildNumber": "16",
+      "associatedDomains": [
+        "applinks:brighton-app.netlify.app",
+        "applinks:app.brightonlawn.com"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

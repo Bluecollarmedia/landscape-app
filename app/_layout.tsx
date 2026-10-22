@@ -5,7 +5,7 @@
  * the splash screen lifecycle. Routes based on auth + onboarding state.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePrefetchKeyImages } from '@/lib/imageCache';
 import { View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
@@ -38,8 +38,9 @@ function RootNavigator() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
-  // Same condition the toggle itself uses to appear.
+  // Same condition the toggle itself uses to appear. The value is memoized so inset readers only re-render when it really changes.
   const showToggle = !isPublicPage && isAuthenticated && appState === 'active' && canToggle;
+  const shiftedInsets = useMemo(() => (showToggle ? { ...insets, top: insets.top + WORKER_TOGGLE_BAND } : insets), [showToggle, insets]);
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
   usePrefetchKeyImages();
@@ -123,7 +124,7 @@ function RootNavigator() {
   return (
     <>
       {/* The Snow / Landscaping toggle sits in its own strip at the top; every screen's top edge starts below it. */}
-      <SafeAreaInsetsContext.Provider value={showToggle ? { ...insets, top: insets.top + WORKER_TOGGLE_BAND } : insets}>
+      <SafeAreaInsetsContext.Provider value={shiftedInsets}>
         <Slot />
       </SafeAreaInsetsContext.Provider>
       {isPublicPage ? null : <WorkerModeToggle />}

@@ -10,7 +10,7 @@ import { usePrefetchKeyImages } from '@/lib/imageCache';
 import { View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import * as ExpoSplashScreen from 'expo-splash-screen';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ThemeProvider, useTheme } from '@/providers/ThemeProvider';
@@ -20,7 +20,7 @@ import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { applyPendingSignup } from '@/data/pendingSignup';
 import { useModeAccess } from '@/hooks/useModeAccess';
-import { WorkerModeToggle } from '@/components/snow/WorkerModeToggle';
+import { WorkerModeToggle, WORKER_TOGGLE_BAND } from '@/components/snow/WorkerModeToggle';
 import { installGlobalErrorHandler } from '@/lib/errorReporting';
 
 ExpoSplashScreen.preventAutoHideAsync();
@@ -34,8 +34,12 @@ function RootNavigator() {
   // The approval page (/approve/<token>), the invite page (/invite/<token>), the legal pages (/legal/privacy, terms, support) the password reset page and the email-link landing page (auth-callback) are public:
   // no sign-in, no redirects.
   const isPublicPage = ['approve', 'invite', 'legal', 'reset-password', 'auth-callback'].includes((segments as string[])[0]);
-  const { shell, pending: shellPending } = useModeAccess(user?.role);
+  const { shell, pending: shellPending, canToggle } = useModeAccess(user?.role);
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+
+  // Same condition the toggle itself uses to appear.
+  const showToggle = !isPublicPage && isAuthenticated && appState === 'active' && canToggle;
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
   usePrefetchKeyImages();
@@ -118,7 +122,10 @@ function RootNavigator() {
   // screen you came from.
   return (
     <>
-      <Slot />
+      {/* The Snow / Landscaping toggle sits in its own strip at the top; every screen's top edge starts below it. */}
+      <SafeAreaInsetsContext.Provider value={showToggle ? { ...insets, top: insets.top + WORKER_TOGGLE_BAND } : insets}>
+        <Slot />
+      </SafeAreaInsetsContext.Provider>
       {isPublicPage ? null : <WorkerModeToggle />}
       {isPublicPage ? null : <SignInWelcome />}
     </>

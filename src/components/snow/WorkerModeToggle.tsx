@@ -12,11 +12,14 @@ import { spacing } from '@/theme/spacing';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 const HEIGHT = 38;
+/** The strip at the top of the screen that belongs to the toggle. The app's screens start below it, so it never covers anything. */
+export const WORKER_TOGGLE_BAND = HEIGHT + 8;
 
 /**
  * A small liquid-glass switch in the top-right corner of every worker's phone while the owner has Snow Mode on: sun = Landscaping,
  * snowflake = Snow. It puts the worker into Snow Mode (no sign-up, no code) and lets them step back to their landscaping work.
  * A worker the owner removed from snow gets nothing here (they see the "Snow Mode is on" screen instead).
+ * It has its own strip under the status bar (WORKER_TOGGLE_BAND): the root layout moves every screen's top edge below that strip.
  */
 export function WorkerModeToggle() {
   const { user, appState, isAuthenticated } = useAuth();

@@ -90,6 +90,9 @@ serve(async (req: Request) => {
   const { data: attached } = await db.from('people').select('id').eq('user_id', made.user.id).maybeSingle();
   if (!attached || attached.id !== inv.person_id) {
     await db.auth.admin.deleteUser(made.user.id);
+    // The trigger's fallback row (a person attached to no company) goes too: people.user_id is ON DELETE SET NULL, so deleting
+    // the login alone would leave an orphan row carrying this person's name and email.
+    if (attached) await db.from('people').delete().eq('id', attached.id);
     return reply({ error: 'link_failed' }, 409);
   }
   return reply({ ok: true });

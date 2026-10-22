@@ -70,6 +70,7 @@ export const PRIVACY: LegalDoc = {
         'Expo: delivery of push notifications to your phone.',
         'Resend: delivery of some email notices, such as an arrival or completion notice a customer asked for.',
         'Netlify: hosting of the web page that customers use to approve a quote, and of this policy.',
+        'Google: address suggestions. When you type an address, the text you have typed so far is sent to Google Places to suggest matching addresses.',
       ],
     },
     {

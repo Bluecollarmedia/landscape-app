@@ -12,6 +12,7 @@ import { Platform } from 'react-native';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { uuid } from './ids';
 import { r2Enabled, requireSession } from './media';
+import { withTimeout } from './mediaQueue';
 import { explainUploadError } from './uploadErrors';
 
 export const SNOW_MEDIA_BUCKET = 'snow-media';
@@ -35,12 +36,8 @@ export function snowReferenceFolder(companyId: string, propertyServiceId: string
 }
 
 /** Runs `work`, giving up with a plain message if it takes longer than `ms`: a stalled connection must never leave a photo "uploading" forever. */
-function within<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${what} timed out after ${Math.round(ms / 1000)} seconds`)), ms);
-    work.then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
-  });
-}
+const within = <T,>(work: Promise<T>, ms: number, what: string): Promise<T> =>
+  withTimeout(work, ms, () => new Error(`${what} timed out after ${Math.round(ms / 1000)} seconds`));
 
 /** What a failed function call actually said. The library's own message only ever says "non-2xx status code". */
 async function functionFailure(error: unknown, data: unknown): Promise<string> {

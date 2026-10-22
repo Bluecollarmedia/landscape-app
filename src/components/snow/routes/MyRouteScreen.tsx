@@ -149,6 +149,11 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>My Route</Text>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
 
+        {/* Photos of earlier stops (or ended storms) still uploading or failed: always visible, so Retry / Remove is never lost. */}
+        <View style={{ marginTop: spacing.sm }}>
+          <SnowUploadStatus uploading={elsewhere.uploading} failed={elsewhere.failed} />
+        </View>
+
         {historyId ? (
           <Pressable onPress={() => setHistoryId(null)} style={styles.backToCurrent} accessibilityRole="button" accessibilityLabel="Back to current work">
             <Icon name="arrow-left" size={18} color={colors.primary} />
@@ -192,9 +197,6 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
             {!working ? (
               <InlineNotice icon="info" tone="info" text={route.cancelled ? 'This route was cancelled.' : 'This storm has ended. Nothing more to do here.'} style={{ marginTop: spacing.md }} />
             ) : null}
-            <View style={{ marginTop: spacing.sm }}>
-              <SnowUploadStatus uploading={elsewhere.uploading} failed={elsewhere.failed} />
-            </View>
 
             {working && current && currentGroup ? (
               <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md, gap: spacing.md }]}>
@@ -243,7 +245,9 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
                     <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Anything the owner should know" />
                     {needMedia > 0 ? (
                       <Text style={[typeScale.caption, { color: colors.warning }]}>
-                        No photos added yet. You can still complete this stop; add photos first if you can.
+                        {addedCount > 0
+                          ? `${addedCount} of ${route.minMedia} photos added. You can still complete this stop; add the rest if you can.`
+                          : 'No photos added yet. You can still complete this stop; add photos first if you can.'}
                       </Text>
                     ) : null}
                     <Button

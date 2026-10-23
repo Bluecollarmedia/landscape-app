@@ -355,6 +355,9 @@ export const ES_WORKER: Record<string, string> = {
 
   // ── Photo upload status ──
   'Not saved': 'No guardado',
+  'Tap for why': 'Toca para ver por qué',
+  'Why it was not saved': 'Por qué no se guardó',
+  'The photo could not be saved. Try again.': 'No se pudo guardar la foto. Inténtalo de nuevo.',
   'Retry upload': 'Reintentar la subida',
   'Retry': 'Reintentar',
   'Upload the original file instead': 'Subir el archivo original en su lugar',

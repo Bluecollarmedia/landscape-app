@@ -1,10 +1,17 @@
 import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, Alert, Platform } from 'react-native';
 import { Icon } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { mediaQueue, useMediaJob } from '@/lib/mediaQueueRuntime';
 import { formatBytes } from '@/lib/mediaPlan';
 import { useT } from '@/i18n';
+
+/** Shows the real reason a photo/video could not be saved, so a failure is never just "Not saved" with no cause. */
+function showWhyNotSaved(t: (s: string) => string, reason: string | undefined) {
+  const msg = reason?.trim() || t('The photo could not be saved. Try again.');
+  if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(msg);
+  else Alert.alert(t('Why it was not saved'), msg);
+}
 
 /**
  * Drawn over a thumbnail that is still a local file. Says plainly where the item is, so a local preview is never mistaken for a saved
@@ -28,8 +35,11 @@ export function MediaJobOverlay({ rowId, onDiscard, localOnly }: { rowId?: strin
   if (job.status === 'failed') {
     return (
       <View style={[StyleSheet.absoluteFill, styles.box, { backgroundColor: 'rgba(120,20,20,0.78)' }]}>
-        <Icon name="alert-circle" size={16} color="#FFFFFF" />
-        <Text style={[typeScale.caption, styles.text]} numberOfLines={2}>{t('Not saved')}</Text>
+        <Pressable onPress={() => showWhyNotSaved(t, job.error)} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('Why it was not saved')} style={{ alignItems: 'center', gap: 2 }}>
+          <Icon name="alert-circle" size={16} color="#FFFFFF" />
+          <Text style={[typeScale.caption, styles.text]} numberOfLines={2}>{t('Not saved')}</Text>
+          <Text style={[typeScale.caption, styles.text, { fontSize: 9, opacity: 0.85 }]}>{t('Tap for why')}</Text>
+        </Pressable>
         <View style={styles.row}>
           <Pressable onPress={() => mediaQueue.retry(job.id)} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('Retry upload')} style={styles.btn}>
             <Text style={[typeScale.caption, styles.btnText]}>{t('Retry')}</Text>

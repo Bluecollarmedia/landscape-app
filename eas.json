@@ -12,7 +12,8 @@
       },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "development"
     },
     "development-simulator": {
       "developmentClient": true,
@@ -20,18 +21,21 @@
       "ios": {
         "simulator": true,
         "image": "sdk-57"
-      }
+      },
+      "channel": "development-simulator"
     },
     "preview": {
       "distribution": "store",
       "ios": {
         "image": "sdk-57"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "ios": {
         "image": "sdk-57"
-      }
+      },
+      "channel": "production"
     },
     "live-test": {
       "extends": "production",
@@ -41,7 +45,8 @@
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_xSURIebG8cawmPmRhN5mPA_Fk9ZU6pv",
         "EXPO_PUBLIC_WEB_URL": "https://brighton-app.netlify.app",
         "EXPO_PUBLIC_R2_PUBLIC_URL": "https://pub-31ea333aa25942858270d64b5b257873.r2.dev"
-      }
+      },
+      "channel": "live-test"
     }
   },
   "submit": {

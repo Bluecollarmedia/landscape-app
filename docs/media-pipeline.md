@@ -30,21 +30,14 @@ beginning; there is no upload while the app is closed.
 
 Sharing: a maintenance photo is always saved internal; compression and uploading never change who can see it.
 
-## Making maintenance, Snow and ID files private (private bucket)
+## Private files (ID photos only)
 
-Files for `{company}/maintenance/`, `{company}/reference/`, `{company}/completion/` and `ids/` live in a second R2 bucket that has no public
-address (secret `R2_PRIVATE_BUCKET_NAME`); everything else stays in the public bucket. The app opens private files through short-lived signed links
-from the `media` function (`maint-sign` for maintenance photos: owner/admin, crew on the route, or the linked customer for a shared photo on a
-finished stop; Snow and ID photos keep their own checks). Without `R2_PRIVATE_BUCKET_NAME` everything behaves as before.
+Only `ids/...` (worker ID photos) are private. They live in a second R2 bucket with no public address (secret `R2_PRIVATE_BUCKET_NAME`,
+the `brighton-private` bucket) and are opened through short-lived signed links from the `media` function (`id-sign`: the person themself, or
+the owner of a company they belong to). Everything else — maintenance, Snow reference/completion, projects, avatars, trucks, issues — is a
+normal public file in the one public bucket, opened straight from its stored address. Without `R2_PRIVATE_BUCKET_NAME`, ID photos fall back to
+the public bucket too (so they would no longer be access-controlled); keep that secret set to a working bucket if you want ID photos private.
 
-Order (each step needs the owner's go-ahead; do them in this order):
-1. Cloudflare: create `brighton-private` (public access OFF); give the API token access to it; add the Supabase secret. (done)
-2. Run SQL 71 and 73 in Supabase (they only add/replace functions).
-3. Deploy the `media` function (new code: private bucket support + `maint-sign`).
-4. Build and release an app version that opens maintenance photos through signed links. Older app versions show maintenance photos from their
-   stored public address, which stops working once the originals are removed in step 6.
-5. Add secret `MIGRATE_SECRET`, deploy `private-migrate`, run it as a dry run, then with `dryRun:false` (COPIES; the originals stay public).
-   Repeat with each `next` token until it is empty. Check `failed` is empty.
-6. After every phone has the new app version: run it again with `dryRun:false, deleteOriginals:true` (verifies each copy, then removes the public
-   original). Then open an old maintenance photo address in a browser: it must say the object does not exist or is not allowed.
-7. Delete the `private-migrate` function and its secret.
+History: maintenance and Snow photos were briefly treated as private (a second bucket + signed links). They are just pictures of properties
+and work, so they were made public again on 2026-10-23. The one-time `private-migrate` tool for moving files into the private bucket was removed.
+After this change, redeploy the `media` function so the server stops routing maintenance/Snow uploads to the private bucket.

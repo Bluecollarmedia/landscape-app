@@ -1,14 +1,12 @@
 /**
- * Private files (maintenance photos, and the rest of the list in supabase/functions/_shared/privateKeys.ts) are not opened through their
- * stored address. The app asks the `media` function for a short-lived signed link; the function asks the database whether this person may
- * open that file (maintenance_photos_i_can_open, update 71) and signs only the ones allowed. Links are cached until shortly before they expire.
- *
- * Until the private bucket is set up and files are moved, the stored address still works, so this falls back to it when signing fails.
+ * Private files (worker ID photos, `ids/...`) are not opened through their stored address. The app asks the `media` function for a
+ * short-lived signed link; the function checks who is asking and signs only the ones allowed. Everything else is a normal public file,
+ * opened straight from its stored address. If signing ever fails, the stored address is used so nothing breaks.
  */
 import { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './supabase';
 
-const PRIVATE_FOLDERS = new Set(['maintenance', 'reference', 'completion']);
+const PRIVATE_FOLDERS = new Set<string>([]);
 
 /** The same rule as the server's isPrivateKey (a check keeps them identical). */
 export function isPrivateKey(key: string): boolean {

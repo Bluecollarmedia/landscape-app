@@ -22,6 +22,7 @@ import { DASHBOARD_HERO_HEIGHT } from '@/components/media/HeaderPhotoField';
 import { useCompanySetup } from '@/hooks/useCompanySetup';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { remindWorker } from '@/data/remindWorker';
+import { AdminJobCard } from '@/components/admin/AdminJobCard';
 import { showMessage } from '@/components/financials/ActionSheet';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
@@ -374,6 +375,9 @@ export default function OwnerDashboard() {
               <Icon name="chevron-right" size={18} color={colors.textTertiary} />
             </Pressable>
           )}
+
+          {/* An admin who is on a job works it like a worker (confirm it, clock in and out). Nothing for the owner. */}
+          <AdminJobCard />
 
           {/* Needs Attention */}
           <View style={styles.section}>

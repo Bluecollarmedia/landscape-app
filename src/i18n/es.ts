@@ -155,4 +155,10 @@ export const ES: Record<string, string> = {
   'No truck has been assigned to you today.': 'Hoy no se te asignó ningún camión.',
   'In use': 'En uso',
   'No truck today': 'Sin camión hoy',
+  // ── Admin on a job ──
+  'Your job today': 'Tu trabajo de hoy',
+  'Job': 'Trabajo',
+  'Full Day': 'Día completo',
+  'Confirmed': 'Confirmado',
+  'Confirm': 'Confirmar',
 };

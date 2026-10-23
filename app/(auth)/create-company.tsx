@@ -1,3 +1,5 @@
+import { useT, tr } from '@/i18n';
+import { LanguageSwitch } from '@/components/ui/LanguageSwitch';
 import { TermsAgreement, TERMS_REQUIRED_MESSAGE } from '@/components/legal/TermsAgreement';
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensions, Alert, Keyboard } from 'react-native';
@@ -28,6 +30,7 @@ export default function CreateCompanyScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const { switchDevRole, signUp, isAuthenticated, user, refreshContext } = useAuth();
   // Already signed in (came from "Finish setting up"): skip the account step.
   const signedIn = isSupabaseConfigured && isAuthenticated && !!user;
@@ -59,11 +62,11 @@ export default function CreateCompanyScreen() {
 
   function validateCompany() {
     if (!companyName.trim()) {
-      setError('Please enter your company name.');
+      setError(tr('Please enter your company name.'));
       return false;
     }
     if (companyPhone.replace(/\D/g, '').length < 10) {
-      setError('Please enter the company phone number.');
+      setError(tr('Please enter the company phone number.'));
       return false;
     }
     const missing = missingAddressPart({ address: companyAddress, city: companyCity, state: companyState, zip: companyZip });
@@ -77,23 +80,23 @@ export default function CreateCompanyScreen() {
 
   function validateOwner() {
     if (!firstName.trim() || !lastName.trim()) {
-      setError('Please enter your full name.');
+      setError(tr('Please enter your full name.'));
       return false;
     }
     if (!email.trim() || !email.includes('@')) {
-      setError('Please enter a valid email address.');
+      setError(tr('Please enter a valid email address.'));
       return false;
     }
     if (!phone.trim()) {
-      setError('Please enter your phone number.');
+      setError(tr('Please enter your phone number.'));
       return false;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(tr('Password must be at least 6 characters.'));
       return false;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(tr('Passwords do not match.'));
       return false;
     }
     setError('');
@@ -198,9 +201,9 @@ export default function CreateCompanyScreen() {
   }
 
   const stepLabels: Record<Step, string> = {
-    company: 'Company Details',
-    owner: 'Your Information',
-    review: 'Review & Create',
+    company: t('Company Details'),
+    owner: t('Your Information'),
+    review: t('Review & Create'),
   };
 
   const stepNumber = step === 'company' ? 1 : step === 'owner' ? 2 : 3;
@@ -212,9 +215,9 @@ export default function CreateCompanyScreen() {
           <Icon name="arrow-left" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
-          Create a Company
+          {t('Create a Company')}
         </Text>
-        <View style={{ width: 24 }} />
+        <LanguageSwitch />
       </View>
 
       {/* Progress */}
@@ -232,7 +235,7 @@ export default function CreateCompanyScreen() {
         ))}
       </View>
       <Text style={[typeScale.labelSmall, { color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg }]}>
-        Step {stepNumber} of 3 — {stepLabels[step]}
+        {t('Step {n} of 3', { n: stepNumber })} — {stepLabels[step]}
       </Text>
 
       <KeyboardAwareScrollView ref={scrollRef} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -245,32 +248,32 @@ export default function CreateCompanyScreen() {
 
         {step === 'company' && (
           <View style={styles.form}>
-            <Input label="Company Name *" placeholder="e.g. Brighton Lawn + Landscape" value={companyName} onChangeText={setCompanyName} icon="briefcase" />
-            <Input label="Company Phone *" placeholder="(555) 555-0100" value={companyPhone} onChangeText={setCompanyPhone} keyboardType="phone-pad" icon="phone" textContentType="telephoneNumber" />
+            <Input label={t('Company Name *')} placeholder={t('e.g. Brighton Lawn + Landscape')} value={companyName} onChangeText={setCompanyName} icon="briefcase" />
+            <Input label={t('Company Phone *')} placeholder="(555) 555-0100" value={companyPhone} onChangeText={setCompanyPhone} keyboardType="phone-pad" icon="phone" textContentType="telephoneNumber" />
             <AddressFields
               required
               value={{ address: companyAddress, city: companyCity, state: companyState, zip: companyZip }}
               onChange={(a) => { setCompanyAddress(a.address); setCompanyCity(a.city); setCompanyState(a.state); setCompanyZip(a.zip); }}
             />
-            <Button title="Next" onPress={handleNext} fullWidth size="lg" icon="arrow-right" />
+            <Button title={t('Next')} onPress={handleNext} fullWidth size="lg" icon="arrow-right" />
           </View>
         )}
 
         {step === 'owner' && (
           <View style={styles.form}>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.md }]}>
-              You'll be the company owner with full administrative access.
+              {t("You'll be the company owner with full administrative access.")}
             </Text>
             {!signedIn && <SignupPhotoPicker uri={photoUri} onChange={setPhotoUri} onError={setError} firstName={firstName} lastName={lastName} />}
             <View style={styles.row}>
-              <Input label="First Name *" placeholder="Joey" value={firstName} onChangeText={setFirstName} containerStyle={{ flex: 1 }} />
-              <Input label="Last Name *" placeholder="Angeloco" value={lastName} onChangeText={setLastName} containerStyle={{ flex: 1 }} />
+              <Input label={t('First Name *')} placeholder="Joey" value={firstName} onChangeText={setFirstName} containerStyle={{ flex: 1 }} />
+              <Input label={t('Last Name *')} placeholder="Angeloco" value={lastName} onChangeText={setLastName} containerStyle={{ flex: 1 }} />
             </View>
-            <Input label="Email *" placeholder="you@company.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />
-            <Input label="Phone *" placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
-            <Input label="Password *" placeholder="At least 6 characters" value={password} onChangeText={setPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
-            <Input label="Confirm Password *" placeholder="Re-enter password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
-            <Button title="Next" onPress={handleNext} fullWidth size="lg" icon="arrow-right" />
+            <Input label={t('Email *')} placeholder="you@company.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />
+            <Input label={t('Phone *')} placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
+            <Input label={t('Password *')} placeholder={t('At least 6 characters')} value={password} onChangeText={setPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
+            <Input label={t('Confirm Password *')} placeholder={t('Re-enter password')} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
+            <Button title={t('Next')} onPress={handleNext} fullWidth size="lg" icon="arrow-right" />
           </View>
         )}
 
@@ -278,7 +281,7 @@ export default function CreateCompanyScreen() {
           <View style={styles.form}>
             <View style={styles.reviewCard}>
               <View style={[styles.reviewSection, { borderBottomColor: colors.borderLight }]}>
-                <Text style={[typeScale.overline, { color: colors.textTertiary }]}>COMPANY</Text>
+                <Text style={[typeScale.overline, { color: colors.textTertiary }]}>{t('COMPANY')}</Text>
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', marginTop: spacing.xs }]}>
                   {companyName}
                 </Text>
@@ -290,7 +293,7 @@ export default function CreateCompanyScreen() {
                 ) : null}
               </View>
               <View style={styles.reviewSection}>
-                <Text style={[typeScale.overline, { color: colors.textTertiary }]}>OWNER</Text>
+                <Text style={[typeScale.overline, { color: colors.textTertiary }]}>{t('OWNER')}</Text>
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', marginTop: spacing.xs }]}>
                   {signedIn ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}` : `${firstName} ${lastName}`}
                 </Text>
@@ -299,7 +302,7 @@ export default function CreateCompanyScreen() {
                 <View style={[styles.roleBadge, { backgroundColor: colors.primarySurface }]}>
                   <Icon name="shield" size={12} color={colors.primary} />
                   <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '600', marginLeft: 4 }]}>
-                    Company Owner
+                    {t('Company Owner')}
                   </Text>
                 </View>
               </View>
@@ -308,13 +311,13 @@ export default function CreateCompanyScreen() {
             <View style={[styles.infoBox, { backgroundColor: colors.primarySurface, borderColor: colors.primary }]}>
               <Icon name="info" size={16} color={colors.primary} />
               <Text style={[typeScale.caption, { color: colors.textSecondary, flex: 1, marginLeft: spacing.sm }]}>
-                As the company owner, you'll have full control over your team, projects, and settings. You can invite workers and customers after setup.
+                {t("As the company owner, you'll have full control over your team, projects, and settings. You can invite workers and customers after setup.")}
               </Text>
             </View>
 
             {!signedIn && <TermsAgreement value={agreed} onChange={(v) => { setAgreed(v); if (v) setError(''); }} />}
 
-            <Button title="Create Company" onPress={handleCreate} loading={loading} fullWidth size="lg" icon="check-circle" />
+            <Button title={t('Create Company')} onPress={handleCreate} loading={loading} fullWidth size="lg" icon="check-circle" />
           </View>
         )}
       </KeyboardAwareScrollView>

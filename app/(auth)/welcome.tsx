@@ -7,6 +7,8 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCompanySlotOpen } from '@/hooks/useCompanySlot';
 import { LegalModal } from '@/components/legal/LegalModal';
+import { LanguageSwitch } from '@/components/ui/LanguageSwitch';
+import { useT } from '@/i18n';
 import type { LegalDoc } from '@/legal/legalContent';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -19,13 +21,16 @@ export default function WelcomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const canCreateCompany = useCompanySlotOpen();
+  const t = useT();
   const insets = useSafeAreaInsets();
   // The legal pages open as a pop-up over this screen, so closing one lands exactly here.
   const [reading, setReading] = useState<LegalDoc['slug'] | null>(null);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.content, { paddingTop: insets.top + spacing['4xl'] }]}>
+      <View style={[styles.content, { paddingTop: insets.top + spacing.lg }]}>
+        {/* English | Español, before anyone signs in or up. English is the default. */}
+        <View style={{ alignItems: 'flex-end', marginBottom: spacing['2xl'] }}><LanguageSwitch /></View>
         <View style={styles.logoSection}>
           <Image
             source={require('../../assets/images/logo-full.png')}
@@ -36,10 +41,10 @@ export default function WelcomeScreen() {
 
         <View style={styles.hero}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary, textAlign: 'center' }]}>
-            Welcome
+            {t('Welcome')}
           </Text>
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
-            Manage your landscaping business{'\n'}from anywhere
+            {t('Manage your landscaping business\nfrom anywhere')}
           </Text>
         </View>
 
@@ -48,21 +53,21 @@ export default function WelcomeScreen() {
             style={({ pressed }) => [styles.primaryBtn, { backgroundColor: pressed ? colors.primaryDark : colors.primary }, pressed && styles.pressed]}
             onPress={() => router.push('/(auth)/login')}
           >
-            <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Sign In</Text>
+            <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('Sign In')}</Text>
             <Icon name="arrow-right" size={20} color="#FFFFFF" />
           </Pressable>
 
           {canCreateCompany && (
             <ChoiceCard
               icon="briefcase"
-              title="Create a Company"
-              subtitle="Start managing your business"
+              title={t('Create a Company')}
+              subtitle={t('Start managing your business')}
               onPress={() => router.push('/(auth)/create-company')}
             />
           )}
 
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
-            Joining a team, or a customer? Open the private link your employer texted you.
+            {t('Joining a team, or a customer? Open the private link your employer texted you.')}
           </Text>
         </View>
       </View>
@@ -72,11 +77,11 @@ export default function WelcomeScreen() {
           Brighton Lawn + Landscape
         </Text>
         <View style={styles.legalRow}>
-          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => setReading('privacy')}>Privacy Policy</Text>
+          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => setReading('privacy')}>{t('Privacy Policy')}</Text>
           <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{'  ·  '}</Text>
-          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => setReading('terms')}>Terms of Use</Text>
+          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => setReading('terms')}>{t('Terms of Use')}</Text>
           <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{'  ·  '}</Text>
-          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => setReading('support')}>Support</Text>
+          <Text style={[typeScale.caption, { color: colors.primary }]} onPress={() => setReading('support')}>{t('Support')}</Text>
         </View>
       </View>
       <LegalModal slug={reading} onClose={() => setReading(null)} />

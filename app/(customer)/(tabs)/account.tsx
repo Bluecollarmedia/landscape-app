@@ -1,3 +1,4 @@
+import { LanguageRow } from '@/components/ui/LanguageSwitch';
 import { LegalSection } from '@/components/legal/LegalSection';
 import React from 'react';
 import { View, Text, Linking, Pressable } from 'react-native';
@@ -106,6 +107,10 @@ export default function CustomerAccountScreen() {
       )}
 
       <LegalSection />
+
+      <ListSection>
+        <LanguageRow />
+      </ListSection>
 
       <ListSection>
         <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={signOut} />

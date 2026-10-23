@@ -1,3 +1,4 @@
+import { LanguageRow } from '@/components/ui/LanguageSwitch';
 import { LegalSection } from '@/components/legal/LegalSection';
 import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
@@ -41,6 +42,9 @@ export default function SnowModeNoticeScreen() {
         </Text>
       </View>
       <View style={{ paddingHorizontal: spacing.lg }}>
+        <SettingsGroup>
+          <LanguageRow />
+        </SettingsGroup>
         <LegalSection />
         <SettingsGroup>
           <SettingsRow icon="log-out" title="Sign Out" destructive onPress={guardedSignOut} />

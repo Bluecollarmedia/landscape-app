@@ -4,6 +4,7 @@
  * controls in grouped white cards: the rules and alerts, customer messages, records, storm management, your profile and mode,
  * legal pages, Sign Out and Delete Account. Team and Properties have their own tabs, so they are not repeated here.
  */
+import { LanguageRow } from '@/components/ui/LanguageSwitch';
 import React from 'react';
 import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, useWindowDimensions } from 'react-native';
@@ -88,6 +89,10 @@ export default function SnowOwnerMoreScreen() {
           <Group title="You">
             <ProfileCard onPress={() => router.push('/snow/owner/edit-profile' as any)} />
             {mode.canSwitch ? <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} /> : null}
+          </Group>
+
+          <Group title="Language">
+            <LanguageRow />
           </Group>
 
           <Group title="Account">

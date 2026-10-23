@@ -15,11 +15,14 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { requestPasswordReset } from '@/data/passwordReset';
+import { LanguageSwitch } from '@/components/ui/LanguageSwitch';
+import { useT } from '@/i18n';
 
 export default function ForgotPasswordScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const t = useT();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -37,21 +40,24 @@ export default function ForgotPasswordScreen() {
 
   return (
     <ScreenContainer scrollable padded keyboardAvoiding contentStyle={{ ...styles.content, paddingTop: insets.top + spacing.lg }}>
-      <Pressable onPress={() => router.back()} style={styles.backRow} accessibilityRole="button" accessibilityLabel="Back to sign in">
-        <Icon name="arrow-left" size={20} color={colors.textSecondary} />
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>Back to sign in</Text>
-      </Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Pressable onPress={() => router.back()} style={styles.backRow} accessibilityRole="button" accessibilityLabel={t('Back to sign in')}>
+          <Icon name="arrow-left" size={20} color={colors.textSecondary} />
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>{t('Back to sign in')}</Text>
+        </Pressable>
+        <LanguageSwitch />
+      </View>
 
-      <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Forgot password?</Text>
+      <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t('Forgot password?')}</Text>
       <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing['2xl'] }]}>
-        Enter the email you signed up with and we will send you a link to choose a new password.
+        {t('Enter the email you signed up with and we will send you a link to choose a new password.')}
       </Text>
 
       {sent ? (
         <View style={[styles.notice, { backgroundColor: colors.primarySurface }]}>
           <Icon name="check-circle" size={18} color={colors.primary} />
           <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm }]}>
-            If there is an account for that email, a reset link is on its way. Open it on this phone, choose a new password, then come back and sign in.
+            {t('If there is an account for that email, a reset link is on its way. Open it on this phone, choose a new password, then come back and sign in.')}
           </Text>
         </View>
       ) : (
@@ -63,7 +69,7 @@ export default function ForgotPasswordScreen() {
             </View>
           ) : null}
           <Input
-            label="Email"
+            label={t('Email')}
             placeholder="you@example.com"
             value={email}
             onChangeText={setEmail}
@@ -74,7 +80,7 @@ export default function ForgotPasswordScreen() {
             onSubmitEditing={handleSend}
             icon="mail"
           />
-          <Button title="Send reset link" onPress={handleSend} loading={loading} fullWidth size="lg" />
+          <Button title={t('Send reset link')} onPress={handleSend} loading={loading} fullWidth size="lg" />
         </View>
       )}
     </ScreenContainer>

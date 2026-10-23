@@ -1,3 +1,4 @@
+import { useT } from '@/i18n';
 import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -11,6 +12,7 @@ try {
 } catch {}
 
 function MaintenanceNativeTabs() {
+  const t = useT();
   const { colors } = useTheme();
 
   return (
@@ -23,7 +25,7 @@ function MaintenanceNativeTabs() {
           sf={{ default: 'sun.max', selected: 'sun.max.fill' }}
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="sun" />}
         />
-        <NativeTabs.Trigger.Label>Today</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('Today')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="route">
@@ -31,7 +33,7 @@ function MaintenanceNativeTabs() {
           sf={{ default: 'map', selected: 'map.fill' }}
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="map" />}
         />
-        <NativeTabs.Trigger.Label>Route</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('Route')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="activity">
@@ -39,7 +41,7 @@ function MaintenanceNativeTabs() {
           sf="chart.xyaxis.line"
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="activity" />}
         />
-        <NativeTabs.Trigger.Label>Activity</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('Activity')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="settings">
@@ -47,13 +49,14 @@ function MaintenanceNativeTabs() {
           sf={{ default: 'gearshape', selected: 'gearshape.fill' }}
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="settings" />}
         />
-        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('Settings')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
 
 function MaintenanceJSTabs() {
+  const t = useT();
   const { colors } = useTheme();
 
   return (
@@ -78,7 +81,7 @@ function MaintenanceJSTabs() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Today',
+          title: t('Today'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="sun" size={size} color={color} />
           ),
@@ -87,7 +90,7 @@ function MaintenanceJSTabs() {
       <Tabs.Screen
         name="route"
         options={{
-          title: 'Route',
+          title: t('Route'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="map" size={size} color={color} />
           ),
@@ -96,7 +99,7 @@ function MaintenanceJSTabs() {
       <Tabs.Screen
         name="activity"
         options={{
-          title: 'Activity',
+          title: t('Activity'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="activity" size={size} color={color} />
           ),
@@ -105,7 +108,7 @@ function MaintenanceJSTabs() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: t('Settings'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="settings" size={size} color={color} />
           ),

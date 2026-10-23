@@ -4,6 +4,7 @@
  * owner's to change, so they are read-only here), and Sign Out. No owner
  * controls. Services come from get_my_snow_access (update 020).
  */
+import { LanguageRow } from '@/components/ui/LanguageSwitch';
 import { LegalSection } from '@/components/legal/LegalSection';
 import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
@@ -127,6 +128,10 @@ export function SnowWorkerSettings() {
             ) : null}
           </SettingsGroup>
         ) : null}
+
+        <SettingsGroup>
+          <LanguageRow />
+        </SettingsGroup>
 
         <LegalSection />
 

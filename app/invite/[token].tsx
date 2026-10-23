@@ -12,6 +12,8 @@ import { View, Text, StyleSheet, Pressable, Platform, Alert, Keyboard, Image as 
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { LanguageSwitch } from '@/components/ui/LanguageSwitch';
+import { useT, tr } from '@/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Button, Input, LoadingSpinner } from '@/components/ui';
@@ -67,6 +69,7 @@ async function lookupInvite(token: string): Promise<Lookup> {
 const say = (title: string, msg: string) => (Platform.OS === 'web' ? alert(`${title}\n\n${msg}`) : Alert.alert(title, msg));
 
 export default function InviteScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -93,11 +96,11 @@ export default function InviteScreen() {
   function choosePhoto() {
     const pick = (source: ProfilePhotoSource) => photo.pick(source, { afterSheetMs: PICKER_AFTER_SHEET_MS });
     if (Platform.OS === 'web') { pick('library'); return; }
-    Alert.alert('Profile photo', undefined, [
-      { text: 'Take Photo', onPress: () => pick('camera') },
-      { text: 'Choose from Library', onPress: () => pick('library') },
-      ...(photoUri ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: () => setPhotoUri(null) }] : []),
-      { text: 'Cancel', style: 'cancel' as const },
+    Alert.alert(t('Profile photo'), undefined, [
+      { text: t('Take Photo'), onPress: () => pick('camera') },
+      { text: t('Choose from Library'), onPress: () => pick('library') },
+      ...(photoUri ? [{ text: t('Remove Photo'), style: 'destructive' as const, onPress: () => setPhotoUri(null) }] : []),
+      { text: t('Cancel'), style: 'cancel' as const },
     ]);
   }
 
@@ -131,10 +134,10 @@ export default function InviteScreen() {
       const { data, error: e } = await supabase.rpc('invite_accept', { p_token: String(token) });
       if (e) throw e;
       const r = data as { success?: boolean; error?: string } | null;
-      if (!r?.success) throw new Error(REASON_TEXT[r?.error ?? 'invalid'] ?? 'This link can’t be used. Ask for a new one.');
+      if (!r?.success) throw new Error(tr(REASON_TEXT[r?.error ?? 'invalid'] ?? 'This link can’t be used. Ask for a new one.'));
       await goHome();
     } catch (err: any) {
-      setError(err?.message ?? 'Something went wrong. Please try again.');
+      setError(err?.message ?? tr('Something went wrong. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -142,12 +145,12 @@ export default function InviteScreen() {
 
   async function handleSubmit() {
     if (!agreed) { setError(TERMS_REQUIRED_MESSAGE); return; }
-    if (!firstName.trim()) { setError('Please enter your first name.'); return; }
-    if (!email.trim() || !email.includes('@')) { setError('Please enter a valid email address.'); return; }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+    if (!firstName.trim()) { setError(tr('Please enter your first name.')); return; }
+    if (!email.trim() || !email.includes('@')) { setError(tr('Please enter a valid email address.')); return; }
+    if (password.length < 6) { setError(tr('Password must be at least 6 characters.')); return; }
+    if (password !== confirmPassword) { setError(tr('Passwords do not match.')); return; }
     if (isWorker) {
-      if (!phone.trim()) { setError('Please enter your phone number.'); return; }
+      if (!phone.trim()) { setError(tr('Please enter your phone number.')); return; }
       const bErr = birthdayProblem(birthday);
       if (bErr) { setError(`Birthday: ${bErr}`); return; }
     }
@@ -193,7 +196,7 @@ export default function InviteScreen() {
       }
       await goHome();
     } catch (err: any) {
-      setError(err?.message ?? 'Something went wrong. Please try again.');
+      setError(err?.message ?? tr('Something went wrong. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -207,9 +210,9 @@ export default function InviteScreen() {
     return (
       <View style={[styles.screen, styles.center, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <Icon name="link-2" size={36} color={colors.textTertiary} />
-        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' }]}>This link can't be used</Text>
-        <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center' }]}>{REASON_TEXT[info.reason ?? 'invalid']}</Text>
-        <Button title="Sign In" onPress={() => router.replace('/(auth)/login')} style={{ marginTop: spacing.xl }} />
+        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' }]}>{t("This link can't be used")}</Text>
+        <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center' }]}>{t(REASON_TEXT[info.reason ?? 'invalid'])}</Text>
+        <Button title={t('Sign In')} onPress={() => router.replace('/(auth)/login')} style={{ marginTop: spacing.xl }} />
       </View>
     );
   }
@@ -217,12 +220,14 @@ export default function InviteScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing.xl }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {/* English | Español: someone can read this page in Spanish before they sign up. English is the default. */}
+        <View style={{ alignItems: 'flex-end', marginBottom: spacing.md }}><LanguageSwitch /></View>
         <RNImage source={require('../../assets/images/logo-full.png')} style={styles.logo} resizeMode="contain" />
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center' }]}>
-          {isWorker ? `Join ${info.companyName}` : `${info.companyName} invited you`}
+          {isWorker ? t('Join {company}', { company: info.companyName ?? '' }) : t('{company} invited you', { company: info.companyName ?? '' })}
         </Text>
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.xl }]}>
-          {isWorker ? 'Set up your login. Everything here is yours to fill in.' : 'Create your login to see your project.'}
+          {isWorker ? t('Set up your login. Everything here is yours to fill in.') : t('Create your login to see your project.')}
         </Text>
 
         {error ? (
@@ -235,9 +240,9 @@ export default function InviteScreen() {
         {signedIn ? (
           <View style={styles.form}>
             <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>
-              You're signed in as {user?.email}. Add {info.companyName} to this account?
+              {t("You're signed in as {email}. Add {company} to this account?", { email: user?.email ?? '', company: info.companyName ?? '' })}
             </Text>
-            <Button title="Accept Invite" onPress={handleAccept} loading={loading} fullWidth size="lg" icon="check" />
+            <Button title={t('Accept Invite')} onPress={handleAccept} loading={loading} fullWidth size="lg" icon="check" />
           </View>
         ) : (
           <View style={styles.form}>
@@ -246,34 +251,34 @@ export default function InviteScreen() {
                   style={[styles.photoUpload, { borderColor: photoUri ? colors.primary : colors.border, backgroundColor: photoUri ? colors.primarySurface : colors.surface }]}
                   onPress={choosePhoto}
                   accessibilityRole="button"
-                  accessibilityLabel="Add a profile photo"
+                  accessibilityLabel={t('Add a profile photo')}
                 >
                   {photoUri ? <Image source={{ uri: photoUri }} style={styles.photoImage} contentFit="cover" /> : <Icon name="camera" size={30} color={colors.textTertiary} />}
                 </Pressable>
-                <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>Profile photo (optional)</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.xs }]}>{t('Profile photo (optional)')}</Text>
               </View>
 
             <View style={styles.row}>
-              <Input label="First Name *" placeholder="First name" value={firstName} onChangeText={setFirstName} editable={!firstLocked} containerStyle={{ flex: 1 }} />
-              <Input label="Last Name" placeholder="Last name" value={lastName} onChangeText={setLastName} editable={!lastLocked} containerStyle={{ flex: 1 }} />
+              <Input label={t('First Name *')} placeholder={t('First name')} value={firstName} onChangeText={setFirstName} editable={!firstLocked} containerStyle={{ flex: 1 }} />
+              <Input label={t('Last Name')} placeholder={t('Last name')} value={lastName} onChangeText={setLastName} editable={!lastLocked} containerStyle={{ flex: 1 }} />
             </View>
-            <Input label={isWorker ? 'Phone *' : 'Phone'} placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
-            <Input label="Email *" placeholder="you@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />
-            <Input label="Password *" placeholder="At least 6 characters" value={password} onChangeText={setPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
-            <Input label="Confirm Password *" placeholder="Re-enter password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
+            <Input label={isWorker ? t('Phone *') : t('Phone')} placeholder="(555) 555-0100" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="phone" />
+            <Input label={t('Email *')} placeholder="you@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail" />
+            <Input label={t('Password *')} placeholder={t('At least 6 characters')} value={password} onChangeText={setPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
+            <Input label={t('Confirm Password *')} placeholder={t('Re-enter password')} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry textContentType="newPassword" autoComplete="new-password" autoCapitalize="none" autoCorrect={false} icon="lock" />
 
             {isWorker ? (
               <>
-                <DateField label="Birthday (optional)" icon="gift" placeholder="Select your birthday" value={parseBirthday(birthday) ?? ''} onChange={(k) => setBirthday(birthdayInputText(k))} onClear={() => setBirthday('')} maximumDate={localDateKey(new Date())} initialPickerDate="1990-01-01" />
+                <DateField label={t('Birthday (optional)')} icon="gift" placeholder={t('Select your birthday')} value={parseBirthday(birthday) ?? ''} onChange={(k) => setBirthday(birthdayInputText(k))} onClear={() => setBirthday('')} maximumDate={localDateKey(new Date())} initialPickerDate="1990-01-01" />
                 <WorkerExtrasFields hoodie={hoodie} onHoodie={setHoodie} newIdUri={idUri} onNewIdUri={setIdUri} onError={setError} />
               </>
             ) : null}
 
             <TermsAgreement value={agreed} onChange={(v) => { setAgreed(v); if (v) setError(''); }} />
-            <Button title={isWorker ? 'Create My Login' : 'Create Account'} onPress={handleSubmit} loading={loading} fullWidth size="lg" icon="arrow-right" />
+            <Button title={isWorker ? t('Create My Login') : t('Create Account')} onPress={handleSubmit} loading={loading} fullWidth size="lg" icon="arrow-right" />
             <Pressable onPress={() => router.push('/(auth)/login')} hitSlop={8}>
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>
-                Already have an account? <Text style={{ color: colors.primary, fontWeight: '600' }}>Sign in first</Text>, then open this link again.
+                {t('Already have an account?')} <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('Sign in first')}</Text>{t(', then open this link again.')}
               </Text>
             </Pressable>
           </View>

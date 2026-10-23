@@ -49,6 +49,7 @@ export default function DocumentEditScreen() {
   const [form, setForm] = useState<Form | null>(null);
   const [editing, setEditing] = useState<{ item: LineItem; isNew: boolean } | null>(null);
   const touched = useRef(false);
+  const scrollRef = useRef<any>(null);
   const suggestions = useMemo(() => recentLineItems(), []);
 
   // Swiping the editor down closes it like the X does: the draft is saved first (or an untouched new one is dropped). If something is
@@ -60,6 +61,9 @@ export default function DocumentEditScreen() {
     if (leaving.current) return;
     if (leaveRef.current()) leaving.current = true; else e.preventDefault();
   }), [navigation]);
+
+  // Every step opens at the top (the page used to stay scrolled to the bottom of the step before, so the new step looked unchanged).
+  useEffect(() => { scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false }); }, [step]);
 
   // Load the draft once.
   useEffect(() => {
@@ -246,6 +250,7 @@ export default function DocumentEditScreen() {
 
       {/* The owner's private notes for this project (what to order, measurements, materials, pictures). Never on the document. */}
       <KeyboardAwareScrollView
+        ref={scrollRef}
         bottomOffset={KEYBOARD_GAP}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.body}
@@ -344,11 +349,6 @@ export default function DocumentEditScreen() {
           </>
         )}
 
-        {step === 1 && doc.kind === 'quote' && project && (
-          <View style={{ marginTop: spacing.lg }}>
-            <ProjectPrivateNotes projectId={project.id} projectName={project.name} address={address} />
-          </View>
-        )}
 
         {step === 2 && (
           <>

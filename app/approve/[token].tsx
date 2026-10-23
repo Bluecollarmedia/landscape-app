@@ -74,6 +74,8 @@ export default function ApprovePage() {
   const [agreed, setAgreed] = useState(false);
   const [signature, setSignature] = useState('');
   const [declining, setDeclining] = useState(false);
+  // The quote comes first: the name / signature form only opens when the customer taps Review & Approve.
+  const [formOpen, setFormOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState<'approve' | 'decline' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -188,8 +190,21 @@ export default function ApprovePage() {
         contentContainerStyle={[styles.inner, styles.barContent, { paddingBottom: insets.bottom + spacing.md }]}
         keyboardShouldPersistTaps="handled"
       >
-        {canAnswer && !declining && (
+        {canAnswer && !declining && !formOpen && (
           <>
+            <View style={styles.row}>
+              <Button title="Request Changes" variant="ghost" onPress={() => { setError(null); setDeclining(true); }} style={{ flex: 1 }} />
+              <Button title={`Review & Approve`} icon="check" onPress={() => setFormOpen(true)} style={{ flex: 2 }} />
+            </View>
+          </>
+        )}
+
+        {canAnswer && !declining && formOpen && (
+          <>
+            <Pressable onPress={() => setFormOpen(false)} style={styles.backToQuote} accessibilityRole="button" accessibilityLabel="Back to the quote">
+              <Icon name="chevron-down" size={16} color={colors.primary} />
+              <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Back to the {label.toLowerCase()}</Text>
+            </Pressable>
             <Input
               label="Your full name"
               value={name}
@@ -291,6 +306,7 @@ const styles = StyleSheet.create({
   bar: { flexGrow: 0, maxHeight: '55%', borderTopWidth: StyleSheet.hairlineWidth },
   barContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm },
   row: { flexDirection: 'row', gap: spacing.sm },
+  backToQuote: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', paddingVertical: spacing.xs },
   agree: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs },
   box: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   answer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg },

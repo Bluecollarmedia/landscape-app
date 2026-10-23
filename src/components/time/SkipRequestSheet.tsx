@@ -4,6 +4,7 @@ import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
+import { useT } from '@/i18n';
 
 /**
  * "Can't service this property?": the worker says why and sends a request. It does NOT skip anything: the property stays open
@@ -15,6 +16,7 @@ export function SkipRequestSheet({ visible, propertyName, onClose, onSend }: {
   onClose: () => void;
   onSend: (reason: string) => Promise<void> | void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -24,23 +26,23 @@ export function SkipRequestSheet({ visible, propertyName, onClose, onSend }: {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Ask to skip {propertyName ?? 'this property'}?</Text>
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t('Ask to skip {name}?', { name: propertyName ?? t('this property') })}</Text>
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-            Tell the owner why it can't be done. It stays open until the owner approves the skip.
+            {t("Tell the owner why it can't be done. It stays open until the owner approves the skip.")}
           </Text>
           <Input
-            label="Reason"
+            label={t('Reason')}
             value={reason}
             onChangeText={setReason}
             multiline
             numberOfLines={3}
-            placeholder="Gate locked, customer away, equipment problem"
+            placeholder={t('Gate locked, customer away, equipment problem')}
             containerStyle={{ marginTop: spacing.md }}
           />
           <View style={styles.row}>
-            <Button title="Cancel" variant="ghost" onPress={onClose} />
+            <Button title={t('Cancel')} variant="ghost" onPress={onClose} />
             <Button
-              title="Send Request"
+              title={t('Send Request')}
               icon="send"
               loading={busy}
               disabled={reason.trim().length < 3}

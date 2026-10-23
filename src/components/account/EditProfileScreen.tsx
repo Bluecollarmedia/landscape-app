@@ -20,6 +20,7 @@ import { parseBirthday, birthdayProblem, birthdayInputText } from '@/lib/birthda
 import { WorkerExtrasFields } from '@/components/account/WorkerExtras';
 import { loadMyDetails, saveMyHoodie, saveMyId, removeMyId } from '@/data/workerDetails';
 import type { HoodieSize } from '@/lib/workerDetails';
+import { useT } from '@/i18n';
 
 interface EditProfileScreenProps {
   /** Workers must fill in every field (photo and phone included); owners only need a name. */
@@ -29,6 +30,7 @@ interface EditProfileScreenProps {
 
 /** Edit your own name, phone and profile photo. Used by the worker and owner apps. */
 export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }: EditProfileScreenProps) {
+  const t = useT();
   const { colors } = useTheme();
   const { user, updateProfile } = useAuth();
   const insets = useSafeAreaInsets();
@@ -51,9 +53,9 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
     let live = true;
     loadMyBirthday(user.id).then((iso) => {
       if (!live) return;
-      const t = birthdayInputText(iso);
-      setSavedBirthday(t);
-      setBirthday((cur) => cur || t);
+      const text = birthdayInputText(iso);
+      setSavedBirthday(text);
+      setBirthday((cur) => cur || text);
     });
     return () => { live = false; };
   }, [user?.id]);
@@ -81,11 +83,11 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
   const todayKey = () => localDateKey(new Date());
   const phoneDigits = phone.replace(/\D/g, '').length;
   const errors = {
-    photo: !requireAll || avatarUrl ? '' : 'Add a profile photo',
-    firstName: firstName.trim() ? '' : 'Enter your first name',
-    lastName: lastName.trim() ? '' : 'Enter your last name',
-    phone: phoneDigits >= 10 || (!requireAll && phoneDigits === 0) ? '' : 'Enter a 10-digit phone number',
-    birthday: birthdayProblem(birthday),
+    photo: !requireAll || avatarUrl ? '' : t('Add a profile photo'),
+    firstName: firstName.trim() ? '' : t('Enter your first name'),
+    lastName: lastName.trim() ? '' : t('Enter your last name'),
+    phone: phoneDigits >= 10 || (!requireAll && phoneDigits === 0) ? '' : t('Enter a 10-digit phone number'),
+    birthday: t(birthdayProblem(birthday)),
   };
   const isValid = !Object.values(errors).some(Boolean);
   const show = (key: keyof typeof errors) => (triedSave ? errors[key] || undefined : undefined);
@@ -135,7 +137,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
       }
       router.back();
     } catch (err: any) {
-      setSaveError(err?.message ?? 'Could not save your photo. Please try again.');
+      setSaveError(err?.message ?? t('Could not save your photo. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -160,9 +162,9 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backRow}>
           <Feather name="chevron-left" size={22} color={colors.textPrimary} />
-          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{backLabel}</Text>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{t(backLabel)}</Text>
         </Pressable>
-        <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Edit Profile</Text>
+        <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t('Edit Profile')}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -176,7 +178,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
           </Pressable>
           <Pressable onPress={() => setPhotoSheetOpen(true)}>
             <Text style={[typeScale.bodyMedium, { color: colors.primary, fontWeight: '600', marginTop: spacing.sm }]}>
-              {avatarUrl ? 'Change Photo' : 'Add Photo'}
+              {avatarUrl ? t('Change Photo') : t('Add Photo')}
             </Text>
           </Pressable>
           {show('photo') ? (
@@ -187,20 +189,20 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
         <View style={styles.fields}>
           <View style={styles.nameRow}>
             <Input
-              label="First Name *"
+              label={t('First Name *')}
               value={firstName}
               onChangeText={setFirstName}
-              placeholder="First name"
+              placeholder={t('First name')}
               textContentType="givenName"
               autoComplete="given-name"
               error={show('firstName')}
               containerStyle={{ flex: 1, width: undefined }}
             />
             <Input
-              label="Last Name *"
+              label={t('Last Name *')}
               value={lastName}
               onChangeText={setLastName}
-              placeholder="Last name"
+              placeholder={t('Last name')}
               textContentType="familyName"
               autoComplete="family-name"
               error={show('lastName')}
@@ -208,7 +210,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
             />
           </View>
           <Input
-            label={requireAll ? 'Phone Number *' : 'Phone Number'}
+            label={requireAll ? t('Phone Number *') : t('Phone Number')}
             value={phone}
             onChangeText={setPhone}
             placeholder="(555) 555-0100"
@@ -219,23 +221,23 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
             error={show('phone')}
           />
           <DateField
-            label="Birthday (optional)"
+            label={t('Birthday (optional)')}
             icon="gift"
             value={parseBirthday(birthday) ?? ''}
             onChange={(k) => setBirthday(birthdayInputText(k))}
             onClear={() => setBirthday('')}
             maximumDate={todayKey()}
             initialPickerDate="1990-01-01"
-            placeholder="Select your birthday"
+            placeholder={t('Select your birthday')}
             error={show('birthday')}
-            hint="Only you and your managers can see this."
+            hint={t('Only you and your managers can see this.')}
           />
           <Input
-            label="Email"
+            label={t('Email')}
             value={user?.email ?? ''}
             editable={false}
             icon="mail"
-            hint="Your email is your login and can't be changed here."
+            hint={t("Your email is your login and can't be changed here.")}
           />
           {requireAll ? (
             <WorkerExtrasFields
@@ -251,7 +253,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
         </View>
 
         <Button
-          title="Save Changes"
+          title={t('Save Changes')}
           onPress={handleSave}
           disabled={!hasChanges || saving}
           loading={saving}
@@ -272,23 +274,23 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.md }]}>
-              Change Profile Photo
+              {t('Change Profile Photo')}
             </Text>
             <Pressable style={styles.sheetOption} onPress={handleTakePhoto}>
               <Feather name="camera" size={18} color={colors.textPrimary} />
-              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>Take Photo</Text>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>{t('Take Photo')}</Text>
             </Pressable>
             <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
             <Pressable style={styles.sheetOption} onPress={handleChooseFromGallery}>
               <Feather name="image" size={18} color={colors.textPrimary} />
-              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>Choose from Gallery</Text>
+              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.md }]}>{t('Choose from Gallery')}</Text>
             </Pressable>
             {avatarUrl && (
               <>
                 <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
                 <Pressable style={styles.sheetOption} onPress={handleRemovePhoto}>
                   <Feather name="trash-2" size={18} color={colors.error} />
-                  <Text style={[typeScale.bodyLarge, { color: colors.error, marginLeft: spacing.md }]}>Remove Current Photo</Text>
+                  <Text style={[typeScale.bodyLarge, { color: colors.error, marginLeft: spacing.md }]}>{t('Remove Current Photo')}</Text>
                 </Pressable>
               </>
             )}
@@ -296,7 +298,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
               style={[styles.cancelButton, { backgroundColor: colors.backgroundSecondary }]}
               onPress={() => setPhotoSheetOpen(false)}
             >
-              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Cancel</Text>
+              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{t('Cancel')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -306,7 +308,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
       <Modal visible={!!permissionError} transparent animationType="fade" onRequestClose={() => setPermissionError(null)}>
         <View style={styles.confirmBackdrop}>
           <View style={[styles.confirmCard, { backgroundColor: colors.surface }]}>
-            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>Couldn't add the photo</Text>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>{t("Couldn't add the photo")}</Text>
             <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }]}>
               {permissionError}
             </Text>
@@ -314,7 +316,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
               style={[styles.confirmButton, { backgroundColor: colors.primary, marginTop: spacing.lg, width: '100%' }]}
               onPress={() => setPermissionError(null)}
             >
-              <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>OK</Text>
+              <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('OK')}</Text>
             </Pressable>
           </View>
         </View>

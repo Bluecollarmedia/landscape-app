@@ -27,7 +27,7 @@ check('6 the crop box is always inside the picture and square', big.originX >= 0
 
 const cropper = read('src/components/account/AvatarCropper.tsx');
 check('7 the crop screen is a circle over the picture with a slider; the website also gets wheel zoom, the phone does not pinch',
-  /borderRadius: frame \/ 2/.test(cropper) && /accessibilityLabel="Zoom"/.test(cropper) && /Platform\.OS === 'web'\s*\? \{ onWheel/.test(cropper) && !/PinchGesture|onTouchMove|scale: .*gesture/i.test(cropper));
+  /borderRadius: frame \/ 2/.test(cropper) && /accessibilityLabel=\{t\('Zoom'\)\}/.test(cropper) && /Platform\.OS === 'web'\s*\? \{ onWheel/.test(cropper) && !/PinchGesture|onTouchMove|scale: .*gesture/i.test(cropper));
 check('8 Done crops the chosen square; if the crop fails the caller still gets a picture (automatic square)', /cropAvatarToBox\(uri, box\)/.test(cropper) && /onPicked\(cropped \?\? p\.fallback\)/.test(read('src/hooks/useProfilePhoto.tsx')));
 const hook = read('src/hooks/useProfilePhoto.tsx');
 check('9 the crop screen opens after the picker (camera or library) has closed', /AFTER_PICKER_MS/.test(hook) && /await sleep\(AFTER_PICKER_MS\)/.test(hook));

@@ -10,6 +10,7 @@
  */
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { tr } from '@/i18n';
 import { squareAvatarUri } from '@/lib/avatarCrop';
 
 export type ProfilePhotoSource = 'camera' | 'library';
@@ -27,7 +28,7 @@ export async function chooseProfilePhoto(source: ProfilePhotoSource, opts: { aft
     if (source === 'camera' && Platform.OS !== 'web') {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        return { status: 'error', message: 'Camera access is needed to take a profile photo. You can turn it on in your phone\'s Settings app.' };
+        return { status: 'error', message: tr('Camera access is needed to take a profile photo. You can turn it on in your phone\'s Settings app.') };
       }
     }
 
@@ -43,7 +44,7 @@ export async function chooseProfilePhoto(source: ProfilePhotoSource, opts: { aft
     console.warn('[profile photo] could not pick', err);
     return {
       status: 'error',
-      message: `Couldn't open ${source === 'camera' ? 'the camera' : 'your photos'}. Please try again.${raw ? ` (${raw})` : ''}`,
+      message: `${source === 'camera' ? tr("Couldn't open the camera. Please try again.") : tr("Couldn't open your photos. Please try again.")}${raw ? ` (${raw})` : ''}`,
     };
   }
 }

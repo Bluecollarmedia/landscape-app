@@ -23,6 +23,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { resetWelcome, useWelcomePhase, welcomeStartedAt } from '@/lib/welcomeAnimation';
@@ -38,6 +39,7 @@ const HOLD_MS = 1300;
 const TIMEOUT_MS = 20000;
 
 export function WelcomeOverlay({ ready, name }: { ready: boolean; name?: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const phase = useWelcomePhase();
   const [visible, setVisible] = useState(false);
@@ -100,8 +102,8 @@ export function WelcomeOverlay({ ready, name }: { ready: boolean; name?: string 
     ripple.value = 0;
     ripple.value = withDelay(300, withRepeat(withTiming(1, { duration: 1300, easing: Easing.out(Easing.quad) }), -1));
 
-    const t = setTimeout(fadeAway, TIMEOUT_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(fadeAway, TIMEOUT_MS);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
@@ -118,7 +120,7 @@ export function WelcomeOverlay({ ready, name }: { ready: boolean; name?: string 
     welcomed.current = true;
     setGreetName(name);
     const wait = Math.max(0, MIN_LEAF_MS - (Date.now() - welcomeStartedAt()));
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       cancelAnimation(ripple);
       ripple.value = withTiming(0, { duration: 200 });
       cancelAnimation(leafScale);
@@ -128,7 +130,7 @@ export function WelcomeOverlay({ ready, name }: { ready: boolean; name?: string 
       textLift.value = withDelay(120, withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) }));
       setTimeout(fadeAway, 620 + HOLD_MS);
     }, wait);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, ready, name]);
 
@@ -165,7 +167,7 @@ export function WelcomeOverlay({ ready, name }: { ready: boolean; name?: string 
         </Animated.View>
         <Animated.View style={[styles.textWrap, textStyle]}>
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, textAlign: 'center' }]}>
-            Welcome Back{greetName ? ',' : ''}
+            {t('Welcome Back')}{greetName ? ',' : ''}
           </Text>
           {greetName ? (
             <Text style={[typeScale.displaySmall, { color: brand.accent, textAlign: 'center', marginTop: 2 }]}>

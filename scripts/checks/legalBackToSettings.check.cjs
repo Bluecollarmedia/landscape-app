@@ -24,7 +24,7 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
   }
 
   const section = read('src/components/legal/LegalSection.tsx');
-  check('5 the shared Settings row is ONE row, titled Legal & Support, and opens the hub of the area the person is in (not the public page)', /title="Legal & Support"/.test(section) && /legalHubPath\(segments\[0\]\)/.test(section) && !/'\/legal\/(privacy|terms|support)'/.test(section) && (section.match(/<ListRow/g) || []).length === 1);
+  check('5 the shared Settings row is ONE row, titled Legal & Support, and opens the hub of the area the person is in (not the public page)', /title=\{t\('Legal & Support'\)\}/.test(section) && /legalHubPath\(segments\[0\]\)/.test(section) && !/'\/legal\/(privacy|terms|support)'/.test(section) && (section.match(/<ListRow/g) || []).length === 1);
 
   // No signed-in screen opens the public pages (which would throw the screen away and send Back to the home screen).
   const walk = (d, out = []) => { for (const e of fs.readdirSync(path.join(root, d), { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p, out); else if (/\.tsx$/.test(e.name)) out.push(p); } return out; };

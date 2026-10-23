@@ -15,11 +15,15 @@ export function meaningfulUpdates<T extends TimelineLike>(events: T[], max = 3):
     .slice(0, max);
 }
 
+/** The screens pass in their translator (t from useT) so these short sentences can be shown in Spanish; this file stays free of app imports. Without one, English comes back as written. */
+type Translate = (text: string, vars?: Record<string, string | number>) => string;
+const plain: Translate = (text, vars) => (vars ? text.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : text);
+
 /** The Billing card's small status: what needs the customer first, else how many invoices are out. Null when nothing to say. */
-export function billingStatus(counts: { waiting: number; issuedInvoices: number }): { label: string } | null {
-  if (counts.waiting > 0) return { label: counts.waiting === 1 ? '1 needs review' : `${counts.waiting} need review` };
-  if (counts.issuedInvoices > 0) return { label: `${counts.issuedInvoices} issued` };
+export function billingStatus(counts: { waiting: number; issuedInvoices: number }, tx: Translate = plain): { label: string } | null {
+  if (counts.waiting > 0) return { label: counts.waiting === 1 ? tx('1 needs review') : tx('{count} need review', { count: counts.waiting }) };
+  if (counts.issuedInvoices > 0) return { label: tx('{count} issued', { count: counts.issuedInvoices }) };
   return null;
 }
 
-export const documentCountLabel = (n: number) => `${n} ${n === 1 ? 'document' : 'documents'}`;
+export const documentCountLabel = (n: number, tx: Translate = plain) => (n === 1 ? tx('1 document') : tx('{count} documents', { count: n }));

@@ -5,6 +5,7 @@
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { formatBytes } from '@/types/storage';
+import { tr } from '@/i18n';
 import type { SnowMediaDraft } from '@/data/snowProperties';
 
 export const MAX_SNOW_VIDEO_SECONDS = 60;
@@ -20,10 +21,10 @@ export function notify(title: string, message: string) {
 function chooseSource(): Promise<'camera' | 'library' | null> {
   if (Platform.OS === 'web') return Promise.resolve('library');
   return new Promise((resolve) => {
-    Alert.alert('Add reference photo or video', undefined, [
-      { text: 'Take Photo or Video', onPress: () => resolve('camera') },
-      { text: 'Choose from Library', onPress: () => resolve('library') },
-      { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+    Alert.alert(tr('Add reference photo or video'), undefined, [
+      { text: tr('Take Photo or Video'), onPress: () => resolve('camera') },
+      { text: tr('Choose from Library'), onPress: () => resolve('library') },
+      { text: tr('Cancel'), style: 'cancel', onPress: () => resolve(null) },
     ], { cancelable: true, onDismiss: () => resolve(null) });
   });
 }
@@ -37,8 +38,8 @@ export async function pickSnowMedia(): Promise<SnowMediaDraft[]> {
     : await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) {
     notify(
-      source === 'camera' ? 'Camera access is off' : 'Photo access is off',
-      'Turn it on for Brighton Lawn in the Settings app to add reference photos and videos.',
+      source === 'camera' ? tr('Camera access is off') : tr('Photo access is off'),
+      tr('Turn it on for Brighton Lawn in the Settings app to add reference photos and videos.'),
     );
     return [];
   }
@@ -62,15 +63,19 @@ export async function pickSnowMedia(): Promise<SnowMediaDraft[]> {
     const mediaType = asset.type === 'video' ? 'video' : 'image';
     const sizeBytes = asset.fileSize ?? (asset as { file?: File }).file?.size;
     if (mediaType === 'video' && asset.duration && asset.duration / 1000 > MAX_SNOW_VIDEO_SECONDS + 1) {
-      skipped.push(`A video is longer than ${MAX_SNOW_VIDEO_SECONDS} seconds. Trim it and try again.`);
+      skipped.push(tr('A video is longer than {n} seconds. Trim it and try again.', { n: MAX_SNOW_VIDEO_SECONDS }));
       continue;
     }
     if (sizeBytes && sizeBytes > MAX_SNOW_FILE_BYTES) {
-      skipped.push(`A ${mediaType} is ${formatBytes(sizeBytes)}; the most one file can be is ${formatBytes(MAX_SNOW_FILE_BYTES)}.`);
+      const size = formatBytes(sizeBytes);
+      const max = formatBytes(MAX_SNOW_FILE_BYTES);
+      skipped.push(mediaType === 'video'
+        ? tr('A video is {size}; the most one file can be is {max}.', { size, max })
+        : tr('A image is {size}; the most one file can be is {max}.', { size, max }));
       continue;
     }
     drafts.push({ uri: asset.uri, mediaType, mimeType: asset.mimeType ?? undefined, sizeBytes });
   }
-  if (skipped.length > 0) notify('Some files weren\'t added', skipped.join('\n'));
+  if (skipped.length > 0) notify(tr("Some files weren't added"), skipped.join('\n'));
   return drafts;
 }

@@ -1,5 +1,6 @@
 import { openDirections, findCoords, distanceMeters, formatDistance, DEFAULT_CHECKIN_RADIUS_M, type Place } from '@/lib/maps';
 import { evaluateCheckIn, checkInRefusal } from '@/lib/checkInRadius';
+import { tr } from '@/i18n';
 import { getCurrentGps } from '@/lib/location';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
@@ -34,7 +35,7 @@ type JobState = 'not_started' | 'confirmed' | 'en_route' | 'checked_in' | 'worki
 
 function showTaskLeadNotice(message: string) {
   if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(message);
-  else Alert.alert('Task Lead only', message);
+  else Alert.alert(tr('Task Lead only'), message);
 }
 
 interface WorkerContextValue {
@@ -223,16 +224,16 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     if (here.status === 'denied') {
       return {
         ok: false,
-        title: 'Turn on location',
-        message: 'Brighton Lawn needs your location to check you in at the job site. Turn it on in Settings, then try again.',
+        title: tr('Turn on location'),
+        message: tr('Brighton Lawn needs your location to check you in at the job site. Turn it on in Settings, then try again.'),
         openSettings: true,
       };
     }
     if (here.status === 'unavailable') {
       return {
         ok: false,
-        title: 'Can’t find your location',
-        message: 'Your phone couldn’t get a GPS fix. Step outside or wait a moment, then try again.',
+        title: tr('Can’t find your location'),
+        message: tr('Your phone couldn’t get a GPS fix. Step outside or wait a moment, then try again.'),
       };
     }
 
@@ -244,7 +245,33 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     // A job with no findable location, or a GPS fix too vague to trust, is refused with a clear reason (never waved through).
     const verdict = evaluateCheckIn({ gps, site, radiusM: radius });
     if (!verdict.ok) {
-      const say = checkInRefusal(verdict, job.project?.name ?? 'the job site', formatDistance);
+      const jobName = job.project?.name ?? tr('the job site');
+      const say = checkInRefusal(verdict, jobName, formatDistance);
+      // The same wording as checkInRefusal (src/lib/checkInRadius.ts), in the worker's language.
+      if (verdict.reason === 'too_far') {
+        return {
+          ok: false,
+          title: tr('You are too far from this project to check in'),
+          message: tr('You are about {distance} from {job}. You need to be within {radius} to check in.', { distance: formatDistance(verdict.distance ?? 0), job: jobName, radius: formatDistance(verdict.radius) }),
+        };
+      }
+      if (verdict.reason === 'inaccurate') {
+        return {
+          ok: false,
+          title: tr('Your location is not accurate enough'),
+          message: tr("Your phone's GPS is only accurate to about {distance} right now. Step into the open, wait a moment, then try again.", { distance: formatDistance(verdict.accuracy ?? 0) }),
+        };
+      }
+      if (verdict.reason === 'bad_gps') {
+        return { ok: false, title: tr("Can't read your location"), message: tr('Your phone gave an unusable location. Wait a moment, then try again.') };
+      }
+      if (verdict.reason === 'no_site') {
+        return {
+          ok: false,
+          title: tr("This project's location isn't set"),
+          message: tr("We can't find {job}'s address on the map, so your location can't be checked. Ask the office to fix the project address, then try again.", { job: jobName }),
+        };
+      }
       return { ok: false, title: say.title, message: say.message };
     }
     return { ok: true, gps: { ...gps, distanceFromSite: verdict.distance } };
@@ -366,8 +393,8 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     if (lead === workerId) return true;
     const name = lead ? db.people[lead] : undefined;
     showTaskLeadNotice(lead
-      ? `Only the Task Lead${name ? `, ${name.firstName},` : ''} can change tasks on this job.`
-      : 'This job has no Task Lead yet. Ask the owner to pick one.');
+      ? (name ? tr('Only the Task Lead, {name}, can change tasks on this job.', { name: name.firstName }) : tr('Only the Task Lead can change tasks on this job.'))
+      : tr('This job has no Task Lead yet. Ask the owner to pick one.'));
     return false;
   }, [v, workerId]);
 

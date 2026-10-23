@@ -12,6 +12,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useFinishingStop } from '@/data/maintenanceFinish';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
+import { useT } from '@/i18n';
 
 interface Props {
   stopId: string;
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export function FinishStopButton({ stopId, missing, onPress, uploading = 0 }: Props) {
+  const t = useT();
   const { colors } = useTheme();
   const saving = useFinishingStop(stopId);
   const ready = missing.length === 0 && !saving;
@@ -31,7 +33,7 @@ export function FinishStopButton({ stopId, missing, onPress, uploading = 0 }: Pr
     <View>
       {missing.length > 0 && (
         <View style={[styles.missing, { backgroundColor: colors.warningLight }]} accessibilityLiveRegion="polite">
-          <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginBottom: 2 }]}>Before you finish</Text>
+          <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginBottom: 2 }]}>{t('Before you finish')}</Text>
           {missing.map((m) => (
             <View key={m} style={styles.missingRow}>
               <Icon name="circle" size={6} color={colors.warning} />
@@ -40,7 +42,7 @@ export function FinishStopButton({ stopId, missing, onPress, uploading = 0 }: Pr
           ))}
           {uploading > 0 && (
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-              {uploading} photo{uploading === 1 ? ' is' : 's are'} still uploading.
+              {uploading === 1 ? t('1 photo is still uploading.') : t('{n} photos are still uploading.', { n: uploading })}
             </Text>
           )}
         </View>
@@ -50,7 +52,7 @@ export function FinishStopButton({ stopId, missing, onPress, uploading = 0 }: Pr
         disabled={!ready}
         haptic={false}
         accessibilityRole="button"
-        accessibilityLabel="Finish stop"
+        accessibilityLabel={t('Finish stop')}
         accessibilityState={{ disabled: !ready, busy: saving }}
       >
         <LinearGradient
@@ -61,7 +63,7 @@ export function FinishStopButton({ stopId, missing, onPress, uploading = 0 }: Pr
         >
           {saving ? <ActivityIndicator color="#FFFFFF" /> : <Icon name="check-circle" size={20} color={ready ? '#FFFFFF' : colors.textTertiary} />}
           <Text style={[typeScale.labelLarge, styles.label, { color: ready || saving ? '#FFFFFF' : colors.textTertiary }]}>
-            {saving ? 'SAVING…' : 'FINISH STOP'}
+            {saving ? t('SAVING…') : t('FINISH STOP')}
           </Text>
         </LinearGradient>
       </PressableScale>

@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
+import { useT } from '@/i18n';
 import { formatClock, servicesLabel, stopAddress } from './format';
 import { ServiceIcon } from './ServiceIcon';
 import { displayStatus, type StopDisplayStatus } from './types';
@@ -18,6 +19,7 @@ const STATUS_LABEL: Record<StopDisplayStatus, string> = {
 };
 
 export function StopStatusPill({ status, icon }: { status: StopDisplayStatus; icon?: boolean }) {
+  const t = useT();
   const { colors } = useTheme();
   const tone =
     status === 'next' || status === 'arrived'
@@ -28,7 +30,7 @@ export function StopStatusPill({ status, icon }: { status: StopDisplayStatus; ic
   return (
     <View style={[styles.pill, { backgroundColor: tone.bg }, icon && styles.pillWithIcon]}>
       {icon && (status === 'next' || status === 'arrived') ? <Feather name="clock" size={14} color={tone.fg} /> : null}
-      <Text style={[typeScale.labelSmall, { color: tone.fg }]}>{STATUS_LABEL[status]}</Text>
+      <Text style={[typeScale.labelSmall, { color: tone.fg }]}>{t(STATUS_LABEL[status])}</Text>
     </View>
   );
 }
@@ -48,12 +50,13 @@ interface StopRowProps {
 
 /** One numbered stop in route order, as in the "Upcoming Stops" list. */
 export function StopRow({ stop, nextStopId, nameOf, first, showInstructions, locked, onPress }: StopRowProps) {
+  const t = useT();
   const { colors } = useTheme();
   const status = displayStatus(stop, nextStopId);
   const active = status === 'next' || status === 'arrived';
   const done = status === 'completed';
   const muted = done || status === 'skipped';
-  const property = stop.property?.name ?? 'Property';
+  const property = stop.property?.name ?? t('Property');
   const finishedBy = nameOf?.(stop.completedBy);
 
   return (
@@ -67,7 +70,7 @@ export function StopRow({ stop, nextStopId, nameOf, first, showInstructions, loc
         muted && { opacity: 0.6 },
       ]}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`Stop ${stop.number}, ${property}, ${STATUS_LABEL[status]}`}
+      accessibilityLabel={t('Stop {n}, {property}, {status}', { n: stop.number, property, status: t(STATUS_LABEL[status]) })}
     >
       <View
         style={[
@@ -109,7 +112,7 @@ export function StopRow({ stop, nextStopId, nameOf, first, showInstructions, loc
           <View style={styles.meta}>
             <Feather name="check-circle" size={13} color={colors.success} />
             <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
-              Finished {formatClock(stop.completedAt)}{finishedBy ? ` by ${finishedBy}` : ''}
+              {finishedBy ? t('Finished {time} by {name}', { time: formatClock(stop.completedAt), name: finishedBy }) : t('Finished {time}', { time: formatClock(stop.completedAt) })}
             </Text>
           </View>
         )}

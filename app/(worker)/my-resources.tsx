@@ -9,12 +9,14 @@ import { useResources } from '@/hooks/useResources';
 import { ResourceRow, groupByCategory, matchesResource } from '@/components/resources/ResourceParts';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
+import { useT } from '@/i18n';
 
 /**
  * Company Resources for a worker: only what the owner gave them access to.
  * `truckId` narrows the list to one truck (opened from a job's truck row).
  */
 export default function WorkerResourcesScreen() {
+  const t = useT();
   const { truckId } = useLocalSearchParams<{ truckId?: string }>();
   const { colors } = useTheme();
   const router = useRouter();
@@ -37,9 +39,9 @@ export default function WorkerResourcesScreen() {
     body = (
       <EmptyState
         icon="wifi-off"
-        title="Couldn't load resources"
-        description="Check your connection and try again."
-        actionTitle="Try Again"
+        title={t("Couldn't load resources")}
+        description={t('Check your connection and try again.')}
+        actionTitle={t('Try Again')}
         onAction={() => refreshResources()}
       />
     );
@@ -47,17 +49,17 @@ export default function WorkerResourcesScreen() {
     body = (
       <EmptyState
         icon="key"
-        title="No company resources yet"
+        title={t('No company resources yet')}
         description={truckId
-          ? "You don't have any codes or info for this truck. Ask your manager if you need access."
-          : "No company resources are available to you right now. When your manager shares gate codes, truck codes or other info with you, they'll show up here."}
+          ? t("You don't have any codes or info for this truck. Ask your manager if you need access.")
+          : t("No company resources are available to you right now. When your manager shares gate codes, truck codes or other info with you, they'll show up here.")}
       />
     );
   } else if (groups.length === 0) {
-    body = <EmptyState icon="search" title="No matches" description={`Nothing matches “${search.trim()}”.`} />;
+    body = <EmptyState icon="search" title={t('No matches')} description={t('Nothing matches “{query}”.', { query: search.trim() })} />;
   } else {
     body = groups.map((g) => (
-      <ListSection key={g.category} title={g.info.label.toUpperCase()}>
+      <ListSection key={g.category} title={t(g.info.label).toUpperCase()}>
         {g.items.map((r) => (
           <ResourceRow key={r.id} resource={r} onPress={() => router.push(`/(worker)/resource/${r.id}` as any)} />
         ))}
@@ -68,22 +70,22 @@ export default function WorkerResourcesScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+        <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel={t('Go back')}>
           <Icon name="arrow-left" size={24} color={colors.textPrimary} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} numberOfLines={1}>
-            {truckName ?? 'Company Resources'}
+            {truckName ?? t('Company Resources')}
           </Text>
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>
-            {truckId ? 'Codes and info for this truck' : 'Codes and info shared with you'}
+            {truckId ? t('Codes and info for this truck') : t('Codes and info shared with you')}
           </Text>
         </View>
       </View>
 
       {scoped.length > 0 && (
         <View style={styles.searchWrap}>
-          <SearchBar value={search} onChangeText={setSearch} placeholder="Search" />
+          <SearchBar value={search} onChangeText={setSearch} placeholder={t('Search')} />
         </View>
       )}
 

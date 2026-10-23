@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { InlineNotice, ScreenHeader } from '@/components/ui';
 import { TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useMySnowPropertyList } from '@/hooks/useHasSnow';
 import { loadServices, loadStatuses, loadTimeline, peekTimeline } from '@/data/snowCustomer';
@@ -31,6 +32,7 @@ interface Prop { id: string; name: string; address: string }
 const sameProperty = (e: TimelineEntry, p: Prop) => e.propertyId === p.id || e.propertyName.trim().toLowerCase() === p.name.trim().toLowerCase();
 
 export function CustomerSnowScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ property?: string }>();
@@ -47,8 +49,8 @@ export function CustomerSnowScreen() {
   const placed = useRef(false);
 
   const reload = useCallback(async () => {
-    const [t, s, sv] = await Promise.all([loadTimeline(), loadStatuses(), loadServices()]);
-    if (t.ok) { setEntries(t.data); setError(null); } else { setEntries((cur) => cur ?? []); setError(t.error); }
+    const [tl, s, sv] = await Promise.all([loadTimeline(), loadStatuses(), loadServices()]);
+    if (tl.ok) { setEntries(tl.data); setError(null); } else { setEntries((cur) => cur ?? []); setError(tl.error); }
     setStatuses(s);
     setServices(sv);
   }, []);
@@ -80,16 +82,16 @@ export function CustomerSnowScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title={current ? properName(current.name) : 'Snow'} subtitle={current?.address || undefined} />
+      <ScreenHeader title={current ? properName(current.name) : t('Snow')} subtitle={current?.address || undefined} />
       {properties.length > 1 ? (
-        <View style={styles.dots} accessibilityLabel={`Property ${page + 1} of ${properties.length}. Swipe to see the next.`}>
+        <View style={styles.dots} accessibilityLabel={t('Property {n} of {total}. Swipe to see the next.', { n: page + 1, total: properties.length })}>
           {properties.map((p, i) => <View key={p.id} style={[styles.dot, { backgroundColor: i === page ? colors.primary : colors.border }]} />)}
         </View>
       ) : null}
 
       {loaded && properties.length === 0 ? (
         <View style={{ paddingHorizontal: spacing.lg }}>
-          <InlineNotice icon="cloud-snow" tone="info" text="No Snow service is linked to your account yet." />
+          <InlineNotice icon="cloud-snow" tone="info" text={t('No Snow service is linked to your account yet.')} />
         </View>
       ) : properties.length === 0 ? (
         <Placeholder />
@@ -134,6 +136,7 @@ function PropertyPage({ prop, entries: loadedEntries, status, services, error, r
   prop: Prop; entries: TimelineEntry[] | null; status?: SnowStatus; services: SnowSvc[]; error: string | null;
   refreshing: boolean; onRefresh: () => void; onOpenPhoto: (e: TimelineEntry, index: number) => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [showAll, setShowAll] = useState(false);
@@ -143,7 +146,7 @@ function PropertyPage({ prop, entries: loadedEntries, status, services, error, r
   const stats = useMemo(() => seasonStats(entries), [entries]);
   const groups = useMemo(() => groupTimeline(entries), [entries]);
   const shown = daysToShow(groups, showAll);
-  const live = statusView(status, prop.address);
+  const live = statusView(status, prop.address, t);
 
   return (
     <ScrollView
@@ -151,15 +154,15 @@ function PropertyPage({ prop, entries: loadedEntries, status, services, error, r
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       showsVerticalScrollIndicator={false}
     >
-      {error ? <InlineNotice icon="alert-circle" tone="error" text={error} /> : null}
+      {error ? <InlineNotice icon="alert-circle" tone="error" text={t(error)} /> : null}
 
       {live ? (
-        <View style={[styles.card, styles.hero, { backgroundColor: live.tone === 'active' ? semantic.infoLight : colors.surface }, shadow.sm]} accessible accessibilityLabel={`Right now. ${live.headline}. ${live.detail ?? ''}`}>
+        <View style={[styles.card, styles.hero, { backgroundColor: live.tone === 'active' ? semantic.infoLight : colors.surface }, shadow.sm]} accessible accessibilityLabel={t('Right now. {headline}. {detail}', { headline: live.headline, detail: live.detail ?? '' })}>
           <View style={[styles.heroIcon, { backgroundColor: live.tone === 'active' ? semantic.info : colors.backgroundTertiary }]}>
             <Icon name={live.tone === 'active' ? 'truck' : 'cloud-snow'} size={22} color={live.tone === 'active' ? '#FFFFFF' : semantic.info} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[typeScale.overline, { color: semantic.info }]}>RIGHT NOW</Text>
+            <Text style={[typeScale.overline, { color: semantic.info }]}>{t('RIGHT NOW')}</Text>
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{live.headline}</Text>
             {live.detail ? <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{live.detail}</Text> : null}
           </View>
@@ -168,23 +171,23 @@ function PropertyPage({ prop, entries: loadedEntries, status, services, error, r
 
       {entries.length > 0 ? (
         <View>
-          <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>THIS SEASON</Text>
+          <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>{t('THIS SEASON')}</Text>
           <View style={styles.statRow}>
-            <Stat value={String(stats.services)} label={stats.services === 1 ? 'Service' : 'Services'} />
-            <Stat value={stats.lastServiceAt ? new Date(stats.lastServiceAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'} label="Last service" />
-            <Stat value={String(stats.photos)} label={stats.photos === 1 ? 'Photo' : 'Photos'} />
+            <Stat value={String(stats.services)} label={stats.services === 1 ? t('Service') : t('Services')} />
+            <Stat value={stats.lastServiceAt ? new Date(stats.lastServiceAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'} label={t('Last service')} />
+            <Stat value={String(stats.photos)} label={stats.photos === 1 ? t('Photo') : t('Photos')} />
           </View>
         </View>
       ) : null}
 
       {services.length > 0 ? (
         <View>
-          <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>INCLUDED AT YOUR PROPERTY</Text>
+          <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>{t('INCLUDED AT YOUR PROPERTY')}</Text>
           <View style={styles.chips}>
             {services.map((s) => (
               <View key={s} style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
                 <Icon name={SERVICE_ICON[s]} size={14} color={semantic.info} />
-                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{SERVICE_NAME[s]}</Text>
+                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{t(SERVICE_NAME[s])}</Text>
               </View>
             ))}
           </View>
@@ -196,23 +199,23 @@ function PropertyPage({ prop, entries: loadedEntries, status, services, error, r
       ) : entries.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface, gap: spacing.md }, shadow.sm]}>
           <View style={[styles.snowCircle, { backgroundColor: semantic.infoLight }]}><Icon name="cloud-snow" size={28} color={semantic.info} /></View>
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>No service yet this season</Text>
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>We'll be ready when the snow falls.</Text>
-          <Text style={[typeScale.overline, { color: colors.textSecondary }]}>HOW IT WORKS</Text>
-          {['The crew is dispatched when snow falls.', "You'll see it here the moment they arrive.", "When it's done you'll see photos here."].map((t, i) => (
-            <View key={t} style={styles.step}>
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>{t('No service yet this season')}</Text>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>{t("We'll be ready when the snow falls.")}</Text>
+          <Text style={[typeScale.overline, { color: colors.textSecondary }]}>{t('HOW IT WORKS')}</Text>
+          {[t('The crew is dispatched when snow falls.'), t("You'll see it here the moment they arrive."), t("When it's done you'll see photos here.")].map((line, i) => (
+            <View key={i} style={styles.step}>
               <View style={[styles.stepNum, { backgroundColor: colors.primarySurface }]}><Text style={[typeScale.labelLarge, { color: colors.primaryDark }]}>{i + 1}</Text></View>
-              <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, flex: 1 }]}>{t}</Text>
+              <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, flex: 1 }]}>{line}</Text>
             </View>
           ))}
         </View>
       ) : (
         <View>
-          <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>TIMELINE</Text>
+          <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>{t('TIMELINE')}</Text>
           {shown.map((g) => (
             <View key={g.key} style={{ marginBottom: spacing.md }}>
               <Text style={[typeScale.labelLarge, { color: colors.textPrimary, marginBottom: spacing.sm }]}>
-                {g.label}{g.stormNames.length ? <Text style={{ color: colors.textTertiary, fontWeight: '500' }}>{`  ·  ${g.stormNames.join(', ')}`}</Text> : null}
+                {t(g.label)}{g.stormNames.length ? <Text style={{ color: colors.textTertiary, fontWeight: '500' }}>{`  ·  ${g.stormNames.join(', ')}`}</Text> : null}
               </Text>
               {g.entries.map((e, i) => (
                 <View key={e.visitId} style={styles.entryRow}>
@@ -227,7 +230,7 @@ function PropertyPage({ prop, entries: loadedEntries, status, services, error, r
           ))}
           {groups.length > DAYS_PREVIEW ? (
             <Pressable onPress={() => setShowAll((v) => !v)} accessibilityRole="button" style={styles.more}>
-              <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{showAll ? 'Show fewer' : `Show earlier (${groups.length - DAYS_PREVIEW} more days)`}</Text>
+              <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{showAll ? t('Show fewer') : t('Show earlier ({count} more days)', { count: groups.length - DAYS_PREVIEW })}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -262,6 +265,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 }
 
 function EntryCard({ entry, onOpenPhoto }: { entry: TimelineEntry; onOpenPhoto: (index: number) => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const visible = entry.media.filter((m) => m.url);
   const strip = visible.slice(0, 4);
@@ -271,25 +275,25 @@ function EntryCard({ entry, onOpenPhoto }: { entry: TimelineEntry; onOpenPhoto: 
       <View style={styles.entryTop}>
         <View style={[styles.svcIcon, { backgroundColor: semantic.infoLight }]}><Icon name={SERVICE_ICON[entry.service]} size={18} color={semantic.info} /></View>
         <View style={{ flex: 1 }}>
-          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{SERVICE_VERB[entry.service]}</Text>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{t(SERVICE_VERB[entry.service])}</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{timeLabel(entry.completedAt)}</Text>
         </View>
         <View style={styles.done}>
           <Icon name="check-circle" size={16} color={semantic.success} />
-          <Text style={[typeScale.labelSmall, { color: semantic.success }]}>Completed</Text>
+          <Text style={[typeScale.labelSmall, { color: semantic.success }]}>{t('Completed')}</Text>
         </View>
       </View>
       {strip.length ? (
         <>
           <View style={styles.strip}>
             {strip.map((m, i) => (
-              <Pressable key={m.id} onPress={() => onOpenPhoto(i)} accessibilityRole="button" accessibilityLabel={m.kind === 'video' ? 'Play video' : 'View photo'} style={[styles.tile, { backgroundColor: colors.borderLight }]}>
+              <Pressable key={m.id} onPress={() => onOpenPhoto(i)} accessibilityRole="button" accessibilityLabel={m.kind === 'video' ? t('Play video') : t('View photo')} style={[styles.tile, { backgroundColor: colors.borderLight }]}>
                 {m.kind === 'photo' ? <Image source={{ uri: m.url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <View style={styles.tileIcon}><Icon name="video" size={22} color={colors.textTertiary} /></View>}
                 {i === strip.length - 1 && extra > 0 ? <View style={styles.tileMore}><Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>+{extra}</Text></View> : null}
               </Pressable>
             ))}
           </View>
-          <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{countLabel(visible.length, 'photo', 'photos')}</Text>
+          <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{countLabel(visible.length, t('photo'), t('photos'))}</Text>
         </>
       ) : null}
     </View>

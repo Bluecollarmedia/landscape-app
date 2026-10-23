@@ -4,6 +4,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { EmptyState, GlassIconButton } from '@/components/ui';
@@ -19,6 +20,7 @@ import { db, useDb } from '@/data/store';
  * and the messages scroll above it.
  */
 export default function CustomerMessagesScreen() {
+  const t = useT();
   const hasSnow = useHasSnow();
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -36,8 +38,8 @@ export default function CustomerMessagesScreen() {
 
   // Keep the newest message in view, also when the keyboard opens or closes.
   useEffect(() => {
-    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    return () => clearTimeout(timer);
   }, [count, projectId, v, keyboardOpen]);
 
   function goBack() {
@@ -51,11 +53,11 @@ export default function CustomerMessagesScreen() {
       style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm }]}
     >
       <View style={styles.header}>
-        <GlassIconButton icon="chevron-left" onPress={goBack} accessibilityLabel="Back" />
+        <GlassIconButton icon="chevron-left" onPress={goBack} accessibilityLabel={t('Back')} />
         <View style={{ flex: 1, marginLeft: spacing.md }}>
-          <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Messages</Text>
+          <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t('Messages')}</Text>
           {db.company?.name ? (
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>Chat with {db.company.name}</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{t('Chat with {company}', { company: db.company.name })}</Text>
           ) : null}
         </View>
       </View>
@@ -88,7 +90,7 @@ export default function CustomerMessagesScreen() {
           >
             <MessageList
               projectId={projectId}
-              emptyText="Questions about your project? Send a message and your landscaper will reply here."
+              emptyText={t('Questions about your project? Send a message and your landscaper will reply here.')}
             />
           </ScrollView>
           <View
@@ -105,10 +107,10 @@ export default function CustomerMessagesScreen() {
       ) : (
         <EmptyState
           icon="message-circle"
-          title="No messages"
+          title={t('No messages')}
           description={hasSnow
-            ? 'Messages are for landscaping projects. Your snow updates and photos are on the Account tab.'
-            : "Once you're added to a project, you can message your landscaper here."}
+            ? t('Messages are for landscaping projects. Your snow updates and photos are on the Account tab.')
+            : t("Once you're added to a project, you can message your landscaper here.")}
         />
       )}
     </KeyboardAvoidingView>

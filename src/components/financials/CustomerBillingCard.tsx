@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
+import { useT } from '@/i18n';
 import { DocumentRow } from './DocumentRow';
 import { customerCanSee } from './CustomerDocuments';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -18,6 +19,7 @@ import { spacing, radius } from '@/theme/spacing';
 import type { FinancialDoc } from '@/types/financial';
 
 export function CustomerBillingCard({ projectId }: { projectId: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const all = useFinancialDocs(projectId);
@@ -27,7 +29,7 @@ export function CustomerBillingCard({ projectId }: { projectId: string }) {
 
   const waiting = docs.filter((d) => d.kind !== 'invoice' && displayStatus(d) === 'sent').length;
   const issuedInvoices = docs.filter((d) => d.kind === 'invoice' && d.status === 'issued').length;
-  const status = billingStatus({ waiting, issuedInvoices });
+  const status = billingStatus({ waiting, issuedInvoices }, t);
   const openDoc = (d: FinancialDoc) => router.push({ pathname: '/(customer)/document', params: { kind: d.kind, id: d.id } } as any);
 
   return (
@@ -36,13 +38,13 @@ export function CustomerBillingCard({ projectId }: { projectId: string }) {
         onPress={() => setOpen((o) => !o)}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={`Billing. Invoices and quotes. ${documentCountLabel(docs.length)}${status ? `. ${status.label}` : ''}`}
+        accessibilityLabel={`${t('Billing')}. ${t('Invoices and quotes')}. ${documentCountLabel(docs.length, t)}${status ? `. ${status.label}` : ''}`}
         style={styles.head}
       >
         <Icon name="file-text" size={22} color={colors.textSecondary} />
         <View style={{ flex: 1 }}>
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Billing</Text>
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 1 }]}>Invoices & Quotes · {documentCountLabel(docs.length)}</Text>
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t('Billing')}</Text>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 1 }]}>{t('Invoices & Quotes')} · {documentCountLabel(docs.length, t)}</Text>
         </View>
         {status && (
           <View style={[styles.pill, { backgroundColor: colors.infoLight }]}>

@@ -4,6 +4,7 @@ import React from 'react';
 import { View, Text, Linking, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useAuth } from '@/providers/AuthProvider';
@@ -19,6 +20,7 @@ import { formatAddress } from '@/lib/address';
 import { useHasSnow } from '@/hooks/useHasSnow';
 
 export default function CustomerAccountScreen() {
+  const t = useT();
   const router = useRouter();
   const { colors } = useTheme();
   const { user, signOut, switchDevRole } = useAuth();
@@ -29,14 +31,14 @@ export default function CustomerAccountScreen() {
   return (
     <ScreenContainer scrollable padded variant="grouped">
       <View style={{ paddingTop: insets.top + spacing.md, marginBottom: spacing.xl }}>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Account</Text>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t('Account')}</Text>
       </View>
 
       <ListSection>
         <Pressable
           onPress={() => router.push('/(customer)/edit-profile' as any)}
           accessibilityRole="button"
-          accessibilityLabel="Edit your profile and photo"
+          accessibilityLabel={t('Edit your profile and photo')}
           style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md }}
         >
           <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={52} uri={user?.avatarUrl} />
@@ -55,7 +57,7 @@ export default function CustomerAccountScreen() {
       {/* Snow and Maintenance updates open from their cards on Home (one way in each), so Account has no rows for them. Here are the customer's own Snow notification switches. */}
       {hasSnow ? <SnowNotifyChoices /> : null}
 
-      <ListSection title="Your Project Team">
+      <ListSection title={t('Your Project Team')}>
         <ListRow
           icon="briefcase"
           title={db.company?.name ?? '—'}
@@ -65,7 +67,7 @@ export default function CustomerAccountScreen() {
           <ListRow
             icon="phone"
             iconColor={colors.primary}
-            title="Call"
+            title={t('Call')}
             value={db.company.phone}
             showChevron
             onPress={() => Linking.openURL(`tel:${db.company!.phone!.replace(/[^\d+]/g, '')}`)}
@@ -75,7 +77,7 @@ export default function CustomerAccountScreen() {
           <ListRow
             icon="mail"
             iconColor={colors.primary}
-            title="Email"
+            title={t('Email')}
             value={db.company.email}
             showChevron
             onPress={() => Linking.openURL(`mailto:${db.company!.email}`)}
@@ -109,13 +111,10 @@ export default function CustomerAccountScreen() {
       <LegalSection />
 
       <ListSection>
-        <LanguageRow />
-      </ListSection>
-
-      <ListSection>
-        <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={signOut} />
+        <ListRow icon="log-out" iconColor={colors.error} title={t('Sign Out')} destructive onPress={signOut} />
         <DeleteAccountRow />
       </ListSection>
+      <LanguageRow />
     </ScreenContainer>
   );
 }

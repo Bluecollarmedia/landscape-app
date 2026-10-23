@@ -91,10 +91,6 @@ export default function SnowOwnerMoreScreen() {
             {mode.canSwitch ? <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} /> : null}
           </Group>
 
-          <Group title="Language">
-            <LanguageRow />
-          </Group>
-
           <Group title="Account">
             <Row icon="shield" title="Legal & Support" subtitle="Privacy Policy, Terms of Use and Help" onPress={() => router.push('/snow/legal-support' as any)} />
             <Row icon="log-out" title="Sign Out" destructive onPress={guardedSignOut} />
@@ -102,6 +98,7 @@ export default function SnowOwnerMoreScreen() {
           <ListSection>
             <DeleteAccountRow />
           </ListSection>
+          <LanguageRow />
         </View>
       </ScrollView>
     </View>

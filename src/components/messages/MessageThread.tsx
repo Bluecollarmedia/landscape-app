@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert, Platform } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -24,7 +25,7 @@ interface MessageThreadProps {
 }
 
 /** Chat bubbles plus a composer. The parent provides the scrolling container. */
-export function MessageThread({ projectId, emptyTitle = 'No messages yet', emptyText }: MessageThreadProps) {
+export function MessageThread({ projectId, emptyTitle, emptyText }: MessageThreadProps) {
   return (
     <View>
       <MessageList projectId={projectId} emptyTitle={emptyTitle} emptyText={emptyText} />
@@ -34,7 +35,8 @@ export function MessageThread({ projectId, emptyTitle = 'No messages yet', empty
 }
 
 /** The chat bubbles only (or the empty note). */
-export function MessageList({ projectId, emptyTitle = 'No messages yet', emptyText }: MessageThreadProps) {
+export function MessageList({ projectId, emptyTitle, emptyText }: MessageThreadProps) {
+  const t = useT();
   const { colors } = useTheme();
   const { messages, remove } = useProjectMessages(projectId);
   const [reporting, setReporting] = useState<ReportTarget | null>(null);
@@ -42,9 +44,9 @@ export function MessageList({ projectId, emptyTitle = 'No messages yet', emptyTe
   function handleLongPress(m: ProjectMessage) {
     if (m.senderId !== db.personId) return;
     const doDelete = () => remove(m.id);
-    Alert.alert('Delete this message?', 'It will be removed for everyone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: doDelete },
+    Alert.alert(t('Delete this message?'), t('It will be removed for everyone.'), [
+      { text: t('Cancel'), style: 'cancel' },
+      { text: t('Delete'), style: 'destructive', onPress: doDelete },
     ]);
   }
 
@@ -52,7 +54,7 @@ export function MessageList({ projectId, emptyTitle = 'No messages yet', emptyTe
     return (
       <View style={styles.empty}>
         <Icon name="message-circle" size={28} color={colors.textTertiary} />
-        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>{emptyTitle}</Text>
+        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>{emptyTitle ?? t('No messages yet')}</Text>
         {emptyText ? (
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>{emptyText}</Text>
         ) : null}
@@ -92,9 +94,9 @@ export function MessageList({ projectId, emptyTitle = 'No messages yet', emptyTe
                   onPress={() => setReporting({ projectId, type: 'message', contentId: m.id })}
                   hitSlop={8}
                   accessibilityRole="button"
-                  accessibilityLabel="Report this message"
+                  accessibilityLabel={t('Report this message')}
                 >
-                  <Text style={[typeScale.caption, { color: colors.textSecondary, textDecorationLine: 'underline' }]}>Report</Text>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary, textDecorationLine: 'underline' }]}>{t('Report')}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -108,6 +110,7 @@ export function MessageList({ projectId, emptyTitle = 'No messages yet', emptyTe
 
 /** The "Write a message…" box with its send button. */
 export function MessageComposer({ projectId }: { projectId: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const { send } = useProjectMessages(projectId);
   const [draft, setDraft] = useState('');
@@ -124,7 +127,7 @@ export function MessageComposer({ projectId }: { projectId: string }) {
         style={[typeScale.bodyLarge, styles.input, { color: colors.textPrimary }]}
         value={draft}
         onChangeText={setDraft}
-        placeholder="Write a message…"
+        placeholder={t('Write a message…')}
         placeholderTextColor={colors.textTertiary}
         multiline
       />
@@ -133,7 +136,7 @@ export function MessageComposer({ projectId }: { projectId: string }) {
         disabled={!draft.trim()}
         style={[styles.sendButton, { backgroundColor: draft.trim() ? colors.primary : colors.backgroundTertiary }]}
         accessibilityRole="button"
-        accessibilityLabel="Send message"
+        accessibilityLabel={t('Send message')}
       >
         <Icon name="send" size={18} color={draft.trim() ? '#FFFFFF' : colors.textTertiary} />
       </Pressable>

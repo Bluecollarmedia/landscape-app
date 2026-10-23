@@ -9,6 +9,7 @@ import { useFocusEffect } from 'expo-router';
 import { ListSection } from '@/components/ui';
 import { Switch } from '@/components/ui/Switch';
 import { IconTile } from '@/components/settings/SettingsList';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadNotifyChoices, saveNotifyChoices, type NotifyChoices } from '@/data/snowCustomer';
 import { typeScale } from '@/theme/typography';
@@ -20,6 +21,7 @@ const ROWS: { key: keyof NotifyChoices; title: string; text: string; icon: 'bell
 ];
 
 export function SnowNotifyChoices() {
+  const t = useT();
   const { colors } = useTheme();
   const [choices, setChoices] = useState<NotifyChoices | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,8 +41,8 @@ export function SnowNotifyChoices() {
     setBusy(false);
     if (!res.ok) {
       setChoices(before);
-      const msg = res.error;
-      if (Platform.OS === 'web') alert(msg); else Alert.alert("Couldn't save", msg);
+      const msg = t(res.error);
+      if (Platform.OS === 'web') alert(msg); else Alert.alert(t("Couldn't save"), msg);
     }
   }
 
@@ -48,15 +50,15 @@ export function SnowNotifyChoices() {
   if (!choices) return null;
 
   return (
-    <ListSection title="Snow notifications" footer="Your company decides which messages are sent. These switches turn them off just for you.">
+    <ListSection title={t('Snow notifications')} footer={t('Your company decides which messages are sent. These switches turn them off just for you.')}>
       {ROWS.map((r) => (
         <View key={r.key} style={styles.row}>
           <IconTile name={r.icon} color={colors.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{r.title}</Text>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 1 }]}>{r.text}</Text>
+            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{t(r.title)}</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 1 }]}>{t(r.text)}</Text>
           </View>
-          <Switch value={choices[r.key]} disabled={busy} onValueChange={(v) => change(r.key, v)} accessibilityLabel={r.title} />
+          <Switch value={choices[r.key]} disabled={busy} onValueChange={(v) => change(r.key, v)} accessibilityLabel={t(r.title)} />
         </View>
       ))}
     </ListSection>

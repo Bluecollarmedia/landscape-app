@@ -4,12 +4,13 @@ import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { db } from '@/data/store';
 import { submitReport } from '@/data/contentReports';
-import { REPORT_REASONS, MAX_REPORT_DETAILS, contentLabel, type ReportContentType, type ReportReason } from '@/lib/contentReports';
+import { REPORT_REASONS, MAX_REPORT_DETAILS, type ReportContentType, type ReportReason } from '@/lib/contentReports';
 
 export interface ReportTarget {
   projectId: string;
@@ -21,6 +22,7 @@ export interface ReportTarget {
 
 /** Pick a reason, add details, send. Used for messages and shared photos. */
 export function ReportSheet({ target, onClose }: { target: ReportTarget | null; onClose: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [reason, setReason] = useState<ReportReason | null>(null);
@@ -41,14 +43,14 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
     const res = await submitReport({ ...target, reason, details }, db.personId);
     setBusy(false);
     if (res.ok) { setSent(true); return; }
-    setError(res.error);
+    setError(t(res.error));
     setMailto(res.mailto ?? null);
   }
 
   function emailInstead() {
     if (mailto) Linking.openURL(mailto).catch(() => {
-      const msg = 'No email app is set up on this phone. You can email us from the Support page.';
-      if (Platform.OS === 'web') alert(msg); else Alert.alert('Email not available', msg);
+      const msg = t('No email app is set up on this phone. You can email us from the Support page.');
+      if (Platform.OS === 'web') alert(msg); else Alert.alert(t('Email not available'), msg);
     });
   }
 
@@ -60,19 +62,19 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
           {sent ? (
             <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
               <Icon name="check-circle" size={32} color={colors.primary} />
-              <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>Report sent</Text>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>{t('Report sent')}</Text>
               <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs }]}>
-                Thank you. The company owner reviews reports within two business days.
+                {t('Thank you. The company owner reviews reports within two business days.')}
               </Text>
-              <Button title="Done" onPress={onClose} fullWidth size="lg" style={{ marginTop: spacing.lg }} />
+              <Button title={t('Done')} onPress={onClose} fullWidth size="lg" style={{ marginTop: spacing.lg }} />
             </View>
           ) : (
             <>
               <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>
-                Report this {target ? contentLabel(target.type) : 'content'}
+                {target ? (target.type === 'photo' ? t('Report this photo') : t('Report this message')) : t('Report this content')}
               </Text>
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs, marginBottom: spacing.md }]}>
-                What is wrong with it?
+                {t('What is wrong with it?')}
               </Text>
               {REPORT_REASONS.map((r) => (
                 <Pressable
@@ -83,8 +85,8 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
                   style={[styles.reason, { borderColor: reason === r.key ? colors.primary : colors.border, backgroundColor: reason === r.key ? colors.primarySurface : colors.surface }]}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{r.label}</Text>
-                    <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{r.hint}</Text>
+                    <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{t(r.label)}</Text>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{t(r.hint)}</Text>
                   </View>
                   {reason === r.key ? <Icon name="check" size={18} color={colors.primary} /> : null}
                 </Pressable>
@@ -92,21 +94,21 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget | null; 
               <TextInput
                 value={details}
                 onChangeText={setDetails}
-                placeholder="Details (optional)"
+                placeholder={t('Details (optional)')}
                 placeholderTextColor={colors.textTertiary}
                 multiline
                 maxLength={MAX_REPORT_DETAILS}
                 style={[typeScale.bodyMedium, styles.details, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
               />
               {error ? <Text style={[typeScale.caption, { color: colors.error, marginTop: spacing.sm }]}>{error}</Text> : null}
-              <Button title="Send report" onPress={send} loading={busy} disabled={!reason} fullWidth size="lg" style={{ marginTop: spacing.md }} />
+              <Button title={t('Send report')} onPress={send} loading={busy} disabled={!reason} fullWidth size="lg" style={{ marginTop: spacing.md }} />
               {mailto ? (
                 <Pressable onPress={emailInstead} style={{ alignSelf: 'center', marginTop: spacing.sm }} hitSlop={8}>
-                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Email us instead</Text>
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('Email us instead')}</Text>
                 </Pressable>
               ) : null}
               <Pressable onPress={onClose} style={{ alignSelf: 'center', marginTop: spacing.sm }} hitSlop={8}>
-                <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>Cancel</Text>
+                <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>{t('Cancel')}</Text>
               </Pressable>
             </>
           )}

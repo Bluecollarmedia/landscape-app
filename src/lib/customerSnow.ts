@@ -3,6 +3,10 @@
 
 export type SnowSvc = 'plowing' | 'shoveling' | 'salting';
 
+/** The screens pass in their translator (t from useT) so the sentences built here can be shown in Spanish; this file stays free of app imports. Without one, English comes back as written. */
+export type Translate = (text: string, vars?: Record<string, string | number>) => string;
+const plain: Translate = (text, vars) => (vars ? text.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : text);
+
 export const SERVICE_VERB: Record<SnowSvc, string> = { plowing: 'Plowed', shoveling: 'Shoveled', salting: 'Salted' };
 export const SERVICE_NAME: Record<SnowSvc, string> = { plowing: 'Plowing', shoveling: 'Shoveling', salting: 'Salting' };
 const ORDER: SnowSvc[] = ['plowing', 'shoveling', 'salting'];
@@ -21,8 +25,8 @@ export const dayKey = (iso: string) => { const d = new Date(iso); return `${d.ge
 export const timeLabel = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
 /** "Tue, Oct 21 at 5:40 AM". */
-export const lastServiceLabel = (iso: string) =>
-  `${new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${timeLabel(iso)}`;
+export const lastServiceLabel = (iso: string, tx: Translate = plain) =>
+  tx('{date} at {time}', { date: new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), time: timeLabel(iso) });
 
 /** "Today", "Yesterday", or "Tuesday, Oct 21" (with the year when it is not this year). */
 export function dayLabel(key: string, now = new Date()): string {
@@ -74,22 +78,22 @@ export const sortServices = (s: SnowSvc[]): SnowSvc[] => [...new Set(s)].sort((a
 export interface StatusView { tone: 'active' | 'scheduled'; headline: string; detail?: string }
 
 /** The "Right now" card on a property. Null (nothing shown) when no storm involves it. */
-export function statusView(status: SnowStatus | undefined, address?: string): StatusView | null {
+export function statusView(status: SnowStatus | undefined, address?: string, tx: Translate = plain): StatusView | null {
   if (!status) return null;
   if (status.state === 'on_site') {
-    return { tone: 'active', headline: status.since ? `Crew on site since ${timeLabel(status.since)}` : 'Crew on site', detail: address };
+    return { tone: 'active', headline: status.since ? tx('Crew on site since {time}', { time: timeLabel(status.since) }) : tx('Crew on site'), detail: address };
   }
-  return { tone: 'scheduled', headline: 'A storm is being handled', detail: status.stormName ? `${status.stormName}. Crew assigned.` : 'Crew assigned.' };
+  return { tone: 'scheduled', headline: tx('A storm is being handled'), detail: status.stormName ? tx('{storm}. Crew assigned.', { storm: status.stormName }) : tx('Crew assigned.') };
 }
 
 export interface HomeStrip { propertyId: string; tone: 'active' | 'scheduled'; headline: string; detail?: string }
 
 /** The strip at the top of Home. Only exists while a storm involves one of their properties; otherwise nothing is shown. */
-export function homeStrip(statuses: SnowStatus[], properties: { id: string; address?: string }[]): HomeStrip | null {
+export function homeStrip(statuses: SnowStatus[], properties: { id: string; address?: string }[], tx: Translate = plain): HomeStrip | null {
   const pick = statuses.find((s) => s.state === 'on_site') ?? statuses.find((s) => s.state === 'scheduled');
   if (!pick) return null;
   const address = properties.find((p) => p.id === pick.propertyId)?.address;
-  const v = statusView(pick, address);
+  const v = statusView(pick, address, tx);
   return v ? { propertyId: pick.propertyId, ...v } : null;
 }
 

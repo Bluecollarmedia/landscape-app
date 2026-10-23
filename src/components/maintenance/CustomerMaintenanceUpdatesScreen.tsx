@@ -7,6 +7,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
 import { PrivatePhoto } from '@/components/media/PrivatePhoto';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import {
   loadCustomerMaintenanceUpdates, loadMyMaintenanceProperties,
@@ -19,6 +20,7 @@ const when = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 export function CustomerMaintenanceUpdatesScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [updates, setUpdates] = useState<CustomerMaintenanceUpdate[]>([]);
@@ -38,15 +40,15 @@ export function CustomerMaintenanceUpdatesScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Maintenance updates" />
+      <ScreenHeader title={t('Maintenance updates')} />
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
       >
-        {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
+        {error ? <InlineNotice icon="alert-circle" tone="error" text={t(error)} style={{ marginBottom: spacing.md }} /> : null}
         {properties.length ? (
           <View style={{ marginBottom: spacing.lg, gap: spacing.xs }}>
-            <Text style={[typeScale.overline, { color: colors.textSecondary, marginLeft: spacing.sm }]}>YOUR PROPERTIES</Text>
+            <Text style={[typeScale.overline, { color: colors.textSecondary, marginLeft: spacing.sm }]}>{t('YOUR PROPERTIES')}</Text>
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, gap: spacing.sm }]}>
               {properties.map((p) => (
                 <View key={p.id}>
@@ -58,15 +60,15 @@ export function CustomerMaintenanceUpdatesScreen() {
           </View>
         ) : null}
         {loading ? <LoadingSpinner /> : !updates.length ? (
-          <EmptyState icon="repeat" title="No maintenance visits yet" description="After each visit to your property you'll see it here, with photos when we've shared them." />
+          <EmptyState icon="repeat" title={t('No maintenance visits yet')} description={t("After each visit to your property you'll see it here, with photos when we've shared them.")} />
         ) : updates.map((u) => (
           <View key={u.stopId} style={[styles.card, { backgroundColor: colors.surface, marginBottom: spacing.md, gap: spacing.sm }]}>
-            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{u.services || 'Maintenance visit'}</Text>
+            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{u.services || t('Maintenance visit')}</Text>
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{u.propertyName} · {when(u.completedAt)}</Text>
             {u.photos.length ? (
               <View style={styles.thumbs}>
                 {u.photos.map((p) => (
-                  <PrivatePhoto key={p.id} fileUrl={p.url} fileKey={p.key} style={styles.thumb as never} accessibilityLabel="Photo from your visit" />
+                  <PrivatePhoto key={p.id} fileUrl={p.url} fileKey={p.key} style={styles.thumb as never} accessibilityLabel={t('Photo from your visit')} />
                 ))}
               </View>
             ) : null}

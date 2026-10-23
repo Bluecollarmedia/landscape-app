@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { SectionTabs, Card, EmptyState, StatusBadge, Button, OptimizedImage } from '@/components/ui';
@@ -62,6 +63,7 @@ const categoryOptions: { key: RequestCategory; label: string; icon: keyof typeof
 
 export default function CustomerProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const t = useT();
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
@@ -99,9 +101,9 @@ export default function CustomerProjectScreen() {
     Keyboard.dismiss();
     submitRequest({ title: reqTitle.trim(), description: reqDescription.trim() || undefined, category: reqCategory });
     const companyName = db.company?.name ?? 'Brighton Lawn + Landscape';
-    const sentMsg = `Your ${categoryOptions.find(c => c.key === reqCategory)?.label ?? reqCategory} has been sent to ${companyName}. They'll review it shortly.`;
+    const sentMsg = t("Your {category} has been sent to {company}. They'll review it shortly.", { category: t(categoryOptions.find(c => c.key === reqCategory)?.label ?? reqCategory), company: companyName });
     if (Platform.OS === 'web') alert(sentMsg);
-    else Alert.alert('Request Submitted', sentMsg);
+    else Alert.alert(t('Request Submitted'), sentMsg);
     setReqTitle('');
     setReqDescription('');
     setReqCategory('question');
@@ -111,7 +113,7 @@ export default function CustomerProjectScreen() {
   if (!project) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <EmptyState icon="alert-circle" title="Project not found" />
+        <EmptyState icon="alert-circle" title={t('Project not found')} />
       </View>
     );
   }
@@ -130,10 +132,10 @@ export default function CustomerProjectScreen() {
 
   function renderOverview() {
     const recent = meaningfulUpdates(customerTimeline, 3);
-    const statusTitle = isCompleted ? 'Complete' : config.label;
+    const statusTitle = isCompleted ? t('Complete') : t(config.label);
     const statusLine = isCompleted && p.completedAt
-      ? `Project finished on ${formatDate(p.completedAt)}`
-      : p.estimatedEndDate ? `Estimated completion ${formatDate(p.estimatedEndDate)}` : undefined;
+      ? t('Project finished on {date}', { date: formatDate(p.completedAt) })
+      : p.estimatedEndDate ? t('Estimated completion {date}', { date: formatDate(p.estimatedEndDate) }) : undefined;
     const ringColor = isCompleted ? semantic.success : colors.primary;
     const cardStyle = [styles.ovCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }];
 
@@ -151,17 +153,17 @@ export default function CustomerProjectScreen() {
         {/* 2. Project Activity: a few meaningful updates only */}
         <View style={cardStyle}>
           <View style={styles.ovHead}>
-            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Project Activity</Text>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>{t('Project Activity')}</Text>
             {customerTimeline.length > 0 && (
-              <Pressable onPress={() => setActiveSection('timeline')} hitSlop={8} accessibilityRole="button" accessibilityLabel="View all project activity" style={styles.viewAll}>
-                <Text style={[typeScale.labelLarge, { color: colors.primary }]}>View all</Text>
+              <Pressable onPress={() => setActiveSection('timeline')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('View all project activity')} style={styles.viewAll}>
+                <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('View all')}</Text>
                 <Icon name="chevron-right" size={16} color={colors.primary} />
               </Pressable>
             )}
           </View>
           {recent.length === 0 ? (
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, paddingBottom: spacing.xs }]}>
-              No updates yet. Completed work will show up here.
+              {t('No updates yet. Completed work will show up here.')}
             </Text>
           ) : (
             recent.map((e, i) => (
@@ -183,7 +185,7 @@ export default function CustomerProjectScreen() {
 
         {/* 3. Project Details */}
         <View style={cardStyle}>
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.xs }]}>Project Details</Text>
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.xs }]}>{t('Project Details')}</Text>
           {p.address && (
             <View style={styles.detailRow}>
               <Icon name="map-pin" size={16} color={colors.textTertiary} />
@@ -195,19 +197,19 @@ export default function CustomerProjectScreen() {
           {p.startDate && (
             <View style={styles.detailRow}>
               <Icon name="calendar" size={16} color={colors.textTertiary} />
-              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>Started {formatDate(p.startDate)}</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>{t('Started {date}', { date: formatDate(p.startDate) })}</Text>
             </View>
           )}
           {!isCompleted && p.estimatedEndDate && (
             <View style={styles.detailRow}>
               <Icon name="clock" size={16} color={colors.textTertiary} />
-              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>Est. completion: {formatDate(p.estimatedEndDate)}</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>{t('Est. completion: {date}', { date: formatDate(p.estimatedEndDate) })}</Text>
             </View>
           )}
           {p.completedAt && (
             <View style={styles.detailRow}>
               <Icon name="check-circle" size={16} color={semantic.success} />
-              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>Completed {formatDate(p.completedAt)}</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginLeft: spacing.sm }]}>{t('Completed {date}', { date: formatDate(p.completedAt) })}</Text>
             </View>
           )}
         </View>
@@ -222,7 +224,7 @@ export default function CustomerProjectScreen() {
     return (
       <View style={styles.sectionContent}>
         {customerTimeline.length === 0 ? (
-          <EmptyState icon="activity" title="No updates yet" description="Project updates and milestones will appear here." />
+          <EmptyState icon="activity" title={t('No updates yet')} description={t('Project updates and milestones will appear here.')} />
         ) : (
           <View style={styles.timeline}>
             {customerTimeline.map((event, i) => (
@@ -268,7 +270,7 @@ export default function CustomerProjectScreen() {
     return (
       <View style={styles.sectionContent}>
         {sharedPhotos.length === 0 ? (
-          <EmptyState icon="camera" title="No photos shared yet" description="Photos of your project will appear here as work progresses." />
+          <EmptyState icon="camera" title={t('No photos shared yet')} description={t('Photos of your project will appear here as work progresses.')} />
         ) : (
           <View style={styles.photoGrid}>
             {sharedPhotos.map(photo => (
@@ -279,7 +281,7 @@ export default function CustomerProjectScreen() {
                 />
                 <View style={{ padding: spacing.md }}>
                   <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>
-                    {photo.customerDescription ?? photo.caption ?? 'Project photo'}
+                    {photo.customerDescription ?? photo.caption ?? t('Project photo')}
                   </Text>
                   {photo.taskTitle && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs }}>
@@ -297,9 +299,9 @@ export default function CustomerProjectScreen() {
                     hitSlop={8}
                     style={{ alignSelf: 'flex-start', marginTop: spacing.xs }}
                     accessibilityRole="button"
-                    accessibilityLabel="Report this photo"
+                    accessibilityLabel={t('Report this photo')}
                   >
-                    <Text style={[typeScale.caption, { color: colors.textSecondary, textDecorationLine: 'underline' }]}>Report</Text>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary, textDecorationLine: 'underline' }]}>{t('Report')}</Text>
                   </Pressable>
                 </View>
               </Card>
@@ -324,7 +326,7 @@ export default function CustomerProjectScreen() {
       <View style={styles.sectionContent}>
         {canSubmitRequests && !showRequestForm && (
           <Button
-            title="New Request"
+            title={t('New Request')}
             onPress={() => setShowRequestForm(true)}
             variant="primary"
             fullWidth
@@ -336,11 +338,11 @@ export default function CustomerProjectScreen() {
         {canSubmitRequests && showRequestForm && (
           <Card style={{ marginBottom: spacing.lg }}>
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.md }]}>
-              Submit a Request
+              {t('Submit a Request')}
             </Text>
 
             <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-              Category
+              {t('Category')}
             </Text>
             <View style={styles.categoryGrid}>
               {categoryOptions.map(cat => {
@@ -359,7 +361,7 @@ export default function CustomerProjectScreen() {
                   >
                     <Icon name={cat.icon} size={14} color={selected ? colors.primary : colors.textTertiary} />
                     <Text style={[typeScale.caption, { color: selected ? colors.primary : colors.textSecondary, fontWeight: selected ? '600' : '400' }]}>
-                      {cat.label}
+                      {t(cat.label)}
                     </Text>
                   </Pressable>
                 );
@@ -367,23 +369,23 @@ export default function CustomerProjectScreen() {
             </View>
 
             <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.md }]}>
-              Title
+              {t('Title')}
             </Text>
             <TextInput
               value={reqTitle}
               onChangeText={setReqTitle}
-              placeholder="Brief summary of your request"
+              placeholder={t('Brief summary of your request')}
               placeholderTextColor={colors.textTertiary}
               style={[styles.formInput, { color: colors.textPrimary, backgroundColor: colors.backgroundTertiary, borderColor: colors.borderLight }]}
             />
 
             <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.md }]}>
-              Details (optional)
+              {t('Details (optional)')}
             </Text>
             <TextInput
               value={reqDescription}
               onChangeText={setReqDescription}
-              placeholder="Add any details or context..."
+              placeholder={t('Add any details or context...')}
               placeholderTextColor={colors.textTertiary}
               multiline
               numberOfLines={3}
@@ -391,14 +393,14 @@ export default function CustomerProjectScreen() {
             />
 
             <View style={styles.formActions}>
-              <Button title="Cancel" onPress={() => { setShowRequestForm(false); setReqTitle(''); setReqDescription(''); }} variant="secondary" style={{ flex: 1 }} />
-              <Button title="Submit" onPress={handleSubmitRequest} variant="primary" style={{ flex: 1 }} icon="send" />
+              <Button title={t('Cancel')} onPress={() => { setShowRequestForm(false); setReqTitle(''); setReqDescription(''); }} variant="secondary" style={{ flex: 1 }} />
+              <Button title={t('Submit')} onPress={handleSubmitRequest} variant="primary" style={{ flex: 1 }} icon="send" />
             </View>
           </Card>
         )}
 
         {customerRequests.length === 0 && !showRequestForm ? (
-          <EmptyState icon="message-circle" title="No requests yet" description={canSubmitRequests ? 'Tap "New Request" to submit a question or change request.' : 'Requests you submit will appear here.'} />
+          <EmptyState icon="message-circle" title={t('No requests yet')} description={canSubmitRequests ? t('Tap "New Request" to submit a question or change request.') : t('Requests you submit will appear here.')} />
         ) : (
           customerRequests.map(req => {
             const badge = statusLabel[req.status] ?? { label: req.status, type: 'neutral' as const };
@@ -406,7 +408,7 @@ export default function CustomerProjectScreen() {
               <Card key={req.id} style={{ marginBottom: spacing.md }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>{req.title}</Text>
-                  <StatusBadge label={badge.label} status={badge.type} />
+                  <StatusBadge label={t(badge.label)} status={badge.type} />
                 </View>
                 {req.description && (
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>
@@ -415,14 +417,14 @@ export default function CustomerProjectScreen() {
                 )}
                 {req.responseNote && (
                   <View style={[styles.responseBox, { backgroundColor: colors.primarySurface }]}>
-                    <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '600' }]}>Response from Brighton Lawn</Text>
+                    <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '600' }]}>{t('Response from Brighton Lawn')}</Text>
                     <Text style={[typeScale.bodySmall, { color: colors.textPrimary, marginTop: spacing.xs }]}>
                       {req.responseNote}
                     </Text>
                   </View>
                 )}
                 <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.md }]}>
-                  Submitted {formatDateTime(req.createdAt)}
+                  {t('Submitted {date}', { date: formatDateTime(req.createdAt) })}
                 </Text>
               </Card>
             );
@@ -432,9 +434,10 @@ export default function CustomerProjectScreen() {
     );
   }
 
-  const activeSections = isCompleted
+  const activeSections = (isCompleted
     ? SECTIONS.filter(s => s.key !== 'requests')
-    : (settings?.customerInteractionEnabled ? SECTIONS : SECTIONS.filter(s => s.key !== 'requests'));
+    : (settings?.customerInteractionEnabled ? SECTIONS : SECTIONS.filter(s => s.key !== 'requests'))
+  ).map(s => ({ ...s, label: t(s.label) }));
 
   const sectionRenderers: Record<string, () => React.ReactNode> = {
     overview: renderOverview,
@@ -447,7 +450,7 @@ export default function CustomerProjectScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerTop}>
-          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel={t('Go back')}>
             <Icon name="arrow-left" size={24} color={colors.textPrimary} />
           </Pressable>
           <View style={{ flex: 1 }}>

@@ -7,6 +7,7 @@ import { unverifiedPrompt } from '@/lib/maintenanceCheckIn';
 import { todayKey } from '@/lib/ids';
 import { haptics } from '@/lib/haptics';
 import { useCompanyYard } from '@/hooks/useCompanyYard';
+import { tr } from '@/i18n';
 import type { LocationStatus, MaintenanceDayAttendance, MaintenanceStop } from '@/types/maintenance';
 
 /** Yard radius used by maintenance_start_day() in the database. */
@@ -40,9 +41,9 @@ type Choice = 'continue' | 'cancel';
 function askToContinue(prompt: { title: string; message: string; openSettings?: boolean }, continueLabel: string): Promise<Choice> {
   return new Promise((resolve) => {
     Alert.alert(prompt.title, prompt.message, [
-      { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+      { text: tr('Cancel'), style: 'cancel', onPress: () => resolve('cancel') },
       ...(prompt.openSettings
-        ? [{ text: 'Open Settings', onPress: () => { Linking.openSettings().catch(() => {}); resolve('cancel'); } }]
+        ? [{ text: tr('Open Settings'), onPress: () => { Linking.openSettings().catch(() => {}); resolve('cancel'); } }]
         : []),
       { text: continueLabel, onPress: () => resolve('continue') },
     ], { cancelable: true, onDismiss: () => resolve('cancel') });
@@ -50,8 +51,8 @@ function askToContinue(prompt: { title: string; message: string; openSettings?: 
 }
 
 function showError(message: string) {
-  if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(message);
-  else Alert.alert('Couldn’t save', message);
+  if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(tr(message));
+  else Alert.alert(tr('Couldn’t save'), tr(message));
 }
 
 /**
@@ -85,7 +86,7 @@ export function useMaintenanceCheckIn(serviceDate: string = todayKey()) {
       const gps: GpsResult = await getCurrentGps();
       const { status } = classifyLocation(gps, { latitude: yard?.latitude, longitude: yard?.longitude }, YARD_RADIUS_M);
       const prompt = unverifiedPrompt(status, yardName, 'day');
-      if (prompt && (await askToContinue(prompt, 'Start day anyway')) === 'cancel') return null;
+      if (prompt && (await askToContinue(prompt, tr('Start day anyway'))) === 'cancel') return null;
       const res = await saveDayStart({ gps, routeId, serviceDate });
       if (res.ok) haptics.success();
       else showError(res.error);
@@ -98,14 +99,14 @@ export function useMaintenanceCheckIn(serviceDate: string = todayKey()) {
   const arriveAtStop = useCallback(async (stopId: string): Promise<Result<MaintenanceStop> | null> => {
     if (busy) return null;
     const stop = db.maintenance.stopById[stopId];
-    if (!stop) return { ok: false, error: 'Stop not found.' };
+    if (!stop) return { ok: false, error: tr('Stop not found.') };
     setBusy(stopId);
     try {
       const gps: GpsResult = await getCurrentGps();
       const p = stop.property;
       const { status } = classifyLocation(gps, p, p?.checkinRadiusM ?? 150);
-      const prompt = unverifiedPrompt(status, p?.name ?? 'this property', 'stop');
-      if (prompt && (await askToContinue(prompt, 'Check in anyway')) === 'cancel') return null;
+      const prompt = unverifiedPrompt(status, p?.name ?? tr('this property'), 'stop');
+      if (prompt && (await askToContinue(prompt, tr('Check in anyway'))) === 'cancel') return null;
       const res = await markArrived(stopId, gps);
       if (res.ok) haptics.success();
       else showError(res.error);

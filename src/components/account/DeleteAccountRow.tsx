@@ -11,11 +11,13 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { useT } from '@/i18n';
 
 const CONFIRM_WORD = 'DELETE';
 
 /** "Delete Account" list row plus its confirmation sheet (type DELETE to confirm). */
 export function DeleteAccountRow() {
+  const t = useT();
   const { colors } = useTheme();
   const { signOut } = useAuth();
   const insets = useSafeAreaInsets();
@@ -40,8 +42,8 @@ export function DeleteAccountRow() {
   async function handleDelete() {
     if (!ready) return;
     if (!isSupabaseConfigured) {
-      const msg = 'Accounts can’t be deleted in demo mode.';
-      if (Platform.OS === 'web') alert(msg); else Alert.alert('Demo mode', msg);
+      const msg = t('Accounts can’t be deleted in demo mode.');
+      if (Platform.OS === 'web') alert(msg); else Alert.alert(t('Demo mode'), msg);
       return;
     }
     setBusy(true);
@@ -59,7 +61,7 @@ export function DeleteAccountRow() {
 
   return (
     <>
-      <ListRow icon="trash-2" iconColor={colors.error} title="Delete Account" destructive onPress={() => setOpen(true)} />
+      <ListRow icon="trash-2" iconColor={colors.error} title={t('Delete Account')} destructive onPress={() => setOpen(true)} />
 
       <BottomSheetModal visible={open} onRequestClose={close}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -72,20 +74,20 @@ export function DeleteAccountRow() {
               <Icon name="alert-triangle" size={24} color={semantic.error} />
             </View>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.md }]}>
-              Delete your account?
+              {t('Delete your account?')}
             </Text>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
-              Your login and contact details are erased and you're removed from the team. Your name stays on past records like hours and project history. This can't be undone.
+              {t("Your login and contact details are erased and you're removed from the team. Your name stays on past records like hours and project history. This can't be undone.")}
             </Text>
             {isOwner && (
               <View style={[styles.warnBox, { backgroundColor: semantic.warningLight }]}>
                 <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>
-                  You own {db.company?.name ?? 'this company'}. Delete the company first (More → Settings → Delete Company), then you can delete your account.
+                  {t('You own {name}. Delete the company first (More → Settings → Delete Company), then you can delete your account.', { name: db.company?.name ?? t('this company') })}
                 </Text>
               </View>
             )}
             <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.lg, marginBottom: spacing.xs }]}>
-              Type {CONFIRM_WORD} to confirm
+              {t('Type {word} to confirm', { word: CONFIRM_WORD })}
             </Text>
             <TextInput
               value={typed}
@@ -100,8 +102,8 @@ export function DeleteAccountRow() {
               <Text style={[typeScale.caption, { color: semantic.error, marginTop: spacing.xs }]}>{error}</Text>
             ) : null}
             <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
-              <Button title="Delete My Account" onPress={handleDelete} variant="danger" fullWidth disabled={!ready} loading={busy} />
-              <Button title="Cancel" onPress={close} variant="ghost" fullWidth />
+              <Button title={t('Delete My Account')} onPress={handleDelete} variant="danger" fullWidth disabled={!ready} loading={busy} />
+              <Button title={t('Cancel')} onPress={close} variant="ghost" fullWidth />
             </View>
           </Pressable>
         </Pressable>

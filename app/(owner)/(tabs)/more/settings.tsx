@@ -217,10 +217,6 @@ export default function SettingsScreen() {
           </SettingsGroup>
         )}
 
-        <SettingsGroup>
-          <LanguageRow />
-        </SettingsGroup>
-
         <LegalSection />
 
         <SettingsGroup>
@@ -230,6 +226,7 @@ export default function SettingsScreen() {
           <DeleteCompanyRow />
           <DeleteAccountRow />
         </ListSection>
+        <LanguageRow />
       </ScrollView>
     </View>
   );

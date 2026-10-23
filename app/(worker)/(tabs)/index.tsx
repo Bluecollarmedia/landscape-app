@@ -35,6 +35,7 @@ import { getProjectImageUriById, getWorkerHeaderImageUri } from '@/lib/projectIm
 import { BrandCover } from '@/components/branding/BrandCover';
 import { WORKER_HERO_HEIGHT as HERO_HEIGHT } from '@/components/media/HeaderPhotoField';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { useT } from '@/i18n';
 
 
 const HERO_HEIGHT_COMPACT = 190;
@@ -77,6 +78,7 @@ function minutesUntil(time: string): number {
 }
 
 export default function WorkerTodayScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
@@ -117,9 +119,9 @@ export default function WorkerTodayScreen() {
   }, []);
 
   const now = new Date();
-  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const greeting = now.getHours() < 12 ? t('Good morning') : now.getHours() < 17 ? t('Good afternoon') : t('Good evening');
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const tagline = showConfirmed ? "You're all set for today." : "Let's get it done today.";
+  const tagline = showConfirmed ? t("You're all set for today.") : t("Let's get it done today.");
 
   const lastCheckIn = primaryAssignment
     ? [...checkIns].reverse().find(c => c.assignmentId === primaryAssignment.id)
@@ -132,9 +134,9 @@ export default function WorkerTodayScreen() {
   const isLead = primaryAssignment ? isTaskLead(primaryAssignment.projectId) : false;
   const leadId = primaryAssignment ? db.projects.find(p => p.id === primaryAssignment.projectId)?.taskLeadId : undefined;
   const lead = leadId ? db.people[leadId] : undefined;
-  const completedTasks = tasks.filter(t => t.status === 'completed');
+  const completedTasks = tasks.filter(task => task.status === 'completed');
   // Completed tasks fold away under a toggle so the list shows only what's left to do.
-  const openTasks = tasks.filter(t => t.status !== 'completed');
+  const openTasks = tasks.filter(task => task.status !== 'completed');
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
   const settings = primaryAssignment ? projectSettings(primaryAssignment.projectId) : undefined;
   const photoRequired = settings?.completionPhotoRequired ?? false;
@@ -159,7 +161,7 @@ export default function WorkerTodayScreen() {
   async function sendSkip(reason: string) {
     if (!primaryAssignment) return;
     const r = await requestSkip('assignment', primaryAssignment.id, reason);
-    if (!r.ok) { if (Platform.OS === 'web') alert(r.error); else Alert.alert("Couldn't send the request", r.error); return; }
+    if (!r.ok) { if (Platform.OS === 'web') alert(r.error); else Alert.alert(t("Couldn't send the request"), r.error); return; }
     haptics.success();
     setSkipOpen(false);
     const again = await loadMySkipRequests();
@@ -179,8 +181,8 @@ export default function WorkerTodayScreen() {
         alert(`${result.title}\n\n${result.message}`);
       } else {
         Alert.alert(result.title, result.message, result.openSettings
-          ? [{ text: 'Cancel', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }]
-          : [{ text: 'OK' }]);
+          ? [{ text: t('Cancel'), style: 'cancel' }, { text: t('Open Settings'), onPress: () => Linking.openSettings() }]
+          : [{ text: t('OK') }]);
       }
       return;
     }
@@ -191,7 +193,7 @@ export default function WorkerTodayScreen() {
         : await checkInTimed(result.gps, undefined);
       if (!started.ok) {
         haptics.warning();
-        if (Platform.OS === 'web') alert(started.error); else Alert.alert("Can't start this property", started.error);
+        if (Platform.OS === 'web') alert(started.error); else Alert.alert(t("Can't start this property"), started.error);
         return;
       }
       haptics.success();
@@ -217,7 +219,7 @@ export default function WorkerTodayScreen() {
         : await checkOutTimed(where);
       if (!done.ok) {
         haptics.warning();
-        if (Platform.OS === 'web') alert(done.error); else Alert.alert("Can't finish this property", done.error);
+        if (Platform.OS === 'web') alert(done.error); else Alert.alert(t("Can't finish this property"), done.error);
       }
       return;
     }
@@ -268,12 +270,12 @@ export default function WorkerTodayScreen() {
           )}
           {task.status === 'completed' && task.completer && (
             <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
-              Done by {task.completer.firstName} {task.completer.lastName}
+              {t('Done by {name}', { name: `${task.completer.firstName} ${task.completer.lastName}` })}
             </Text>
           )}
           {task.status === 'in_progress' && (
             <View style={[styles.inProgressTag, { backgroundColor: colors.warningLight }]}>
-              <Text style={[typeScale.caption, { color: colors.warning }]}>In Progress</Text>
+              <Text style={[typeScale.caption, { color: colors.warning }]}>{t('In Progress')}</Text>
             </View>
           )}
         </View>
@@ -314,10 +316,10 @@ export default function WorkerTodayScreen() {
           <Feather name="check" size={40} color="#FFFFFF" />
         </View>
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.xl }]}>
-          Checked Out
+          {t('Checked Out')}
         </Text>
         <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-          Great work today!
+          {t('Great work today!')}
         </Text>
 
         <View style={[styles.card, styles.summaryCard, { backgroundColor: colors.surface }, shadow.md]}>
@@ -326,7 +328,7 @@ export default function WorkerTodayScreen() {
               <Feather name="home" size={14} color={colors.primaryDark} />
             </View>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-              {primaryAssignment.project?.name ?? 'Unknown Project'}
+              {primaryAssignment.project?.name ?? t('Unknown Project')}
             </Text>
           </View>
           {primaryAssignment.project?.address && (
@@ -343,17 +345,17 @@ export default function WorkerTodayScreen() {
           <View style={styles.summaryRow}>
             <View style={styles.labelRow}>
               <Feather name="clock" size={14} color={colors.textTertiary} />
-              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.xs }]}>Worked</Text>
+              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.xs }]}>{t('Worked')}</Text>
             </View>
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{workedLabel}</Text>
           </View>
           <View style={styles.summaryRow}>
             <View style={styles.labelRow}>
               <Feather name="check-square" size={14} color={colors.textTertiary} />
-              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.xs }]}>Tasks Completed</Text>
+              <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.xs }]}>{t('Tasks Completed')}</Text>
             </View>
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>
-              {completedTasks.length} of {tasks.length}
+              {t('{done} of {total}', { done: completedTasks.length, total: tasks.length })}
             </Text>
           </View>
         </View>
@@ -369,12 +371,12 @@ export default function WorkerTodayScreen() {
           >
             <Feather name="home" size={18} color="#FFFFFF" />
             <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>
-              Back to Today
+              {t('Back to Today')}
             </Text>
           </LinearGradient>
         </Pressable>
         <Pressable onPress={handleCheckIn} hitSlop={8} style={{ marginTop: spacing.lg }} accessibilityRole="button">
-          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{locating ? 'Finding your location…' : 'Left by mistake? Check back in'}</Text>
+          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{locating ? t('Finding your location…') : t('Left by mistake? Check back in')}</Text>
         </Pressable>
       </View>
     );
@@ -398,13 +400,13 @@ export default function WorkerTodayScreen() {
           {showWorking ? (
             <View style={[styles.onSitePill, { top: insets.top + spacing.sm, backgroundColor: 'rgba(255,255,255,0.9)' }]}>
               <View style={[styles.onSiteDot, { backgroundColor: colors.success }]} />
-              <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginLeft: spacing.xs }]}>On Site</Text>
+              <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginLeft: spacing.xs }]}>{t('On Site')}</Text>
             </View>
           ) : (
             <View style={styles.heroText}>
               <Text style={[typeScale.bodyMedium, styles.heroTextShadow, { color: '#FFFFFF' }]}>{dateStr}</Text>
               <Text style={[typeScale.displayLarge, styles.heroTextShadow, { color: '#FFFFFF', marginTop: 2 }]}>
-                {greeting},{'\n'}{user?.firstName ?? 'there'}
+                {greeting},{'\n'}{user?.firstName ?? t('there')}
               </Text>
               {yard && (
                 <Pressable
@@ -413,7 +415,7 @@ export default function WorkerTodayScreen() {
                   style={({ pressed }) => [styles.yardRow, pressed && { opacity: 0.7 }]}
                   accessibilityRole="button"
                   accessibilityLabel={`${yardName}, ${formatAddress(yard)}`}
-                  accessibilityHint="Opens directions to the yard"
+                  accessibilityHint={t('Opens directions to the yard')}
                 >
                   <View style={[styles.yardPin, { backgroundColor: colors.primary }]}>
                     <Feather name="map-pin" size={11} color="#FFFFFF" />
@@ -455,8 +457,8 @@ export default function WorkerTodayScreen() {
           {onRoute ? (
             <OtherWorkCard
               icon="map"
-              title={todayRoute ? 'Your maintenance route today' : 'You have a maintenance route coming up'}
-              subtitle={todayRoute ? `${todayRoute.stops.length} stop${todayRoute.stops.length === 1 ? '' : 's'}. Tap to open it.` : 'Tap to see it.'}
+              title={todayRoute ? t('Your maintenance route today') : t('You have a maintenance route coming up')}
+              subtitle={todayRoute ? (todayRoute.stops.length === 1 ? t('1 stop. Tap to open it.') : t('{n} stops. Tap to open it.', { n: todayRoute.stops.length })) : t('Tap to see it.')}
               onPress={() => router.push('/(worker)/maintenance' as any)}
             />
           ) : null}
@@ -481,7 +483,7 @@ export default function WorkerTodayScreen() {
                 <View style={{ flex: 1, marginLeft: spacing.sm }}>
                   <View style={styles.announcementTopRow}>
                     <Text style={[typeScale.labelSmall, { color: isStrong ? colors.error : colors.textSecondary, fontWeight: '700' }]}>
-                      {weatherMeta ? weatherMeta.label.toUpperCase() : unreadAnnouncement.priority === 'urgent' ? 'URGENT' : 'ANNOUNCEMENT'}
+                      {weatherMeta ? t(weatherMeta.label).toUpperCase() : unreadAnnouncement.priority === 'urgent' ? t('URGENT') : t('ANNOUNCEMENT')}
                     </Text>
                   </View>
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700', marginTop: 2 }]} numberOfLines={1}>
@@ -500,11 +502,12 @@ export default function WorkerTodayScreen() {
             <View style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
               <Feather name="check-square" size={26} color={colors.primary} />
               <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.md }]}>
-                Confirm Your Schedule
+                {t('Confirm Your Schedule')}
               </Text>
               <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-                You have {todayAssignments.length} job{todayAssignments.length > 1 ? 's' : ''} today.
-                Confirm to let the team know you're ready.
+                {todayAssignments.length > 1
+                  ? t("You have {n} jobs today. Confirm to let the team know you're ready.", { n: todayAssignments.length })
+                  : t("You have 1 job today. Confirm to let the team know you're ready.")}
               </Text>
               <Pressable onPress={handleConfirm} style={{ marginTop: spacing.lg }}>
                 <LinearGradient
@@ -515,7 +518,7 @@ export default function WorkerTodayScreen() {
                 >
                   <Feather name="check" size={18} color="#FFFFFF" />
                   <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>
-                    Confirm Schedule
+                    {t('Confirm Schedule')}
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -523,17 +526,17 @@ export default function WorkerTodayScreen() {
           )}
 
           {!scheduleConfirmed && primaryAssignment && (
-            <JobCard label="Today's Job" assignment={primaryAssignment} />
+            <JobCard label={t("Today's Job")} assignment={primaryAssignment} />
           )}
 
           {showConfirmed && primaryAssignment && (
             <>
               <View style={[styles.card, styles.mapCard, { backgroundColor: colors.surface }, shadow.md]}>
-                <JobCardBody label="Next Job" assignment={primaryAssignment} />
+                <JobCardBody label={t('Next Job')} assignment={primaryAssignment} />
 
                 {primaryAssignment.project?.address && (
                   <>
-                    <Pressable onPress={() => openMapsNavigation(primaryAssignment.project!)} accessibilityLabel="Open in Maps">
+                    <Pressable onPress={() => openMapsNavigation(primaryAssignment.project!)} accessibilityLabel={t('Open in Maps')}>
                       <JobMap place={primaryAssignment.project} />
                     </Pressable>
                     <Pressable
@@ -542,7 +545,7 @@ export default function WorkerTodayScreen() {
                     >
                       <Feather name="navigation" size={15} color={colors.primary} />
                       <Text style={[typeScale.bodyMedium, { color: colors.primary, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
-                        Open in Maps
+                        {t('Open in Maps')}
                       </Text>
                       <Feather name="chevron-right" size={16} color={colors.textTertiary} />
                     </Pressable>
@@ -556,16 +559,16 @@ export default function WorkerTodayScreen() {
                   <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
                     {(() => {
                       const mins = minutesUntil(primaryAssignment.startTime!);
-                      if (mins > 1) return `Starts in ${mins} minutes`;
-                      if (mins === 1) return 'Starts in 1 minute';
-                      return 'Starting now';
+                      if (mins > 1) return t('Starts in {n} minutes', { n: mins });
+                      if (mins === 1) return t('Starts in 1 minute');
+                      return t('Starting now');
                     })()}
                   </Text>
                 </View>
               )}
 
               {needsClockIn ? (
-                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, textAlign: 'center' }]}>Clock in for the day first. The Clock In button is at the top.</Text>
+                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, textAlign: 'center' }]}>{t('Clock in for the day first. The Clock In button is at the top.')}</Text>
               ) : (
               <Pressable onPress={handleCheckIn}>
                 <LinearGradient
@@ -577,21 +580,21 @@ export default function WorkerTodayScreen() {
                   <View style={styles.checkInRow}>
                     <Feather name="log-in" size={20} color="#FFFFFF" />
                     <Text style={[typeScale.headingSmall, { color: '#FFFFFF', marginLeft: spacing.sm, fontWeight: '700' }]}>
-                      {timeOn ? 'START PROPERTY' : "I'M HERE"}
+                      {timeOn ? t('START PROPERTY') : t("I'M HERE")}
                     </Text>
                   </View>
                   <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]}>
-                    {locating ? 'Finding your location…' : timeOn ? 'Start your time at this property' : 'Check in to start this job'}
+                    {locating ? t('Finding your location…') : timeOn ? t('Start your time at this property') : t('Check in to start this job')}
                   </Text>
                 </LinearGradient>
               </Pressable>
               )}
               {timeOn && primaryAssignment ? (
                 pendingSkip ? (
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>Skip requested. Waiting for the owner. This job stays open until they approve it.</Text>
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>{t('Skip requested. Waiting for the owner. This job stays open until they approve it.')}</Text>
                 ) : (
                   <Pressable onPress={() => setSkipOpen(true)} hitSlop={8} accessibilityRole="button">
-                    <Text style={[typeScale.labelLarge, { color: colors.textSecondary, textAlign: 'center' }]}>Can't do this job? Ask to skip it</Text>
+                    <Text style={[typeScale.labelLarge, { color: colors.textSecondary, textAlign: 'center' }]}>{t("Can't do this job? Ask to skip it")}</Text>
                   </Pressable>
                 )
               ) : null}
@@ -602,7 +605,7 @@ export default function WorkerTodayScreen() {
             <>
               <View>
                 <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>
-                  {primaryAssignment.project?.name ?? 'Unknown Project'}
+                  {primaryAssignment.project?.name ?? t('Unknown Project')}
                 </Text>
                 {primaryAssignment.project?.address && (
                   <View style={[styles.metaRow, { marginTop: spacing.xs }]}>
@@ -615,7 +618,7 @@ export default function WorkerTodayScreen() {
                 <View style={styles.metaRow}>
                   <Feather name="clock" size={13} color={colors.textTertiary} />
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-                    {primaryAssignment.isFullDay ? 'Full day' : `${formatTime(primaryAssignment.startTime)} – ${formatTime(primaryAssignment.endTime)}`}
+                    {primaryAssignment.isFullDay ? t('Full day') : `${formatTime(primaryAssignment.startTime)} – ${formatTime(primaryAssignment.endTime)}`}
                   </Text>
                 </View>
               </View>
@@ -625,7 +628,7 @@ export default function WorkerTodayScreen() {
                   <View style={styles.labelRow}>
                     <Feather name="check-circle" size={13} color={colors.success} />
                     <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
-                      Checked In
+                      {t('Checked In')}
                     </Text>
                   </View>
                   <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.xs }]}>
@@ -637,7 +640,7 @@ export default function WorkerTodayScreen() {
                   <View style={styles.labelRow}>
                     <Feather name="clock" size={13} color={colors.primary} />
                     <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
-                      On site for
+                      {t('On site for')}
                     </Text>
                   </View>
                   <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.xs }]}>
@@ -654,7 +657,7 @@ export default function WorkerTodayScreen() {
                   >
                     <Feather name="navigation" size={16} color={colors.primaryDark} />
                     <Text style={[typeScale.bodyMedium, { color: colors.primaryDark, marginLeft: spacing.xs, fontWeight: '600' }]}>
-                      Open in Maps
+                      {t('Open in Maps')}
                     </Text>
                   </Pressable>
                 )}
@@ -663,9 +666,9 @@ export default function WorkerTodayScreen() {
               {tasks.length > 0 && (
                 <View style={[styles.card, styles.mapCard, { backgroundColor: colors.surface }, shadow.md]}>
                   <View style={styles.tasksHeader}>
-                    <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>Today's Tasks</Text>
+                    <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{t("Today's Tasks")}</Text>
                     <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                      {completedTasks.length} of {tasks.length} completed
+                      {t('{done} of {total} completed', { done: completedTasks.length, total: tasks.length })}
                     </Text>
                   </View>
                   <View style={{ paddingHorizontal: spacing.lg }}>
@@ -681,10 +684,10 @@ export default function WorkerTodayScreen() {
                       <Feather name={isLead ? 'award' : 'lock'} size={13} color={isLead ? colors.primary : colors.textTertiary} />
                       <Text style={[typeScale.caption, { color: isLead ? colors.primary : colors.textSecondary, marginLeft: 6, flex: 1 }]}>
                         {isLead
-                          ? "You're the Task Lead. You check off tasks for this job."
+                          ? t("You're the Task Lead. You check off tasks for this job.")
                           : lead
-                          ? `Task Lead: ${lead.firstName} ${lead.lastName}`.trimEnd() + '. Only they can check off tasks.'
-                          : 'No Task Lead yet. The owner needs to pick one before tasks can be checked off.'}
+                          ? t('Task Lead: {name}. Only they can check off tasks.', { name: `${lead.firstName} ${lead.lastName}`.trimEnd() })
+                          : t('No Task Lead yet. The owner needs to pick one before tasks can be checked off.')}
                       </Text>
                     </View>
                   </View>
@@ -693,7 +696,7 @@ export default function WorkerTodayScreen() {
                     <View style={[styles.allDoneRow, { marginTop: spacing.md }]}>
                       <Feather name="check-circle" size={18} color={colors.success} />
                       <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
-                        All tasks done
+                        {t('All tasks done')}
                       </Text>
                     </View>
                   )}
@@ -703,7 +706,7 @@ export default function WorkerTodayScreen() {
                       onPress={() => { haptics.select(); setShowCompletedTasks(v => !v); }}
                     >
                       <Text style={[typeScale.bodyLarge, { color: colors.primary, fontWeight: '600', flex: 1 }]}>
-                        {showCompletedTasks ? 'Hide completed' : `Show completed (${completedTasks.length})`}
+                        {showCompletedTasks ? t('Hide completed') : t('Show completed ({n})', { n: completedTasks.length })}
                       </Text>
                       <Feather name={showCompletedTasks ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
                     </Pressable>
@@ -717,7 +720,7 @@ export default function WorkerTodayScreen() {
                   <View style={styles.labelRow}>
                     <Feather name="file-text" size={15} color={colors.primary} />
                     <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
-                      Job Notes
+                      {t('Job Notes')}
                     </Text>
                   </View>
                   <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, marginTop: spacing.xs }]}>
@@ -736,10 +739,10 @@ export default function WorkerTodayScreen() {
                   <Feather name="log-out" size={22} color="#FFFFFF" />
                   <View style={{ marginLeft: spacing.md }}>
                     <Text style={[typeScale.headingSmall, { color: '#FFFFFF', fontWeight: '700' }]}>
-                      I'M LEAVING
+                      {t("I'M LEAVING")}
                     </Text>
                     <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)' }]}>
-                      Check out when you're done
+                      {t("Check out when you're done")}
                     </Text>
                   </View>
                 </LinearGradient>
@@ -764,10 +767,10 @@ export default function WorkerTodayScreen() {
               <Feather name="log-out" size={24} color={colors.error} />
             </View>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.lg, textAlign: 'center' }]}>
-              You're done for today?
+              {t("You're done for today?")}
             </Text>
             <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }]}>
-              This checks you out from {primaryAssignment?.project?.name ?? 'this job'} and ends your work session.
+              {t('This checks you out from {name} and ends your work session.', { name: primaryAssignment?.project?.name ?? t('this job') })}
             </Text>
 
             <View style={styles.modalActions}>
@@ -775,7 +778,7 @@ export default function WorkerTodayScreen() {
                 style={[styles.modalButton, { backgroundColor: colors.backgroundSecondary }]}
                 onPress={() => setShowCheckoutConfirm(false)}
               >
-                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Cancel</Text>
+                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{t('Cancel')}</Text>
               </Pressable>
               <Pressable style={styles.modalButton} onPress={confirmCheckOut}>
                 <LinearGradient
@@ -784,7 +787,7 @@ export default function WorkerTodayScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.modalButtonFill}
                 >
-                  <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Check Out</Text>
+                  <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('Check Out')}</Text>
                 </LinearGradient>
               </Pressable>
             </View>
@@ -805,7 +808,7 @@ export default function WorkerTodayScreen() {
                     <View style={[styles.sheetBadge, { backgroundColor: colors.errorLight }]}>
                       <Feather name={(weatherMeta?.icon ?? 'alert-circle') as any} size={13} color={colors.error} />
                       <Text style={[typeScale.labelSmall, { color: colors.error, fontWeight: '700', marginLeft: 4 }]}>
-                        {weatherMeta ? weatherMeta.label.toUpperCase() : 'URGENT'}
+                        {weatherMeta ? t(weatherMeta.label).toUpperCase() : t('URGENT')}
                       </Text>
                     </View>
                   )}
@@ -822,7 +825,7 @@ export default function WorkerTodayScreen() {
                     style={[styles.pillButton, { backgroundColor: colors.primary, marginTop: spacing.xl }]}
                     onPress={handleCloseAnnouncement}
                   >
-                    <Text style={[typeScale.labelLarge, { color: '#FFFFFF', fontWeight: '700' }]}>Got it</Text>
+                    <Text style={[typeScale.labelLarge, { color: '#FFFFFF', fontWeight: '700' }]}>{t('Got it')}</Text>
                   </Pressable>
                 </>
               );
@@ -845,6 +848,7 @@ function JobCard({ label, assignment }: { label: string; assignment: Assignment 
 }
 
 function JobCardBody({ label, assignment }: { label: string; assignment: Assignment }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <View style={styles.jobCard}>
@@ -861,7 +865,7 @@ function JobCardBody({ label, assignment }: { label: string; assignment: Assignm
             <Feather name="home" size={14} color={colors.primaryDark} />
           </View>
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-            {assignment.project?.name ?? 'Unknown Project'}
+            {assignment.project?.name ?? t('Unknown Project')}
           </Text>
         </View>
 
@@ -876,7 +880,7 @@ function JobCardBody({ label, assignment }: { label: string; assignment: Assignm
         <View style={[styles.metaRow, { marginLeft: 36 }]}>
           <Feather name="clock" size={13} color={colors.textTertiary} />
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-            {assignment.isFullDay ? 'Full day' : `${formatTime(assignment.startTime)} – ${formatTime(assignment.endTime)}`}
+            {assignment.isFullDay ? t('Full day') : `${formatTime(assignment.startTime)} – ${formatTime(assignment.endTime)}`}
           </Text>
         </View>
       </View>

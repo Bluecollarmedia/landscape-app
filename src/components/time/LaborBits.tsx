@@ -9,24 +9,26 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { REVIEW_LABEL, type ReviewState } from '@/lib/timeCalc';
 import { localDateKey } from '@/lib/ids';
+import { useT, tr } from '@/i18n';
 
 export const fmtClock = (iso?: string | null) => (iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '–');
 export const fmtDay = (key: string) => new Date(`${key}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 export const fmtDayLong = (key: string) => new Date(`${key}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-export const money = (n: number | null | undefined) => (n == null ? 'No rate set' : `$${n.toFixed(2)}`);
+export const money = (n: number | null | undefined) => (n == null ? tr('No rate set') : `$${n.toFixed(2)}`);
 export const shiftDay = (key: string, days: number) => { const d = new Date(`${key}T12:00:00`); d.setDate(d.getDate() + days); return localDateKey(d); };
 
 /** The frame every Hours & Labor screen shares: back arrow, title, optional right action, scrolling content, pull to refresh. */
 export function LaborScreen({ title, subtitle, right, children, loading, onRefresh, onBack }: {
   title: string; subtitle?: string; right?: React.ReactNode; children: React.ReactNode; loading?: boolean; onRefresh?: () => void; onBack?: () => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
-        <Pressable onPress={onBack ?? (() => router.back())} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back"><Icon name="arrow-left" size={24} color={colors.textPrimary} /></Pressable>
+        <Pressable onPress={onBack ?? (() => router.back())} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('Go back')}><Icon name="arrow-left" size={24} color={colors.textPrimary} /></Pressable>
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} numberOfLines={1}>{title}</Text>
           {subtitle ? <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{subtitle}</Text> : null}
@@ -82,11 +84,12 @@ export function KV({ label, value, bold, hint }: { label: string; value: string;
 
 const STATE_TONE: Record<ReviewState, 'neutral' | 'info' | 'warn' | 'good'> = { in_progress: 'info', needs_correction: 'warn', needs_end_time: 'warn', ready: 'neutral', approved: 'good', reapproval: 'warn' };
 export function StatePill({ state }: { state: ReviewState }) {
+  const t = useT();
   const { colors } = useTheme();
   const tone = STATE_TONE[state];
   const bg = tone === 'good' ? colors.successLight : tone === 'warn' ? colors.warningLight : tone === 'info' ? colors.primarySurface : colors.backgroundTertiary;
   const fg = tone === 'good' ? colors.success : tone === 'warn' ? colors.warning : tone === 'info' ? colors.primaryDark : colors.textSecondary;
-  return <View style={[styles.pill, { backgroundColor: bg }]}><Text style={[typeScale.labelSmall, { color: fg }]}>{REVIEW_LABEL[state]}</Text></View>;
+  return <View style={[styles.pill, { backgroundColor: bg }]}><Text style={[typeScale.labelSmall, { color: fg }]}>{t(REVIEW_LABEL[state])}</Text></View>;
 }
 
 export function Chip({ label, onPress, on, icon }: { label: string; onPress: () => void; on?: boolean; icon?: React.ComponentProps<typeof Icon>['name'] }) {
@@ -101,15 +104,16 @@ export function Chip({ label, onPress, on, icon }: { label: string; onPress: () 
 
 /** Previous / next day with a date picker in the middle. */
 export function DayBar({ dateKey, onChange }: { dateKey: string; onChange: (key: string) => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const today = localDateKey(new Date());
   return (
     <View style={styles.dayBar}>
-      <Pressable onPress={() => onChange(shiftDay(dateKey, -1))} hitSlop={10} accessibilityRole="button" accessibilityLabel="Previous day"><Icon name="chevron-left" size={26} color={colors.primary} /></Pressable>
+      <Pressable onPress={() => onChange(shiftDay(dateKey, -1))} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('Previous day')}><Icon name="chevron-left" size={26} color={colors.primary} /></Pressable>
       <View style={{ flex: 1 }}>
-        <DateField label="" value={dateKey} onChange={onChange} maximumDate={shiftDay(today, 1)} placeholder="Pick a date" />
+        <DateField label="" value={dateKey} onChange={onChange} maximumDate={shiftDay(today, 1)} placeholder={t('Pick a date')} />
       </View>
-      <Pressable onPress={() => onChange(shiftDay(dateKey, 1))} hitSlop={10} accessibilityRole="button" accessibilityLabel="Next day"><Icon name="chevron-right" size={26} color={dateKey >= today ? colors.textTertiary : colors.primary} /></Pressable>
+      <Pressable onPress={() => onChange(shiftDay(dateKey, 1))} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('Next day')}><Icon name="chevron-right" size={26} color={dateKey >= today ? colors.textTertiary : colors.primary} /></Pressable>
     </View>
   );
 }
@@ -125,12 +129,13 @@ export function Empty({ icon, text }: { icon: React.ComponentProps<typeof Icon>[
 }
 
 export function NotInstalled() {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <Card>
-      <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Hours & Labor isn't switched on yet</Text>
+      <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t("Hours & Labor isn't switched on yet")}</Text>
       <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-        The database updates 63, 64 and 65 have not been run. Once they are, workdays and property times show up here.
+        {t('The database updates 63, 64 and 65 have not been run. Once they are, workdays and property times show up here.')}
       </Text>
     </Card>
   );

@@ -17,6 +17,7 @@ import { haptics } from '@/lib/haptics';
 import { RESOURCE_CATEGORIES, RESOURCE_CATEGORY_ORDER, type ResourceCategory } from '@/types/resource';
 import type { ResourceView } from '@/hooks/useResources';
 import type { PersonSummary } from '@/types/company';
+import { useT, tr } from '@/i18n';
 
 /** Groups resources by category in the standard order, skipping empty ones. */
 export function groupByCategory<T extends { category: ResourceCategory }>(items: T[]) {
@@ -29,7 +30,7 @@ export function groupByCategory<T extends { category: ResourceCategory }>(items:
 export function matchesResource(r: ResourceView, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [r.name, r.truckName, r.itemName, r.description, r.cardHolderName, RESOURCE_CATEGORIES[r.category].label]
+  return [r.name, r.truckName, r.itemName, r.description, r.cardHolderName, RESOURCE_CATEGORIES[r.category].label, tr(RESOURCE_CATEGORIES[r.category].label)]
     .some((f) => f?.toLowerCase().includes(q));
 }
 
@@ -60,6 +61,7 @@ interface ResourceRowProps {
 }
 
 export function ResourceRow({ resource: r, onPress, onManageAccess }: ResourceRowProps) {
+  const t = useT();
   const { colors } = useTheme();
   const context = resourceContext(r);
   // Row and Manage Access pill are siblings, not nested, so each is its own
@@ -80,9 +82,9 @@ export function ResourceRow({ resource: r, onPress, onManageAccess }: ResourceRo
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flexShrink: 1 }]} numberOfLines={1}>{context}</Text>
             )}
             {r.hasSecret && (
-              <View style={styles.lockTag} accessibilityLabel="Protected code stored">
+              <View style={styles.lockTag} accessibilityLabel={t('Protected code stored')}>
                 <Icon name="lock" size={11} color={colors.textTertiary} />
-                <Text style={[typeScale.caption, { color: colors.textTertiary, marginLeft: 3 }]}>Code</Text>
+                <Text style={[typeScale.caption, { color: colors.textTertiary, marginLeft: 3 }]}>{t('Code')}</Text>
               </View>
             )}
           </View>
@@ -95,7 +97,7 @@ export function ResourceRow({ resource: r, onPress, onManageAccess }: ResourceRo
           hitSlop={6}
           style={({ pressed }) => [styles.accessPill, { backgroundColor: pressed ? colors.border : colors.primarySurface }]}
           accessibilityRole="button"
-          accessibilityLabel={`Manage access, ${r.accessCount} worker${r.accessCount === 1 ? '' : 's'}`}
+          accessibilityLabel={r.accessCount === 1 ? t('Manage access, 1 worker') : t('Manage access, {n} workers', { n: r.accessCount })}
         >
           <Icon name="users" size={13} color={colors.primaryDark} />
           <Text style={[typeScale.labelSmall, { color: colors.primaryDark, marginLeft: 4 }]}>{r.accessCount}</Text>
@@ -126,6 +128,7 @@ interface PersonCheckRowProps {
 }
 
 export function PersonCheckRow({ person, checked, onToggle }: PersonCheckRowProps) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <Pressable
@@ -141,7 +144,7 @@ export function PersonCheckRow({ person, checked, onToggle }: PersonCheckRowProp
           {person.firstName} {person.lastName}
         </Text>
         <Text style={[typeScale.caption, { color: checked ? colors.primaryDark : colors.textTertiary }]}>
-          {checked ? 'Has access' : 'No access'}
+          {checked ? t('Has access') : t('No access')}
         </Text>
       </View>
       <Checkbox checked={checked} />
@@ -164,6 +167,7 @@ interface ProtectedCodeProps {
  * state, and cleared when the screen loses focus or after 30 seconds.
  */
 export function ProtectedCode({ label, reveal, onUnavailable }: ProtectedCodeProps) {
+  const t = useT();
   const { colors } = useTheme();
   const [code, setCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -196,7 +200,7 @@ export function ProtectedCode({ label, reveal, onUnavailable }: ProtectedCodePro
       return null;
     }
     if (!res.code) {
-      setError('No code is stored.');
+      setError(t('No code is stored.'));
       return null;
     }
     setCode(res.code);
@@ -217,12 +221,12 @@ export function ProtectedCode({ label, reveal, onUnavailable }: ProtectedCodePro
 
   return (
     <View>
-      <Text style={[typeScale.overline, { color: colors.textTertiary, marginBottom: spacing.xs }]}>{label.toUpperCase()}</Text>
+      <Text style={[typeScale.overline, { color: colors.textTertiary, marginBottom: spacing.xs }]}>{t(label).toUpperCase()}</Text>
       <View style={[styles.codeBox, { backgroundColor: colors.backgroundSecondary }]}>
         <Text
           style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, letterSpacing: code ? 1 : 4 }]}
           selectable={!!code}
-          accessibilityLabel={code ? `Code ${code.split('').join(' ')}` : 'Code hidden'}
+          accessibilityLabel={code ? t('Code {code}', { code: code.split('').join(' ') }) : t('Code hidden')}
         >
           {code ?? '••••••'}
         </Text>
@@ -234,20 +238,20 @@ export function ProtectedCode({ label, reveal, onUnavailable }: ProtectedCodePro
           disabled={busy}
           style={({ pressed }) => [styles.codeBtn, { backgroundColor: pressed ? colors.border : colors.primarySurface }]}
           accessibilityRole="button"
-          accessibilityLabel={code ? 'Hide code' : 'Reveal code'}
+          accessibilityLabel={code ? t('Hide code') : t('Reveal code')}
         >
           <Icon name={code ? 'eye-off' : 'eye'} size={16} color={colors.primaryDark} />
-          <Text style={[typeScale.labelLarge, { color: colors.primaryDark, marginLeft: spacing.xs }]}>{code ? 'Hide' : 'Reveal'}</Text>
+          <Text style={[typeScale.labelLarge, { color: colors.primaryDark, marginLeft: spacing.xs }]}>{code ? t('Hide') : t('Reveal')}</Text>
         </Pressable>
         <Pressable
           onPress={handleCopy}
           disabled={busy}
           style={({ pressed }) => [styles.codeBtn, { backgroundColor: pressed ? colors.primaryDark : colors.primary }]}
           accessibilityRole="button"
-          accessibilityLabel="Copy code"
+          accessibilityLabel={t('Copy code')}
         >
           <Icon name={copied ? 'check' : 'copy'} size={16} color={colors.textOnPrimary} />
-          <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary, marginLeft: spacing.xs }]}>{copied ? 'Copied' : 'Copy'}</Text>
+          <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary, marginLeft: spacing.xs }]}>{copied ? t('Copied') : t('Copy')}</Text>
         </Pressable>
       </View>
       {error && <Text style={[typeScale.caption, { color: colors.error, marginTop: spacing.xs }]}>{error}</Text>}

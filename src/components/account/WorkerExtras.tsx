@@ -9,6 +9,7 @@ import { spacing, radius } from '@/theme/spacing';
 import { pickImage } from '@/lib/pickImage';
 import { HOODIE_SIZES, ID_PRIVACY_TEXT, type HoodieSize } from '@/lib/workerDetails';
 import { getIdViewUrl, loadHoodieSizes, loadIdKeys } from '@/data/workerDetails';
+import { useT } from '@/i18n';
 
 interface FieldsProps {
   hoodie: HoodieSize | null;
@@ -25,6 +26,7 @@ interface FieldsProps {
 
 /** Hoodie size and ID photo: used when joining a team and again in Edit Profile, so they can be added or changed later. */
 export function WorkerExtrasFields({ hoodie, onHoodie, newIdUri, onNewIdUri, savedIdKey, onRemoveSaved, onError }: FieldsProps) {
+  const t = useT();
   const { colors } = useTheme();
   const [viewing, setViewing] = useState(false);
 
@@ -38,7 +40,7 @@ export function WorkerExtrasFields({ hoodie, onHoodie, newIdUri, onNewIdUri, sav
   return (
     <View style={{ gap: spacing.lg }}>
       <View>
-        <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginBottom: spacing.sm }]}>Hoodie Size (optional)</Text>
+        <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginBottom: spacing.sm }]}>{t('Hoodie Size (optional)')}</Text>
         <View style={styles.chips}>
           {HOODIE_SIZES.map((s) => {
             const on = hoodie === s;
@@ -58,38 +60,38 @@ export function WorkerExtrasFields({ hoodie, onHoodie, newIdUri, onNewIdUri, sav
       </View>
 
       <View>
-        <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginBottom: spacing.xs }]}>ID (optional)</Text>
+        <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginBottom: spacing.xs }]}>{t('ID (optional)')}</Text>
         <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-          A clear photo of your driver license or other ID. {ID_PRIVACY_TEXT}
+          {t('A clear photo of your driver license or other ID.')} {t(ID_PRIVACY_TEXT)}
         </Text>
         {newIdUri ? (
           <Image source={{ uri: newIdUri }} style={[styles.preview, { borderColor: colors.border }]} contentFit="cover" />
         ) : savedIdKey ? (
           <View style={[styles.onFile, { backgroundColor: colors.primarySurface }]}>
             <Feather name="check-circle" size={16} color={colors.primary} />
-            <Text style={[typeScale.bodySmall, { color: colors.primary, marginLeft: spacing.sm, flex: 1 }]}>ID on file</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.primary, marginLeft: spacing.sm, flex: 1 }]}>{t('ID on file')}</Text>
             <Pressable onPress={() => setViewing(true)} hitSlop={8}>
-              <Text style={[typeScale.labelSmall, { color: colors.primary }]}>View</Text>
+              <Text style={[typeScale.labelSmall, { color: colors.primary }]}>{t('View')}</Text>
             </Pressable>
           </View>
         ) : null}
         <View style={styles.btnRow}>
           <Pressable onPress={() => pick('camera')} style={[styles.btn, { borderColor: colors.border, backgroundColor: colors.surface }]}>
             <Feather name="camera" size={16} color={colors.textPrimary} />
-            <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginLeft: spacing.xs }]}>{hasId ? 'Retake' : 'Take Photo'}</Text>
+            <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginLeft: spacing.xs }]}>{hasId ? t('Retake') : t('Take Photo')}</Text>
           </Pressable>
           <Pressable onPress={() => pick('library')} style={[styles.btn, { borderColor: colors.border, backgroundColor: colors.surface }]}>
             <Feather name="image" size={16} color={colors.textPrimary} />
-            <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginLeft: spacing.xs }]}>{hasId ? 'Choose Another' : 'Choose Photo'}</Text>
+            <Text style={[typeScale.labelSmall, { color: colors.textPrimary, marginLeft: spacing.xs }]}>{hasId ? t('Choose Another') : t('Choose Photo')}</Text>
           </Pressable>
         </View>
         {newIdUri ? (
           <Pressable onPress={() => onNewIdUri(null)} style={{ marginTop: spacing.sm }}>
-            <Text style={[typeScale.caption, { color: colors.error }]}>Do not use this photo</Text>
+            <Text style={[typeScale.caption, { color: colors.error }]}>{t('Do not use this photo')}</Text>
           </Pressable>
         ) : savedIdKey && onRemoveSaved ? (
           <Pressable onPress={onRemoveSaved} style={{ marginTop: spacing.sm }}>
-            <Text style={[typeScale.caption, { color: colors.error }]}>Remove my ID</Text>
+            <Text style={[typeScale.caption, { color: colors.error }]}>{t('Remove my ID')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -100,6 +102,7 @@ export function WorkerExtrasFields({ hoodie, onHoodie, newIdUri, onNewIdUri, sav
 
 /** Shows an ID photo from a short-lived private link. Used by the worker on their own ID and by the owner. */
 export function IdViewerModal({ visible, idKey, onClose }: { visible: boolean; idKey: string; onClose: () => void }) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +120,7 @@ export function IdViewerModal({ visible, idKey, onClose }: { visible: boolean; i
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <Pressable onPress={onClose} style={[styles.close, { top: insets.top + spacing.md }]} hitSlop={12} accessibilityLabel="Close">
+        <Pressable onPress={onClose} style={[styles.close, { top: insets.top + spacing.md }]} hitSlop={12} accessibilityLabel={t('Close')}>
           <Feather name="x" size={26} color="#FFFFFF" />
         </Pressable>
         {url ? (
@@ -128,7 +131,7 @@ export function IdViewerModal({ visible, idKey, onClose }: { visible: boolean; i
           <ActivityIndicator color="#FFFFFF" />
         )}
         <Text style={[typeScale.caption, { color: '#BBBBBB', position: 'absolute', bottom: insets.bottom + spacing.lg }]}>
-          Private. Only the worker and the owner can see this.
+          {t('Private. Only the worker and the owner can see this.')}
         </Text>
       </View>
     </Modal>
@@ -137,6 +140,7 @@ export function IdViewerModal({ visible, idKey, onClose }: { visible: boolean; i
 
 /** A "View ID" row for the owner's worker page and join-request cards. Renders nothing when there is no ID on file. */
 export function ViewIdButton({ idKey }: { idKey: string | undefined }) {
+  const t = useT();
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   if (!idKey) return null;
@@ -144,7 +148,7 @@ export function ViewIdButton({ idKey }: { idKey: string | undefined }) {
     <>
       <Pressable onPress={() => setOpen(true)} style={styles.viewRow} accessibilityRole="button">
         <Feather name="credit-card" size={14} color={colors.primary} />
-        <Text style={[typeScale.bodySmall, { color: colors.primary, marginLeft: spacing.xs, fontWeight: '600' }]}>View ID (private)</Text>
+        <Text style={[typeScale.bodySmall, { color: colors.primary, marginLeft: spacing.xs, fontWeight: '600' }]}>{t('View ID (private)')}</Text>
       </Pressable>
       <IdViewerModal visible={open} idKey={idKey} onClose={() => setOpen(false)} />
     </>
@@ -153,6 +157,7 @@ export function ViewIdButton({ idKey }: { idKey: string | undefined }) {
 
 /** For the owner: a worker's hoodie size and (owner only) a private View ID link. Shows nothing until one of them exists. */
 export function OwnerWorkerExtras({ personId }: { personId: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const [size, setSize] = useState<string | null>(null);
   const [idKey, setIdKey] = useState<string | undefined>(undefined);
@@ -168,7 +173,7 @@ export function OwnerWorkerExtras({ personId }: { personId: string }) {
   if (!size && !idKey) return null;
   return (
     <View>
-      {size ? <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>Hoodie size: {size}</Text> : null}
+      {size ? <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>{t('Hoodie size: {size}', { size })}</Text> : null}
       <ViewIdButton idKey={idKey} />
     </View>
   );

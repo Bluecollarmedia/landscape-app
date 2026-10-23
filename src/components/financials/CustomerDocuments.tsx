@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { ListSection } from '@/components/ui';
 import { DocumentRow } from './DocumentRow';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useFinancialDocs } from '@/hooks/useFinancials';
 import { displayStatus, DOC_LABEL } from '@/data/financials';
@@ -24,6 +25,7 @@ export function customerCanSee(d: FinancialDoc): boolean {
 }
 
 export function CustomerDocuments({ projectId }: { projectId: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const all = useFinancialDocs(projectId);
@@ -47,14 +49,14 @@ export function CustomerDocuments({ projectId }: { projectId: string }) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>
-              {DOC_LABEL[d.kind]} {d.number} is ready for review
+              {t('{doc} {number} is ready for review', { doc: t(DOC_LABEL[d.kind]), number: d.number })}
             </Text>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{formatMoney(d.total)} · Tap to review and approve</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{formatMoney(d.total)} · {t('Tap to review and approve')}</Text>
           </View>
           <Icon name="chevron-right" size={18} color={colors.textTertiary} />
         </Pressable>
       ))}
-      <ListSection title="QUOTES & INVOICES" style={{ marginBottom: 0 }}>
+      <ListSection title={t('QUOTES & INVOICES')} style={{ marginBottom: 0 }}>
         {docs.map((d) => <DocumentRow key={d.id} doc={d} onPress={() => open(d)} />)}
       </ListSection>
     </View>

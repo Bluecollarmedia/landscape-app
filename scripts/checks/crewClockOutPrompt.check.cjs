@@ -14,7 +14,7 @@ const finish = read('src/data/maintenanceFinish.ts');
 
 check('1 the question and both answers are on the card', /Clock out the whole crew now\?/.test(card) && /NOT YET/.test(card) && /CLOCK OUT CREW/.test(card));
 check('2 it shows only when every stop is done, the workday clock is on, and the viewer is the leader (or owner/admin)', /allDone && timeOn && leader && route \? <CrewClockOutCard routeId=\{route\.id\} \/>/.test(screen));
-check('3 "Not yet" does nothing but keep a smaller button for later', /setStage\('later'\)/.test(card) && /stage === 'later' \? 'CLOCK OUT THE WHOLE CREW'/.test(card));
+check('3 "Not yet" does nothing but keep a smaller button for later', /setStage\('later'\)/.test(card) && /stage === 'later' \? (?:t\()?'CLOCK OUT THE WHOLE CREW'/.test(card));
 check('4 nothing clocks out by itself: finishing a stop never calls the crew clock-out', !/clockOutCrew|maintenance_clock_out_crew/.test(finish) && (screen.match(/clockOutCrew/g) || []).length === 0);
 check('5 the phone asks the database function and refreshes the clocks after', /rpc\('maintenance_clock_out_crew', \{ p_route: routeId \}\)/.test(data) && /emitTimeChanged\(\);\n?\r?\n?\s*const d = /.test(data));
 check('6 the database allows only the route leader or staff', /public\.is_staff\(r\.company_id\) or r\.lead_person_id = me/.test(sql));

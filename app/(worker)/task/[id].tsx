@@ -13,8 +13,10 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { haptics } from '@/lib/haptics';
 import { db } from '@/data/store';
 import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
+import { useT, tr } from '@/i18n';
 
 export default function TaskDetailScreen() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const router = useRouter();
@@ -28,7 +30,7 @@ export default function TaskDetailScreen() {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const tasks = currentJob ? projectTasks(currentJob.projectId) : [];
-  const task = tasks.find(t => t.id === id);
+  const task = tasks.find(x => x.id === id);
   const attachments = task ? db.taskAttachments[task.id] ?? [] : [];
   const mediaItems: TaskMediaItem[] = attachments.map(a => ({ key: a.id, uri: a.fileUrl, mediaType: a.mediaType }));
   const settings = currentJob ? projectSettings(currentJob.projectId) : undefined;
@@ -44,7 +46,7 @@ export default function TaskDetailScreen() {
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <Header onBack={() => router.back()} colors={colors} insets={insets} />
         <View style={styles.center}>
-          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Task not found</Text>
+          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>{t('Task not found')}</Text>
         </View>
       </View>
     );
@@ -52,10 +54,10 @@ export default function TaskDetailScreen() {
 
   const badge =
     task.status === 'completed'
-      ? { label: 'Completed', status: 'success' as const }
+      ? { label: t('Completed'), status: 'success' as const }
       : task.status === 'in_progress'
-      ? { label: 'In Progress', status: 'warning' as const }
-      : { label: 'Not Started', status: 'neutral' as const };
+      ? { label: t('In Progress'), status: 'warning' as const }
+      : { label: t('Not Started'), status: 'neutral' as const };
 
   function handleStart() {
     haptics.select();
@@ -67,10 +69,10 @@ export default function TaskDetailScreen() {
       pickPhoto('library');
       return;
     }
-    Alert.alert('Add Photo', undefined, [
-      { text: 'Take Photo', onPress: () => pickPhoto('camera') },
-      { text: 'Choose from Library', onPress: () => pickPhoto('library') },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('Add Photo'), undefined, [
+      { text: t('Take Photo'), onPress: () => pickPhoto('camera') },
+      { text: t('Choose from Library'), onPress: () => pickPhoto('library') },
+      { text: t('Cancel'), style: 'cancel' },
     ]);
   }
 
@@ -82,8 +84,8 @@ export default function TaskDetailScreen() {
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
-          source === 'camera' ? 'Camera access needed' : 'Photo access needed',
-          'Turn it on for Brighton Lawn in the Settings app to add task photos.',
+          source === 'camera' ? t('Camera access needed') : t('Photo access needed'),
+          t('Turn it on for Brighton Lawn in the Settings app to add task photos.'),
         );
         return;
       }
@@ -136,7 +138,7 @@ export default function TaskDetailScreen() {
           <View style={[styles.card, styles.notice, { backgroundColor: colors.successLight, marginTop: spacing.lg }]}>
             <Feather name="check-circle" size={18} color={colors.success} />
             <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
-              Completed{task.completer ? ` by ${task.completer.firstName} ${task.completer.lastName}`.trimEnd() : ''}
+              {task.completer ? t('Completed by {name}', { name: `${task.completer.firstName} ${task.completer.lastName}`.trimEnd() }) : t('Completed')}
               {task.completedAt && (
                 <Text style={{ color: colors.textSecondary }}>{'\n'}{formatCompletedAt(task.completedAt)}</Text>
               )}
@@ -148,11 +150,11 @@ export default function TaskDetailScreen() {
           <View style={[styles.card, styles.notice, { backgroundColor: colors.backgroundTertiary, marginTop: spacing.lg }]}>
             <Feather name="lock" size={18} color={colors.textSecondary} />
             <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
-              Only the Task Lead can check off tasks{'\n'}
+              {t('Only the Task Lead can check off tasks')}{'\n'}
               <Text style={{ color: colors.textSecondary }}>
                 {lead
-                  ? `${lead.firstName} ${lead.lastName}`.trim() + ' is the Task Lead for this job.'
-                  : 'No Task Lead yet. The owner needs to pick one before tasks can be checked off.'}
+                  ? t('{name} is the Task Lead for this job.', { name: `${lead.firstName} ${lead.lastName}`.trim() })
+                  : t('No Task Lead yet. The owner needs to pick one before tasks can be checked off.')}
               </Text>
             </Text>
           </View>
@@ -162,15 +164,15 @@ export default function TaskDetailScreen() {
           <View style={[styles.card, styles.notice, { backgroundColor: colors.infoLight, marginTop: spacing.lg }]}>
             <Feather name="camera" size={18} color={colors.info} />
             <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
-              Photos Required{'\n'}
-              <Text style={{ color: colors.textSecondary }}>Take a photo when this task is complete.</Text>
+              {t('Photos Required')}{'\n'}
+              <Text style={{ color: colors.textSecondary }}>{t('Take a photo when this task is complete.')}</Text>
             </Text>
           </View>
         )}
 
         {task.description && (
           <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.lg }, shadow.md]}>
-            <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>NOTES</Text>
+            <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>{t('NOTES')}</Text>
             <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, marginTop: spacing.xs }]}>
               {task.description}
             </Text>
@@ -180,10 +182,10 @@ export default function TaskDetailScreen() {
         {attachments.length > 0 && (
           <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.lg }, shadow.md]}>
             <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>
-              {attachments.some(a => a.mediaType === 'video') ? 'PHOTOS AND VIDEOS' : 'PHOTOS'}
+              {attachments.some(a => a.mediaType === 'video') ? t('PHOTOS AND VIDEOS') : t('PHOTOS')}
             </Text>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>
-              Tap to see what needs to be done.
+              {t('Tap to see what needs to be done.')}
             </Text>
             <TaskMediaStrip items={mediaItems} onOpen={setViewerIndex} />
           </View>
@@ -197,7 +199,7 @@ export default function TaskDetailScreen() {
               <View style={styles.photoPlaceholder}>
                 <Feather name="image" size={32} color={colors.textTertiary} />
                 <Text style={[typeScale.bodySmall, { color: colors.textTertiary, marginTop: spacing.sm }]}>
-                  No photo yet
+                  {t('No photo yet')}
                 </Text>
               </View>
             )}
@@ -214,7 +216,7 @@ export default function TaskDetailScreen() {
                 style={styles.pillButton}
               >
                 <Feather name="play" size={18} color="#FFFFFF" />
-                <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>Start Task</Text>
+                <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>{t('Start Task')}</Text>
               </LinearGradient>
             </Pressable>
           )}
@@ -229,7 +231,7 @@ export default function TaskDetailScreen() {
                 >
                   <Feather name="camera" size={18} color={colors.primary} />
                   <Text style={[typeScale.labelLarge, { color: colors.primary, marginLeft: spacing.sm }]}>
-                    {hasPhoto ? 'Retake Photo' : 'Take Photo'}
+                    {hasPhoto ? t('Retake Photo') : t('Take Photo')}
                   </Text>
                 </Pressable>
               )}
@@ -242,13 +244,13 @@ export default function TaskDetailScreen() {
                 >
                   <Feather name="check" size={18} color="#FFFFFF" />
                   <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>
-                    Mark Complete
+                    {t('Mark Complete')}
                   </Text>
                 </LinearGradient>
               </Pressable>
               {photoRequired && !hasPhoto && (
                 <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
-                  Take a photo before marking this task complete.
+                  {t('Take a photo before marking this task complete.')}
                 </Text>
               )}
             </>
@@ -268,17 +270,21 @@ export default function TaskDetailScreen() {
 
 function formatCompletedAt(iso: string) {
   const d = new Date(iso);
-  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+  return tr('{date} at {time}', {
+    date: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+  });
 }
 
 function Header({ onBack, colors, insets }: { onBack: () => void; colors: any; insets: any }) {
+  const t = useT();
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
       <Pressable onPress={onBack} hitSlop={12} style={styles.backButton}>
         <Feather name="arrow-left" size={22} color={colors.textPrimary} />
       </Pressable>
       <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>
-        Task Details
+        {t('Task Details')}
       </Text>
       <View style={{ width: 22 + spacing.xs * 2 }} />
     </View>

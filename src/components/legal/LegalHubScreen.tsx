@@ -11,18 +11,20 @@ import { ListSection, ListRow, ScreenHeader } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { LEGAL_ROWS, legalDocPath } from '@/lib/legalPaths';
 import { spacing } from '@/theme/spacing';
+import { useT } from '@/i18n';
 
 export function LegalHubScreen({ basePath }: { basePath: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScreenHeader title="Legal & Support" />
+      <ScreenHeader title={t('Legal & Support')} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['3xl'] }} showsVerticalScrollIndicator={false}>
         <ListSection>
           {LEGAL_ROWS.map((r) => (
-            <ListRow key={r.slug} icon={r.icon} title={r.title} subtitle={r.subtitle} showChevron onPress={() => router.push(legalDocPath(basePath, r.slug) as any)} />
+            <ListRow key={r.slug} icon={r.icon} title={t(r.title)} subtitle={t(r.subtitle)} showChevron onPress={() => router.push(legalDocPath(basePath, r.slug) as any)} />
           ))}
         </ListSection>
       </ScrollView>

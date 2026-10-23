@@ -45,6 +45,15 @@ export function setLanguage(next: Language) {
   current = next;
   emit();
   AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
+  syncLanguageToAccount();
+}
+
+/** Saves the language on the signed-in account (update 95) so the server's push notices come in it. Quietly does nothing when signed out or the update is not installed. */
+export function syncLanguageToAccount() {
+  try {
+    const { supabase } = require('@/lib/supabase') as typeof import('@/lib/supabase');
+    supabase.rpc('set_my_language', { p_language: current }).then(() => {}, () => {});
+  } catch { /* offline or signed out */ }
 }
 
 /** Reads the saved choice (called once at startup). Anything unexpected stays English. */

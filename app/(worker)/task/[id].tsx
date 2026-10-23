@@ -13,6 +13,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { haptics } from '@/lib/haptics';
 import { db } from '@/data/store';
 import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
+import { PhotoPager } from '@/components/media/PhotoPager';
 import { useT, tr } from '@/i18n';
 
 export default function TaskDetailScreen() {
@@ -28,6 +29,7 @@ export default function TaskDetailScreen() {
 
   const [busy, setBusy] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [viewCompletionPhoto, setViewCompletionPhoto] = useState(false);
 
   const tasks = currentJob ? projectTasks(currentJob.projectId) : [];
   const task = tasks.find(x => x.id === id);
@@ -194,7 +196,9 @@ export default function TaskDetailScreen() {
         {((isLead && photoRequired) || photoUri) && (
           <View style={[styles.photoArea, { backgroundColor: colors.groupedBackground, marginTop: spacing.lg }]}>
             {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.photoImage} resizeMode="cover" />
+              <Pressable onPress={() => setViewCompletionPhoto(true)} accessibilityRole="button" accessibilityLabel={t('View photo')}>
+                <Image source={{ uri: photoUri }} style={styles.photoImage} resizeMode="cover" />
+              </Pressable>
             ) : (
               <View style={styles.photoPlaceholder}>
                 <Feather name="image" size={32} color={colors.textTertiary} />
@@ -264,6 +268,7 @@ export default function TaskDetailScreen() {
         onIndexChange={setViewerIndex}
         onClose={() => setViewerIndex(null)}
       />
+      {photoUri ? <PhotoPager photos={[{ id: 'done', url: photoUri }]} startId={viewCompletionPhoto ? 'done' : null} onClose={() => setViewCompletionPhoto(false)} /> : null}
     </View>
   );
 }

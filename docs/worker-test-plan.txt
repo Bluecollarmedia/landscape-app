@@ -1,0 +1,59 @@
+SNOW WORKER SIDE: WHAT I CHECKED AND HOW TO TEST IT ON YOUR PHONE
+(2026-10-21, branch fix/snow-audit / PR #155. Nothing here has been seen on a phone.)
+
+WHAT A WORKER SEES (3 tabs)
+  Route       only if the owner put them on a route as lead OR crew. Otherwise the tab is hidden and they land on Time Clock.
+  Time Clock  Clock In / Clock Out and this week's shifts.
+  Settings    profile card, email and role, snow services (read-only), Privacy/Terms/Help, Sign Out, Delete Account.
+
+WHAT I CHECKED (database, automated, all passing)
+  Multi-service storms (56), crew on routes (47), clock-in tagged to a storm (21), shift corrections (11), snow gaps (12),
+  stop notes and photos (11), combined routes (20), worker auto-enroll (16), clock-in needs work (46),
+  permissions and cleanup (18), crew push notifications (14).
+  One test was stale (it called an internal function the new permissions correctly lock); I pointed it at the real one.
+
+WHAT I CHANGED TODAY ON THE WORKER SIDE
+  Settings had four ways into the same "edit profile" screen (the card, plus Photo, Name and Phone rows). Now there is the
+  card only, with one line under it: "Tap to change your name, phone or photo. The office sees them."
+
+RULES THE CODE ENFORCES (so you know what is "correct" while testing)
+  - Only the route LEAD can press I'm Here, add photos, Finish Stop, or ask to skip. Crew see the route and a note
+    saying "You're on this route's crew. The route lead marks arrivals, finishes stops and adds photos."
+  - Stops are done in order, one at a time. Finish Stop is blocked until the minimum photos are added.
+  - Clock In only works when the worker is on a route in a dispatched storm. An open shift always keeps its Clock Out.
+  - A storm that has ended (or a cancelled route) shows a notice and no buttons.
+  - Pull down on the Route tab to refresh. The Route tab also re-checks every minute.
+
+PHONE TEST SCRIPT (needs a NEW build; use 2 phones or 2 accounts: owner + worker lead + worker crew)
+  A. Setup (owner phone)
+     1. Create a storm, add properties, make a route, pick a lead and one crew member, tap Dispatch.
+  B. Push (both worker phones, app closed)
+     2. Lead gets a push about the dispatch with the route name and stop count.
+     3. Crew gets a push saying they are crew on that route.
+     4. Tapping either push opens the storm screen.
+  C. Lead flow
+     5. Route tab shows "Next stop" with name, address, owner note, Directions.
+     6. Directions opens maps.
+     7. Tap I'm Here -> status changes to "You're here".
+     8. Try Finish Stop with no photos -> blocked, message says how many more photos.
+     9. Add photos, add a note, Finish Stop -> next stop appears, count goes up, owner dashboard updates.
+    10. Ask to skip a stop -> owner sees the request.
+    11. Finish the last stop -> "Every stop on this route is done."
+  D. Crew flow
+    12. Route tab shows the route but NO I'm Here / Finish / photo buttons, only the crew note.
+    13. Crew can still use Directions and see instructions.
+  E. Time clock (either worker)
+    14. Clock In works while storm is dispatched; Clock Out ends it and hours add to "this week".
+    15. Before dispatch (or after the storm ends) Clock In is not offered.
+    16. Forget to clock out -> owner can correct it in More > Snow hours.
+  F. Settings
+    17. Tap the profile card -> change photo/name/phone -> Save -> screen closes, keyboard gone.
+    18. Services list matches what the owner gave. Sign Out, Privacy, Terms, Help, Delete Account each appear once.
+  G. Edge cases
+    19. Owner removes the worker's snow access -> worker is signed out of Snow Mode or sees no routes.
+    20. Owner cancels the route mid-storm -> worker sees "This route was cancelled."
+    21. Airplane mode: I'm Here / Finish should show a clear error, not freeze.
+
+WHAT I COULD NOT VERIFY
+  Anything visual or on a real device: push delivery to a locked phone, camera and photo upload, Directions handoff,
+  and how the screens look. The database rules above are tested; the screens are only type-checked.

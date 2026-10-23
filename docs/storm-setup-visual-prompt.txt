@@ -1,0 +1,27 @@
+PROMPT FOR AN AI VISUAL: the "Storm setup" screen (Snow Mode, owner)
+
+Design a mobile app screen (iPhone portrait, 390x844) for a snow-plowing business owner. App name: Brighton Lawn + Landscape, Snow Mode. Style: clean, calm "icy blue" look. A soft winter photo of snow-covered pine trees fades into the page behind the header only. Below it the page is a very light blue-grey with white rounded cards (16px corners, thin borders, no heavy shadows). Dark navy text, one strong blue accent for buttons. Big, thumb-friendly buttons. Friendly, not corporate.
+
+WHERE IT IS
+Snow Mode > Storms > tap a storm that is still a DRAFT (for example "Oct 20 Plowing"). It is the page where the owner gets a storm ready before sending the crews out. Nothing is running yet.
+
+WHAT IT DOES
+The owner builds the route for one storm, top to bottom, then dispatches it. The screen is a single scrolling page:
+
+1. HEADER over the winter photo: a round back button on the left, a small pill saying "Draft" on the right. Big bold storm name "Oct 20 Plowing" with the service "Plowing" under it.
+
+2. ROUTE NAME: the route's name in small text with a pencil icon (tap to rename, for example "David's route").
+
+3. CREW CARD (white card):
+   - "Crew" with a line such as "No crew" and a blue "+ Add Crew" button on the right. Tapping it opens a short list of snow-team workers to add. Added workers appear as rows with a small "Remove" link.
+   - Below that, "Crew lead: who runs the route" with the chosen person's name (or an orange "Assign a crew lead" if nobody is picked yet) and a down chevron to pick from a list. A crew lead is required before dispatch.
+
+4. PROPERTIES section: the label "PROPERTIES" (small caps). Empty state: "No properties yet. Tap Add Property below." Once added, each property is a numbered row (1, 2, 3) with name, address, a tiny camera icon with "Photos required" or "No photos required", and little arrows to move it up or down and an X to remove. Rows can be dragged to reorder. A full-width blue "+ Add Property" button sits under the list; tapping it shows a checklist of properties that offer plowing, with Cancel and Add buttons.
+
+5. A small grey note: "5 properties offer plowing." (or "No active properties offer plowing yet. Turn the service on for a property first.")
+
+6. BOTTOM ACTIONS: a large full-width blue button "Dispatch storm" with a send icon, and under it a plain text button "Delete draft".
+
+NOT on this screen: no progress dashboard, no history list, no stats. Those only appear after the storm is dispatched.
+
+Show two versions: (A) empty draft just created, (B) filled in with a 2-person crew, a lead chosen, and 4 properties.

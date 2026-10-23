@@ -1,0 +1,43 @@
+PROMPT: THE SNOW WORKER'S ROUTE SCREEN
+
+Design a phone screen (iPhone, portrait, light theme, clean white cards on a pale blue-grey background) called "My Route". It is the first screen a snow worker sees after signing in to Snow Mode. It tells the worker what to do next, one stop at a time. It is not a map and not a list of everything; it is a simple "do this next" screen.
+
+TOP OF THE SCREEN
+- Big title: "My Route".
+- Directly under it, a card: "Clock in for the storm" with the line "Tap when you start. Your hours count from now." and one blue "Clock In" button. Once the worker has clocked in, this card becomes a single quiet line: "Clocked in since 4:12 PM. Clock out in the Time Clock tab." (no button).
+- A small grey summary line: "North Route - Oct 21 Plowing - Plowing - 1 of 3 done".
+- If the worker is on more than one route, small pill buttons to switch between them.
+
+THE CURRENT STOP (the big white card, the heart of the screen)
+- Small label at the top left: "NEXT STOP" with a status badge on the right ("Not started"). After the worker arrives it says "YOU'RE HERE" and the badge says "On site".
+- The property name in large bold text (for example "Oak Plaza"), with its street address under it in grey.
+- If the property gets more than one service on this visit (for example plowing + salting), a blue line under the address: "Plowing + Salting".
+- If the owner left a note for this stop, a light blue note box with it (for example "Gate code 4412, plow behind the building first").
+- A "Directions" button (secondary style) that opens maps.
+- Then ONE main action that changes as the worker moves through the stop:
+    1. Before arriving: a big blue "I'm Here" button.
+    2. After arriving: an "Add photos" button (shows "Add photos (2 added)"), a small line "2 photos are uploading in the background. You can keep going.", an optional "Note" box ("Anything the owner should know"), a warning if more photos are required ("Add 1 more photo before finishing this stop"), and a big blue "Finish Stop" button.
+- Under the buttons, a small "Skip this stop" request option for the route lead.
+- If the worker is on the crew but not the route lead, the buttons are replaced by a calm note: "You're on this route's crew. The route lead marks arrivals, finishes stops and adds photos." They can still see the stop and tap Directions.
+
+INSTRUCTIONS CARD
+- Under the current stop, a card titled "Plowing instructions" showing the owner's saved instructions and reference photos for that property (where to plow, what to avoid).
+
+ALL STOPS LIST
+- A small heading "ALL STOPS" then one white rounded list: each row has a number (1, 2, 3), the property name, its address in grey, and on the right either a green check (done) or a small status badge ("Not started", "On site"). The current stop is the first row that is not done.
+- When every stop is finished, a green message replaces the current-stop card: "Every stop on this route is done."
+
+BOTTOM
+- A collapsed "PAST WORK (3)" row with a small down arrow; tapping it lists earlier routes for reference only.
+- Floating tab bar at the very bottom with three tabs: Route (selected), Time Clock, Settings.
+
+WHAT THE WORKER DOES, IN ORDER (explain this in the picture if there is room)
+1. Clock in for the storm.
+2. Look at the next stop, tap Directions, drive there.
+3. Tap "I'm Here" when they arrive.
+4. Plow, shovel or salt the property, take photos of the finished work, add them.
+5. Tap "Finish Stop". The next stop appears automatically.
+6. Repeat until "Every stop on this route is done."
+7. Go to the Time Clock tab and clock out.
+
+Tone: simple, big tap targets, readable with gloves on in the cold. No clutter, no duplicate buttons, one obvious next action at all times. Brand colors: calm blue primary, white cards, green for done, amber for warnings.

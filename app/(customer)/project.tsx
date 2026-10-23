@@ -16,6 +16,7 @@ import { CustomerBillingCard } from '@/components/financials/CustomerBillingCard
 import { ProgressRing } from '@/components/ui/ProgressRing';
 import { meaningfulUpdates } from '@/lib/customerOverview';
 import { ReportSheet, type ReportTarget } from '@/components/reports/ReportSheet';
+import { PhotoPager, type PagerPhoto } from '@/components/media/PhotoPager';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic, brand } from '@/theme/colors';
@@ -69,6 +70,7 @@ export default function CustomerProjectScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [activeSection, setActiveSection] = useState('overview');
+  const [viewing, setViewing] = useState<{ photos: PagerPhoto[]; startId: string } | null>(null);
 
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [reqTitle, setReqTitle] = useState('');
@@ -176,7 +178,9 @@ export default function CustomerProjectScreen() {
                   <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>{formatDateTime(e.timestamp)}</Text>
                 </View>
                 {e.photoUrl ? (
-                  <OptimizedImage source={e.photoUrl} style={[styles.actThumb, { backgroundColor: colors.backgroundTertiary }]} />
+                  <Pressable onPress={() => setViewing({ photos: [{ id: e.photoUrl!, url: e.photoUrl! }], startId: e.photoUrl! })} accessibilityRole="button" accessibilityLabel={t('View photo')}>
+                    <OptimizedImage source={e.photoUrl} style={[styles.actThumb, { backgroundColor: colors.backgroundTertiary }]} />
+                  </Pressable>
                 ) : null}
               </View>
             ))
@@ -249,10 +253,12 @@ export default function CustomerProjectScreen() {
                     </Text>
                   )}
                   {event.photoUrl && (
-                    <OptimizedImage
-                      source={event.photoUrl}
-                      style={[styles.timelinePhoto, { backgroundColor: colors.backgroundTertiary }]}
-                    />
+                    <Pressable onPress={() => setViewing({ photos: [{ id: event.photoUrl!, url: event.photoUrl! }], startId: event.photoUrl! })} accessibilityRole="button" accessibilityLabel={t('View photo')}>
+                      <OptimizedImage
+                        source={event.photoUrl}
+                        style={[styles.timelinePhoto, { backgroundColor: colors.backgroundTertiary }]}
+                      />
+                    </Pressable>
                   )}
                   <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
                     {formatDateTime(event.timestamp)}
@@ -275,10 +281,12 @@ export default function CustomerProjectScreen() {
           <View style={styles.photoGrid}>
             {sharedPhotos.map(photo => (
               <Card key={photo.id} style={styles.photoCard}>
-                <OptimizedImage
-                  source={photo.fileUrl}
-                  style={[styles.photoImage, { backgroundColor: colors.backgroundTertiary }]}
-                />
+                <Pressable onPress={() => setViewing({ photos: sharedPhotos.map(p => ({ id: p.id, url: p.fileUrl })), startId: photo.id })} accessibilityRole="button" accessibilityLabel={t('View photo')}>
+                  <OptimizedImage
+                    source={photo.fileUrl}
+                    style={[styles.photoImage, { backgroundColor: colors.backgroundTertiary }]}
+                  />
+                </Pressable>
                 <View style={{ padding: spacing.md }}>
                   <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>
                     {photo.customerDescription ?? photo.caption ?? t('Project photo')}
@@ -466,6 +474,7 @@ export default function CustomerProjectScreen() {
       <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {sectionRenderers[activeSection]?.()}
       </KeyboardAwareScrollView>
+      <PhotoPager photos={viewing?.photos ?? []} startId={viewing?.startId ?? null} onClose={() => setViewing(null)} />
     </View>
   );
 }

@@ -4,6 +4,7 @@
  * report, mark them Resolved and can delete them (supabase/updates/038).
  */
 
+import { tr } from '@/i18n';
 import { useMemo } from 'react';
 import { db, insertRow, updateRow, deleteRow, rowsOf, useDb } from './store';
 import { uploadImage } from '@/lib/media';
@@ -110,7 +111,7 @@ export async function reportIssue(input: ReportInput): Promise<{ ok: true } | { 
       photos.push({ url, key });
     }
   } catch (err) {
-    return { ok: false, error: `A photo couldn't be uploaded. ${err instanceof Error ? err.message : ''}`.trim() };
+    return { ok: false, error: `${tr("A photo couldn't be uploaded.")} ${err instanceof Error ? err.message : ''}`.trim() };
   }
   insertRow('property_issues', {
     reportedBy: db.personId,

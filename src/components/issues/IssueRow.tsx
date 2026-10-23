@@ -1,3 +1,4 @@
+import { useLanguage, tr } from '@/i18n';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -11,15 +12,16 @@ import { spacing, radius } from '@/theme/spacing';
 export function issueWhen(iso: string): string {
   const d = new Date(iso);
   const mins = Math.round((Date.now() - d.getTime()) / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins} min ago`;
-  if (mins < 60 * 24) return `${Math.round(mins / 60)} hr ago`;
+  if (mins < 1) return tr('Just now');
+  if (mins < 60) return tr('{n} min ago', { n: mins });
+  if (mins < 60 * 24) return tr('{n} hr ago', { n: Math.round(mins / 60) });
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 /** One reported problem: type, place, who and when, first photo, status. */
 export function IssueRow({ issue, showPlace = true }: { issue: PropertyIssue; showPlace?: boolean }) {
   const { colors } = useTheme();
+  const { language } = useLanguage();
   const router = useRouter();
   const icon = ISSUE_TYPES.find((t) => t.key === issue.issueType)?.icon ?? 'flag';
   const open = issue.status === 'open';
@@ -51,7 +53,7 @@ export function IssueRow({ issue, showPlace = true }: { issue: PropertyIssue; sh
       </View>
       <View style={[styles.badge, { backgroundColor: open ? colors.warningLight : colors.primarySurface }]}>
         <Text style={[typeScale.caption, { color: open ? colors.warning : colors.primaryDark, fontWeight: '700' }]}>
-          {open ? 'Open' : 'Resolved'}
+          {open ? (language === 'es' ? 'Abierto' : 'Open') : (language === 'es' ? 'Resuelto' : 'Resolved')}
         </Text>
       </View>
     </PressableScale>

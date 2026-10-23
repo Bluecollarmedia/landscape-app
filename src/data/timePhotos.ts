@@ -5,6 +5,7 @@
  * it. These helpers make that smooth: when the database says a photo is missing, offer the camera, save the photo (awaited, not in the
  * background, so it counts immediately), and try the step again. The photo is internal; it is never shown to customers.
  */
+import { tr } from '@/i18n';
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
@@ -61,7 +62,7 @@ export async function takeTimedPhoto(target: TimedPhotoTarget, phase: Phase): Pr
     }
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "The photo couldn't be uploaded. Try again." };
+    return { ok: false, error: e instanceof Error ? e.message : tr("The photo couldn't be uploaded. Try again.") };
   }
 }
 

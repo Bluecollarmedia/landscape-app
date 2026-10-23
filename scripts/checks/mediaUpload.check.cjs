@@ -29,7 +29,7 @@ const fakeSupabase = {
   functions: { invoke: async (name, args) => { calls.push({ fn: name, args }); return invokeResult; } },
 };
 
-const errors = compile(read('src/lib/uploadErrors.ts'), () => ({}));
+const errors = compile(read('src/lib/uploadErrors.ts'), (n) => (n === '@/i18n' ? { tr: (t) => t } : {}));
 const load = (r2) => {
   const req = (name) => {
     if (name === 'react-native') return { Platform: { OS: 'ios' } };

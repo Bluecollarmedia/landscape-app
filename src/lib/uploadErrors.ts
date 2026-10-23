@@ -1,5 +1,6 @@
 // Turns the raw error text from a failed photo/video upload into a sentence that says what to do.
 // The raw text is always kept in brackets so the real cause is never hidden.
+import { tr } from '@/i18n';
 
 const RULES: { test: RegExp; say: string }[] = [
   { test: /bucket not found/i, say: "Photo storage isn't set up on the server yet (the storage bucket is missing)." },
@@ -20,7 +21,7 @@ export function explainUploadError(raw: unknown): string {
     : null;
   const text = (fromObject ?? String(raw ?? '')).trim() || 'Unknown error';
   const rule = RULES.find((r) => r.test.test(text));
-  return rule ? `${rule.say} (${text})` : text;
+  return rule ? `${tr(rule.say)} (${text})` : text;
 }
 
 /** Message used when there is no signed-in session, so the server would refuse the upload anyway. */

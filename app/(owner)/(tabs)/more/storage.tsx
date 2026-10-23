@@ -187,13 +187,13 @@ export default function StorageScreen() {
             <View style={[styles.noteBox, { backgroundColor: semantic.infoLight }]}>
               <Icon name="info" size={14} color={semantic.info} />
               <Text style={[typeScale.caption, { color: semantic.info, flex: 1, marginLeft: spacing.xs }]}>
-                Photos are saved in Supabase. Its Free plan holds 1 GB, so anything over that needs
-                the Supabase Pro plan ($25/month with 100 GB included, then about 2¢ per extra GB).
+                New photos and videos are saved on Cloudflare R2: the first 10 GB are free, then about
+                1.5¢ per GB per month, with no charge for viewing them. Older files stay in Supabase.
               </Text>
             </View>
           ) : (
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-              1 GB matches the Supabase Free plan your photos are saved on.
+              New photos and videos are saved on Cloudflare R2, which includes 10 GB free.
             </Text>
           )}
         </Card>

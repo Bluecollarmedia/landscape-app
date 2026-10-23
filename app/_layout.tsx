@@ -25,6 +25,7 @@ import { installWebAlert } from '@/lib/webDialog';
 import { db } from '@/data/store';
 import { todayKey } from '@/lib/ids';
 import { hasOpenProjectWork } from '@/lib/workerAreas';
+import { useAdminWorksSnow } from '@/lib/adminSnowWork';
 import { WebDialogHost } from '@/components/ui/WebDialogHost';
 
 // On the website Alert.alert does nothing by itself; this points it at the app's own dialog (a phone keeps the system alert).
@@ -42,6 +43,8 @@ function RootNavigator() {
   // no sign-in, no redirects.
   const isPublicPage = ['approve', 'invite', 'legal', 'reset-password', 'auth-callback'].includes((segments as string[])[0]);
   const { shell, pending: shellPending } = useModeAccess(user?.role);
+  // An admin who opened their Snow route may stay in the worker Snow area (see lib/adminSnowWork).
+  const adminOnSnowRoute = useAdminWorksSnow();
   const { colors } = useTheme();
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
@@ -100,14 +103,14 @@ function RootNavigator() {
       // Legal & Support opens inside the Snow area (so Back returns to Settings): it is part of whichever Snow shell they are in.
       const inLegal = s1 === 'legal-support';
       const onTarget =
-        shell === 'snow' ? currentGroup === 'snow' && (s1 === role || inLegal)
+        shell === 'snow' ? currentGroup === 'snow' && (s1 === role || inLegal || (db.role === 'admin' && adminOnSnowRoute && s1 === 'worker'))
         : shell === 'snow_notice' ? currentGroup === 'snow' && (s1 === 'notice' || inLegal)
         : currentGroup === `(${role})` || (adminWorks && currentGroup === '(worker)');
       if (inAuthGroup || inOnboardingGroup || !onTarget) {
         router.replace(target as any);
       }
     }
-  }, [isLoading, isAuthenticated, user, appState, onboardingStep, segments, splashDone, isPublicPage, shell, shellPending]);
+  }, [isLoading, isAuthenticated, user, appState, onboardingStep, segments, splashDone, isPublicPage, shell, shellPending, adminOnSnowRoute]);
 
   const handleSplashFinish = useCallback(() => {
     setSplashDone(true);

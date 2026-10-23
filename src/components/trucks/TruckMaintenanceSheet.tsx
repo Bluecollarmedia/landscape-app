@@ -2,6 +2,7 @@
  * Add or change one entry in a truck's maintenance log: a title (tap a suggestion or type your own), the date the service was done,
  * when it is next due (you get a reminder that morning), and notes about what was done.
  */
+import { useKeepDraft } from '@/hooks/useKeepDraft';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, TextInput, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,21 +34,21 @@ export function TruckMaintenanceSheet({ visible, editing, onClose, onSubmit }: P
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!visible) return;
+  // Swipe it away and open it again: what you typed is still there (until it is sent or you leave the page).
+  const markSaved = useKeepDraft(visible, editing?.id ?? 'new', () => {
     setTitle(editing?.title ?? '');
     setServicedOn(editing?.servicedOn ?? localDateKey(new Date()));
     setDueOn(editing?.dueOn ?? '');
     setNotes(editing?.notes ?? '');
     setError(null);
-  }, [visible, editing]);
+  });
 
   function save() {
     const input = { title, servicedOn, dueOn: dueOn || undefined, notes };
     const problem = maintenanceProblem(input);
     if (problem) { setError(problem); return; }
     const err = onSubmit(input);
-    if (err) setError(err); else { Keyboard.dismiss(); onClose(); }
+    if (err) setError(err); else { markSaved(); Keyboard.dismiss(); onClose(); }
   }
 
   return (

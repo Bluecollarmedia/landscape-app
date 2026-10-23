@@ -1,3 +1,4 @@
+import { useTeamAccess } from '@/hooks/useTeamAccess';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Alert, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -58,6 +59,7 @@ export default function WorkerDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { getWorker, updateWorker } = useWorkers({ includeInactive: true });
+  const team = useTeamAccess();
   const schedule = useSchedule();
   const { resourcesFor } = useResources();
   const { crews, crewOf, setWorkerCrew } = useCrews();
@@ -117,6 +119,25 @@ export default function WorkerDetailScreen() {
       'Deactivate Worker',
       `${p.firstName} ${p.lastName} will lose access. Historical records (hours, payroll, attendance) will be preserved.`,
       [{ text: 'Cancel', style: 'cancel' }, { text: 'Deactivate', style: 'destructive', onPress: doDeactivate }],
+    );
+  }
+
+  /** Brings a deactivated worker back (Landscaping access; Snow and Maintenance can be set on Team Access). Old admin rights are never restored. */
+  function handleReactivate() {
+    Alert.alert(
+      `Reactivate ${p.firstName} ${p.lastName}?`,
+      'They get Landscaping access again. Nothing is assigned to them automatically, and their history stays as it is.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reactivate',
+          onPress: async () => {
+            const why = await team.reactivate(p.id, true, worksOnMaintenance(w.member) ? 'maintenance' : 'landscaping', []);
+            if (why) Alert.alert("Couldn't reactivate", why);
+            else haptics.success();
+          },
+        },
+      ],
     );
   }
 
@@ -380,12 +401,18 @@ export default function WorkerDetailScreen() {
               </Text>
             </Pressable>
           ) : (
+            <>
             <View style={[styles.deactivatedBanner, { backgroundColor: semantic.errorLight }]}>
               <Icon name="alert-circle" size={16} color={semantic.error} />
               <Text style={[typeScale.bodySmall, { color: semantic.error, flex: 1, marginLeft: spacing.sm }]}>
                 This worker has been deactivated. Historical records are preserved.
               </Text>
             </View>
+            <Pressable onPress={handleReactivate} style={[styles.deactivateRow, { backgroundColor: colors.primarySurface, marginTop: spacing.sm }]} accessibilityRole="button" accessibilityLabel="Reactivate worker">
+              <Icon name="user-check" size={16} color={colors.primaryDark} />
+              <Text style={[typeScale.labelLarge, { color: colors.primaryDark, fontWeight: '700', marginLeft: spacing.xs }]}>Reactivate Worker</Text>
+            </Pressable>
+            </>
           )}
 
           <Pressable onPress={handleDelete} style={[styles.deactivateRow, { backgroundColor: colors.backgroundTertiary }]} accessibilityRole="button" accessibilityLabel="Delete worker">

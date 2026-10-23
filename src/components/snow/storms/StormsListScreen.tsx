@@ -4,6 +4,8 @@
  *
  * Working layout in the existing app style; no approved mockup yet.
  */
+import { DateStrip } from '@/components/ui/DateStrip';
+import { localDateKey } from '@/lib/ids';
 import { servicesLabel, stormServices } from '@/lib/snowServices';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
@@ -34,7 +36,16 @@ export function StormsListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const clearance = useTabBarClearance();
-  const { active, drafts, ended, loading, error, reload } = useSnowStorms();
+  const all = useSnowStorms();
+  const { loading, error, reload } = all;
+  // Day cards: tap a day to see only the storms of that day (a storm's day is when it was dispatched, or created if it was not yet).
+  const [day, setDay] = useState<string | null>(null);
+  const dayOf = (st: SnowStorm) => localDateKey(new Date(st.dispatchedAt ?? st.createdAt));
+  const days = Array.from(new Set([...all.active, ...all.drafts, ...all.ended].map(dayOf))).sort().reverse().slice(0, 14);
+  const keep = (list: SnowStorm[]) => (day ? list.filter((st) => dayOf(st) === day) : list);
+  const active = keep(all.active);
+  const drafts = keep(all.drafts);
+  const ended = keep(all.ended);
   const [refreshing, setRefreshing] = useState(false);
 
   async function onRefresh() {
@@ -81,7 +92,7 @@ export function StormsListScreen() {
     );
   }
 
-  const empty = !loading && !error && !active.length && !drafts.length && !ended.length;
+  const empty = !loading && !error && !all.active.length && !all.drafts.length && !all.ended.length;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -94,6 +105,7 @@ export function StormsListScreen() {
           <View style={{ flexShrink: 0, marginLeft: spacing.md }}><Button title="Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} /></View>
         </View>
 
+        <DateStrip dates={days} selected={day} onSelect={setDay} />
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.lg }} /> : null}
         {loading ? <LoadingSpinner /> : null}
         {empty ? (

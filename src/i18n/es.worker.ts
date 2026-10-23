@@ -417,4 +417,5 @@ export const ES_WORKER: Record<string, string> = {
   "The ID photo couldn't be uploaded.": 'No se pudo subir la foto de la identificación.',
   'Photo not saved': 'Foto no guardada',
   "You're in, but your profile photo wasn't saved. {why} You can add it later by tapping your name in Settings.": 'Ya entraste, pero tu foto de perfil no se guardó. {why} Puedes agregarla después tocando tu nombre en Ajustes.',
+  'You have more work today. Clock back in': 'Tienes más trabajo hoy. Registra tu entrada otra vez',
 };

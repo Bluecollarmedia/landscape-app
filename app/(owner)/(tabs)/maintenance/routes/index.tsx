@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import { DateStrip } from '@/components/ui/DateStrip';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
@@ -24,6 +25,9 @@ export default function RoutesScreen() {
   const tabBarClearance = useTabBarClearance();
   const m = useMaintenance();
   const today = todayKey();
+  // Day cards: tap a day to see only that day's routes.
+  const [day, setDay] = useState<string | null>(null);
+  const days = useMemo(() => Array.from(new Set(m.routes.map((r) => r.serviceDate))).sort().reverse().slice(0, 14), [m.routes]);
 
   const { current, past, attentionById } = useMemo(() => {
     const attention: Record<string, number> = {};
@@ -31,11 +35,11 @@ export default function RoutesScreen() {
       if (r.serviceDate <= today) attention[r.id] = buildRouteReview(r, m.events, m.attendance, db.people, today).attention.length;
     }
     return {
-      current: m.routes.filter((r) => r.serviceDate >= today).slice().reverse(),
-      past: m.routes.filter((r) => r.serviceDate < today).slice(0, PAST_LIMIT),
+      current: m.routes.filter((r) => r.serviceDate >= today && (!day || r.serviceDate === day)).slice().reverse(),
+      past: m.routes.filter((r) => r.serviceDate < today && (!day || r.serviceDate === day)).slice(0, PAST_LIMIT),
       attentionById: attention,
     };
-  }, [m, today]);
+  }, [m, today, day]);
 
   const newRoute = () => router.push('/(owner)/route-new' as any);
   const open = (id: string) => router.push(`/(owner)/maintenance/routes/${id}` as any);
@@ -58,6 +62,7 @@ export default function RoutesScreen() {
           />
         ) : (
           <>
+            <DateStrip dates={days} selected={day} onSelect={setDay} />
             <SectionTitle>TODAY AND UPCOMING</SectionTitle>
             {current.length === 0 ? (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginHorizontal: spacing.xs }]}>

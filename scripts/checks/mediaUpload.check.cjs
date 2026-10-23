@@ -37,6 +37,8 @@ const load = (r2) => {
     if (name === './ids') return { uuid: () => 'uuid-1' };
     if (name === './uploadErrors') return errors;
     if (name === './uploadLimit') return { tooLargeMessage: () => null };
+    // The real timeout helper, so the time limits in snowMedia work in this harness too.
+    if (name === './mediaQueue') return { withTimeout: (work, ms, onTimeout) => new Promise((res, rej) => { const t = setTimeout(() => rej(onTimeout()), ms); work.then((v) => { clearTimeout(t); res(v); }, (e) => { clearTimeout(t); rej(e); }); }) };
     // Compression is not what this check is about: treat every picture as already prepared.
     if (name === './mediaCompress') return { isPrepared: () => true, prepareImage: async (j) => ({ uri: j.sourceUri }) };
     return {};

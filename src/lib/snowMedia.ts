@@ -12,6 +12,7 @@ import { Platform } from 'react-native';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { uuid } from './ids';
 import { r2Enabled, requireSession } from './media';
+import { withTimeout } from './mediaQueue';
 import { explainUploadError } from './uploadErrors';
 
 export const SNOW_MEDIA_BUCKET = 'snow-media';
@@ -34,7 +35,81 @@ export function snowReferenceFolder(companyId: string, propertyServiceId: string
   return `${companyId}/reference/${propertyServiceId}`;
 }
 
-/** Uploads a local photo/video to the private bucket and returns its key. */
+/** Runs `work`, giving up with a plain message if it takes longer than `ms`: a stalled connection must never leave a photo "uploading" forever. */
+const within = <T,>(work: Promise<T>, ms: number, what: string): Promise<T> =>
+  withTimeout(work, ms, () => new Error(`${what} timed out after ${Math.round(ms / 1000)} seconds`));
+
+/** What a failed function call actually said. The library's own message only ever says "non-2xx status code". */
+async function functionFailure(error: unknown, data: unknown): Promise<string> {
+  const res = (error as { context?: Response } | null)?.context;
+  if (res && typeof res.json === 'function') {
+    const body = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+    return `${res.status}: ${body?.error ?? body?.message ?? 'no reason given'}`;
+  }
+  return (data as { error?: string } | null)?.error ?? (error as { message?: string } | null)?.message ?? 'no answer';
+}
+
+const reasonOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
+/** How long the file itself may take to send: photos are small, videos can be big. */
+const sendMs = (contentType: string) => (contentType.startsWith('video/') ? 300_000 : 90_000);
+
+/**
+ * The cloud route: a 1-byte stand-in goes to the private bucket (so the database's permission rules decide who may write and read the
+ * file), then the real file goes to cloud storage through a short-lived link. Every step says what it was doing if it fails.
+ */
+async function putViaCloud(localUri: string, key: string, contentType: string): Promise<void> {
+  const reserved = await within(
+    supabase.storage.from(SNOW_MEDIA_BUCKET).upload(key, new Uint8Array([0]).buffer, { contentType, upsert: false }),
+    30_000, 'Reserving the file',
+  );
+  if (reserved.error) throw new Error(`Couldn't reserve the file: ${explainUploadError(reserved.error.message)}`);
+  try {
+    const blob = await within(fetch(localUri).then((r) => r.blob()), 30_000, 'Reading the photo');
+    const link = await within(supabase.functions.invoke('media', { body: { action: 'snow-put', key, contentType } }), 30_000, 'Asking for the upload link');
+    if (link.error || !link.data?.uploadUrl) throw new Error(`The upload link was refused (${await functionFailure(link.error, link.data)})`);
+    const limit = sendMs(contentType);
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), limit);
+    let res: Response;
+    try {
+      res = await fetch(link.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob, signal: stop.signal });
+    } catch (err) {
+      throw new Error(stop.signal.aborted ? `Sending the file timed out after ${Math.round(limit / 1000)} seconds` : `Sending the file failed (${reasonOf(err)})`);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) {
+      const code = (await res.text().catch(() => '')).match(/<Code>([^<]+)<\/Code>/)?.[1];
+      throw new Error(`Cloud storage answered ${res.status}${code ? ` (${code})` : ''}`);
+    }
+  } catch (err) {
+    await supabase.storage.from(SNOW_MEDIA_BUCKET).remove([key]);
+    throw err;
+  }
+}
+
+/** The backup route: the whole file goes straight into the private bucket (no stand-in, no cloud link). */
+async function putViaBackup(localUri: string, key: string, contentType: string): Promise<void> {
+  let body: Blob | FormData;
+  if (Platform.OS === 'web') {
+    body = await (await fetch(localUri)).blob();
+  } else {
+    const form = new FormData();
+    form.append('file', { uri: localUri, name: key.split('/').pop(), type: contentType } as unknown as Blob);
+    body = form;
+  }
+  const { error } = await within(
+    supabase.storage.from(SNOW_MEDIA_BUCKET).upload(key, body, { contentType, upsert: false }),
+    sendMs(contentType), 'Sending the file',
+  );
+  if (error) throw new Error(explainUploadError(error.message));
+}
+
+/**
+ * Uploads a local photo/video to the private bucket and returns its key. Tries cloud storage first; if that fails for any reason the
+ * file goes to the private bucket directly, so a cloud-storage problem never stops a photo. If both fail, the message says what each
+ * one said, so the real cause is on the screen and not hidden behind "check your connection".
+ */
 export async function uploadSnowMedia(localUri: string, folder: string, mimeType?: string): Promise<string> {
   if (!isSupabaseConfigured) throw new Error('Snow media needs the live database.');
   let { contentType, ext } = contentTypeOf(localUri, mimeType);
@@ -48,44 +123,25 @@ export async function uploadSnowMedia(localUri: string, folder: string, mimeType
       if (p.uri !== localUri) { localUri = p.uri; contentType = 'image/jpeg'; ext = 'jpg'; }
     }
   }
-  const key = `${folder}/${uuid()}.${ext}`;
 
+  let cloudWhy = '';
   if (r2Enabled) {
-    // The real file goes to R2. A 1-byte stand-in goes to the private bucket so
-    // the database's existing permission rules decide who may write and read it.
-    const { error: standInError } = await supabase.storage
-      .from(SNOW_MEDIA_BUCKET)
-      .upload(key, new Uint8Array([0]).buffer, { contentType, upsert: false });
-    if (standInError) throw new Error(`Upload failed: ${explainUploadError(standInError.message)}`);
+    const key = `${folder}/${uuid()}.${ext}`;
     try {
-      const blob = await (await fetch(localUri)).blob();
-      const { data, error } = await supabase.functions.invoke('media', { body: { action: 'snow-put', key, contentType } });
-      if (error || !data?.uploadUrl) throw new Error(error?.message ?? data?.error ?? 'no upload link');
-      const res = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
-      if (!res.ok) throw new Error('Please check your connection and try again.');
+      await putViaCloud(localUri, key, contentType);
+      return key;
     } catch (err) {
-      await supabase.storage.from(SNOW_MEDIA_BUCKET).remove([key]);
-      throw new Error(`Upload failed: ${explainUploadError(err)}`);
+      cloudWhy = reasonOf(err);
+      console.warn('[snow media] cloud storage failed, using the backup route:', cloudWhy);
     }
-    return key;
   }
-
-  let body: Blob | FormData;
-  if (Platform.OS === 'web') {
-    body = await (await fetch(localUri)).blob();
-  } else {
-    const form = new FormData();
-    form.append('file', { uri: localUri, name: key.split('/').pop(), type: contentType } as unknown as Blob);
-    body = form;
-  }
-  let uploadError: { message: string } | null = null;
+  const key = `${folder}/${uuid()}.${ext}`;
   try {
-    ({ error: uploadError } = await supabase.storage.from(SNOW_MEDIA_BUCKET).upload(key, body, { contentType, upsert: false }));
+    await putViaBackup(localUri, key, contentType);
+    return key;
   } catch (err) {
-    uploadError = { message: err instanceof Error ? err.message : String(err) };
+    throw new Error(cloudWhy ? `Upload failed. Cloud storage: ${cloudWhy}. Backup: ${reasonOf(err)}` : `Upload failed: ${reasonOf(err)}`);
   }
-  if (uploadError) throw new Error(`Upload failed: ${explainUploadError(uploadError.message)}`);
-  return key;
 }
 
 /** Removes an upload that was never saved as media (the database refuses saved ones). */

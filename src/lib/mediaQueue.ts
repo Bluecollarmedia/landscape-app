@@ -83,6 +83,17 @@ export interface QueueDeps {
   later?: (fn: () => void, ms: number) => unknown;
 }
 
+/** No step may run forever: a stalled connection or a stuck compressor fails with a plain reason, and the normal retry rules take over. */
+export const PREPARE_LIMIT_MS = 120_000;
+export const UPLOAD_LIMIT_MS = 6 * 60_000;
+export const RECORD_LIMIT_MS = 60_000;
+export function withTimeout<T>(work: Promise<T>, ms: number, onTimeout: () => Error): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(onTimeout()), ms);
+    work.then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
+  });
+}
+
 export const MAX_ACTIVE = 3;
 export const MAX_VIDEOS = 1;
 export const MAX_AUTO_TRIES = 4;
@@ -218,7 +229,7 @@ export class MediaQueue {
         const adopted = j.sourceUri.includes('/media-queue/') ? j.sourceUri : await this.d.adopt(j);
         if (adopted !== j.sourceUri) this.patch(id, { sourceUri: adopted });
         j = this.get(id); if (!j) return;
-        const prepared = j.useOriginal ? { uri: j.sourceUri, bytes: j.bytesIn } : await this.d.prepare(j);
+        const prepared = j.useOriginal ? { uri: j.sourceUri, bytes: j.bytesIn } : await withTimeout(this.d.prepare(j), PREPARE_LIMIT_MS, () => new CompressionError('Getting the photo ready took too long.'));
         if (!this.get(id)) { await this.d.cleanup(prepared.uri !== j.sourceUri ? [prepared.uri] : []); return; }
         this.patch(id, { preparedUri: prepared.uri, bytesOut: prepared.bytes, width: prepared.width ?? j.width, height: prepared.height ?? j.height, stage: 'upload', status: 'uploading', error: undefined });
         j = this.get(id); if (!j) return;
@@ -226,14 +237,14 @@ export class MediaQueue {
 
       if (j.stage === 'upload') {
         const uri = j.preparedUri ?? j.sourceUri;
-        const up = await this.d.upload(j, uri);
+        const up = await withTimeout(this.d.upload(j, uri), UPLOAD_LIMIT_MS, () => new Error(`The upload timed out after ${Math.round(UPLOAD_LIMIT_MS / 60_000)} minutes`));
         if (!this.get(id)) { try { await this.d.removeStored(up.key); } catch { /* nothing points at it */ } return; }
         this.patch(id, { uploaded: up, stage: 'record', status: 'uploading', error: undefined });
         j = this.get(id); if (!j) return;
       }
 
       if (j.stage === 'record' && j.uploaded) {
-        await this.d.complete(j, j.uploaded);
+        await withTimeout(this.d.complete(j, j.uploaded), RECORD_LIMIT_MS, () => new Error('Saving the photo timed out'));
         this.patch(id, { status: 'uploaded', error: undefined, nextTryAt: undefined });
         await this.cleanupFiles(this.get(id)!);
         // Finished jobs are kept in memory for the screen to show "Uploaded", but never saved again as pending work.

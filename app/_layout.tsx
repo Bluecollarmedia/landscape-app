@@ -22,6 +22,9 @@ import { applyPendingSignup } from '@/data/pendingSignup';
 import { useModeAccess } from '@/hooks/useModeAccess';
 import { installGlobalErrorHandler } from '@/lib/errorReporting';
 import { installWebAlert } from '@/lib/webDialog';
+import { db } from '@/data/store';
+import { todayKey } from '@/lib/ids';
+import { hasOpenProjectWork } from '@/lib/workerAreas';
 import { WebDialogHost } from '@/components/ui/WebDialogHost';
 
 // On the website Alert.alert does nothing by itself; this points it at the app's own dialog (a phone keeps the system alert).
@@ -92,12 +95,14 @@ function RootNavigator() {
       const target =
         shell === 'snow' ? `/snow/${role}` : shell === 'snow_notice' ? '/snow/notice' : `/(${role})`;
       const s1 = (segments as string[])[1];
+      // An admin who is put on a job can work it like a worker: the worker area is open to them while they have work coming up.
+      const adminWorks = db.role === 'admin' && hasOpenProjectWork(db.assignments, db.personId, todayKey());
       // Legal & Support opens inside the Snow area (so Back returns to Settings): it is part of whichever Snow shell they are in.
       const inLegal = s1 === 'legal-support';
       const onTarget =
         shell === 'snow' ? currentGroup === 'snow' && (s1 === role || inLegal)
         : shell === 'snow_notice' ? currentGroup === 'snow' && (s1 === 'notice' || inLegal)
-        : currentGroup === `(${role})`;
+        : currentGroup === `(${role})` || (adminWorks && currentGroup === '(worker)');
       if (inAuthGroup || inOnboardingGroup || !onTarget) {
         router.replace(target as any);
       }

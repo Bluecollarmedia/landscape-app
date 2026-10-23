@@ -21,6 +21,8 @@ import { BrandCover } from '@/components/branding/BrandCover';
 import { DASHBOARD_HERO_HEIGHT } from '@/components/media/HeaderPhotoField';
 import { useCompanySetup } from '@/hooks/useCompanySetup';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { remindWorker } from '@/data/remindWorker';
+import { showMessage } from '@/components/financials/ActionSheet';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
@@ -58,6 +60,8 @@ export default function OwnerDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [reminding, setReminding] = useState<string | null>(null);
+  const [reminded, setReminded] = useState<Record<string, boolean>>({});
 
   // The Dashboard always opens at the top: every time its tab comes into view, and when its tab is tapped again.
   const scrollRef = useRef<ScrollView>(null);
@@ -98,6 +102,16 @@ export default function OwnerDashboard() {
     );
   }
 
+  /** Remind: sends the worker a push and stays here; the owner is told plainly what happened. */
+  async function sendRemind(item: AttentionItem) {
+    if (!item.remind || reminding) return;
+    setReminding(item.id);
+    const res = await remindWorker(item.remind.assignmentId, item.remind.firstName);
+    setReminding(null);
+    if (res.sent) setReminded((r) => ({ ...r, [item.id]: true }));
+    showMessage(res.sent ? 'Reminder' : res.tone === 'ok' ? 'Reminder' : "Couldn't remind", res.text);
+  }
+
   function renderAttentionRow(item: AttentionItem) {
     const c = SEVERITY_COLORS[item.severity];
     return (
@@ -118,11 +132,14 @@ export default function OwnerDashboard() {
           </Text>
         </View>
         <Pressable
-          style={[styles.attentionAction, { backgroundColor: colors.surface }]}
-          onPress={() => router.push(item.route as any)}
+          style={[styles.attentionAction, { backgroundColor: colors.surface, opacity: reminding === item.id ? 0.6 : 1 }]}
+          onPress={() => (item.remind ? sendRemind(item) : router.push(item.route as any))}
+          disabled={reminding === item.id}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={item.remind ? `Remind ${item.remind.firstName || 'the worker'} to confirm` : item.actionLabel}
         >
-          <Text style={[typeScale.labelSmall, { color: c.icon }]}>{item.actionLabel}</Text>
+          <Text style={[typeScale.labelSmall, { color: c.icon }]}>{reminding === item.id ? 'Sending…' : reminded[item.id] ? 'Sent' : item.actionLabel}</Text>
         </Pressable>
       </Pressable>
     );

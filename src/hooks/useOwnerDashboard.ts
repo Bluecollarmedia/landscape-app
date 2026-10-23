@@ -22,6 +22,8 @@ export interface AttentionItem {
   severity: Severity;
   actionLabel: string;
   route: string;
+  /** Remind: the button sends this worker a push for this job instead of opening a page. */
+  remind?: { assignmentId: string; firstName: string };
 }
 
 export type CrewStatus = 'on_site' | 'late' | 'awaiting_confirmation' | 'scheduled' | 'completed';
@@ -168,6 +170,7 @@ export function useOwnerDashboard() {
           severity: 'warning',
           actionLabel: 'Remind',
           route: `/(owner)/workers/${personId}`,
+          remind: { assignmentId: unconfirmed.id, firstName: unconfirmed.person?.firstName ?? '' },
         });
         handledWorkers.add(personId);
         continue;

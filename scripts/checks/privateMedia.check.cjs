@@ -8,7 +8,9 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
   const server = await import(pathToFileURL(path.join(root, 'supabase', 'functions', '_shared', 'privateKeys.ts')).href);
   const client = await import(pathToFileURL(path.join(root, 'src', 'lib', 'privateMedia.ts')).href).catch(() => null);
   const sample = {
-    'co1/maintenance/prop1/a.jpg': true, 'co1/reference/svc1/a.mp4': true, 'co1/completion/visit1/a.jpg': true, 'ids/person1/a.jpg': true,
+    // ID photos are the only private files now. Maintenance and Snow photos are public (pictures of properties and work).
+    'ids/person1/a.jpg': true,
+    'co1/maintenance/prop1/a.jpg': false, 'co1/reference/svc1/a.mp4': false, 'co1/completion/visit1/a.jpg': false,
     'co1/projects/p1/a.jpg': false, 'avatars/person1/a.jpg': false, 'co1/trucks/t1/a.pdf': false, 'co1/issues/x/a.jpg': false,
     'maintenance/a.jpg': false, 'co1/maintenance': false, 'co1/Maintenance/p/a.jpg': false,
   };
@@ -18,7 +20,7 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
   } else {
     // privateMedia.ts imports React Native modules, which plain Node cannot load: compare the rule text instead.
     const fs = require('node:fs');
-    const grab = (f) => fs.readFileSync(f, 'utf8').match(/PRIVATE_FOLDERS = new Set\(\[([^\]]*)\]\)/)[1].replace(/\s/g, '');
+    const grab = (f) => fs.readFileSync(f, 'utf8').match(/PRIVATE_FOLDERS = new Set(?:<string>)?\(\[([^\]]*)\]\)/)[1].replace(/\s/g, '');
     const a = grab(path.join(root, 'supabase/functions/_shared/privateKeys.ts')), b = grab(path.join(root, 'src/lib/privateMedia.ts'));
     check('the app and the server list the same private folders', a === b, a + ' vs ' + b);
     const c = grab(path.join(root, 'supabase/functions/media/index.ts'));

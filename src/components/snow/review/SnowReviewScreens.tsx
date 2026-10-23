@@ -5,6 +5,7 @@
  * the photos the owner sent. Working layout in the existing app style; no
  * approved mockup yet.
  */
+import { PhotoPager, type PagerAction } from '@/components/media/PhotoPager';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { Image } from 'expo-image';
@@ -16,7 +17,7 @@ import { db, useDb } from '@/data/store';
 import { useTheme } from '@/providers/ThemeProvider';
 import { SERVICE_LABEL } from '@/data/snowStorms';
 import {
-  addOwnerMedia, loadReviewQueue, reviewMedia, sendCustomerUpdate, withdrawMedia,
+  addOwnerMedia, deleteMedia, loadReviewQueue, reviewMedia, sendCustomerUpdate, withdrawMedia,
   type ReviewMedia, type ReviewStop,
 } from '@/data/snowMediaReview';
 import { shortWhen } from '@/lib/snowFormat';
@@ -28,15 +29,15 @@ import { spacing, radius } from '@/theme/spacing';
 
 const when = shortWhen;
 
-function Thumb({ m, children }: { m: { kind: string; url?: string }; children?: React.ReactNode }) {
+function Thumb({ m, children, onPress }: { m: { kind: string; url?: string }; children?: React.ReactNode; onPress?: () => void }) {
   const { colors } = useTheme();
   return (
-    <View style={[styles.thumb, { backgroundColor: colors.borderLight }]}>
+    <Pressable onPress={onPress} disabled={!onPress} accessibilityRole="button" accessibilityLabel="Open photo" style={[styles.thumb, { backgroundColor: colors.borderLight }]}>
       {m.url && m.kind === 'photo' ? <Image source={{ uri: m.url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : (
         <View style={styles.thumbIcon}><Icon name={m.kind === 'video' ? 'video' : 'image'} size={22} color={colors.textTertiary} /></View>
       )}
       {children}
-    </View>
+    </Pressable>
   );
 }
 
@@ -49,6 +50,8 @@ export function SnowMediaReviewScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  // The photo open full screen (tap a thumbnail; swipe for the others of that stop).
+  const [viewing, setViewing] = useState<{ visitId: string; mediaId: string } | null>(null);
 
   const reload = useCallback(async () => {
     const res = await loadReviewQueue();
@@ -84,6 +87,37 @@ export function SnowMediaReviewScreen() {
       },
       true,
     );
+  }
+
+  function remove(m: ReviewMedia) {
+    confirmAction(
+      'Delete this photo?',
+      m.shared ? "It is removed for good, and the customer can no longer see it. This can't be undone." : "It is removed for good. This can't be undone.",
+      'Delete',
+      async () => {
+        setBusy(m.id);
+        const res = await deleteMedia(m.id);
+        setBusy(null);
+        if (!res.ok) showMessage("Couldn't delete", res.error);
+        reload();
+      },
+      true,
+    );
+  }
+
+  const viewStop = viewing ? stops.find((x) => x.visitId === viewing.visitId) : undefined;
+  const viewPhotos = (viewStop?.media ?? []).filter((m) => m.kind === 'photo' && m.url).map((m) => ({ id: m.id, url: m.url as string }));
+  function actionsFor(photo: { id: string }): PagerAction[] {
+    const m = viewStop?.media.find((x) => x.id === photo.id);
+    if (!m) return [];
+    const out: PagerAction[] = [];
+    if (!m.withdrawn && !m.shared) {
+      out.push({ key: 'approve', label: m.status === 'approved' ? 'Approved' : 'Approve', icon: 'check-circle', onPress: () => review(m, 'approved') });
+      out.push({ key: 'hide', label: m.status === 'hidden' ? 'Hidden' : 'Hide', icon: 'eye-off', onPress: () => review(m, 'hidden') });
+    }
+    if (m.shared && !m.withdrawn) out.push({ key: 'withdraw', label: 'Withdraw', icon: 'corner-up-left', onPress: () => withdraw(m) });
+    out.push({ key: 'delete', label: 'Delete', icon: 'trash-2', destructive: true, onPress: () => remove(m) });
+    return out;
   }
 
   async function send(s: ReviewStop) {
@@ -127,7 +161,7 @@ export function SnowMediaReviewScreen() {
           <View style={styles.thumbs}>
             {s.media.map((m) => (
               <View key={m.id} style={{ gap: 4, opacity: m.status === 'hidden' || m.withdrawn ? 0.4 : 1 }}>
-                <Thumb m={m} />
+                <Thumb m={m} onPress={m.kind === 'photo' && m.url ? () => setViewing({ visitId: s.visitId, mediaId: m.id }) : undefined} />
                 {m.withdrawn ? (
                   <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>Withdrawn</Text>
                 ) : m.shared ? (
@@ -196,6 +230,7 @@ export function SnowMediaReviewScreen() {
           </>
         )}
       </ScrollView>
+      <PhotoPager photos={viewPhotos} startId={viewing?.mediaId ?? null} onClose={() => setViewing(null)} actionsFor={actionsFor} />
     </View>
   );
 }

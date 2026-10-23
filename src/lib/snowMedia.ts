@@ -13,6 +13,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { uuid } from './ids';
 import { r2Enabled, requireSession } from './media';
 import { withTimeout } from './mediaQueue';
+import { putFile } from './uploadFile';
 import { explainUploadError } from './uploadErrors';
 
 export const SNOW_MEDIA_BUCKET = 'snow-media';
@@ -64,23 +65,13 @@ async function putViaCloud(localUri: string, key: string, contentType: string): 
   );
   if (reserved.error) throw new Error(`Couldn't reserve the file: ${explainUploadError(reserved.error.message)}`);
   try {
-    const blob = await within(fetch(localUri).then((r) => r.blob()), 30_000, 'Reading the photo');
     const link = await within(supabase.functions.invoke('media', { body: { action: 'snow-put', key, contentType } }), 30_000, 'Asking for the upload link');
     if (link.error || !link.data?.uploadUrl) throw new Error(`The upload link was refused (${await functionFailure(link.error, link.data)})`);
-    const limit = sendMs(contentType);
-    const stop = new AbortController();
-    const timer = setTimeout(() => stop.abort(), limit);
-    let res: Response;
-    try {
-      res = await fetch(link.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob, signal: stop.signal });
-    } catch (err) {
-      throw new Error(stop.signal.aborted ? `Sending the file timed out after ${Math.round(limit / 1000)} seconds` : `Sending the file failed (${reasonOf(err)})`);
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!res.ok) {
-      const code = (await res.text().catch(() => '')).match(/<Code>([^<]+)<\/Code>/)?.[1];
-      throw new Error(`Cloud storage answered ${res.status}${code ? ` (${code})` : ''}`);
+    // The file is sent by the phone's own file upload (not JavaScript fetch + Blob, which is unreliable on a phone): see uploadFile.ts.
+    const sent = await putFile(localUri, link.data.uploadUrl, contentType, sendMs(contentType));
+    if (sent.status < 200 || sent.status >= 300) {
+      const code = sent.body.match(/<Code>([^<]+)<\/Code>/)?.[1];
+      throw new Error(`Cloud storage answered ${sent.status}${code ? ` (${code})` : ''}`);
     }
   } catch (err) {
     await supabase.storage.from(SNOW_MEDIA_BUCKET).remove([key]);

@@ -49,6 +49,8 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  // The stop in the list whose instructions and photos are open (any stop, any time: before the storm starts and for stops still ahead).
+  const [openStopId, setOpenStopId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     const mine = await loadMyRoutes();
@@ -286,8 +288,16 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
                 const s = g[0];
                 const status = groupStatus(g);
                 const word = stopStatusWord(status, working && g === currentGroup);
+                const open = openStopId === s.id;
                 return (
-                <View key={s.id} style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
+                <View key={s.id} style={i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight } : undefined}>
+                <Pressable
+                  onPress={() => setOpenStopId(open ? null : s.id)}
+                  style={styles.row}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Stop ${i + 1}, ${s.propertyName}. ${open ? 'Hide' : 'Show'} instructions and photos`}
+                  accessibilityState={{ expanded: open }}
+                >
                   <View style={[styles.numberMarker, { backgroundColor: colors.backgroundTertiary }]} accessible accessibilityLabel={`Stop ${i + 1}`}>
                     <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>{i + 1}</Text>
                   </View>
@@ -305,6 +315,18 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
                   ) : (
                     <StatusBadge label={word} status={word === 'Arrived' ? 'info' : word === 'Skipped' ? 'warning' : 'neutral'} />
                   )}
+                  <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} />
+                </Pressable>
+                {open ? (
+                  <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md }}>
+                    {Array.from(new Set(groupServices(g))).map((sv) => (
+                      <View key={sv}>
+                        <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>{svcLabel(sv)} instructions and photos</Text>
+                        <SnowServiceReferenceCard propertyId={s.propertyId} service={sv} />
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
                 </View>
                 );
               })}

@@ -81,14 +81,10 @@ export default function CrewEditScreen() {
     if (!existing) return;
     const msg = `Delete ${existing.name}? Its workers stay on your team, just without a crew.`;
     const run = () => { haptics.destructive(); deleteCrew(existing.id); router.back(); };
-    if (Platform.OS === 'web') {
-      if (confirm(msg)) run();
-    } else {
-      Alert.alert('Delete Crew', msg, [
-        { text: 'Keep', style: 'cancel' },
-        { text: 'Delete Crew', style: 'destructive', onPress: run },
-      ]);
-    }
+    Alert.alert('Delete Crew', msg, [
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Delete Crew', style: 'destructive', onPress: run },
+    ]);
   }
 
   return (

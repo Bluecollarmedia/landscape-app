@@ -25,11 +25,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
 function confirmThen(title: string, msg: string, action: string, run: () => void) {
-  if (Platform.OS === 'web') {
-    if (confirm(msg)) run();
-  } else {
-    Alert.alert(title, msg, [{ text: 'Cancel', style: 'cancel' }, { text: action, onPress: run }]);
-  }
+  Alert.alert(title, msg, [{ text: 'Cancel', style: 'cancel' }, { text: action, onPress: run }]);
 }
 
 /** Visits shown here; the rest are on the history screen. */

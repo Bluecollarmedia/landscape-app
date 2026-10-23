@@ -24,11 +24,7 @@ function notify(title: string, msg: string) {
 }
 
 function confirmAction(title: string, msg: string, okLabel: string, run: () => void) {
-  if (Platform.OS === 'web') {
-    if (confirm(msg)) run();
-  } else {
-    Alert.alert(title, msg, [{ text: 'Cancel', style: 'cancel' }, { text: okLabel, onPress: run }]);
-  }
+  Alert.alert(title, msg, [{ text: 'Cancel', style: 'cancel' }, { text: okLabel, onPress: run }]);
 }
 
 function formatDay(key: string, style: 'chip' | 'full' | 'short') {

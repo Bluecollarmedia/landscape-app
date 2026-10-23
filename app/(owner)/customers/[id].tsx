@@ -10,6 +10,9 @@ import { db, rpc, refresh, rowsOf, updateRow } from '@/data/store';
 import { accessErrorText, portalAccessView, turnOffText } from '@/lib/customerAccess';
 import { CustomerPropertiesCard } from '@/components/properties/CustomerPropertiesCard';
 import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
+import { deleteUnusedMember } from '@/data/deleteMember';
+import { haptics } from '@/lib/haptics';
+import { semantic } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
@@ -56,6 +59,28 @@ export default function CustomerDetailScreen() {
     : { label: 'Inactive', status: 'neutral' as const };
 
   const portal = portalAccessView(c.member.status);
+
+  /** Deletes a customer with no login and no records. Anyone with projects, properties or a login is kept (turn their portal access off instead). */
+  function handleDelete() {
+    Alert.alert(
+      `Delete ${p.firstName} ${p.lastName}?`,
+      'This removes them completely and cannot be undone. It only works for a customer who never logged in and has no projects, properties, quotes or other records.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await deleteUnusedMember(p.id);
+            if (res.ok) { haptics.destructive(); router.back(); return; }
+            Alert.alert(res.hasHistory ? "Can't delete" : "Couldn't delete", res.hasHistory ? `${res.error}
+
+You can turn their portal access off instead.` : res.error);
+          },
+        },
+      ],
+    );
+  }
   const [savingAccess, setSavingAccess] = useState(false);
 
   /** The owner decides: turn this customer's access on or off. Off asks first; it keeps all their records. */
@@ -267,6 +292,16 @@ export default function CustomerDetailScreen() {
               <Switch value={portal.on} disabled={savingAccess} onValueChange={changeAccess} accessibilityLabel={`Portal access for ${p.firstName}`} />
             </View>
           </View>
+
+          <Pressable
+            onPress={handleDelete}
+            style={[styles.deleteRow, { backgroundColor: colors.backgroundTertiary }]}
+            accessibilityRole="button"
+            accessibilityLabel="Delete customer"
+          >
+            <Icon name="trash-2" size={16} color={semantic.error} />
+            <Text style={[typeScale.labelLarge, { color: semantic.error, fontWeight: '700', marginLeft: spacing.xs }]}>Delete Customer</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </View>
@@ -283,6 +318,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   backButton: { padding: spacing.xs },
+  deleteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: radius.lg, marginTop: spacing.md },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { paddingBottom: spacing['5xl'] },
   content: { paddingHorizontal: spacing.lg },

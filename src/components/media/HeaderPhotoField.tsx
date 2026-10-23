@@ -98,10 +98,6 @@ export function HeaderPhotoField({ kind, value, onChange }: HeaderPhotoFieldProp
 
   function confirmRemove() {
     const msg = 'Go back to the Brighton green header?';
-    if (Platform.OS === 'web') {
-      if (confirm(msg)) onChange(undefined);
-      return;
-    }
     Alert.alert('Remove photo', msg, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => onChange(undefined) },

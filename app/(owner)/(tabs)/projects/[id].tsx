@@ -681,15 +681,10 @@ export default function ProjectDetailScreen() {
 
   function handleRemoveTeamMember(personId: string, name: string) {
     const msg = `Remove ${name} from this project's team? They will no longer be assignable to this project's tasks or schedule.`;
-    if (Platform.OS === 'web') {
-      if (!confirm(msg)) return;
-      removeTeamMember(personId);
-    } else {
-      Alert.alert('Remove team member?', msg, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => removeTeamMember(personId) },
-      ]);
-    }
+    Alert.alert('Remove team member?', msg, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => removeTeamMember(personId) },
+    ]);
   }
 
   function renderPeople() {
@@ -1526,16 +1521,10 @@ export default function ProjectDetailScreen() {
     if (!reviewPhoto) return;
     const photoId = reviewPhoto.id;
     const msg = 'Delete Photo? This permanently removes the photo and cannot be undone.';
-    if (Platform.OS === 'web') {
-      if (!confirm(msg)) return;
-      deletePhoto(photoId);
-      setReviewPhoto(null);
-    } else {
-      Alert.alert('Delete Photo?', 'This permanently removes the photo and cannot be undone.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => { deletePhoto(photoId); setReviewPhoto(null); } },
-      ]);
-    }
+    Alert.alert('Delete Photo?', 'This permanently removes the photo and cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => { deletePhoto(photoId); setReviewPhoto(null); } },
+    ]);
   }
 
   function formatPhotoDetailDateTime(iso: string): string {
@@ -2149,12 +2138,6 @@ export default function ProjectDetailScreen() {
 
   /** Asks first on every platform (these actions cut a customer off or invalidate a shared code). */
   function confirmThen(title: string, message: string, action: string, run: () => void) {
-    if (Platform.OS === 'web') {
-      if (confirm(`${title}
-
-${message}`)) run();
-      return;
-    }
     Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       { text: action, style: 'destructive', onPress: run },

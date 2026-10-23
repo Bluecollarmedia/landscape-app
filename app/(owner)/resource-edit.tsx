@@ -126,14 +126,10 @@ export default function ResourceEditScreen() {
       router.back();
     };
     const msg = `Delete “${existing.name}”? Workers will lose access right away and its code will be erased.`;
-    if (Platform.OS === 'web') {
-      if (confirm(msg)) go();
-    } else {
-      Alert.alert('Delete Resource', msg, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: go },
-      ]);
-    }
+    Alert.alert('Delete Resource', msg, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: go },
+    ]);
   }
 
   return (

@@ -120,14 +120,10 @@ export default function ScheduleScreen() {
       schedule.endSeriesAfter(assignment.seriesId!, assignment.scheduledDate);
       setSelectedAssignment(null);
     };
-    if (Platform.OS === 'web') {
-      if (confirm(msg)) end();
-    } else {
-      Alert.alert('End Repeat', msg, [
-        { text: 'Keep Repeating', style: 'cancel' },
-        { text: 'End Repeat', style: 'destructive', onPress: end },
-      ]);
-    }
+    Alert.alert('End Repeat', msg, [
+      { text: 'Keep Repeating', style: 'cancel' },
+      { text: 'End Repeat', style: 'destructive', onPress: end },
+    ]);
   }
 
   function handleMove(assignment: Assignment) {

@@ -1,10 +1,8 @@
 import { Redirect, Stack, useSegments } from 'expo-router';
 import { WorkerProvider } from '@/providers/WorkerProvider';
-import { useIsMaintenanceWorker } from '@/hooks/useMaintenance';
+import { useWorkerLanding } from '@/hooks/useWorkerLanding';
 
-/** Regular-crew screens a maintenance worker never opens (project jobs, tasks and day logs). */
-const LANDSCAPING_ONLY = ['(tabs)', 'job', 'task', 'day'];
-/** Maintenance-crew screens a regular worker never opens. */
+/** Maintenance screens: open to a worker who works Maintenance or was put on a route. */
 const MAINTENANCE_ONLY = ['maintenance', 'maintenance-stop'];
 
 /**
@@ -13,20 +11,20 @@ const MAINTENANCE_ONLY = ['maintenance', 'maintenance-stop'];
  * navigator because native tabs can't navigate to routes that aren't
  * declared as tab triggers — pushing them from a tab silently did nothing.
  *
- * Maintenance workers have their own tab bar (`maintenance/`: Today, Route,
- * Activity, Settings). Both kinds of worker share the profile, notification
- * and resource screens; each is kept out of the other's work screens.
+ * A worker who works Maintenance and nothing else (and has no project job coming up) lands on the Maintenance home
+ * (`maintenance/`: Today, Route, Activity, Settings). Everyone else lands on the main home. Nobody is locked out of work they
+ * were assigned: project screens are open to every worker, and a worker put on a route can open the route screens.
  */
 export default function WorkerLayout() {
   const segments = useSegments() as string[];
-  const isMaintenance = useIsMaintenanceWorker();
+  const { landing, maintenanceAccess } = useWorkerLanding();
   // segments[1] is the screen under (worker); undefined means the default (tabs) index.
   const screen = segments[1] ?? '(tabs)';
 
-  if (isMaintenance && LANDSCAPING_ONLY.includes(screen)) {
+  if (landing === 'maintenance' && screen === '(tabs)') {
     return <Redirect href={'/(worker)/maintenance' as any} />;
   }
-  if (!isMaintenance && MAINTENANCE_ONLY.includes(screen)) {
+  if (!maintenanceAccess && MAINTENANCE_ONLY.includes(screen)) {
     return <Redirect href={'/(worker)' as any} />;
   }
 

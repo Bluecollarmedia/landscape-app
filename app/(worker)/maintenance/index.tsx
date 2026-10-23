@@ -21,6 +21,8 @@ import { JobMap } from '@/components/maps/JobMap';
 import { YardStartCard } from '@/components/maintenance/YardStartCard';
 import { WorkdayCard } from '@/components/time/WorkdayCard';
 import { CrewClockOutCard } from '@/components/maintenance/CrewClockOutCard';
+import { OtherWorkCard } from '@/components/worker/OtherWorkCard';
+import { useWorkerLanding } from '@/hooks/useWorkerLanding';
 import { RouteProgress } from '@/components/maintenance/RouteProgress';
 import { StopRow, StopStatusPill } from '@/components/maintenance/StopRow';
 import { displayStatus } from '@/components/maintenance/types';
@@ -73,6 +75,7 @@ export default function MaintenanceTodayScreen() {
   const { openMapsNavigation, timeOn, workday } = useWorkerContext();
   // With the workday clock on, nothing is started before the worker clocks in.
   const clockedIn = !timeOn || !!workday.active;
+  const { projectWork } = useWorkerLanding();
   const checkIn = useMaintenanceCheckIn();
   const { yard, yardName, dayStart } = checkIn;
   useDb();
@@ -183,6 +186,9 @@ export default function MaintenanceTodayScreen() {
         </View>
 
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          {projectWork ? (
+            <OtherWorkCard icon="briefcase" title="You also have project work" subtitle="Tap to see your jobs." onPress={() => router.push('/(worker)/(tabs)' as any)} />
+          ) : null}
           {timeOn ? (
             !route && !workday.active ? (
               <View style={[styles.notScheduled, { backgroundColor: colors.backgroundSecondary }]}>

@@ -1,4 +1,7 @@
 import { WorkdayCard } from '@/components/time/WorkdayCard';
+import { OtherWorkCard } from '@/components/worker/OtherWorkCard';
+import { useWorkerLanding } from '@/hooks/useWorkerLanding';
+import { useMyMaintenanceRoute } from '@/hooks/useMaintenance';
 import { SkipRequestSheet } from '@/components/time/SkipRequestSheet';
 import { withTimedPhoto } from '@/data/timePhotos';
 import { loadMySkipRequests, requestSkip, type MySkipRequest } from '@/data/timeTracking';
@@ -80,6 +83,8 @@ export default function WorkerTodayScreen() {
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
   const { resources } = useResources();
+  const { onRoute } = useWorkerLanding();
+  const todayRoute = useMyMaintenanceRoute();
   const {
     todayAssignments, currentJob, jobState, checkIns, checkOuts, moveToNextJob,
     scheduleConfirmed, confirmSchedule, checkIn, checkOut, locateForCheckIn, locateForCheckOut, openMapsNavigation,
@@ -447,6 +452,14 @@ export default function WorkerTodayScreen() {
 
         <View style={[styles.content, { paddingTop: showWorking ? spacing.xl : PILL_OVERHANG + spacing.xl }]}>
           <WorkdayCard />
+          {onRoute ? (
+            <OtherWorkCard
+              icon="map"
+              title={todayRoute ? 'Your maintenance route today' : 'You have a maintenance route coming up'}
+              subtitle={todayRoute ? `${todayRoute.stops.length} stop${todayRoute.stops.length === 1 ? '' : 's'}. Tap to open it.` : 'Tap to see it.'}
+              onPress={() => router.push('/(worker)/maintenance' as any)}
+            />
+          ) : null}
           {unreadAnnouncement && (() => {
             const weatherMeta = unreadAnnouncement.weatherAction ? WEATHER_ACTION_META[unreadAnnouncement.weatherAction] : null;
             const isStrong = unreadAnnouncement.priority === 'urgent' || !!weatherMeta;

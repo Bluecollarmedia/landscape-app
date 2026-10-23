@@ -2951,9 +2951,9 @@ export default function ProjectDetailScreen() {
       <Modal visible={showPhotoViewer && !!reviewPhoto} transparent animationType="fade" onRequestClose={() => setShowPhotoViewer(false)}>
         {reviewPhoto && (
           <PhotoViewer
-            photos={[reviewPhoto]}
-            index={0}
-            onIndexChange={() => {}}
+            photos={photos.some((ph) => ph.id === reviewPhoto.id) ? photos : [reviewPhoto]}
+            index={Math.max(0, photos.findIndex((ph) => ph.id === reviewPhoto.id))}
+            onIndexChange={(i) => { if (photos[i]) openPhotoReview(photos[i]); }}
             onClose={() => setShowPhotoViewer(false)}
             insets={insets}
           />

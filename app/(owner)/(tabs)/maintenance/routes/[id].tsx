@@ -1,3 +1,5 @@
+import { PhotoPager } from '@/components/media/PhotoPager';
+import { removeStopPhoto } from '@/data/maintenance';
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -353,6 +355,7 @@ function StopCard({ review, canFix, onFix, onOpenProperty }: {
 }) {
   const { colors } = useTheme();
   const { stop } = review;
+  const [viewing, setViewing] = useState<string | null>(null);
   const st = STOP_STATUS[stop.status];
   const p = stop.property;
   const otherArrivals = review.arrivals.filter((a) => a.personId !== stop.arrivedBy);
@@ -470,7 +473,9 @@ function StopCard({ review, canFix, onFix, onOpenProperty }: {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }}>
               {stop.photos.map((ph) => (
                 <View key={ph.id} style={{ alignItems: 'center', gap: 4 }}>
-                  <PrivatePhoto fileUrl={ph.fileUrl} fileKey={ph.fileKey} style={styles.thumb as never} accessibilityLabel={ph.caption ?? 'Stop photo'} />
+                  <Pressable onPress={() => setViewing(ph.id)} accessibilityRole="button" accessibilityLabel="Open photo">
+                    <PrivatePhoto fileUrl={ph.fileUrl} fileKey={ph.fileKey} style={styles.thumb as never} accessibilityLabel={ph.caption ?? 'Stop photo'} />
+                  </Pressable>
                   <Pressable
                     onPress={() => setStopPhotoShared(ph.id, !ph.isCustomerVisible)}
                     hitSlop={6}
@@ -505,6 +510,15 @@ function StopCard({ review, canFix, onFix, onOpenProperty }: {
           </Pressable>
         </View>
       )}
+      <PhotoPager
+        photos={stop.photos.map((ph) => ({ id: ph.id, url: ph.fileUrl, key: ph.fileKey }))}
+        startId={viewing}
+        onClose={() => setViewing(null)}
+        actionsFor={(ph) => [{
+          key: 'delete', label: 'Delete', icon: 'trash-2', destructive: true,
+          onPress: () => Alert.alert('Delete this photo?', 'It is removed from this stop for good.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => removeStopPhoto(ph.id) }]),
+        }]}
+      />
     </View>
   );
 }

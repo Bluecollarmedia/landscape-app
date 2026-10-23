@@ -5,6 +5,7 @@
  * and don't count toward the requirement until they've finished.
  */
 
+import { PhotoPager } from '@/components/media/PhotoPager';
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Icon, PressableScale } from '@/components/ui';
@@ -33,6 +34,7 @@ export function StopPhotos({ stopId, photos, requiresPhotos, minPhotos, locked }
   const t = useT();
   const { colors } = useTheme();
   const [busy, setBusy] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
   const saved = photos.filter(isUploaded).length;
   const staff = db.role === 'owner' || db.role === 'admin';
 
@@ -75,10 +77,16 @@ export function StopPhotos({ stopId, photos, requiresPhotos, minPhotos, locked }
       <View style={styles.grid}>
         {photos.map((p) => {
           const uploading = !isUploaded(p);
-          const canRemove = !locked && (staff || p.uploadedBy === db.personId);
+          // The owner (and admins) can always delete a photo; a worker can delete their own until the stop is finished.
+          const canRemove = staff || (!locked && p.uploadedBy === db.personId);
           return (
             <View key={p.id} style={[styles.tile, { backgroundColor: colors.groupedBackground }]}>
               <PrivatePhoto plain fileUrl={p.fileUrl} fileKey={p.fileKey} style={StyleSheet.absoluteFill as never} />
+              {!uploading && (
+                <PressableScale onPress={() => setViewing(p.id)} accessibilityRole="button" accessibilityLabel={t('Open photo')} style={StyleSheet.absoluteFill as never}>
+                  <View style={StyleSheet.absoluteFill} />
+                </PressableScale>
+              )}
               {uploading && <MediaJobOverlay rowId={p.id} localOnly />}
               {canRemove && !uploading && (
                 <PressableScale
@@ -107,6 +115,17 @@ export function StopPhotos({ stopId, photos, requiresPhotos, minPhotos, locked }
           </PressableScale>
         )}
       </View>
+      <PhotoPager
+        photos={photos.filter(isUploaded).map((p) => ({ id: p.id, url: p.fileUrl, key: p.fileKey }))}
+        startId={viewing}
+        onClose={() => setViewing(null)}
+        actionsFor={(ph) => {
+          const p = photos.find((x) => x.id === ph.id);
+          return p && (staff || (!locked && p.uploadedBy === db.personId))
+            ? [{ key: 'delete', label: t('Delete'), icon: 'trash-2', destructive: true, onPress: () => confirm(t('Remove photo?'), t('It will be deleted from this stop.'), t('Remove'), () => removeStopPhoto(p.id)) }]
+            : [];
+        }}
+      />
     </View>
   );
 }

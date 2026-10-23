@@ -5,6 +5,9 @@
  * allowed (order, one stop at a time, photo minimum, dispatched storm only;
  * update 026). Working layout in the existing app style; no approved mockup.
  */
+import { Image } from 'expo-image';
+import { PhotoPager } from '@/components/media/PhotoPager';
+import { deleteMedia } from '@/data/snowMediaReview';
 import { useT } from '@/i18n';
 import { useBackStep } from '@/hooks/useBackStep';
 import { pickActiveRoute, splitMyRoutes } from '@/lib/snowMyRoute';
@@ -14,7 +17,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, ProgressBar, StatusBadge } from '@/components/ui';
-import { showMessage } from '@/components/financials/ActionSheet';
+import { showMessage, confirmAction } from '@/components/financials/ActionSheet';
 import { pickSnowMedia } from '@/components/snow/pickSnowMedia';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -54,6 +57,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
   // The stop in the list whose instructions and photos are open (any stop, any time: before the storm starts and for stops still ahead).
   const [openStopId, setOpenStopId] = useState<string | null>(null);
 
@@ -107,6 +111,8 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
   const { active: activeRoutes, history: pastRoutes } = splitMyRoutes(routes);
   // Update 41: crew can see the route, its stops and instructions; only the lead can act on it.
   const isLead = canWorkRoute(routes.find((r) => r.id === route?.id)?.role);
+  // The photos already saved for this stop: tap one to open it (swipe for the others); the lead can delete one (a wrong photo by mistake).
+  const stopPhotos = (currentGroup ?? []).flatMap((st) => st.photos ?? []);
   const svcLabel = (x: string) => t(SERVICE_LABEL[x as SnowService]);
   const { street, place } = current ? splitAddress(current.propertyName, current.propertyAddress) : { street: undefined, place: undefined };
   const groupServices = (g: RouteStop[]) => g.map((v) => v.service ?? route!.service);
@@ -253,6 +259,15 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
                       fullWidth
                     />
                     <SnowUploadStatus uploading={uploading} failed={failedJobs} />
+                    {stopPhotos.length ? (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+                        {stopPhotos.map((p) => (
+                          <Pressable key={p.id} onPress={() => setViewingPhoto(p.id)} accessibilityRole="button" accessibilityLabel={t('Open photo')}>
+                            <Image source={{ uri: p.url }} style={{ width: 72, height: 72, borderRadius: radius.md }} contentFit="cover" />
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    ) : null}
                     <Input label={t('Note (optional)')} value={note} onChangeText={setNote} placeholder={t('Anything the owner should know')} />
                     {needMedia > 0 ? (
                       <Text style={[typeScale.caption, { color: colors.warning }]}>
@@ -375,6 +390,19 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
           </>
         ) : null}
       </ScrollView>
+      <PhotoPager
+        photos={stopPhotos}
+        startId={viewingPhoto}
+        onClose={() => setViewingPhoto(null)}
+        actionsFor={(ph) => (isLead ? [{
+          key: 'delete', label: t('Delete'), icon: 'trash-2', destructive: true,
+          onPress: () => confirmAction(t('Delete this photo?'), t('It is removed for good.'), t('Delete'), async () => {
+            const res = await deleteMedia(ph.id);
+            if (!res.ok) showMessage(t("Couldn't delete"), res.error);
+            reload();
+          }, true),
+        }] : [])}
+      />
     </View>
   );
 }

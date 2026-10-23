@@ -6,10 +6,10 @@ const repo = process.argv[2];
 const { db, failures } = await buildFullSchema(repo);
 const results = [];
 const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + String(detail).slice(0, 300)}`); };
-check('0 the full schema and all updates (including 96) load', failures.length === 0, JSON.stringify(failures));
+check('0 the full schema and all updates (including 97) load', failures.length === 0, JSON.stringify(failures));
 let again = true;
-try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/096_delete_snow_photo.sql`, 'utf8')); } catch (e) { again = false; console.log(e.message); }
-check('0b update 96 can be run a second time', again);
+try { await db.exec(fs.readFileSync(`${repo}/supabase/updates/097_workers_delete_own_snow_photo.sql`, 'utf8')); } catch (e) { again = false; console.log(e.message); }
+check('0b update 97 can be run a second time', again);
 
 const one = async (sql, p) => (await db.query(sql, p)).rows[0];
 const asUser = async (u) => { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${u}', false); set role authenticated;`); };
@@ -45,12 +45,12 @@ check('1 setup: three photos on the stop', (await count()) === 3);
 let r = await rpc(other.u, `select public.snow_delete_media($1::uuid)`, [m1]);
 check('2 a worker cannot delete it', !r.ok && /not found/i.test(r.msg) && (await count()) === 3, r.msg);
 r = await rpc(lead.u, `select public.snow_delete_media($1::uuid)`, [m1]);
-check('3 not even the lead who uploaded it (only the owner or an admin)', !r.ok && (await count()) === 3, r.msg);
+check('3 the person who uploaded it can delete it (update 97), even after the stop is completed', r.ok && (await count()) === 2, r.msg);
 r = await rpc(owner.u, `select public.snow_delete_media($1::uuid)`, [m2]);
-check('4 the owner can delete a photo', r.ok && (await count()) === 2, r.msg);
+check('4 the owner can delete a photo', r.ok && (await count()) === 1, r.msg);
 // (photos reach the customer by themselves, update 87, so this one is already shared)
 r = await rpc(owner.u, `select public.snow_delete_media($1::uuid)`, [m3]);
-check('5 even one already sent to the customer (it disappears for them)', r.ok && (await count()) === 1, r.msg);
+check('5 even one already sent to the customer (it disappears for them)', r.ok && (await count()) === 0, r.msg);
 r = await rpc(owner.u, `select public.snow_delete_media($1::uuid)`, [m3]);
 check('6 deleting one that is already gone says so', !r.ok && /not found/i.test(r.msg), r.msg);
 console.log(results.every(Boolean) ? '\nall passed' : '\nsome failed');

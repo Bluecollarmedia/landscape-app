@@ -39,6 +39,8 @@ export interface RouteStop {
   completedAt?: string;
   completionNote?: string;
   mediaCount: number;
+  /** The stop's saved photos (signed links), so the lead can open and delete one. */
+  photos?: { id: string; url: string }[];
   /** The owner's note for this property (update 60). */
   ownerNote?: string;
   /** Photos required at this property: true / false, or undefined to follow the route's rule (update 60). */
@@ -82,7 +84,7 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
   const visitCols = 'id, property_id, position, status, service, property_name, property_address, arrived_at, completed_at, completion_note';
   const [first, media] = await Promise.all([
     supabase.from('snow_visits').select(`${visitCols}, owner_note, photos_required`).eq('route_id', routeId).order('position'),
-    supabase.from('snow_completion_media').select('visit_id').eq('route_id', routeId),
+    supabase.from('snow_completion_media').select('id, visit_id, kind, file_key').eq('route_id', routeId),
   ]);
   // A database without update 60 has no note / photo columns yet: load the stops without them rather than failing.
   const visits = first.error && /owner_note|photos_required/i.test(first.error.message)
@@ -91,6 +93,12 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
   if (visits.error) return fail(message(visits.error, 'Couldn\'t load the stops.'));
   const counts = new Map<string, number>();
   for (const m of media.data ?? []) counts.set(m.visit_id, (counts.get(m.visit_id) ?? 0) + 1);
+  let signed: Record<string, string> = {};
+  try {
+    const { signedSnowMediaUrls } = require('@/lib/snowMedia') as typeof import('@/lib/snowMedia');
+    signed = await signedSnowMediaUrls((media.data ?? []).filter((m) => m.kind === 'photo').map((m) => m.file_key as string));
+  } catch { /* thumbnails are optional */ }
+  const photosOf = (visitId: string) => (media.data ?? []).filter((m) => m.visit_id === visitId && m.kind === 'photo' && signed[m.file_key as string]).map((m) => ({ id: m.id as string, url: signed[m.file_key as string] }));
   const storm = (Array.isArray(r.snow_storms) ? r.snow_storms[0] : r.snow_storms) as { name: string; status: RouteDetail['stormStatus'] } | null;
   return ok({
     id: r.id,
@@ -118,6 +126,7 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
       completedAt: v.completed_at ?? undefined,
       completionNote: v.completion_note ?? undefined,
       mediaCount: counts.get(v.id) ?? 0,
+      photos: photosOf(v.id),
       ownerNote: (v as { owner_note?: string | null }).owner_note?.trim() || undefined,
       photosRequired: typeof (v as { photos_required?: boolean | null }).photos_required === 'boolean' ? (v as unknown as { photos_required: boolean }).photos_required : undefined,
     })),

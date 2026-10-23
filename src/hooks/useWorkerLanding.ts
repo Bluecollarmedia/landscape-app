@@ -10,7 +10,7 @@ import { hasOpenProjectWork, mayOpenMaintenance, worksOnLandscaping, worksOnMain
 export function useWorkerLanding() {
   const v = useDb();
   return useMemo(() => {
-    const me = db.members.find((m) => m.personId === db.personId && m.role === 'worker' && m.status === 'active');
+    const me = db.members.find((m) => m.personId === db.personId && (m.role === 'worker' || m.role === 'admin') && m.status === 'active');
     const today = todayKey();
     const projectWork = hasOpenProjectWork(db.assignments, db.personId, today);
     const onRoute = db.maintenance.routes.some((r) => r.status !== 'cancelled' && r.serviceDate >= today && r.crewIds.includes(db.personId));

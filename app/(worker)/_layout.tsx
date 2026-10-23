@@ -1,6 +1,7 @@
 import { Redirect, Stack, useSegments } from 'expo-router';
 import { WorkerProvider } from '@/providers/WorkerProvider';
 import { useWorkerLanding } from '@/hooks/useWorkerLanding';
+import { AdminBackPill } from '@/components/admin/AdminBackPill';
 
 /** Maintenance screens: open to a worker who works Maintenance or was put on a route. */
 const MAINTENANCE_ONLY = ['maintenance', 'maintenance-stop'];
@@ -30,6 +31,7 @@ export default function WorkerLayout() {
 
   return (
     <WorkerProvider>
+      <AdminBackPill />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="maintenance" />

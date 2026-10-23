@@ -161,4 +161,6 @@ export const ES: Record<string, string> = {
   'Full Day': 'Día completo',
   'Confirmed': 'Confirmado',
   'Confirm': 'Confirmar',
+  'Open my worker view': 'Abrir mi vista de trabajador',
+  'Back to admin view': 'Volver a la vista de administrador',
 };

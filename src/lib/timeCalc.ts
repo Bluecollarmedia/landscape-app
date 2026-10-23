@@ -237,11 +237,13 @@ export function buildTimeline(
 }
 
 // ── Problems the owner should look at ───────────────────────────────────────
-export interface Problem { kind: 'no_clock_out' | 'open_interval_after_close' | 'overlap' | 'visit_outside_day'; message: string; refId?: string }
+export interface Problem { kind: 'no_clock_out' | 'never_clocked_out' | 'open_interval_after_close' | 'overlap' | 'visit_outside_day'; message: string; refId?: string }
 
 /** Neutral "needs review" findings for one workday (nothing is changed or hidden). */
 export function dayProblems(w: TimeWorkday, intervals: TimeInterval[], now: number = Date.now(), openHours = 14): Problem[] {
   const out: Problem[] = [];
+  // Update 90: a day the employee never clocked out of is flagged by the database at zero hours. One clear line, not a pile of side effects.
+  if (w.status === 'needs_review') return [{ kind: 'never_clocked_out', message: 'Never clocked out. It counts as zero hours until you set the real end time.', refId: w.id }];
   if (!w.clockOutAt && now - ms(w.clockInAt) > openHours * HOUR_MS) out.push({ kind: 'no_clock_out', message: `Still clocked in after more than ${openHours} hours. Needs review.`, refId: w.id });
   const live = intervals.filter((i) => i.status !== 'void').sort((a, b) => ms(a.startedAt) - ms(b.startedAt));
   for (const i of live) {
@@ -256,15 +258,16 @@ export function dayProblems(w: TimeWorkday, intervals: TimeInterval[], now: numb
 }
 
 /** Review state shown to the owner (derived; the database keeps active / closed / approved / reopened). */
-export type ReviewState = 'in_progress' | 'needs_correction' | 'ready' | 'approved' | 'reapproval';
+export type ReviewState = 'in_progress' | 'needs_correction' | 'needs_end_time' | 'ready' | 'approved' | 'reapproval';
 export function reviewState(w: TimeWorkday, problems: Problem[]): ReviewState {
+  if (w.status === 'needs_review') return 'needs_end_time';
   if (w.status === 'approved') return 'approved';
   if (w.status === 'reopened') return 'reapproval';
   if (!w.clockOutAt) return problems.length ? 'needs_correction' : 'in_progress';
   return problems.length ? 'needs_correction' : 'ready';
 }
 export const REVIEW_LABEL: Record<ReviewState, string> = {
-  in_progress: 'In progress', needs_correction: 'Needs correction', ready: 'Ready for review', approved: 'Approved', reapproval: 'Needs approval again',
+  in_progress: 'In progress', needs_correction: 'Needs correction', needs_end_time: 'Never clocked out', ready: 'Ready for review', approved: 'Approved', reapproval: 'Needs approval again',
 };
 
 // ── Visit history, averages, targets ────────────────────────────────────────

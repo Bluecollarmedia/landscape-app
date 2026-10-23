@@ -30,6 +30,13 @@ export interface SnowShift {
   stormId?: string;
   corrected: boolean;
   correctionReason?: string;
+  /** Set by the database when this shift was never clocked out of (update 90): it counts as zero hours until the owner corrects it. */
+  flaggedAt?: string;
+  /** What the worker said when they really stopped (saved only). */
+  claimedOutAt?: string;
+  claimNote?: string;
+  /** When the worker answered (a time, or "not sure"). */
+  claimedAt?: string;
 }
 
 /** Shifts the caller can see (own for workers, everyone's for owner/admin), newest first. */
@@ -41,13 +48,20 @@ export async function loadShifts(sinceIso: string, untilIso?: string): Promise<R
     return q.order('clock_in_at', { ascending: false });
   };
   const corrections = 'snow_shift_corrections(clock_in_at, clock_out_at, reason, created_at)';
-  let { data, error } = await run(`id, person_id, storm_id, clock_in_at, clock_out_at, ${corrections}`);
-  // Before update 42 there is no storm_id column: load the shifts without it (every shift is untagged).
+  let { data, error } = await run(`id, person_id, storm_id, clock_in_at, clock_out_at, flagged_at, claimed_out_at, claim_note, claimed_at, ${corrections}`);
+  // Before update 90 there are no flag columns: load without them. Before update 42 there is no storm_id column either.
+  if (error && /flagged_at|claimed_/i.test(error.message)) {
+    ({ data, error } = await run(`id, person_id, storm_id, clock_in_at, clock_out_at, ${corrections}`));
+  }
   if (error && /storm_id/i.test(error.message)) {
     ({ data, error } = await run(`id, person_id, clock_in_at, clock_out_at, ${corrections}`));
   }
   if (error) return fail(message(error, 'Couldn\'t load shifts.'));
-  return ok(((data ?? []) as any[]).map((s) => {
+  return ok(shiftsFromRows((data ?? []) as any[]));
+}
+
+function shiftsFromRows(rows: any[]): SnowShift[] {
+  return (rows.map((s) => {
     const fixes = ((s.snow_shift_corrections ?? []) as { clock_in_at: string; clock_out_at: string | null; reason: string; created_at: string }[])
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
     const last = fixes[fixes.length - 1];
@@ -61,8 +75,53 @@ export async function loadShifts(sinceIso: string, untilIso?: string): Promise<R
       stormId: s.storm_id ?? undefined,
       corrected: !!last,
       correctionReason: last?.reason,
+      flaggedAt: s.flagged_at ?? undefined,
+      claimedOutAt: s.claimed_out_at ?? undefined,
+      claimNote: s.claim_note ?? undefined,
+      claimedAt: s.claimed_at ?? undefined,
     };
   }));
+}
+
+/**
+ * The caller's shifts that are not settled, from ANY week: still open, or flagged "never clocked out" and not yet corrected. The weekly
+ * list above starts at this week's Monday, which would hide an old open shift (the app would offer Clock In while the database says "already clocked in").
+ */
+export async function loadMyUnsettledShifts(): Promise<Result<SnowShift[]>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const corrections = 'snow_shift_corrections(clock_in_at, clock_out_at, reason, created_at)';
+  const q = (cols: string, filter: string) => supabase.from('snow_shifts').select(cols).or(filter).order('clock_in_at', { ascending: false }).limit(20);
+  let { data, error } = await q(`id, person_id, storm_id, clock_in_at, clock_out_at, flagged_at, claimed_out_at, claim_note, claimed_at, ${corrections}`, 'clock_out_at.is.null,flagged_at.not.is.null');
+  if (error && /flagged_at|claimed_/i.test(error.message)) {
+    ({ data, error } = await q(`id, person_id, storm_id, clock_in_at, clock_out_at, ${corrections}`, 'clock_out_at.is.null'));
+  }
+  if (error) return fail(message(error, 'Couldn\'t load your shifts.'));
+  return ok(shiftsFromRows((data ?? []) as any[]));
+}
+
+/** Asks the database to flag a shift that was never clocked out of (older than 20 hours) before anything is shown. A failure changes nothing. */
+export async function checkMyShift(): Promise<void> {
+  if (!isSupabaseConfigured) return;
+  try { await supabase.rpc('snow_check_my_shift'); } catch { /* an older database has no such function; the screens work out staleness themselves */ }
+}
+
+/** The worker says when they really stopped a shift they never clocked out of (null = not sure). Saved for the owner; no hours change. */
+export async function claimStaleShift(shiftId: string, stoppedAtIso: string | null, note?: string): Promise<Result> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { error } = await supabase.rpc('snow_claim_stale_end', { p_shift: shiftId, p_stopped_at: stoppedAtIso, p_note: note ?? null });
+  return error ? fail(message(error, 'Couldn\'t save your answer.')) : ok(undefined);
+}
+
+/**
+ * Which of a person's shifts is really running, and which one needs the "you didn't clock out" answer. The same rule as the workday clock
+ * (lib/clockSession), with the Snow threshold (storms run through the night). Merges the weekly list with the unsettled ones.
+ */
+export function splitShifts(shifts: SnowShift[], nowMs: number = Date.now()): { open?: SnowShift; stale?: SnowShift } {
+  const { isCurrent, needsAnswer, SNOW_STALE_HOURS } = require('@/lib/clockSession') as typeof import('@/lib/clockSession');
+  const asSession = (s: SnowShift) => ({ clockInAt: s.originalIn, clockOutAt: s.originalOut, flagged: !!s.flaggedAt && !s.corrected });
+  const open = shifts.find((s) => !s.originalOut && !s.flaggedAt && isCurrent(asSession(s), nowMs, SNOW_STALE_HOURS));
+  const stale = shifts.find((s) => needsAnswer(asSession(s), nowMs, SNOW_STALE_HOURS));
+  return { open, stale };
 }
 
 /**

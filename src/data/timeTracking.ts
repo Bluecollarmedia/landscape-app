@@ -32,7 +32,14 @@ export interface MyWorkday {
   workDate: string;
   clockInAt: string;
   clockOutAt?: string;
-  status: 'active' | 'closed' | 'approved' | 'reopened';
+  status: 'active' | 'closed' | 'approved' | 'reopened' | 'needs_review';
+  /** Set when the database flagged this day (never clocked out): it counts as zero hours until the owner sets the real end time. */
+  flaggedAt?: string;
+  /** What the worker said when they really stopped (saved only; the owner decides). Empty = not answered, or "not sure". */
+  claimedOutAt?: string;
+  claimNote?: string;
+  /** When the worker answered (a time, or "not sure"). Empty = not answered yet. */
+  claimedAt?: string;
   truck?: { id: string; name: string; source: 'owner' | 'worker' };
   breaks: MyBreak[];
 }
@@ -54,8 +61,8 @@ export interface MyDay {
   workDate: string;
   /** False when the worker has no route or job today: the phone shows "No work scheduled today" instead of Clock In. (The database refuses it either way.) */
   canClockIn: boolean;
-  settings: { breaksEnabled: boolean; requireStartPhoto: boolean; requireCompletePhoto: boolean };
-  /** Today's workdays (usually one) plus any still open. */
+  settings: { breaksEnabled: boolean; requireStartPhoto: boolean; requireCompletePhoto: boolean; /** Open this long = stale (the owner's "open workday hours"). */ staleAfterHours: number };
+  /** Today's workdays (usually one), any still open, and any flagged "needs review". */
   days: MyWorkday[];
   current?: MyCurrentVisit;
   alreadyActive?: boolean;
@@ -85,9 +92,11 @@ function parseDay(r: Raw): MyDay {
       breaksEnabled: !!r.settings?.breaks_enabled,
       requireStartPhoto: !!r.settings?.require_start_photo,
       requireCompletePhoto: !!r.settings?.require_complete_photo,
+      staleAfterHours: Number(r.settings?.stale_after_hours) > 0 ? Number(r.settings.stale_after_hours) : 14,
     },
     days: ((r.days ?? []) as Raw[]).map((d) => ({
       id: d.id, workDate: d.work_date, clockInAt: d.clock_in_at, clockOutAt: d.clock_out_at ?? undefined, status: d.status,
+      flaggedAt: d.flagged_at ?? undefined, claimedOutAt: d.claimed_out_at ?? undefined, claimNote: d.claim_note ?? undefined, claimedAt: d.claimed_at ?? undefined,
       truck: d.truck ? { id: d.truck.id, name: d.truck.name ?? 'Truck', source: d.truck.source } : undefined,
       breaks: ((d.breaks ?? []) as Raw[]).map((b) => ({ id: b.id, startedAt: b.started_at, endedAt: b.ended_at ?? undefined, paid: !!b.paid })),
     })),
@@ -125,6 +134,9 @@ export const loadMyDay = (date: string) => timeRpc('time_my_day', { p_date: date
 export const clockIn = (date: string, truckId?: string, requestId: string = uuid()) =>
   callDay('time_clock_in', { p_work_date: date, p_truck_id: truckId ?? null, p_request_id: requestId }, "Couldn't clock you in.");
 export const clockOut = (requestId: string = uuid()) => callDay('time_clock_out', { p_request_id: requestId }, "Couldn't clock you out.");
+/** The worker says when they really stopped a day they never clocked out of (null = not sure). Saved for the owner; no hours change. */
+export const claimStaleEnd = (workdayId: string, stoppedAtIso: string | null, note?: string) =>
+  callDay('time_claim_stale_end', { p_workday: workdayId, p_stopped_at: stoppedAtIso, p_note: note ?? null }, "Couldn't save your answer.");
 export const startBreak = () => callDay('time_break_start', {}, "Couldn't start the break.");
 export const endBreak = () => callDay('time_break_end', {}, "Couldn't end the break.");
 
@@ -163,8 +175,10 @@ export async function withdrawSkip(id: string): Promise<Result> {
 // ── Owner: reading ──────────────────────────────────────────────────────────
 
 export interface LaborWorkday {
-  id: string; personId: string; workDate: string; clockInAt: string; clockOutAt?: string; status: 'active' | 'closed' | 'approved' | 'reopened';
+  id: string; personId: string; workDate: string; clockInAt: string; clockOutAt?: string; status: 'active' | 'closed' | 'approved' | 'reopened' | 'needs_review';
   truckId?: string; truckSource?: string; approvedBy?: string; approvedAt?: string; approvalVersion: number; hourlyRate?: number | null;
+  /** Update 90: a day never clocked out of is flagged (zero hours); the worker's answer, if any, is here. */
+  flaggedAt?: string; claimedOutAt?: string; claimNote?: string; claimedAt?: string;
 }
 export interface LaborBreak { id: string; workdayId: string; personId: string; startedAt: string; endedAt?: string; paid: boolean }
 export interface LaborVisit {
@@ -272,6 +286,7 @@ function toWorkday(w: Raw): LaborWorkday {
     id: w.id, personId: w.person_id, workDate: w.work_date, clockInAt: w.clock_in_at, clockOutAt: w.clock_out_at ?? undefined, status: w.status,
     truckId: w.truck_id ?? undefined, truckSource: w.truck_source ?? undefined, approvedBy: w.approved_by ?? undefined, approvedAt: w.approved_at ?? undefined,
     approvalVersion: w.approval_version ?? 0, hourlyRate: rateOf(w.time_workday_rates),
+    flaggedAt: w.flagged_at ?? undefined, claimedOutAt: w.claimed_out_at ?? undefined, claimNote: w.claim_note ?? undefined, claimedAt: w.claimed_at ?? undefined,
   };
 }
 function rateOf(v: unknown): number | null {

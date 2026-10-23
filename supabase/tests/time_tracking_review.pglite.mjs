@@ -418,8 +418,12 @@ check('73 a shift across midnight (and a US clock change) is 8 elapsed hours; a 
 f = await fails(`insert into public.time_workdays (company_id, person_id, work_date, clock_in_at, clock_out_at, status) values ($1,$2,'2026-03-08','2026-03-08T05:00:00Z','2026-03-08T09:00:00Z','closed')`, [co, w4.pid]);
 check('74 a second workday that overlaps the first is refused (hours can\'t be counted twice)', f.raised && /overlaps/.test(f.msg), f.msg);
 await db.query(`insert into public.time_workdays (company_id, person_id, work_date, clock_in_at, status) values ($1,$2,current_date - 1, now() - interval '30 hours','active')`, [co, w4.pid]);
-r = await rpc(w4.u, `select public.time_clock_in($1::date, null, null) as x`, [today]);
-check('75 a worker who forgot to clock out yesterday sees that open workday (never a second one) and can close it', r.ok && r.v.already_active === true && r.v.days.length === 1 && r.v.days[0].clock_out_at === null, r.msg);
+r = await rpc(w4.u, `select public.time_my_day($1::date) as x`, [today]);
+// Update 90: a workday left open for longer than the owner's "open workday hours" is FLAGGED (needs review, zero hours, original clock-in kept),
+// never closed at "now" and never counted twice; it does not block today's clock-in.
+check('75 a worker who forgot to clock out yesterday: the old day is flagged "needs review" at zero hours (not closed at "now"), and it is no longer an open session', r.ok && r.v.days.length === 1 && r.v.days[0].status === 'needs_review' && r.v.days[0].clock_out_at === r.v.days[0].clock_in_at, JSON.stringify(r.v?.days));
+// The alert tests below need a day that is still open: leave one open (same 30 hours old).
+await db.query(`insert into public.time_workdays (company_id, person_id, work_date, clock_in_at, status) values ($1,$2,current_date - 1, now() - interval '29 hours','active')`, [co, w4.pid]);
 
 const stale = (await one(`select id from public.time_workdays where person_id = $1 and clock_out_at is null`, [w4.pid])).id;
 await rpc(owner.u, `select public.time_scan_alerts() as x`);
@@ -477,11 +481,11 @@ check('79 re-running them changed no recorded time', (await one(`select count(*)
 // ── 5. the catalog: nothing is exposed that shouldn't be (so a future careless change is caught) ──
 const cat = await all(`select p.proname, p.prosecdef, coalesce(p.proconfig::text, '') cfg, has_function_privilege('anon', p.oid, 'execute') anon_x, has_function_privilege('authenticated', p.oid, 'execute') auth_x
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and (p.proname like 'time\_%' or p.proname like '\_time\_%')`);
-const EXPECTED = ['time_alert_resolve', 'time_approve_workday', 'time_break_end', 'time_break_start', 'time_clock_in', 'time_clock_out', 'time_complete_visit', 'time_decide_skip', 'time_my_day',
+const EXPECTED = ['time_alert_resolve', 'time_approve_workday', 'time_break_end', 'time_break_start', 'time_claim_stale_end', 'time_clock_in', 'time_clock_out', 'time_complete_visit', 'time_decide_skip', 'time_my_day',
   'time_my_skip_requests', 'time_reopen_workday', 'time_request_skip', 'time_scan_alerts', 'time_set_hourly_rate', 'time_set_visit_billable', 'time_staff_add_break', 'time_staff_add_interval',
   'time_staff_add_workday', 'time_staff_edit_break', 'time_staff_edit_interval', 'time_staff_edit_workday', 'time_staff_void_interval', 'time_start_visit', 'time_trucks_for_clock_in', 'time_withdraw_skip'];
 const callable = cat.filter((x) => x.auth_x).map((x) => x.proname).sort();
-check('80 a signed-in user can run exactly the 25 intended time functions and no helper or trigger function', JSON.stringify(callable) === JSON.stringify([...EXPECTED].sort()), JSON.stringify(callable.filter((x) => !EXPECTED.includes(x))));
+check('80 a signed-in user can run exactly the 26 intended time functions and no helper or trigger function', JSON.stringify(callable) === JSON.stringify([...EXPECTED].sort()), JSON.stringify(callable.filter((x) => !EXPECTED.includes(x))));
 check('81 a signed-out user can run none of them', cat.every((x) => !x.anon_x), cat.filter((x) => x.anon_x).map((x) => x.proname).join(','));
 check('82 every SECURITY DEFINER time function pins its search_path (no lookalike-object hijack)', cat.filter((x) => x.prosecdef).every((x) => /search_path=public/.test(x.cfg)), cat.filter((x) => x.prosecdef && !/search_path=public/.test(x.cfg)).map((x) => x.proname).join(','));
 const priv = await all(`select c.relname, has_table_privilege('anon', c.oid, 'select') as a_s, has_table_privilege('anon', c.oid, 'insert') as a_i, c.relrowsecurity as rls from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'time\_%'`);

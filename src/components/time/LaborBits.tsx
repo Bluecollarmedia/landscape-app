@@ -80,7 +80,7 @@ export function KV({ label, value, bold, hint }: { label: string; value: string;
   );
 }
 
-const STATE_TONE: Record<ReviewState, 'neutral' | 'info' | 'warn' | 'good'> = { in_progress: 'info', needs_correction: 'warn', ready: 'neutral', approved: 'good', reapproval: 'warn' };
+const STATE_TONE: Record<ReviewState, 'neutral' | 'info' | 'warn' | 'good'> = { in_progress: 'info', needs_correction: 'warn', needs_end_time: 'warn', ready: 'neutral', approved: 'good', reapproval: 'warn' };
 export function StatePill({ state }: { state: ReviewState }) {
   const { colors } = useTheme();
   const tone = STATE_TONE[state];

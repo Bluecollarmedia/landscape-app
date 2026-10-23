@@ -197,6 +197,28 @@ export default function LaborDayScreen() {
             {(row.state === 'needs_correction' || (row.state === 'in_progress' && row.problems.length)) ? <Text style={[typeScale.caption, { color: colors.warning, marginTop: spacing.sm }]}>Fix the items below before this day can be approved.</Text> : null}
           </Card>
 
+          {row.state === 'needs_end_time' ? (
+            <Card>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Never clocked out</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+                {wd.claimedOutAt
+                  ? `${row.personName} says they stopped ${new Date(wd.claimedOutAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}${wd.claimNote ? ` ("${wd.claimNote}")` : ''}.`
+                  : wd.claimedAt ? `${row.personName} is not sure when they stopped.` : `${row.personName} has not answered yet.`}
+                {' '}This day counts as zero hours until you set the real end time. The original clock-in is kept.
+              </Text>
+              <View style={styles.btnRow}>
+                {wd.claimedOutAt ? (
+                  <Pressable onPress={async () => { await done(await editWorkday(wd.id, null, wd.claimedOutAt!, 'Used the time the employee gave')); }} style={[styles.btn, { backgroundColor: colors.primary }]} accessibilityRole="button">
+                    <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Use their time</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={() => setSheet({ kind: 'workday' })} style={[styles.btn, { backgroundColor: colors.backgroundTertiary }]} accessibilityRole="button">
+                  <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Set the end time</Text>
+                </Pressable>
+              </View>
+            </Card>
+          ) : null}
+
           {row.problems.length ? (
             <Card title="NEEDS REVIEW">
               {row.problems.map((p, i) => <View key={i} style={styles.problem}><Icon name="alert-circle" size={16} color={colors.warning} /><Text style={[typeScale.bodyMedium, { color: colors.textPrimary, flex: 1 }]}>{p.message}</Text></View>)}

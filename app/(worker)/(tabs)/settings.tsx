@@ -1,4 +1,5 @@
 import { LegalSection } from '@/components/legal/LegalSection';
+import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +33,7 @@ export default function WorkerSettingsScreen() {
   const { settings, updateNavApp } = useWorkerContext();
   const [navSheetOpen, setNavSheetOpen] = useState(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
+  const guardedSignOut = useGuardedSignOut();
 
   const currentNavLabel = NAV_OPTIONS.find(o => o.value === settings.navApp)?.label ?? 'System Default';
 
@@ -170,7 +172,7 @@ export default function WorkerSettingsScreen() {
               Are you sure you want to sign out of your account?
             </Text>
             <View style={{ marginTop: spacing.xl, gap: spacing.sm, width: '100%' }}>
-              <Pressable onPress={() => { setSignOutConfirmOpen(false); signOut(); }}>
+              <Pressable onPress={() => { setSignOutConfirmOpen(false); guardedSignOut(); }}>
                 <LinearGradient
                   colors={['#E1615D', '#C4453F']}
                   start={{ x: 0, y: 0 }}

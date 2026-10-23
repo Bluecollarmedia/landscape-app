@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { canClockIn, clockIn, loadShifts, startOfWeekIso, type SnowShift } from '@/data/snowShifts';
+import { canClockIn, checkMyShift, claimStaleShift, clockIn, loadMyUnsettledShifts, loadShifts, splitShifts, startOfWeekIso, type SnowShift } from '@/data/snowShifts';
 
 /**
  * A Snow worker's clock state, for any screen that shows it (the Route tab's Clock In gate and the Time Clock tab). There
@@ -11,13 +11,23 @@ import { canClockIn, clockIn, loadShifts, startOfWeekIso, type SnowShift } from 
  */
 export function useSnowClock() {
   const [open, setOpen] = useState<SnowShift | null>(null);
+  /** A shift never clocked out of: counts as zero hours, blocks nothing, and shows ONE card asking when they stopped. */
+  const [stale, setStale] = useState<SnowShift | null>(null);
   const [allowed, setAllowed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [shifts, can] = await Promise.all([loadShifts(startOfWeekIso()), canClockIn()]);
-    if (shifts.ok) setOpen(shifts.data.find((s) => !s.originalOut) ?? null);
+    // First let the database flag any shift that was never clocked out of, so nothing stale is ever shown as "clocked in".
+    await checkMyShift();
+    const [week, unsettled, can] = await Promise.all([loadShifts(startOfWeekIso()), loadMyUnsettledShifts(), canClockIn()]);
+    if (week.ok || unsettled.ok) {
+      const byId = new Map<string, SnowShift>();
+      for (const sh of [...(week.ok ? week.data : []), ...(unsettled.ok ? unsettled.data : [])]) byId.set(sh.id, sh);
+      const split = splitShifts([...byId.values()]);
+      setOpen(split.open ?? null);
+      setStale(split.stale ?? null);
+    }
     setAllowed(can);
     setLoading(false);
   }, []);
@@ -43,5 +53,14 @@ export function useSnowClock() {
     return res.ok ? null : res.error;
   }, [refresh]);
 
-  return { open, allowed, loading, busy, refresh, clockInNow };
+  /** Saves the worker's answer about the shift they never clocked out of (null = not sure). Resolves with an error sentence, or null when it worked. */
+  const claimStale = useCallback(async (shiftId: string, stoppedAtIso: string | null): Promise<string | null> => {
+    setBusy(true);
+    const res = await claimStaleShift(shiftId, stoppedAtIso);
+    setBusy(false);
+    await refresh();
+    return res.ok ? null : res.error;
+  }, [refresh]);
+
+  return { open, stale, allowed, loading, busy, refresh, clockInNow, claimStale };
 }

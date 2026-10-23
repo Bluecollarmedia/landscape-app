@@ -8,6 +8,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { clockText, durationText, intervalMs } from '@/lib/timeCalc';
 import { haptics } from '@/lib/haptics';
+import { StaleSessionCard } from '@/components/time/StaleSessionCard';
 import type { TruckOptions } from '@/data/timeTracking';
 
 function say(title: string, message: string) {
@@ -37,7 +38,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
   }, [running]);
   const nowMs = Date.now() + w.clockOffsetMs;
   const todayNetMs = w.netMsAt(nowMs);
-  // Still clocked in from an earlier calendar day: almost always a forgotten clock-out. Said plainly, never hidden or silently closed.
+  // A running day that began before today (an overnight job) is labelled with its day. A day open for much longer is never "running": it is `w.stale`.
   const fromEarlier = !!w.active && new Date(w.active.clockInAt).toDateString() !== new Date(nowMs).toDateString();
 
   if (w.installed !== true) return null;
@@ -77,6 +78,15 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
+      {w.stale ? (
+        <StaleSessionCard
+          session={{ id: w.stale.id, clockInAt: w.stale.clockInAt, claimedOutAt: w.stale.claimedOutAt, claimNote: w.stale.claimNote, answered: !!w.stale.claimedAt }}
+          busy={w.busy}
+          nowMs={nowMs}
+          onAnswer={(iso) => w.claimStale(w.stale!.id, iso)}
+          error={w.error}
+        />
+      ) : null}
       {noWork && !closedToday ? (
         <>
           <View style={styles.head}>
@@ -123,11 +133,6 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
               <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Clock Out</Text>
             </Pressable>
           </View>
-          {fromEarlier ? (
-            <Text style={[typeScale.caption, { color: colors.warning, marginTop: spacing.xs }]}>
-              This workday started on an earlier day. If you forgot to clock out, clock out now and tell your boss when you really finished.
-            </Text>
-          ) : null}
         </>
       ) : null}
 
@@ -140,11 +145,6 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
           </View>
           <Text style={[styles.timer, { color: colors.textPrimary }]} accessibilityLabel={`Workday total ${durationText(todayNetMs)}`}>{clockText(todayNetMs)}</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Workday total</Text>
-          {fromEarlier ? (
-            <Text style={[typeScale.caption, { color: colors.warning, marginTop: spacing.xs }]}>
-              This workday started on an earlier day. If you forgot to clock out, clock out now and tell your boss when you really finished so they can fix the time.
-            </Text>
-          ) : null}
 
           {active.truck ? (
             <View style={styles.row}>

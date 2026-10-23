@@ -5,6 +5,7 @@
  * legal pages, Sign Out and Delete Account. Team and Properties have their own tabs, so they are not repeated here.
  */
 import React from 'react';
+import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import { View, Text, ScrollView, Pressable, Image, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
@@ -33,6 +34,7 @@ export default function SnowOwnerMoreScreen() {
   useDb();
   const { colors } = useTheme();
   const { signOut } = useAuth();
+  const guardedSignOut = useGuardedSignOut();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const tabBarClearance = useTabBarClearance();
@@ -90,7 +92,7 @@ export default function SnowOwnerMoreScreen() {
 
           <Group title="Account">
             <Row icon="shield" title="Legal & Support" subtitle="Privacy Policy, Terms of Use and Help" onPress={() => router.push('/snow/legal-support' as any)} />
-            <Row icon="log-out" title="Sign Out" destructive onPress={signOut} />
+            <Row icon="log-out" title="Sign Out" destructive onPress={guardedSignOut} />
           </Group>
           <ListSection>
             <DeleteAccountRow />

@@ -14,10 +14,15 @@
       "buildNumber": "18",
       "associatedDomains": [
         "applinks:brighton-app.netlify.app",
+        "applinks:app.brightonlawn.com",
+        "applinks:brighton-app.netlify.app",
         "applinks:app.brightonlawn.com"
       ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -27,7 +32,12 @@
       },
       "package": "com.brightonlawn.app",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -79,6 +89,9 @@
         "projectId": "c9628d1e-80c3-4a58-a2bd-f008542a71d2"
       }
     },
-    "owner": "abbacohen"
+    "owner": "abbacohen",
+    "updates": {
+      "url": "https://u.expo.dev/c9628d1e-80c3-4a58-a2bd-f008542a71d2"
+    }
   }
 }

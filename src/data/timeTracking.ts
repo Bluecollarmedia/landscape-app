@@ -172,6 +172,22 @@ export async function withdrawSkip(id: string): Promise<Result> {
   return error ? explainError(error, "Couldn't withdraw the request.") : ok(undefined);
 }
 
+export interface CrewClockOut { closed: string[]; stillWorking: { name: string; why: string }[] }
+/** The crew leader (or the owner) clocks out everyone on the route after the last stop. Anyone on a property timer or a break is left alone and reported. */
+export async function clockOutCrew(routeId: string): Promise<Result<CrewClockOut>> {
+  const { data, error } = await supabase.rpc('maintenance_clock_out_crew', { p_route: routeId });
+  if (error) {
+    const failed = explainError(error, "Couldn't clock the crew out.");
+    return failed.notInstalled ? { ...failed, error: "Clocking the whole crew out isn't switched on yet." } : failed;
+  }
+  emitTimeChanged();
+  const d = (data ?? {}) as { closed?: Raw[]; still_working?: Raw[] };
+  return ok({
+    closed: (d.closed ?? []).map((x) => String(x.first_name)),
+    stillWorking: (d.still_working ?? []).map((x) => ({ name: String(x.first_name), why: String(x.why) })),
+  });
+}
+
 // ── Owner: reading ──────────────────────────────────────────────────────────
 
 export interface LaborWorkday {

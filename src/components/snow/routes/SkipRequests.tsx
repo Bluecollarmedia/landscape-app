@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Keyboard } from 'react-native';
 import { Button, InlineNotice, Input } from '@/components/ui';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { decideSkip, listRouteSkips, requestSkip, skipHistory, withdrawSkip } from '@/data/snowSkips';
 import type { SnowSkipRequest } from '@/types/snow';
@@ -26,6 +27,7 @@ import { spacing, radius } from '@/theme/spacing';
 // ── Lead ────────────────────────────────────────────────────────────────────
 
 export function LeadSkipPanel({ visitId, disabled, onChanged }: { visitId: string; disabled?: boolean; onChanged: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const [latest, setLatest] = useState<SnowSkipRequest | undefined>();
   const [asking, setAsking] = useState(false);
@@ -43,7 +45,7 @@ export function LeadSkipPanel({ visitId, disabled, onChanged }: { visitId: strin
     setBusy(true);
     const res = await requestSkip(visitId, reason);
     setBusy(false);
-    if (!res.ok) return showMessage('Couldn\'t send the request', res.error);
+    if (!res.ok) return showMessage(t("Couldn't send the request"), t(res.error));
     Keyboard.dismiss();
     setAsking(false);
     setReason('');
@@ -56,7 +58,7 @@ export function LeadSkipPanel({ visitId, disabled, onChanged }: { visitId: strin
     setBusy(true);
     const res = await withdrawSkip(latest.id);
     setBusy(false);
-    if (!res.ok) showMessage('Couldn\'t take it back', res.error);
+    if (!res.ok) showMessage(t("Couldn't take it back"), t(res.error));
     await refresh();
     onChanged();
   }
@@ -64,8 +66,8 @@ export function LeadSkipPanel({ visitId, disabled, onChanged }: { visitId: strin
   if (latest?.status === 'pending') {
     return (
       <View style={{ gap: spacing.sm }}>
-        <InlineNotice icon="clock" tone="info" text={`Skip requested. Waiting for the owner. "${latest.reason}"`} />
-        <Button title="Take request back" variant="ghost" loading={busy} onPress={withdraw} fullWidth />
+        <InlineNotice icon="clock" tone="info" text={t('Skip requested. Waiting for the owner. "{reason}"', { reason: latest.reason })} />
+        <Button title={t('Take request back')} variant="ghost" loading={busy} onPress={withdraw} fullWidth />
       </View>
     );
   }
@@ -76,25 +78,25 @@ export function LeadSkipPanel({ visitId, disabled, onChanged }: { visitId: strin
         <InlineNotice
           icon="alert-circle"
           tone="warning"
-          text={latest.decisionNote ? `The owner said this stop still needs doing: ${latest.decisionNote}` : 'The owner said this stop still needs doing.'}
+          text={latest.decisionNote ? t('The owner said this stop still needs doing: {note}', { note: latest.decisionNote }) : t('The owner said this stop still needs doing.')}
         />
       ) : null}
       {asking ? (
         <>
           <Input
-            label="Why can't this stop be done?"
+            label={t("Why can't this stop be done?")}
             value={reason}
             onChangeText={setReason}
-            placeholder="Locked gate, car in the way, no snow to clear…"
+            placeholder={t('Locked gate, car in the way, no snow to clear…')}
             multiline
           />
           <View style={styles.buttons}>
-            <Button title="Cancel" variant="ghost" disabled={busy} onPress={() => { setAsking(false); setReason(''); }} />
-            <Button title="Send request" loading={busy} disabled={!reason.trim()} onPress={send} />
+            <Button title={t('Cancel')} variant="ghost" disabled={busy} onPress={() => { setAsking(false); setReason(''); }} />
+            <Button title={t('Send request')} loading={busy} disabled={!reason.trim()} onPress={send} />
           </View>
         </>
       ) : (
-        <Button title="Can't do this stop" icon="slash" variant="ghost" disabled={disabled} onPress={() => setAsking(true)} fullWidth />
+        <Button title={t("Can't do this stop")} icon="slash" variant="ghost" disabled={disabled} onPress={() => setAsking(true)} fullWidth />
       )}
     </View>
   );

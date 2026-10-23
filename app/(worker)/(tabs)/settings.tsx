@@ -18,6 +18,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { ScreenContainer } from '@/components/layout';
 import type { NavAppPreference } from '@/types/worker';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { useT } from '@/i18n';
 
 const NAV_OPTIONS: { value: NavAppPreference; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { value: 'google_maps', label: 'Google Maps', icon: 'map' },
@@ -27,6 +28,7 @@ const NAV_OPTIONS: { value: NavAppPreference; label: string; icon: keyof typeof 
 ];
 
 export default function WorkerSettingsScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const { user, signOut, switchDevRole } = useAuth();
   const insets = useSafeAreaInsets();
@@ -41,9 +43,9 @@ export default function WorkerSettingsScreen() {
   return (
     <ScreenContainer scrollable padded variant="grouped">
       <View style={{ paddingTop: insets.top + spacing.md, marginBottom: spacing.xl }}>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Settings</Text>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t('Settings')}</Text>
         <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>
-          Manage your account and preferences
+          {t('Manage your account and preferences')}
         </Text>
       </View>
 
@@ -51,7 +53,7 @@ export default function WorkerSettingsScreen() {
         style={[styles.profileCard, { backgroundColor: colors.surface }, shadow.sm]}
         onPress={() => router.push('/(worker)/edit-profile' as any)}
         accessibilityRole="button"
-        accessibilityLabel="Edit your profile and photo"
+        accessibilityLabel={t('Edit your profile and photo')}
       >
         <View style={styles.profileRow}>
           <View style={styles.avatarWrap}>
@@ -73,35 +75,35 @@ export default function WorkerSettingsScreen() {
         </View>
       </Pressable>
 
-      <ListSection title="Preferences">
+      <ListSection title={t('Preferences')}>
         <ListRow
           icon="navigation"
-          title="Maps App"
-          value={currentNavLabel}
+          title={t('Maps App')}
+          value={t(currentNavLabel)}
           showChevron
           onPress={() => setNavSheetOpen(true)}
         />
         <ListRow
           icon="bell"
-          title="Notifications"
-          subtitle="Manage your notification preferences"
+          title={t('Notifications')}
+          subtitle={t('Manage your notification preferences')}
           showChevron
           onPress={() => router.push('/(worker)/notifications' as any)}
         />
       </ListSection>
 
-      <ListSection title="Company">
+      <ListSection title={t('Company')}>
         <ListRow
           icon="key"
-          title="Company Resources"
-          subtitle="Codes and info shared with you"
+          title={t('Company Resources')}
+          subtitle={t('Codes and info shared with you')}
           showChevron
           onPress={() => router.push('/(worker)/my-resources' as any)}
         />
       </ListSection>
 
-      <ListSection title="App">
-        <ListRow title="Version" value="1.0.0" />
+      <ListSection title={t('App')}>
+        <ListRow title={t('Version')} value="1.0.0" />
       </ListSection>
 
       {!isSupabaseConfigured && (
@@ -127,16 +129,13 @@ export default function WorkerSettingsScreen() {
         </ListSection>
       )}
 
-      <ListSection>
-        <LanguageRow />
-      </ListSection>
-
       <LegalSection />
 
       <ListSection>
-        <ListRow icon="log-out" iconColor={colors.error} title="Sign Out" destructive onPress={() => setSignOutConfirmOpen(true)} />
+        <ListRow icon="log-out" iconColor={colors.error} title={t('Sign Out')} destructive onPress={() => setSignOutConfirmOpen(true)} />
         <DeleteAccountRow />
       </ListSection>
+      <LanguageRow />
 
       {/* Navigation App selection sheet */}
       <BottomSheetModal visible={navSheetOpen} onRequestClose={() => setNavSheetOpen(false)}>
@@ -144,7 +143,7 @@ export default function WorkerSettingsScreen() {
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.md }]} onPress={() => {}}>
             <View style={[styles.sheetHandle, { backgroundColor: colors.borderLight }]} />
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.md }]}>
-              Maps App
+              {t('Maps App')}
             </Text>
             {NAV_OPTIONS.map(opt => (
               <Pressable
@@ -154,7 +153,7 @@ export default function WorkerSettingsScreen() {
               >
                 <Feather name={opt.icon} size={18} color={colors.textSecondary} />
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1, marginLeft: spacing.md }]}>
-                  {opt.label}
+                  {t(opt.label)}
                 </Text>
                 {settings.navApp === opt.value && <Feather name="check" size={18} color={colors.primary} />}
               </Pressable>
@@ -171,10 +170,10 @@ export default function WorkerSettingsScreen() {
               <Feather name="log-out" size={22} color={colors.error} />
             </View>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.lg, textAlign: 'center' }]}>
-              Sign Out?
+              {t('Sign Out?')}
             </Text>
             <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }]}>
-              Are you sure you want to sign out of your account?
+              {t('Are you sure you want to sign out of your account?')}
             </Text>
             <View style={{ marginTop: spacing.xl, gap: spacing.sm, width: '100%' }}>
               <Pressable onPress={() => { setSignOutConfirmOpen(false); guardedSignOut(); }}>
@@ -184,14 +183,14 @@ export default function WorkerSettingsScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.confirmButton}
                 >
-                  <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Sign Out</Text>
+                  <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('Sign Out')}</Text>
                 </LinearGradient>
               </Pressable>
               <Pressable
                 style={[styles.confirmButton, { backgroundColor: colors.backgroundSecondary }]}
                 onPress={() => setSignOutConfirmOpen(false)}
               >
-                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Cancel</Text>
+                <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{t('Cancel')}</Text>
               </Pressable>
             </View>
           </View>

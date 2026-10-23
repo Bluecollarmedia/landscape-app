@@ -15,6 +15,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Icon, LoadingSpinner } from '@/components/ui';
 import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -42,6 +43,7 @@ interface SnowReferenceViewProps {
 }
 
 export function SnowReferenceView({ reference, mediaUrls, note, showTitle = true }: SnowReferenceViewProps) {
+  const t = useT();
   const { colors } = useTheme();
   const [open, setOpen] = useState<number | null>(null);
   const items = useMemo(() => snowMediaItems(reference.media, mediaUrls), [reference.media, mediaUrls]);
@@ -52,21 +54,21 @@ export function SnowReferenceView({ reference, mediaUrls, note, showTitle = true
     <View style={{ gap: spacing.sm }}>
       {showTitle && (
         <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>
-          {SNOW_SERVICE_LABELS[reference.service.service]}
+          {t(SNOW_SERVICE_LABELS[reference.service.service])}
         </Text>
       )}
       {note ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{note}</Text> : null}
       <Text style={[typeScale.bodyLarge, { color: body ? colors.textPrimary : colors.textTertiary }]}>
-        {body || 'No instructions for this service.'}
+        {body || t('No instructions for this service.')}
       </Text>
       {items.length > 0 ? (
         <TaskMediaStrip items={items} onOpen={setOpen} />
       ) : (
-        <Text style={[typeScale.caption, { color: colors.textTertiary }]}>No reference photos or videos.</Text>
+        <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{t('No reference photos or videos.')}</Text>
       )}
       {missing > 0 && (
         <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-          {missing === 1 ? 'One file couldn\'t be loaded.' : `${missing} files couldn't be loaded.`}
+          {missing === 1 ? t("One file couldn't be loaded.") : t("{n} files couldn't be loaded.", { n: missing })}
         </Text>
       )}
       <TaskMediaViewer items={items} index={open} onIndexChange={setOpen} onClose={() => setOpen(null)} />
@@ -82,6 +84,7 @@ interface SnowServiceReferenceCardProps {
 }
 
 export function SnowServiceReferenceCard({ propertyId, service, at }: SnowServiceReferenceCardProps) {
+  const t = useT();
   const { colors } = useTheme();
   const [state, setState] = useState<
     | { kind: 'loading' }
@@ -115,19 +118,19 @@ export function SnowServiceReferenceCard({ propertyId, service, at }: SnowServic
       {state.kind === 'error' && (
         <View style={styles.row}>
           <Icon name="alert-circle" size={16} color={colors.textSecondary} />
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1 }]}>{state.message}</Text>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1 }]}>{t(state.message)}</Text>
         </View>
       )}
       {state.kind === 'none' && (
         <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>
-          No {SNOW_SERVICE_LABELS[service].toLowerCase()} instructions are available for this property.
+          {t('No {service} instructions are available for this property.', { service: t(SNOW_SERVICE_LABELS[service]).toLowerCase() })}
         </Text>
       )}
       {state.kind === 'ready' && (
         <SnowReferenceView
           reference={state.reference}
           mediaUrls={state.urls}
-          note={at ? `As it was on ${formatDate(at)}` : undefined}
+          note={at ? t('As it was on {date}', { date: formatDate(at) }) : undefined}
         />
       )}
     </View>

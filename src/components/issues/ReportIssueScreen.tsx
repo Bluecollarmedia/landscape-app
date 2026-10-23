@@ -15,8 +15,10 @@ import { ISSUE_TYPES, placeNameFor, reportIssue, type IssueType, type IssueWhere
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { haptics } from '@/lib/haptics';
+import { useT } from '@/i18n';
 
 export function ReportIssueScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -33,10 +35,10 @@ export function ReportIssueScreen() {
 
   function addPhoto() {
     if (Platform.OS === 'web') return pick('library');
-    Alert.alert('Add Photo', undefined, [
-      { text: 'Take Photo', onPress: () => pick('camera') },
-      { text: 'Choose from Library', onPress: () => pick('library') },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('Add Photo'), undefined, [
+      { text: t('Take Photo'), onPress: () => pick('camera') },
+      { text: t('Choose from Library'), onPress: () => pick('library') },
+      { text: t('Cancel'), style: 'cancel' },
     ]);
   }
 
@@ -46,7 +48,7 @@ export function ReportIssueScreen() {
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Permission needed', 'Turn it on for Brighton Lawn in the Settings app to add photos.');
+        Alert.alert(t('Permission needed'), t('Turn it on for Brighton Lawn in the Settings app to add photos.'));
         return;
       }
     }
@@ -64,14 +66,14 @@ export function ReportIssueScreen() {
     if (!res.ok) { setError(res.error); return; }
     haptics.success();
     if (Platform.OS === 'web') router.back();
-    else Alert.alert('Sent', 'The office has been told.', [{ text: 'OK', onPress: () => router.back() }]);
+    else Alert.alert(t('Sent'), t('The office has been told.'), [{ text: t('OK'), onPress: () => router.back() }]);
   }
 
   if (!where) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg }]}>
-        <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back" />
-        <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xl }]}>Open this from a property or job.</Text>
+        <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel={t('Back')} />
+        <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xl }]}>{t('Open this from a property or job.')}</Text>
       </View>
     );
   }
@@ -82,30 +84,30 @@ export function ReportIssueScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: 140 }}
       >
-        <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back" />
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>Report a Problem</Text>
+        <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel={t('Back')} />
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>{t('Report a Problem')}</Text>
         <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: 2 }]}>{placeNameFor(where)}</Text>
 
-        <Text style={[typeScale.overline, { color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm }]}>WHAT HAPPENED?</Text>
+        <Text style={[typeScale.overline, { color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm }]}>{t('WHAT HAPPENED?')}</Text>
         <View style={styles.chips}>
-          {ISSUE_TYPES.map((t) => {
-            const on = type === t.key;
+          {ISSUE_TYPES.map((it) => {
+            const on = type === it.key;
             return (
               <PressableScale
-                key={t.key}
-                onPress={() => setType(t.key)}
+                key={it.key}
+                onPress={() => setType(it.key)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
                 style={[styles.chip, { backgroundColor: on ? colors.primary : colors.backgroundTertiary }]}
               >
-                <Icon name={t.icon as any} size={16} color={on ? '#FFFFFF' : colors.textPrimary} />
-                <Text style={[typeScale.labelLarge, { color: on ? '#FFFFFF' : colors.textPrimary, fontWeight: '600' }]}>{t.label}</Text>
+                <Icon name={it.icon as any} size={16} color={on ? '#FFFFFF' : colors.textPrimary} />
+                <Text style={[typeScale.labelLarge, { color: on ? '#FFFFFF' : colors.textPrimary, fontWeight: '600' }]}>{t(it.label)}</Text>
               </PressableScale>
             );
           })}
         </View>
 
-        <Text style={[typeScale.overline, { color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm }]}>PHOTOS</Text>
+        <Text style={[typeScale.overline, { color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm }]}>{t('PHOTOS')}</Text>
         <View style={styles.photos}>
           {photos.map((uri) => (
             <View key={uri} style={styles.photoWrap}>
@@ -113,7 +115,7 @@ export function ReportIssueScreen() {
               <PressableScale
                 onPress={() => setPhotos((cur) => cur.filter((u) => u !== uri))}
                 accessibilityRole="button"
-                accessibilityLabel="Remove photo"
+                accessibilityLabel={t('Remove photo')}
                 style={styles.remove}
               >
                 <Icon name="x" size={14} color="#FFFFFF" />
@@ -124,20 +126,20 @@ export function ReportIssueScreen() {
             <PressableScale
               onPress={addPhoto}
               accessibilityRole="button"
-              accessibilityLabel="Add photo"
+              accessibilityLabel={t('Add photo')}
               style={[styles.photo, styles.add, { borderColor: colors.border }]}
             >
               <Icon name="camera" size={22} color={colors.textSecondary} />
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Add photo</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{t('Add photo')}</Text>
             </PressableScale>
           )}
         </View>
 
-        <Text style={[typeScale.overline, { color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm }]}>NOTES (OPTIONAL)</Text>
+        <Text style={[typeScale.overline, { color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.sm }]}>{t('NOTES (OPTIONAL)')}</Text>
         <TextInput
           value={notes}
           onChangeText={setNotes}
-          placeholder="Anything the office should know"
+          placeholder={t('Anything the office should know')}
           placeholderTextColor={colors.textTertiary}
           multiline
           style={[styles.input, typeScale.bodyLarge, { color: colors.textPrimary, backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
@@ -151,11 +153,11 @@ export function ReportIssueScreen() {
           disabled={!type || busy}
           haptic={false}
           accessibilityRole="button"
-          accessibilityLabel="Send report"
+          accessibilityLabel={t('Send report')}
           style={[styles.send, { backgroundColor: colors.primary, opacity: !type || busy ? 0.5 : 1 }]}
         >
           {busy ? <ActivityIndicator color="#FFFFFF" /> : <Icon name="send" size={18} color="#FFFFFF" />}
-          <Text style={[typeScale.labelLarge, { color: '#FFFFFF', fontWeight: '800', letterSpacing: 0.6 }]}>{busy ? 'SENDING…' : 'SEND REPORT'}</Text>
+          <Text style={[typeScale.labelLarge, { color: '#FFFFFF', fontWeight: '800', letterSpacing: 0.6 }]}>{busy ? t('SENDING…') : t('SEND REPORT')}</Text>
         </PressableScale>
       </View>
     </View>

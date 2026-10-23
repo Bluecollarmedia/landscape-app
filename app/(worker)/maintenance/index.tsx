@@ -14,6 +14,7 @@ import { useDb, db } from '@/data/store';
 import { locationLabel } from '@/data/maintenance';
 import { missingRequirements, finishStopAndAdvance, useFinishingStop } from '@/data/maintenanceFinish';
 import { haptics } from '@/lib/haptics';
+import { useT } from '@/i18n';
 import { crewStopMessage, isCrewLeader } from '@/lib/maintenanceLeader';
 import { EmptyState } from '@/components/ui';
 import { BrandCover } from '@/components/branding/BrandCover';
@@ -54,6 +55,7 @@ function firstName(personId?: string): string | undefined {
  * Stop for each stop in the owner's order.
  */
 export default function MaintenanceTodayScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
@@ -99,8 +101,13 @@ export default function MaintenanceTodayScreen() {
   const [skippedYard, setSkippedYard] = useState(false);
 
   const now = new Date();
-  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const greeting = now.getHours() < 12 ? t('Good morning') : now.getHours() < 17 ? t('Good afternoon') : t('Good evening');
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const preShiftText = stops.length === 0
+    ? t("Clocking in starts your workday and unlocks today's route.")
+    : stops.length === 1
+      ? t("Clocking in starts your workday and unlocks today's route (1 stop).")
+      : t("Clocking in starts your workday and unlocks today's route ({n} stops).", { n: stops.length });
 
   // Start Day and I'M HERE (with their honest GPS prompts) come from useMaintenanceCheckIn.
   const handleStartDay = () => { haptics.select(); checkIn.startDay(route?.id); };
@@ -119,7 +126,7 @@ export default function MaintenanceTodayScreen() {
     else if (result.missing.length) openStop(stop);
     else {
       haptics.warning();
-      showMessage("Couldn't save that", result.error ?? 'Please try again.');
+      showMessage(t("Couldn't save that"), result.error ?? t('Please try again.'));
     }
   }
 
@@ -138,14 +145,14 @@ export default function MaintenanceTodayScreen() {
   } else if (!timeOn && !dayStart.started && !skippedYard && !allDone) {
     action = {
       title: 'START DAY',
-      subtitle: checkIn.busy === 'day' ? 'Finding your location…' : `Check in at ${yardName}`,
+      subtitle: checkIn.busy === 'day' ? t('Finding your location…') : t('Check in at {yard}', { yard: yardName }),
       icon: 'sunrise',
       onPress: handleStartDay,
     };
   } else if (next && (next.status === 'pending' || !iCheckedIn)) {
     action = {
       title: timeOn ? 'START PROPERTY' : "I'M HERE",
-      subtitle: checkIn.busy === next.id ? 'Finding your location…' : timeOn ? 'Start your time at this property' : 'Check in to start this stop',
+      subtitle: checkIn.busy === next.id ? t('Finding your location…') : timeOn ? t('Start your time at this property') : t('Check in to start this stop'),
       icon: 'map-pin',
       onPress: () => handleArrive(next),
     };
@@ -154,8 +161,8 @@ export default function MaintenanceTodayScreen() {
     action = {
       title: 'FINISH STOP',
       subtitle: finishing
-        ? 'Saving…'
-        : blockers.length > 1 ? `${blockers[0]} and ${blockers.length - 1} more` : blockers[0] ?? 'Mark this property done',
+        ? t('Saving…')
+        : blockers.length > 1 ? t('{first} and {n} more', { first: blockers[0], n: blockers.length - 1 }) : blockers[0] ?? t('Mark this property done'),
       icon: 'check-circle',
       onPress: () => handleFinish(next),
       muted: blockers.length > 0,
@@ -180,29 +187,29 @@ export default function MaintenanceTodayScreen() {
             <Text style={[typeScale.bodySmall, styles.heroShadow, { color: '#FFFFFF' }]}>{dateStr}</Text>
             <Text style={[typeScale.displayLarge, styles.heroShadow, { color: '#FFFFFF', marginTop: 2 }]}>{greeting}</Text>
             <Text style={[typeScale.bodyLarge, styles.heroShadow, { color: '#FFFFFF', marginTop: spacing.xs }]}>
-              {route ? "Here's your maintenance route for today." : 'Maintenance crew'}
+              {route ? t("Here's your maintenance route for today.") : t('Maintenance crew')}
             </Text>
           </View>
         </View>
 
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
           {projectWork ? (
-            <OtherWorkCard icon="briefcase" title="You also have project work" subtitle="Tap to see your jobs." onPress={() => router.push('/(worker)/(tabs)' as any)} />
+            <OtherWorkCard icon="briefcase" title={t('You also have project work')} subtitle={t('Tap to see your jobs.')} onPress={() => router.push('/(worker)/(tabs)' as any)} />
           ) : null}
           {timeOn ? (
             !route && !workday.active ? (
               <View style={[styles.notScheduled, { backgroundColor: colors.backgroundSecondary }]}>
                 <Feather name="calendar" size={22} color={colors.textSecondary} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>You're not scheduled today</Text>
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Clock In appears when the owner puts you on a route for the day.</Text>
+                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t("You're not scheduled today")}</Text>
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t('Clock In appears when the owner puts you on a route for the day.')}</Text>
                 </View>
               </View>
             ) : (
               <WorkdayCard
                 compact={clockedIn}
-                preShiftTitle="Ready to start your day"
-                preShiftText={`Clocking in starts your workday and unlocks today's route${stops.length ? ` (${stops.length} stop${stops.length === 1 ? '' : 's'})` : ''}.`}
+                preShiftTitle={t('Ready to start your day')}
+                preShiftText={preShiftText}
               />
             )
           ) : (
@@ -218,8 +225,8 @@ export default function MaintenanceTodayScreen() {
             timeOn ? null : (
               <EmptyState
                 icon="map"
-                title="No route today"
-                description="When the owner puts you on a maintenance route, its stops show up here."
+                title={t('No route today')}
+                description={t('When the owner puts you on a maintenance route, its stops show up here.')}
               />
             )
           ) : !showRoute ? null : (
@@ -227,14 +234,14 @@ export default function MaintenanceTodayScreen() {
               <View style={styles.routeHeader}>
                 <MaterialCommunityIcons name="map-marker-path" size={30} color={colors.primary} />
                 <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]}>
-                  Today's Route
+                  {t("Today's Route")}
                 </Text>
               </View>
               {route.lead && (
                 <View style={styles.leadRow}>
                   <Feather name="star" size={13} color={colors.textTertiary} />
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-                    {route.lead.id === user?.id ? 'You are the route lead' : `Lead: ${route.lead.firstName} ${route.lead.lastName}`.trim()}
+                    {route.lead.id === user?.id ? t('You are the route lead') : t('Lead: {name}', { name: `${route.lead.firstName} ${route.lead.lastName}`.trim() })}
                   </Text>
                 </View>
               )}
@@ -244,7 +251,7 @@ export default function MaintenanceTodayScreen() {
                 </View>
               ) : (
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-                  This route doesn't have any stops yet.
+                  {t("This route doesn't have any stops yet.")}
                 </Text>
               )}
 
@@ -275,9 +282,9 @@ export default function MaintenanceTodayScreen() {
                 <View style={[styles.doneBox, { backgroundColor: colors.primarySurface }]}>
                   <Feather name="check-circle" size={22} color={colors.primaryDark} />
                   <View style={{ flex: 1, marginLeft: spacing.md }}>
-                    <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Route complete</Text>
+                    <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t('Route complete')}</Text>
                     <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                      Every stop is finished. Nice work today.
+                      {t('Every stop is finished. Nice work today.')}
                     </Text>
                   </View>
                 </View>
@@ -291,7 +298,7 @@ export default function MaintenanceTodayScreen() {
           {showRoute && stops.length > 0 && (
             <View>
               <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginBottom: spacing.sm }]}>
-                {upcoming.length > 0 ? 'Stops' : 'Stops today'}
+                {upcoming.length > 0 ? t('Stops') : t('Stops today')}
               </Text>
               <View style={[styles.listCard, { borderColor: colors.border }]}>
                 {stops.map((s, i) => (
@@ -326,13 +333,13 @@ export default function MaintenanceTodayScreen() {
             onPress={action.onPress}
             disabled={!!busy}
             accessibilityRole="button"
-            accessibilityLabel={`${action.title}. ${action.subtitle}`}
+            accessibilityLabel={`${t(action.title)}. ${action.subtitle}`}
             style={({ pressed }) => [pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] }]}
           >
             <View style={[styles.actionButton, { backgroundColor: action.muted ? colors.primary : colors.primaryDark }]}>
               <View style={styles.actionRow}>
                 <Feather name={action.icon} size={20} color="#FFFFFF" />
-                <Text style={[typeScale.headingSmall, styles.actionTitle]}>{action.title}</Text>
+                <Text style={[typeScale.headingSmall, styles.actionTitle]}>{t(action.title)}</Text>
               </View>
               <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.9)', marginTop: 2 }]} numberOfLines={1}>
                 {action.subtitle}
@@ -346,7 +353,7 @@ export default function MaintenanceTodayScreen() {
               style={styles.secondaryLink}
               accessibilityRole="button"
             >
-              <Text style={[typeScale.labelLarge, { color: colors.primaryDark }]}>Already at a property? Check in there</Text>
+              <Text style={[typeScale.labelLarge, { color: colors.primaryDark }]}>{t('Already at a property? Check in there')}</Text>
             </Pressable>
           )}
         </View>
@@ -359,11 +366,12 @@ function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName
   stop: MaintenanceStopDetail; onOpen: () => void; onDirections?: () => void;
   crewMode?: boolean; leader?: boolean; leaderName?: string; busy?: boolean; starting?: boolean; finishing?: boolean; onArrive?: () => void; onFinish?: () => void;
 }) {
+  const t = useT();
   const { colors } = useTheme();
   const blockers = missingRequirements(stop);
   const status = displayStatus(stop, stop.id);
-  const requiredTasks = stop.tasks.filter(t => t.isRequired);
-  const tasksDone = requiredTasks.filter(t => t.completedAt).length;
+  const requiredTasks = stop.tasks.filter(task => task.isRequired);
+  const tasksDone = requiredTasks.filter(task => task.completedAt).length;
   const arrivedBy = firstName(stop.arrivedBy);
 
   return (
@@ -374,7 +382,7 @@ function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName
             <Feather name="home" size={16} color={colors.primaryDark} />
           </View>
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginLeft: spacing.sm, flex: 1 }]} numberOfLines={2}>
-            {stop.property?.name ?? 'Property'}
+            {stop.property?.name ?? t('Property')}
           </Text>
         </View>
         <View style={styles.nextBody}>
@@ -399,7 +407,7 @@ function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName
         </View>
         {stop.status === 'arrived' && stop.arrivedAt && (
           <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm }]} numberOfLines={2}>
-            Checked in {formatClock(stop.arrivedAt)}{arrivedBy ? ` by ${arrivedBy}` : ''} · {locationLabel(stop.arrivalLocationStatus)}
+            {arrivedBy ? t('Checked in {time} by {name}', { time: formatClock(stop.arrivedAt), name: arrivedBy }) : t('Checked in {time}', { time: formatClock(stop.arrivedAt) })} · {t(locationLabel(stop.arrivalLocationStatus))}
           </Text>
         )}
       </Pressable>
@@ -423,7 +431,7 @@ function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName
             <View style={styles.reqItem}>
               <Feather name="check-square" size={14} color={tasksDone === requiredTasks.length ? colors.success : colors.textSecondary} />
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-                Checklist {tasksDone}/{requiredTasks.length}
+                {t('Checklist {done}/{total}', { done: tasksDone, total: requiredTasks.length })}
               </Text>
             </View>
           )}
@@ -431,7 +439,7 @@ function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName
             <View style={styles.reqItem}>
               <Feather name="camera" size={14} color={stop.photos.length >= stop.minPhotos ? colors.success : colors.textSecondary} />
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>
-                Photos {Math.min(stop.photos.length, stop.minPhotos)}/{stop.minPhotos}
+                {t('Photos {done}/{total}', { done: Math.min(stop.photos.length, stop.minPhotos), total: stop.minPhotos })}
               </Text>
             </View>
           )}
@@ -442,17 +450,17 @@ function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName
         <View style={[styles.cardAction, { borderTopColor: colors.border }]}>
           {leader ? (
             stop.status === 'pending' ? (
-              <Pressable onPress={onArrive} disabled={!!busy} accessibilityRole="button" accessibilityLabel={`I'm here at ${stop.property?.name ?? 'this property'}`}
+              <Pressable onPress={onArrive} disabled={!!busy} accessibilityRole="button" accessibilityLabel={t("I'm here at {name}", { name: stop.property?.name ?? t('this property') })}
                 style={({ pressed }) => [styles.cardButton, { backgroundColor: colors.primaryDark, opacity: busy ? 0.6 : pressed ? 0.9 : 1 }]}>
                 <Feather name="map-pin" size={18} color="#FFFFFF" />
-                <Text style={[typeScale.labelLarge, styles.cardButtonText]}>{starting ? 'Finding your location…' : "I'M HERE"}</Text>
+                <Text style={[typeScale.labelLarge, styles.cardButtonText]}>{starting ? t('Finding your location…') : t("I'M HERE")}</Text>
               </Pressable>
             ) : stop.status === 'arrived' ? (
-              <Pressable onPress={onFinish} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Finish stop"
+              <Pressable onPress={onFinish} disabled={!!busy} accessibilityRole="button" accessibilityLabel={t('Finish stop')}
                 style={({ pressed }) => [styles.cardButton, { backgroundColor: blockers.length ? colors.primary : colors.primaryDark, opacity: busy ? 0.6 : pressed ? 0.9 : 1 }]}>
                 <Feather name="check-circle" size={18} color="#FFFFFF" />
                 <Text style={[typeScale.labelLarge, styles.cardButtonText]}>
-                  {finishing ? 'Saving…' : blockers.length ? `FINISH STOP · ${blockers[0]}${blockers.length > 1 ? ` +${blockers.length - 1}` : ''}` : 'FINISH STOP'}
+                  {finishing ? t('Saving…') : blockers.length ? `${t('FINISH STOP')} · ${blockers[0]}${blockers.length > 1 ? ` +${blockers.length - 1}` : ''}` : t('FINISH STOP')}
                 </Text>
               </Pressable>
             ) : null
@@ -469,11 +477,11 @@ function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName
           onPress={onDirections}
           style={({ pressed }) => [styles.mapsRow, { borderTopColor: colors.border }, pressed && { backgroundColor: colors.surfacePressed }]}
           accessibilityRole="button"
-          accessibilityLabel="Open in Maps"
+          accessibilityLabel={t('Open in Maps')}
         >
           <Feather name="navigation" size={16} color={colors.primary} />
           <Text style={[typeScale.bodyLarge, { color: colors.primary, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
-            Open in Maps
+            {t('Open in Maps')}
           </Text>
           <Feather name="chevron-right" size={18} color={colors.textTertiary} />
         </Pressable>

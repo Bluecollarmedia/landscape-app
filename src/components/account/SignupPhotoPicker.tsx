@@ -12,6 +12,7 @@ import { PICKER_AFTER_SHEET_MS, type ProfilePhotoSource } from '@/lib/profilePho
 import { useProfilePhoto } from '@/hooks/useProfilePhoto';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
+import { useT } from '@/i18n';
 
 interface Props {
   uri: string | null;
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function SignupPhotoPicker({ uri, onChange, onError, firstName, lastName }: Props) {
+  const t = useT();
   const { colors } = useTheme();
 
   const photo = useProfilePhoto(onChange, onError);
@@ -30,11 +32,11 @@ export function SignupPhotoPicker({ uri, onChange, onError, firstName, lastName 
 
   function choose() {
     if (Platform.OS === 'web') { pick('library'); return; }
-    Alert.alert('Profile photo', undefined, [
-      { text: 'Take Photo', onPress: () => pick('camera') },
-      { text: 'Choose from Library', onPress: () => pick('library') },
-      ...(uri ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: () => onChange(null) }] : []),
-      { text: 'Cancel', style: 'cancel' as const },
+    Alert.alert(t('Profile photo'), undefined, [
+      { text: t('Take Photo'), onPress: () => pick('camera') },
+      { text: t('Choose from Library'), onPress: () => pick('library') },
+      ...(uri ? [{ text: t('Remove Photo'), style: 'destructive' as const, onPress: () => onChange(null) }] : []),
+      { text: t('Cancel'), style: 'cancel' as const },
     ]);
   }
 
@@ -42,7 +44,7 @@ export function SignupPhotoPicker({ uri, onChange, onError, firstName, lastName 
     <Pressable
       onPress={choose}
       accessibilityRole="button"
-      accessibilityLabel={uri ? 'Change profile photo' : 'Add a profile photo (optional)'}
+      accessibilityLabel={uri ? t('Change profile photo') : t('Add a profile photo (optional)')}
       style={styles.wrap}
     >
       <View>
@@ -52,7 +54,7 @@ export function SignupPhotoPicker({ uri, onChange, onError, firstName, lastName 
         </View>
       </View>
       <Text style={[typeScale.labelLarge, { color: colors.primary, marginTop: spacing.sm }]}>
-        {uri ? 'Change photo' : 'Add a photo (optional)'}
+        {uri ? t('Change photo') : t('Add a photo (optional)')}
       </Text>
       {photo.cropper}
     </Pressable>

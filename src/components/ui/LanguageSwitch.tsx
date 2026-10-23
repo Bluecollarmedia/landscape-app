@@ -10,7 +10,7 @@ import { spacing, radius } from '@/theme/spacing';
  * English | Español. Small on purpose: a pill for the sign-in / sign-up screens (so someone can read the page in Spanish before they sign up),
  * and the same switch as one quiet row in Settings. The choice stays on this phone.
  */
-export function LanguageSwitch({ style }: { style?: object }) {
+export function LanguageSwitch({ style, compact = false }: { style?: object; compact?: boolean }) {
   const { colors } = useTheme();
   const { language, setLanguage } = useLanguage();
   const t = useT();
@@ -26,9 +26,9 @@ export function LanguageSwitch({ style }: { style?: object }) {
             accessibilityState={{ selected: on }}
             accessibilityLabel={l.label}
             hitSlop={6}
-            style={[styles.segment, on && { backgroundColor: colors.primary }]}
+            style={[styles.segment, compact && styles.segmentSmall, on && { backgroundColor: colors.primary }]}
           >
-            <Text style={[typeScale.labelSmall, { color: on ? '#FFFFFF' : colors.textSecondary, fontWeight: '700' }]}>{l.label}</Text>
+            <Text style={[compact ? typeScale.caption : typeScale.labelSmall, { color: on ? '#FFFFFF' : colors.textSecondary, fontWeight: '700' }]}>{l.label}</Text>
           </Pressable>
         );
       })}
@@ -36,14 +36,14 @@ export function LanguageSwitch({ style }: { style?: object }) {
   );
 }
 
-/** One row for Settings: the label on the left, the switch on the right. */
+/** A small, quiet line at the very bottom of Settings: it is a one-time choice, so it takes almost no room. */
 export function LanguageRow() {
   const { colors } = useTheme();
   const t = useT();
   return (
     <View style={styles.row}>
-      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{t('Language')}</Text>
-      <LanguageSwitch />
+      <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{t('Language')}</Text>
+      <LanguageSwitch compact />
     </View>
   );
 }
@@ -51,5 +51,6 @@ export function LanguageRow() {
 const styles = StyleSheet.create({
   pill: { flexDirection: 'row', borderRadius: radius.full, borderWidth: StyleSheet.hairlineWidth, padding: 2, alignSelf: 'flex-start' },
   segment: { paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full, minWidth: 64, alignItems: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg },
+  segmentSmall: { paddingHorizontal: spacing.sm, paddingVertical: 3, minWidth: 54 },
 });

@@ -23,5 +23,5 @@ const pos = (s) => o.indexOf(s);
 check('6 order: ring, Project Activity, Project Details, Billing last', pos('<ProgressRing') > 0 && pos('Project Activity') > pos('<ProgressRing') && pos('Project Details') > pos('Project Activity') && pos('<CustomerBillingCard') > pos('Project Details'));
 check('7 View all opens the real timeline tab; no banner, stats, wrench or celebration', /setActiveSection\('timeline'\)/.test(o) && !/wrench|Thank you|completedBanner|statsRow/i.test(o));
 check('8 billing reuses the existing visibility rule and document screen', /customerCanSee/.test(billing) && /\/\(customer\)\/document/.test(billing));
-check('9 header and tabs untouched', /<SectionTabs tabs=\{activeSections\}/.test(screen) && /accessibilityLabel="Go back"/.test(screen));
+check('9 header and tabs untouched', /<SectionTabs tabs=\{activeSections\}/.test(screen) && /accessibilityLabel=\{t\('Go back'\)\}/.test(screen));
 console.log(bad ? `\n${bad} failed` : '\nall passed'); process.exit(bad ? 1 : 0);

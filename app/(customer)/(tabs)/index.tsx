@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { ScreenContainer } from '@/components/layout';
@@ -31,6 +32,7 @@ const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', { mon
  * have), then completed projects as a compact list. A property filter appears only when they have more than one property.
  */
 export default function CustomerHomeScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -67,7 +69,7 @@ export default function CustomerHomeScreen() {
   // Snow is not a project: it has its own section (and its own "Right now" strip, only while a storm involves a property).
   const snowItems = active.filter((i) => i.kind === 'snow');
   const activeRest = active.filter((i) => i.kind !== 'snow');
-  const strip = homeStrip(snowHome.statuses, mySnow);
+  const strip = homeStrip(snowHome.statuses, mySnow, t);
 
   function open(i: HomeItem) {
     if (i.kind === 'maintenance') return router.push('/(customer)/maintenance-updates' as any);
@@ -78,7 +80,7 @@ export default function CustomerHomeScreen() {
   return (
     <ScreenContainer scrollable padded>
       <View style={{ paddingTop: insets.top + spacing.sm, marginBottom: spacing.md }}>
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Welcome Back</Text>
+        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t('Welcome Back')}</Text>
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontWeight: '800' }]}>{user?.firstName ?? 'there'}</Text>
       </View>
 
@@ -87,12 +89,12 @@ export default function CustomerHomeScreen() {
       {strip ? <StormStrip strip={strip} onPress={() => router.push(`/(customer)/snow-updates?property=${strip.propertyId}` as any)} /> : null}
 
       {all.length === 0 ? (
-        <EmptyState icon="layers" title={emptyPortalText().title} description={emptyPortalText().description} />
+        <EmptyState icon="layers" title={t(emptyPortalText().title)} description={t(emptyPortalText().description)} />
       ) : (
         <>
           {options.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={{ marginBottom: spacing.md, marginHorizontal: -spacing.lg }}>
-              <Chip label="All properties" on={!activeProperty} onPress={() => setProperty(null)} />
+              <Chip label={t('All properties')} on={!activeProperty} onPress={() => setProperty(null)} />
               {options.map((o) => <Chip key={o.key} label={o.label} on={activeProperty === o.key} onPress={() => setProperty(o.key)} />)}
             </ScrollView>
           )}
@@ -114,7 +116,7 @@ export default function CustomerHomeScreen() {
               {activeRest.length === 0 ? (
                 <View style={[styles.emptyActive, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
                   <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>
-                    No active projects right now.{completed.length > 0 ? ' Your completed projects are below.' : ''}
+                    {t('No active projects right now.')}{completed.length > 0 ? ` ${t('Your completed projects are below.')}` : ''}
                   </Text>
                 </View>
               ) : (
@@ -133,7 +135,7 @@ export default function CustomerHomeScreen() {
               </View>
               {completed.length > COMPLETED_PREVIEW && (
                 <Pressable onPress={() => setShowAllCompleted((v) => !v)} accessibilityRole="button" style={styles.viewAll}>
-                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{showAllCompleted ? 'Show fewer' : `View all ${completed.length}`}</Text>
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{showAllCompleted ? t('Show fewer') : t('View all {count}', { count: completed.length })}</Text>
                 </Pressable>
               )}
             </>
@@ -145,13 +147,14 @@ export default function CustomerHomeScreen() {
 }
 
 function StormStrip({ strip, onPress }: { strip: NonNullable<ReturnType<typeof homeStrip>>; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const active = strip.tone === 'active';
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${strip.headline}. ${strip.detail ?? ''} Open`}
+      accessibilityLabel={t('{headline}. {detail} Open', { headline: strip.headline, detail: strip.detail ?? '' })}
       style={({ pressed }) => [styles.strip, { backgroundColor: active ? semantic.infoLight : colors.surface, borderColor: active ? semantic.info : colors.borderLight }, pressed && { opacity: 0.9 }]}
     >
       <View style={[styles.stripIcon, { backgroundColor: active ? semantic.info : colors.backgroundTertiary }]}>
@@ -167,12 +170,13 @@ function StormStrip({ strip, onPress }: { strip: NonNullable<ReturnType<typeof h
 }
 
 function SnowCard({ item, services, last, onPress }: { item: HomeItem; services: SnowSvc[]; last?: string; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Snow: ${item.name}. ${item.address}. Open`}
+      accessibilityLabel={t('Snow: {name}. {address}. Open', { name: item.name, address: item.address })}
       style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }, pressed && { opacity: 0.9 }]}
     >
       <View style={{ flex: 1, gap: 2 }}>
@@ -189,13 +193,13 @@ function SnowCard({ item, services, last, onPress }: { item: HomeItem; services:
             {services.map((s) => (
               <View key={s} style={[styles.svcChip, { backgroundColor: semantic.infoLight }]}>
                 <Icon name={SERVICE_ICON[s]} size={12} color={semantic.info} />
-                <Text style={[typeScale.caption, { color: semantic.info, fontWeight: '600' }]}>{SERVICE_NAME[s]}</Text>
+                <Text style={[typeScale.caption, { color: semantic.info, fontWeight: '600' }]}>{t(SERVICE_NAME[s])}</Text>
               </View>
             ))}
           </View>
         ) : null}
         <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
-          {last ? `Last service ${lastServiceLabel(last)}` : 'No service yet this season'}
+          {last ? t('Last service {when}', { when: lastServiceLabel(last, t) }) : t('No service yet this season')}
         </Text>
       </View>
       <Icon name="chevron-right" size={20} color={colors.textTertiary} />
@@ -218,10 +222,11 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
 }
 
 function SectionHeading({ title, count, style }: { title: string; count: number; style?: object }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <View style={[styles.heading, style]}>
-      <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '800' }]} accessibilityRole="header">{title}</Text>
+      <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '800' }]} accessibilityRole="header">{t(title)}</Text>
       <View style={[styles.count, { backgroundColor: colors.primarySurface }]}>
         <Text style={[typeScale.caption, { color: colors.primaryDark, fontWeight: '700' }]}>{count}</Text>
       </View>
@@ -230,6 +235,7 @@ function SectionHeading({ title, count, style }: { title: string; count: number;
 }
 
 function TypePill({ item }: { item: HomeItem }) {
+  const t = useT();
   const { colors } = useTheme();
   const snow = item.kind === 'snow';
   const bg = snow ? semantic.infoLight : colors.primarySurface;
@@ -237,23 +243,24 @@ function TypePill({ item }: { item: HomeItem }) {
   return (
     <View style={[styles.pill, { backgroundColor: bg }]}>
       <View style={[styles.dot, { backgroundColor: fg }]} />
-      <Text style={[typeScale.caption, { color: fg, fontWeight: '700' }]}>{item.typeLabel}</Text>
+      <Text style={[typeScale.caption, { color: fg, fontWeight: '700' }]}>{t(item.typeLabel)}</Text>
     </View>
   );
 }
 
 function ActiveCard({ item, onPress }: { item: HomeItem; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const held = item.status === 'on_hold';
-  const update = item.latestUpdate ? `Last update ${fmtDate(item.latestUpdate.at)}` : undefined;
+  const update = item.latestUpdate ? t('Last update {date}', { date: fmtDate(item.latestUpdate.at) }) : undefined;
   const line = item.kind === 'project'
-    ? [item.progress != null && !held ? `${item.progress}% complete` : undefined, update].filter(Boolean).join(' · ')
-    : item.note;
+    ? [item.progress != null && !held ? t('{percent}% complete', { percent: item.progress }) : undefined, update].filter(Boolean).join(' · ')
+    : item.note ? t(item.note) : item.note;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${item.typeLabel}: ${item.name}. ${item.address}. ${statusLabel(item)}`}
+      accessibilityLabel={t('{type}: {name}. {address}. {status}', { type: t(item.typeLabel), name: item.name, address: item.address, status: t(statusLabel(item)) })}
       style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }, pressed && { opacity: 0.9 }]}
     >
       <View style={{ flex: 1 }}>
@@ -265,7 +272,7 @@ function ActiveCard({ item, onPress }: { item: HomeItem; onPress: () => void }) 
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1 }]} numberOfLines={1}>{item.address}</Text>
           </View>
         ) : null}
-        <Text style={[typeScale.labelLarge, { color: held ? semantic.warning : semantic.success, marginTop: spacing.sm }]}>{statusLabel(item)}</Text>
+        <Text style={[typeScale.labelLarge, { color: held ? semantic.warning : semantic.success, marginTop: spacing.sm }]}>{t(statusLabel(item))}</Text>
         {line ? <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 1 }]} numberOfLines={2}>{line}</Text> : null}
         {item.latestUpdate && item.kind === 'project' ? (
           <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 1 }]} numberOfLines={1}>{item.latestUpdate.title}</Text>
@@ -277,22 +284,23 @@ function ActiveCard({ item, onPress }: { item: HomeItem; onPress: () => void }) 
 }
 
 function CompletedRow({ item, first, onPress }: { item: HomeItem; first: boolean; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Completed project: ${item.name}. ${item.address}. Open`}
+      accessibilityLabel={t('Completed project: {name}. {address}. Open', { name: item.name, address: item.address })}
       style={({ pressed }) => [styles.doneRow, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }, pressed && { opacity: 0.85 }]}
     >
       <Icon name="check-circle" size={18} color={semantic.success} />
       <View style={{ flex: 1 }}>
         <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{item.name}</Text>
         <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
-          {[item.address, item.completedAt ? `Completed ${fmtDate(item.completedAt)}` : 'Completed'].filter(Boolean).join(' · ')}
+          {[item.address, item.completedAt ? t('Completed {date}', { date: fmtDate(item.completedAt) }) : t('Completed')].filter(Boolean).join(' · ')}
         </Text>
       </View>
-      <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Open</Text>
+      <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('Open')}</Text>
     </Pressable>
   );
 }

@@ -5,6 +5,7 @@
  */
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function SignaturePad({ onChange }: Props) {
+  const t = useT();
   const { colors } = useTheme();
   const [strokes, setStrokes] = useState<Point[][]>([]);
   const strokesRef = useRef<Point[][]>([]);
@@ -28,7 +30,7 @@ export function SignaturePad({ onChange }: Props) {
   }, [onChange]);
 
   if (Platform.OS !== 'web') {
-    return <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Open the approval link in a web browser to sign.</Text>;
+    return <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t('Open the approval link in a web browser to sign.')}</Text>;
   }
 
   const toPoint = (e: { clientX: number; clientY: number; currentTarget: Element }): Point => {
@@ -45,7 +47,7 @@ export function SignaturePad({ onChange }: Props) {
       width: '100%',
       height: '100%',
       role: 'img',
-      'aria-label': 'Signature area: draw your signature here',
+      'aria-label': t('Signature area: draw your signature here'),
       style: { touchAction: 'none', cursor: 'crosshair', display: 'block' },
       onPointerDown: (e: any) => {
         e.preventDefault();
@@ -75,10 +77,10 @@ export function SignaturePad({ onChange }: Props) {
     <View>
       <View style={[styles.box, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
         {svg}
-        {empty && <Text pointerEvents="none" style={[typeScale.bodySmall, styles.hint, { color: colors.textTertiary }]}>Sign here with your finger or mouse</Text>}
+        {empty && <Text pointerEvents="none" style={[typeScale.bodySmall, styles.hint, { color: colors.textTertiary }]}>{t('Sign here with your finger or mouse')}</Text>}
       </View>
-      <Pressable onPress={() => commit([])} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear signature" style={styles.clear}>
-        <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Clear</Text>
+      <Pressable onPress={() => commit([])} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('Clear signature')} style={styles.clear}>
+        <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('Clear')}</Text>
       </Pressable>
     </View>
   );

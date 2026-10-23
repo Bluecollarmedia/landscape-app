@@ -1,4 +1,5 @@
 import { LanguageRow } from '@/components/ui/LanguageSwitch';
+import { useT } from '@/i18n';
 import { LegalSection } from '@/components/legal/LegalSection';
 import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
@@ -20,6 +21,7 @@ import { spacing } from '@/theme/spacing';
  * returns to their landscaping screens as soon as the owner switches back.
  */
 export default function SnowModeNoticeScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const { signOut } = useAuth();
   const guardedSignOut = useGuardedSignOut();
@@ -34,24 +36,23 @@ export default function SnowModeNoticeScreen() {
           <Icon name="cloud-snow" size={34} color={colors.primary} />
         </View>
         <Text style={[typeScale.displaySmall, styles.center, { color: colors.textPrimary }]} accessibilityRole="header">
-          Snow Mode is on
+          {t('Snow Mode is on')}
         </Text>
         <Text style={[typeScale.bodyLarge, styles.center, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-          {company ? `${company} is` : "We're"} running snow operations right now. Your landscaping
-          schedule comes back here on its own when the owner switches back to Landscaping Mode.
+          {company
+            ? t('{company} is running snow operations right now. Your landscaping schedule comes back here on its own when the owner switches back to Landscaping Mode.', { company })
+            : t("We're running snow operations right now. Your landscaping schedule comes back here on its own when the owner switches back to Landscaping Mode.")}
         </Text>
       </View>
       <View style={{ paddingHorizontal: spacing.lg }}>
-        <SettingsGroup>
-          <LanguageRow />
-        </SettingsGroup>
         <LegalSection />
         <SettingsGroup>
-          <SettingsRow icon="log-out" title="Sign Out" destructive onPress={guardedSignOut} />
+          <SettingsRow icon="log-out" title={t('Sign Out')} destructive onPress={guardedSignOut} />
         </SettingsGroup>
         <ListSection>
           <DeleteAccountRow />
         </ListSection>
+        <LanguageRow />
       </View>
     </View>
   );

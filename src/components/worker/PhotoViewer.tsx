@@ -5,6 +5,7 @@ import { OptimizedImage } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import type { ProjectPhoto } from '@/types/project';
+import { useT } from '@/i18n';
 
 interface PhotoViewerProps {
   photos: ProjectPhoto[];
@@ -15,6 +16,7 @@ interface PhotoViewerProps {
 }
 
 export function PhotoViewer({ photos, index, onIndexChange, onClose, insets }: PhotoViewerProps) {
+  const t = useT();
   const { width, height } = useWindowDimensions();
   const current = photos[index];
   const imageAreaHeight = height - insets.top - insets.bottom - 120;
@@ -27,7 +29,7 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose, insets }: P
         </Pressable>
         {photos.length > 1 && (
           <Text style={[typeScale.bodyMedium, { color: '#FFFFFF' }]}>
-            {index + 1} of {photos.length}
+            {t('{n} of {total}', { n: index + 1, total: photos.length })}
           </Text>
         )}
         <View style={{ width: 38 }} />

@@ -43,7 +43,7 @@ check('14 the old advice "clock out now" (which would stamp today\'s time on yes
 const gate = read('src/components/snow/time/SnowClockGate.tsx');
 const timeScreens = read('src/components/snow/time/SnowTimeScreens.tsx');
 check('15 the Snow Clock In screen, the Route banner and the Time Clock tab all show the one card and read the one clock', /<SnowStaleShiftCard/.test(gate) && /topNotice=\{staleCard\}/.test(gate) && /<SnowStaleShiftCard/.test(timeScreens) && /const clock = useSnowClock\(\)/.test(timeScreens) && /topNotice/.test(read('src/components/snow/routes/MyRouteScreen.tsx')));
-check('16 a failed clock-out stays on the Snow Time Clock screen and says the person is still clocked in', /You are still \$\{open \? 'clocked in' : 'not clocked in'\}/.test(timeScreens) && /clockError \?/.test(timeScreens));
+check('16 a failed clock-out stays on the Snow Time Clock screen and says the person is still clocked in', /You are still clocked in\./.test(timeScreens) && /You are still not clocked in\./.test(timeScreens) && /clockError \?/.test(timeScreens));
 
 // ── the owner ──
 check('17 the owner sees "Never clocked out" with the worker\'s answer and can use their time or set another', /Never clocked out/.test(read('app/(owner)/(tabs)/more/labor-day.tsx')) && /Use their time/.test(read('app/(owner)/(tabs)/more/labor-day.tsx')) && /Use their time/.test(timeScreens) && /needs_end_time/.test(read('src/lib/timeCalc.ts')));

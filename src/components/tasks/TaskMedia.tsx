@@ -13,6 +13,7 @@ const isDemoMode = () => !!db.demo;
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
+import { useT, tr } from '@/i18n';
 
 export interface TaskMediaItem {
   key: string;
@@ -27,8 +28,8 @@ export function taskMediaLabel(items: { mediaType: 'image' | 'video' }[]): strin
   const photos = items.filter(i => i.mediaType === 'image').length;
   const videos = items.length - photos;
   const parts: string[] = [];
-  if (photos) parts.push(`${photos} ${photos === 1 ? 'photo' : 'photos'}`);
-  if (videos) parts.push(`${videos} ${videos === 1 ? 'video' : 'videos'}`);
+  if (photos) parts.push(photos === 1 ? tr('1 photo') : tr('{n} photos', { n: photos }));
+  if (videos) parts.push(videos === 1 ? tr('1 video') : tr('{n} videos', { n: videos }));
   return parts.join(', ');
 }
 
@@ -42,6 +43,7 @@ interface TaskMediaStripProps {
 }
 
 export function TaskMediaStrip({ items, onOpen, onAdd, onRemove }: TaskMediaStripProps) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <View style={styles.strip}>
@@ -51,7 +53,7 @@ export function TaskMediaStrip({ items, onOpen, onAdd, onRemove }: TaskMediaStri
             onPress={() => onOpen(i)}
             style={[styles.tile, { backgroundColor: item.mediaType === 'video' ? '#1B3A2D' : colors.backgroundTertiary }]}
             accessibilityRole="button"
-            accessibilityLabel={item.mediaType === 'video' ? 'Play video' : 'View photo'}
+            accessibilityLabel={item.mediaType === 'video' ? t('Play video') : t('View photo')}
           >
             {item.mediaType === 'image' ? (
               <OptimizedImage source={item.uri} style={styles.tileImage} />
@@ -69,7 +71,7 @@ export function TaskMediaStrip({ items, onOpen, onAdd, onRemove }: TaskMediaStri
               hitSlop={8}
               style={[styles.removeButton, { backgroundColor: colors.textPrimary }]}
               accessibilityRole="button"
-              accessibilityLabel="Remove"
+              accessibilityLabel={t('Remove')}
             >
               <Icon name="x" size={12} color={colors.background} />
             </Pressable>
@@ -81,10 +83,10 @@ export function TaskMediaStrip({ items, onOpen, onAdd, onRemove }: TaskMediaStri
           onPress={onAdd}
           style={[styles.tile, styles.addTile, { borderColor: colors.primary, backgroundColor: colors.primarySurface }]}
           accessibilityRole="button"
-          accessibilityLabel="Add photo or video"
+          accessibilityLabel={t('Add photo or video')}
         >
           <Icon name="camera" size={20} color={colors.primary} />
-          <Text style={[typeScale.caption, { color: colors.primary, marginTop: 2, fontWeight: '600' }]}>Add</Text>
+          <Text style={[typeScale.caption, { color: colors.primary, marginTop: 2, fontWeight: '600' }]}>{t('Add')}</Text>
         </Pressable>
       )}
     </View>
@@ -100,6 +102,7 @@ interface TaskMediaViewerProps {
 }
 
 export function TaskMediaViewer({ items, index, onIndexChange, onClose }: TaskMediaViewerProps) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const current = index != null ? items[index] : undefined;
@@ -109,11 +112,11 @@ export function TaskMediaViewer({ items, index, onIndexChange, onClose }: TaskMe
     <Modal visible={!!current} animationType="fade" onRequestClose={onClose} supportedOrientations={['portrait', 'landscape']}>
       <View style={styles.backdrop}>
         <View style={[styles.viewerHeader, { paddingTop: insets.top + spacing.sm }]}>
-          <Pressable onPress={onClose} hitSlop={12} style={styles.viewerButton} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable onPress={onClose} hitSlop={12} style={styles.viewerButton} accessibilityRole="button" accessibilityLabel={t('Close')}>
             <Icon name="x" size={22} color="#FFFFFF" />
           </Pressable>
           {items.length > 1 && index != null && (
-            <Text style={[typeScale.bodyLarge, { color: '#FFFFFF' }]}>{index + 1} of {items.length}</Text>
+            <Text style={[typeScale.bodyLarge, { color: '#FFFFFF' }]}>{t('{n} of {total}', { n: index + 1, total: items.length })}</Text>
           )}
           <View style={{ width: 38 }} />
         </View>
@@ -134,7 +137,7 @@ export function TaskMediaViewer({ items, index, onIndexChange, onClose }: TaskMe
               disabled={index === 0}
               style={[styles.viewerButton, index === 0 && { opacity: 0.3 }]}
               accessibilityRole="button"
-              accessibilityLabel="Previous"
+              accessibilityLabel={t('Previous')}
             >
               <Icon name="chevron-left" size={22} color="#FFFFFF" />
             </Pressable>
@@ -143,7 +146,7 @@ export function TaskMediaViewer({ items, index, onIndexChange, onClose }: TaskMe
               disabled={index === items.length - 1}
               style={[styles.viewerButton, index === items.length - 1 && { opacity: 0.3 }]}
               accessibilityRole="button"
-              accessibilityLabel="Next"
+              accessibilityLabel={t('Next')}
             >
               <Icon name="chevron-right" size={22} color="#FFFFFF" />
             </Pressable>

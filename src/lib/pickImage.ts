@@ -5,6 +5,7 @@
  */
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { tr } from '@/i18n';
 
 export type PickedImage = { status: 'picked'; uri: string; width: number; height: number; mimeType?: string; fileName?: string; size?: number }
   | { status: 'cancelled' }
@@ -17,7 +18,7 @@ export async function pickImage(source: 'camera' | 'library', opts: { afterSheet
     if (opts.afterSheetMs) await sleep(opts.afterSheetMs);
     if (source === 'camera' && Platform.OS !== 'web') {
       const p = await ImagePicker.requestCameraPermissionsAsync();
-      if (!p.granted) return { status: 'error', message: "Camera access is needed to take a photo. You can turn it on in your phone's Settings app." };
+      if (!p.granted) return { status: 'error', message: tr("Camera access is needed to take a photo. You can turn it on in your phone's Settings app.") };
     }
     const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: false, quality: 1 };
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
@@ -26,6 +27,6 @@ export async function pickImage(source: 'camera' | 'library', opts: { afterSheet
     return { status: 'picked', uri: a.uri, width: a.width, height: a.height, mimeType: a.mimeType, fileName: a.fileName ?? undefined, size: a.fileSize };
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err ?? '');
-    return { status: 'error', message: `Couldn't open ${source === 'camera' ? 'the camera' : 'your photos'}. Please try again.${raw ? ` (${raw})` : ''}` };
+    return { status: 'error', message: `${source === 'camera' ? tr("Couldn't open the camera. Please try again.") : tr("Couldn't open your photos. Please try again.")}${raw ? ` (${raw})` : ''}` };
   }
 }

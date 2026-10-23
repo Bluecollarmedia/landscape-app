@@ -24,10 +24,10 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
   const s = read('src/components/snow/routes/MyRouteScreen.tsx');
   check('10 the screen uses the helpers and the thin progress bar', /routeHeaderLine\(route\.name/.test(s) && /<ProgressBar progress=\{progress\.percent\} height=\{5\}/.test(s) && /routeProgress\(groups\.map\(groupStatus\)\)/.test(s));
   check('11 buttons are squared-off (not pills) and large', (s.match(/style=\{styles\.squared\}/g) || []).length >= 4 && /squared: \{ borderRadius: radius\.md \}/.test(s));
-  check('12 the primary button: I\'m Here, then Complete Stop; Finish Stop wording is gone', /title="I'm Here"/.test(s) && /title="Complete Stop"/.test(s) && !/Finish Stop/.test(s));
+  check('12 the primary button: I\'m Here, then Complete Stop; Finish Stop wording is gone', /title=\{t\("I'm Here"\)\}/.test(s) && /title=\{t\('Complete Stop'\)\}/.test(s) && !/Finish Stop/.test(s));
   check('13 arrive and complete still call the existing database actions, and complete waits for the real answer (act reloads after)', /arriveAtStop\(v\.id\)/.test(s) && /finishStop\(v\.id/.test(s) && /async function act/.test(s) && /loading=\{busy\}/.test(s));
-  check('14 Directions and Can\'t do this stop are kept', /title="Directions"/.test(s) && /<LeadSkipPanel/.test(s));
-  check('15 every stop has a stable number from its place in the route, and Completed shows as a word with a check', /\{i \+ 1\}/.test(s) && /Stop \$\{i \+ 1\}/.test(s) && />Completed<\/Text>/.test(s) && /numberMarker/.test(s));
+  check('14 Directions and Can\'t do this stop are kept', /title=\{t\('Directions'\)\}/.test(s) && /<LeadSkipPanel/.test(s));
+  check('15 every stop has a stable number from its place in the route, and Completed shows as a word with a check', /\{i \+ 1\}/.test(s) && /t\('Stop \{n\}', \{ n: i \+ 1 \}\)/.test(s) && /\{t\('Completed'\)\}<\/Text>/.test(s) && /numberMarker/.test(s));
   check('16 the Next Stop card shows property name, street, then the smaller city line', /\{street \?/.test(s) && /\{place \?/.test(s) && /splitAddress\(current\.propertyName, current\.propertyAddress\)/.test(s));
   check('17 the crew view, instructions card, past work and bottom clearance are kept', /You're on this route's crew/.test(s) && /SnowServiceReferenceCard/.test(s) && /PAST WORK/.test(s) && /tabBarClearance/.test(s));
   console.log(bad ? `\n${bad} failed` : '\nall passed');

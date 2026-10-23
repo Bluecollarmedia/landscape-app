@@ -7,9 +7,11 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { BUSINESS, LEGAL_DOCS, type LegalDoc } from '@/legal/legalContent';
+import { useT } from '@/i18n';
 
 /** Shows one of the legal pages. Works signed in or out, in the app and on the web. */
 export function LegalScreen({ slug, onClose }: { slug: LegalDoc['slug']; /** Set when shown as a pop-up: Back closes it instead of navigating. */ onClose?: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -24,19 +26,19 @@ export function LegalScreen({ slug, onClose }: { slug: LegalDoc['slug']; /** Set
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={goBack} hitSlop={12} style={styles.back} accessibilityRole="button" accessibilityLabel="Go back">
+        <Pressable onPress={goBack} hitSlop={12} style={styles.back} accessibilityRole="button" accessibilityLabel={t('Go back')}>
           <Icon name="chevron-left" size={22} color={colors.textPrimary} />
-          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Back</Text>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{t('Back')}</Text>
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing['3xl'] }]}>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{doc.title}</Text>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t(doc.title)}</Text>
         <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.sm }]}>{doc.intro}</Text>
 
         {slug === 'support' && (
           <View style={styles.actions}>
-            <Action label="Email us" icon="mail" onPress={() => Linking.openURL(`mailto:${BUSINESS.email}`)} />
-            <Action label="Call us" icon="phone" onPress={() => Linking.openURL(`tel:${BUSINESS.phone.replace(/\D/g, '')}`)} />
+            <Action label={t('Email us')} icon="mail" onPress={() => Linking.openURL(`mailto:${BUSINESS.email}`)} />
+            <Action label={t('Call us')} icon="phone" onPress={() => Linking.openURL(`tel:${BUSINESS.phone.replace(/\D/g, '')}`)} />
           </View>
         )}
 

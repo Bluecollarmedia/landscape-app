@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useMyMaintenanceRoute } from '@/hooks/useMaintenance';
 import { db } from '@/data/store';
+import { useT } from '@/i18n';
 import { ScreenContainer } from '@/components/layout';
 import { EmptyState } from '@/components/ui';
 import { RouteProgress } from '@/components/maintenance/RouteProgress';
@@ -17,6 +18,7 @@ const nameOf = (personId?: string) => (personId ? db.people[personId]?.firstName
 
 /** The whole route in the owner's saved order: done stops stay in place with their finish times. */
 export default function MaintenanceRouteScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -27,31 +29,31 @@ export default function MaintenanceRouteScreen() {
   return (
     <ScreenContainer scrollable padded variant="grouped">
       <View style={{ paddingTop: insets.top + spacing.md, marginBottom: spacing.lg }}>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{route?.name || 'Route'}</Text>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{route?.name || t('Route')}</Text>
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{dateStr}</Text>
       </View>
 
       {!route ? (
-        <EmptyState icon="map" title="No route today" description="When the owner puts you on a maintenance route, every stop shows up here in order." />
+        <EmptyState icon="map" title={t('No route today')} description={t('When the owner puts you on a maintenance route, every stop shows up here in order.')} />
       ) : (
         <>
           <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
             {stops.length > 0 ? (
               <RouteProgress stops={stops} nextStopId={route.nextStop?.id} />
             ) : (
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>This route doesn't have any stops yet.</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t("This route doesn't have any stops yet.")}</Text>
             )}
             <View style={styles.metaRow}>
               <Feather name="users" size={13} color={colors.textTertiary} />
               <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]} numberOfLines={2}>
-                {route.crew.map(p => `${p.firstName} ${p.lastName}`.trim()).join(', ') || 'No crew assigned'}
+                {route.crew.map(p => `${p.firstName} ${p.lastName}`.trim()).join(', ') || t('No crew assigned')}
               </Text>
             </View>
             {route.lead && (
               <View style={styles.metaRow}>
                 <Feather name="star" size={13} color={colors.textTertiary} />
                 <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]}>
-                  Lead: {route.lead.firstName} {route.lead.lastName}
+                  {t('Lead: {name}', { name: `${route.lead.firstName} ${route.lead.lastName}` })}
                 </Text>
               </View>
             )}
@@ -66,7 +68,7 @@ export default function MaintenanceRouteScreen() {
           {stops.length > 0 && (
             <>
               <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xl, marginBottom: spacing.sm }]}>
-                {stops.length} stop{stops.length === 1 ? '' : 's'}
+                {stops.length === 1 ? t('1 stop') : t('{n} stops', { n: stops.length })}
               </Text>
               <View style={[styles.listCard, { backgroundColor: colors.surface }, shadow.sm]}>
                 {stops.map((s, i) => (

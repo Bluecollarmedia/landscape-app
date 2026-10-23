@@ -11,6 +11,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { useWorkerActivitySummary, formatWorkedDuration, ACTIVITY_PERIODS, type ActivityPeriod, type DayGroup } from '@/hooks/useWorkerActivitySummary';
 import { getWorkerHeaderImageUri } from '@/lib/projectImages';
 import { BrandCover } from '@/components/branding/BrandCover';
+import { useT, tr } from '@/i18n';
 
 
 function formatDayHeading(dateKey: string): string {
@@ -21,12 +22,13 @@ function formatDayHeading(dateKey: string): string {
   yesterday.setDate(yesterday.getDate() - 1);
   const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
-  if (sameDay(date, today)) return 'Today';
-  if (sameDay(date, yesterday)) return 'Yesterday';
+  if (sameDay(date, today)) return tr('Today');
+  if (sameDay(date, yesterday)) return tr('Yesterday');
   return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
 function DayCard({ day, onPress }: { day: DayGroup; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   const isMultiJob = day.sessions.length > 1;
 
@@ -72,10 +74,10 @@ function DayCard({ day, onPress }: { day: DayGroup; onPress: () => void }) {
           )}
 
           <View style={styles.statsRow}>
-            <StatChip icon="briefcase" label={`${day.jobs} job${day.jobs > 1 ? 's' : ''}`} colors={colors} />
-            <StatChip icon="check-square" label={`${day.tasksCompleted} task${day.tasksCompleted !== 1 ? 's' : ''}`} colors={colors} />
+            <StatChip icon="briefcase" label={day.jobs > 1 ? t('{n} jobs', { n: day.jobs }) : t('{n} job', { n: day.jobs })} colors={colors} />
+            <StatChip icon="check-square" label={day.tasksCompleted !== 1 ? t('{n} tasks', { n: day.tasksCompleted }) : t('{n} task', { n: day.tasksCompleted })} colors={colors} />
             {day.photosUploaded > 0 && (
-              <StatChip icon="camera" label={`${day.photosUploaded} photo${day.photosUploaded > 1 ? 's' : ''}`} colors={colors} />
+              <StatChip icon="camera" label={day.photosUploaded > 1 ? t('{n} photos', { n: day.photosUploaded }) : t('{n} photo', { n: day.photosUploaded })} colors={colors} />
             )}
           </View>
         </View>
@@ -95,6 +97,7 @@ function StatChip({ icon, label, colors }: { icon: keyof typeof Feather.glyphMap
 }
 
 export default function WorkerActivityScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
@@ -110,9 +113,9 @@ export default function WorkerActivityScreen() {
         <View style={[styles.headerContent, { paddingTop: insets.top + spacing.md }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Activity</Text>
+              <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t('Activity')}</Text>
               <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>
-                Your work history and progress
+                {t('Your work history and progress')}
               </Text>
             </View>
             <View>
@@ -121,7 +124,7 @@ export default function WorkerActivityScreen() {
                 onPress={() => setPickerOpen(v => !v)}
               >
                 <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontWeight: '600' }]}>
-                  {summary.rangeLabel}
+                  {t(summary.rangeLabel)}
                 </Text>
                 <Feather name="chevron-down" size={14} color={colors.textSecondary} style={{ marginLeft: 4 }} />
               </Pressable>
@@ -134,7 +137,7 @@ export default function WorkerActivityScreen() {
                       onPress={() => { setPeriod(p.key); setPickerOpen(false); }}
                     >
                       <Text style={[typeScale.bodyMedium, { color: period === p.key ? colors.primary : colors.textPrimary }]}>
-                        {p.label}
+                        {t(p.label)}
                       </Text>
                       {period === p.key && <Feather name="check" size={16} color={colors.primary} />}
                     </Pressable>
@@ -148,30 +151,30 @@ export default function WorkerActivityScreen() {
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }]}>
-          <Text style={[typeScale.overline, { color: colors.primaryDark }]}>{summary.rangeLabel.toUpperCase()}</Text>
+          <Text style={[typeScale.overline, { color: colors.primaryDark }]}>{t(summary.rangeLabel).toUpperCase()}</Text>
           <Text style={[typeScale.displayLarge, { color: colors.textPrimary, marginTop: 2 }]}>
             {formatWorkedDuration(summary.totalWorkedMs)}
           </Text>
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Total hours worked</Text>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t('Total hours worked')}</Text>
 
           <View style={[styles.summaryDivider, { backgroundColor: colors.primary, opacity: 0.15 }]} />
 
           <View style={styles.summaryStatsRow}>
-            <SummaryStat icon="briefcase" value={summary.jobs} label="Jobs" colors={colors} />
-            <SummaryStat icon="check-circle" value={summary.tasksCompleted} label="Tasks completed" colors={colors} />
-            <SummaryStat icon="camera" value={summary.photosUploaded} label="Photos uploaded" colors={colors} />
+            <SummaryStat icon="briefcase" value={summary.jobs} label={t('Jobs')} colors={colors} />
+            <SummaryStat icon="check-circle" value={summary.tasksCompleted} label={t('Tasks completed')} colors={colors} />
+            <SummaryStat icon="camera" value={summary.photosUploaded} label={t('Photos uploaded')} colors={colors} />
           </View>
         </View>
 
         <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xl, marginBottom: spacing.md }]}>
-          Recent Activity
+          {t('Recent Activity')}
         </Text>
 
         {summary.days.length === 0 ? (
           <EmptyState
             icon="activity"
-            title={`No activity ${period === 'all_time' ? 'yet' : summary.rangeLabel.toLowerCase()}`}
-            description="Your check-ins, tasks, and photos will appear here."
+            title={period === 'all_time' ? t('No activity yet') : t('No activity {period}', { period: t(summary.rangeLabel).toLowerCase() })}
+            description={t('Your check-ins, tasks, and photos will appear here.')}
           />
         ) : (
           summary.days.map(day => (

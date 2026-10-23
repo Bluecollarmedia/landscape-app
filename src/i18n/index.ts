@@ -8,7 +8,7 @@
  */
 import { useMemo, useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ES } from './es';
+import { DICTIONARY } from './dictionary';
 
 export type Language = 'en' | 'es';
 export const LANGUAGES: { key: Language; label: string; short: string }[] = [
@@ -28,7 +28,7 @@ function fill(text: string, vars?: Record<string, string | number>): string {
 
 /** Translates for a given language (English, or any text the dictionary does not have yet, comes back as written). */
 export function translate(lang: Language, text: string, vars?: Record<string, string | number>): string {
-  return fill(lang === 'es' ? ES[text] ?? text : text, vars);
+  return fill(lang === 'es' ? DICTIONARY[text] ?? text : text, vars);
 }
 
 /** For code that is not a component (alerts, messages made in data functions): uses the language at the moment it is called. */

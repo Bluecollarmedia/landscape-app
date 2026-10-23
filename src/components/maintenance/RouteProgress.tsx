@@ -6,16 +6,20 @@ import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import type { MaintenanceStopDetail } from '@/types/maintenance';
 import { displayStatus } from './types';
+import { useT } from '@/i18n';
 
 /** Past this many stops the dots get too small to read, so a bar is shown instead. */
 const MAX_DOTS = 10;
 
 /** The step tracker under "Today's Route": one dot per stop, in route order. */
 export function RouteProgress({ stops, nextStopId }: { stops: MaintenanceStopDetail[]; nextStopId?: string }) {
+  const t = useT();
   const { colors } = useTheme();
   const done = stops.filter(s => s.status === 'completed' || s.status === 'skipped').length;
   const completed = stops.filter(s => s.status === 'completed').length;
-  const label = `${completed} of ${stops.length} stop${stops.length === 1 ? '' : 's'} completed`;
+  const label = stops.length === 1
+    ? t('{done} of 1 stop completed', { done: completed })
+    : t('{done} of {total} stops completed', { done: completed, total: stops.length });
 
   return (
     <View accessible accessibilityLabel={label}>

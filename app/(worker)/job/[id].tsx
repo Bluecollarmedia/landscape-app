@@ -19,6 +19,7 @@ import { todayKey, localDateKey } from '@/lib/ids';
 import type { ProjectPhoto } from '@/types/project';
 import { getProjectImageUriById } from '@/lib/projectImages';
 import { BrandCover } from '@/components/branding/BrandCover';
+import { useT, tr } from '@/i18n';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
@@ -43,12 +44,13 @@ function formatDateLabel(dateStr: string): string {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const iso = (x: Date) => localDateKey(x);
-  if (dateStr === iso(today)) return 'Today';
-  if (dateStr === iso(tomorrow)) return 'Tomorrow';
+  if (dateStr === iso(today)) return tr('Today');
+  if (dateStr === iso(tomorrow)) return tr('Tomorrow');
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
 export default function JobDetailScreen() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -70,7 +72,7 @@ export default function JobDetailScreen() {
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <Header onBack={() => router.back()} colors={colors} insets={insets} />
         <View style={styles.center}>
-          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>Job not found</Text>
+          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>{t('Job not found')}</Text>
         </View>
       </View>
     );
@@ -107,12 +109,12 @@ export default function JobDetailScreen() {
               {HAS_LIQUID_GLASS ? (
                 <GlassView glassEffectStyle="regular" isInteractive style={styles.backChip}>
                   <Feather name="chevron-left" size={20} color="#FFFFFF" />
-                  <Text style={[typeScale.bodyLarge, { color: '#FFFFFF', marginLeft: 2 }]}>My Jobs</Text>
+                  <Text style={[typeScale.bodyLarge, { color: '#FFFFFF', marginLeft: 2 }]}>{t('My Jobs')}</Text>
                 </GlassView>
               ) : (
                 <View style={[styles.backChip, styles.backChipFallback]}>
                   <Feather name="chevron-left" size={20} color="#FFFFFF" />
-                  <Text style={[typeScale.bodyLarge, { color: '#FFFFFF', marginLeft: 2 }]}>My Jobs</Text>
+                  <Text style={[typeScale.bodyLarge, { color: '#FFFFFF', marginLeft: 2 }]}>{t('My Jobs')}</Text>
                 </View>
               )}
             </Pressable>
@@ -123,9 +125,9 @@ export default function JobDetailScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, marginTop: -28 }, shadow.md]}>
             <View style={styles.titleRow}>
               <Text style={[typeScale.displaySmall, { color: colors.textPrimary, flex: 1 }]}>
-                {assignment.project?.name ?? 'Unknown Project'}
+                {assignment.project?.name ?? t('Unknown Project')}
               </Text>
-              <StatusBadge label={isPast ? 'Past' : 'Upcoming'} status={isPast ? 'neutral' : 'success'} />
+              <StatusBadge label={isPast ? t('Past') : t('Upcoming')} status={isPast ? 'neutral' : 'success'} />
             </View>
 
             <View style={[styles.metaRow, { marginTop: spacing.md }]}>
@@ -137,7 +139,7 @@ export default function JobDetailScreen() {
             <View style={styles.metaRow}>
               <Feather name="clock" size={14} color={colors.textTertiary} />
               <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginLeft: spacing.sm }]}>
-                {assignment.isFullDay ? 'Full day' : `${formatTime(assignment.startTime)} – ${formatTime(assignment.endTime)}`}
+                {assignment.isFullDay ? t('Full day') : `${formatTime(assignment.startTime)} – ${formatTime(assignment.endTime)}`}
               </Text>
             </View>
             {assignment.project?.address && (
@@ -168,10 +170,10 @@ export default function JobDetailScreen() {
                     style={[styles.truckCodes, { backgroundColor: colors.primarySurface }]}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel="Truck codes"
+                    accessibilityLabel={t('Truck codes')}
                   >
                     <Feather name="key" size={12} color={colors.primaryDark} />
-                    <Text style={[typeScale.labelSmall, { color: colors.primaryDark, marginLeft: 4 }]}>Codes</Text>
+                    <Text style={[typeScale.labelSmall, { color: colors.primaryDark, marginLeft: 4 }]}>{t('Codes')}</Text>
                   </Pressable>
                 )}
               </View>
@@ -185,7 +187,7 @@ export default function JobDetailScreen() {
             >
               <Feather name="map" size={18} color={colors.primaryDark} />
               <Text style={[typeScale.bodyLarge, { color: colors.primaryDark, flex: 1, marginLeft: spacing.sm, fontWeight: '600' }]}>
-                Open in Maps
+                {t('Open in Maps')}
               </Text>
               <Feather name="chevron-right" size={18} color={colors.primaryDark} />
             </Pressable>
@@ -193,10 +195,10 @@ export default function JobDetailScreen() {
 
           {isPast && (lastCheckIn || lastCheckOut) && (
             <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
-              <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>SUMMARY</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>{t('SUMMARY')}</Text>
               {lastCheckIn && (
                 <View style={[styles.summaryRow, { marginTop: spacing.sm }]}>
-                  <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>Checked In</Text>
+                  <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>{t('Checked In')}</Text>
                   <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, fontWeight: '600' }]}>
                     {formatClock(lastCheckIn.timestamp)}
                   </Text>
@@ -204,7 +206,7 @@ export default function JobDetailScreen() {
               )}
               {lastCheckOut && (
                 <View style={styles.summaryRow}>
-                  <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>Checked Out</Text>
+                  <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>{t('Checked Out')}</Text>
                   <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, fontWeight: '600' }]}>
                     {formatClock(lastCheckOut.timestamp)}
                   </Text>
@@ -218,7 +220,7 @@ export default function JobDetailScreen() {
               <View style={styles.labelRow}>
                 <Feather name="file-text" size={14} color={colors.primary} />
                 <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, fontWeight: '600' }]}>
-                  JOB NOTES
+                  {t('JOB NOTES')}
                 </Text>
               </View>
               <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, marginTop: spacing.xs }]}>
@@ -230,9 +232,9 @@ export default function JobDetailScreen() {
           {tasks.length > 0 && (
             <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
               <View style={styles.tasksHeader}>
-                <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Assigned Tasks</Text>
+                <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t('Assigned Tasks')}</Text>
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-                  {tasks.filter(t => t.status === 'completed').length} of {tasks.length} completed
+                  {t('{done} of {total} completed', { done: tasks.filter(x => x.status === 'completed').length, total: tasks.length })}
                 </Text>
               </View>
               {tasks.map((task, i) => {
@@ -258,7 +260,7 @@ export default function JobDetailScreen() {
                     {taskPhotos.length > 0 && (
                       <Pressable onPress={() => openViewer(taskPhotos)} hitSlop={8} style={styles.viewPhotoRow}>
                         <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>
-                          {taskPhotos.length === 1 ? 'View Photo' : `View Photos (${taskPhotos.length})`}
+                          {taskPhotos.length === 1 ? t('View Photo') : t('View Photos ({n})', { n: taskPhotos.length })}
                         </Text>
                         <Feather name="chevron-right" size={14} color={colors.primary} />
                       </Pressable>
@@ -279,7 +281,7 @@ export default function JobDetailScreen() {
               >
                 <Feather name="navigation" size={18} color="#FFFFFF" />
                 <Text style={[typeScale.labelLarge, { color: '#FFFFFF', marginLeft: spacing.sm }]}>
-                  Get Directions
+                  {t('Get Directions')}
                 </Text>
               </LinearGradient>
             </Pressable>
@@ -309,11 +311,12 @@ export default function JobDetailScreen() {
 }
 
 function Header({ onBack, colors, insets }: { onBack: () => void; colors: any; insets: any }) {
+  const t = useT();
   return (
     <View style={[styles.plainHeader, { paddingTop: insets.top + spacing.sm }]}>
       <Pressable onPress={onBack} hitSlop={12} style={styles.backRow}>
         <Feather name="chevron-left" size={22} color={colors.textPrimary} />
-        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>My Jobs</Text>
+        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{t('My Jobs')}</Text>
       </Pressable>
     </View>
   );

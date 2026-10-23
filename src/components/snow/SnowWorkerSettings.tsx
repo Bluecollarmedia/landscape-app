@@ -10,6 +10,7 @@ import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { ListSection } from '@/components/ui';
 import { displayName, profileNudge, roleLabel } from '@/lib/snowWorkerProfile';
+import { useT } from '@/i18n';
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -60,6 +61,7 @@ function useMySnowAccess(companyId?: string | null) {
 }
 
 export function SnowWorkerSettings() {
+  const t = useT();
   useDb();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -77,13 +79,13 @@ export function SnowWorkerSettings() {
         contentContainerStyle={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: tabBarClearance + spacing.lg }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginBottom: spacing.lg }]}>Settings</Text>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginBottom: spacing.lg }]}>{t('Settings')}</Text>
 
         <Pressable
           onPress={editProfile}
           style={[styles.profile, { backgroundColor: colors.surface }]}
           accessibilityRole="button"
-          accessibilityLabel="Edit your profile and photo"
+          accessibilityLabel={t('Edit your profile and photo')}
         >
           <View>
             <Avatar firstName={user?.firstName ?? 'W'} lastName={user?.lastName ?? 'K'} size={64} uri={user?.avatarUrl} />
@@ -92,7 +94,7 @@ export function SnowWorkerSettings() {
             </View>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} numberOfLines={1}>{displayName(user)}</Text>
+            <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} numberOfLines={1}>{displayName(user) === 'Your name' ? t('Your name') : displayName(user)}</Text>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]} numberOfLines={1}>{user?.email}</Text>
             {access?.companyName ? (
               <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>{access.companyName}</Text>
@@ -101,46 +103,43 @@ export function SnowWorkerSettings() {
           <Icon name="chevron-right" size={18} color={colors.textTertiary} />
         </Pressable>
         <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: -spacing.md, marginBottom: spacing.xl, marginHorizontal: spacing.sm }]}>
-          {nudge ?? 'Tap to change your name, phone or photo. The office sees them.'}
+          {nudge ? t(nudge) : t('Tap to change your name, phone or photo. The office sees them.')}
         </Text>
 
-        <SettingsGroup title="Your account" footer="Your email is your sign-in. Ask the office if it needs to change.">
-          <SettingsRow icon="mail" title="Email" value={user?.email ?? ''} />
-          <SettingsRow icon="shield" title="Role" value={roleLabel(user?.role, access?.services ?? [])} />
+        <SettingsGroup title={t('Your account')} footer={t('Your email is your sign-in. Ask the office if it needs to change.')}>
+          <SettingsRow icon="mail" title={t('Email')} value={user?.email ?? ''} />
+          <SettingsRow icon="shield" title={t('Role')} value={t(roleLabel(user?.role, access?.services ?? []))} />
         </SettingsGroup>
 
         {error ? (
-          <InlineNotice icon="alert-circle" tone="warning" text="Couldn't load your snow team access. Close and reopen this screen, or try again later." style={{ marginBottom: spacing.xl }} />
+          <InlineNotice icon="alert-circle" tone="warning" text={t("Couldn't load your snow team access. Close and reopen this screen, or try again later.")} style={{ marginBottom: spacing.xl }} />
         ) : null}
 
         {access ? (
           <SettingsGroup
-            title="Your snow services"
-            footer="The owner decides which services you work. Ask them if one is missing."
+            title={t('Your snow services')}
+            footer={t('The owner decides which services you work. Ask them if one is missing.')}
           >
             {access.services.length ? access.services.map((s) => (
-              <SettingsRow key={s} icon={SNOW_SERVICE_ICONS[s]} title={SNOW_SERVICE_LABELS[s]} />
+              <SettingsRow key={s} icon={SNOW_SERVICE_ICONS[s]} title={t(SNOW_SERVICE_LABELS[s])} />
             )) : (
-              <SettingsRow icon="info" title="No services assigned yet" subtitle="The owner hasn't given you a snow service." />
+              <SettingsRow icon="info" title={t('No services assigned yet')} subtitle={t("The owner hasn't given you a snow service.")} />
             )}
             {access.alsoLandscaping ? (
-              <SettingsRow icon="sun" title="Landscaping" subtitle="You also have access to the landscaping app." />
+              <SettingsRow icon="sun" title={t('Landscaping')} subtitle={t('You also have access to the landscaping app.')} />
             ) : null}
           </SettingsGroup>
         ) : null}
 
-        <SettingsGroup>
-          <LanguageRow />
-        </SettingsGroup>
-
         <LegalSection />
 
         <SettingsGroup>
-          <SettingsRow icon="log-out" title="Sign Out" destructive onPress={guardedSignOut} />
+          <SettingsRow icon="log-out" title={t('Sign Out')} destructive onPress={guardedSignOut} />
         </SettingsGroup>
         <ListSection>
           <DeleteAccountRow />
         </ListSection>
+        <LanguageRow />
       </ScrollView>
     </View>
   );

@@ -5,6 +5,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { formatAddress } from '@/lib/address';
+import { useT } from '@/i18n';
 import { yardLocationLabel } from '@/lib/maintenanceCheckIn';
 import type { YardLocation } from '@/hooks/useCompanyYard';
 import type { DayStartState } from '@/hooks/useMaintenanceCheckIn';
@@ -26,6 +27,7 @@ const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour:
  * bottom action area.
  */
 export function YardStartCard({ dayStart, yard, yardName, onYardPress }: YardStartCardProps) {
+  const t = useT();
   const { colors } = useTheme();
 
   if (dayStart.started && dayStart.startedAt) {
@@ -34,16 +36,16 @@ export function YardStartCard({ dayStart, yard, yardName, onYardPress }: YardSta
       <View
         style={[styles.startedRow, { backgroundColor: colors.backgroundSecondary }]}
         accessibilityRole="text"
-        accessibilityLabel={`Day started at ${clock(dayStart.startedAt)}. ${yardLocationLabel(dayStart.locationStatus)}.`}
+        accessibilityLabel={`${t('Day started at {time}', { time: clock(dayStart.startedAt) })}. ${yardLocationLabel(dayStart.locationStatus)}.`}
       >
         <Feather name="check-circle" size={16} color={colors.primaryDark} />
         <Text style={[typeScale.labelLarge, styles.startedText, { color: colors.textPrimary }]} numberOfLines={1}>
-          Day started {clock(dayStart.startedAt)}
+          {t('Day started {time}', { time: clock(dayStart.startedAt) })}
         </Text>
         <View style={[styles.chip, { backgroundColor: verified ? colors.primarySurface : colors.warningLight }]}>
           <Feather name={verified ? 'map-pin' : 'alert-circle'} size={12} color={verified ? colors.primaryDark : colors.textSecondary} />
           <Text style={[typeScale.labelSmall, { color: verified ? colors.primaryDark : colors.textSecondary }]} numberOfLines={1}>
-            {dayStart.corrected ? 'Set by office' : yardLocationLabel(dayStart.locationStatus)}
+            {dayStart.corrected ? t('Set by office') : yardLocationLabel(dayStart.locationStatus)}
           </Text>
         </View>
       </View>
@@ -52,14 +54,14 @@ export function YardStartCard({ dayStart, yard, yardName, onYardPress }: YardSta
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[typeScale.overline, { color: colors.textSecondary }]}>START OF DAY</Text>
+      <Text style={[typeScale.overline, { color: colors.textSecondary }]}>{t('START OF DAY')}</Text>
       <Pressable
         onPress={yard ? onYardPress : undefined}
         disabled={!yard || !onYardPress}
         style={({ pressed }) => [styles.yardRow, pressed && { opacity: 0.7 }]}
         accessibilityRole={yard && onYardPress ? 'button' : 'text'}
-        accessibilityLabel={yard ? `${yardName}, ${formatAddress(yard)}` : 'Yard address not set'}
-        accessibilityHint={yard && onYardPress ? 'Opens directions to the yard' : undefined}
+        accessibilityLabel={yard ? `${yardName}, ${formatAddress(yard)}` : t('Yard address not set')}
+        accessibilityHint={yard && onYardPress ? t('Opens directions to the yard') : undefined}
       >
         <View style={[styles.pin, { backgroundColor: colors.primary }]}>
           <Feather name="home" size={14} color={colors.textOnPrimary} />
@@ -67,13 +69,13 @@ export function YardStartCard({ dayStart, yard, yardName, onYardPress }: YardSta
         <View style={styles.yardText}>
           <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]} numberOfLines={1}>{yardName}</Text>
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]} numberOfLines={2}>
-            {yard ? formatAddress(yard) : 'The office hasn’t set the yard address yet.'}
+            {yard ? formatAddress(yard) : t('The office hasn’t set the yard address yet.')}
           </Text>
         </View>
         {yard && onYardPress && <Feather name="navigation" size={16} color={colors.primaryDark} />}
       </Pressable>
       <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-        Tap Start Day when you get to the yard. If you’re already at a property, go ahead and check in there. The office will see that the day wasn’t started.
+        {t('Tap Start Day when you get to the yard. If you’re already at a property, go ahead and check in there. The office will see that the day wasn’t started.')}
       </Text>
     </View>
   );

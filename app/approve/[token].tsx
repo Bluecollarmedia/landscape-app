@@ -18,6 +18,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Button, Input, EmptyState, LoadingSpinner, StatusBadge } from '@/components/ui';
 import { DocumentPreview } from '@/components/financials/DocumentPreview';
 import { SignaturePad } from '@/components/financials/SignaturePad';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { renderDocumentHtml, formatDocDateTime } from '@/lib/documentHtml';
@@ -66,6 +67,7 @@ const RESPONSE_ERRORS: Record<string, string> = {
 
 export default function ApprovePage() {
   const { token } = useLocalSearchParams<{ token: string }>();
+  const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<'loading' | 'missing' | 'ready'>('loading');
@@ -96,9 +98,9 @@ export default function ApprovePage() {
 
   useEffect(() => {
     if (Platform.OS === 'web' && shared) {
-      document.title = `${DOC_LABEL[shared.doc.kind]} ${shared.doc.number} · ${shared.doc.snapshot?.company.name ?? 'Brighton Lawn + Landscape'}`;
+      document.title = `${t(DOC_LABEL[shared.doc.kind])} ${shared.doc.number} · ${shared.doc.snapshot?.company.name ?? 'Brighton Lawn + Landscape'}`;
     }
-  }, [shared]);
+  }, [shared, t]);
 
   const snapshot: DocumentSnapshot | null = shared?.doc.snapshot ?? null;
   const html = useMemo(() => {
@@ -119,8 +121,8 @@ export default function ApprovePage() {
         ) : (
           <EmptyState
             icon="file-text"
-            title="This link isn’t available"
-            description="It may have been replaced by a newer version. Please contact Brighton Lawn + Landscape for an updated link."
+            title={t('This link isn’t available')}
+            description={t('It may have been replaced by a newer version. Please contact Brighton Lawn + Landscape for an updated link.')}
           />
         )}
       </View>
@@ -128,7 +130,7 @@ export default function ApprovePage() {
   }
 
   const { doc } = shared;
-  const label = DOC_LABEL[doc.kind];
+  const label = t(DOC_LABEL[doc.kind]);
   const status = displayStatus(doc);
   const company = snapshot.company;
   const canAnswer = doc.kind !== 'invoice' && status === 'sent';
@@ -150,7 +152,7 @@ export default function ApprovePage() {
     setSaving(null);
     const res = data as { success?: boolean; error?: string } | null;
     if (e || !res?.success) {
-      setError(RESPONSE_ERRORS[res?.error ?? ''] ?? 'Something went wrong. Please try again.');
+      setError(t(RESPONSE_ERRORS[res?.error ?? ''] ?? 'Something went wrong. Please try again.'));
       if (res?.error === 'not_open') load();
       return;
     }
@@ -177,7 +179,7 @@ export default function ApprovePage() {
             </Text>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontVariant: ['tabular-nums'] }]}>{formatMoney(doc.total)}</Text>
           </View>
-          <StatusBadge label={STATUS_LABEL[status]} status={STATUS_TONE[status]} />
+          <StatusBadge label={t(STATUS_LABEL[status])} status={STATUS_TONE[status]} />
         </View>
       </View>
 
@@ -193,30 +195,30 @@ export default function ApprovePage() {
         {canAnswer && !declining && !formOpen && (
           <>
             <View style={styles.row}>
-              <Button title="Request Changes" variant="ghost" onPress={() => { setError(null); setDeclining(true); }} style={{ flex: 1 }} />
-              <Button title={`Review & Approve`} icon="check" onPress={() => setFormOpen(true)} style={{ flex: 2 }} />
+              <Button title={t('Request Changes')} variant="ghost" onPress={() => { setError(null); setDeclining(true); }} style={{ flex: 1 }} />
+              <Button title={t('Review & Approve')} icon="check" onPress={() => setFormOpen(true)} style={{ flex: 2 }} />
             </View>
           </>
         )}
 
         {canAnswer && !declining && formOpen && (
           <>
-            <Pressable onPress={() => setFormOpen(false)} style={styles.backToQuote} accessibilityRole="button" accessibilityLabel="Back to the quote">
+            <Pressable onPress={() => setFormOpen(false)} style={styles.backToQuote} accessibilityRole="button" accessibilityLabel={t('Back to the quote')}>
               <Icon name="chevron-down" size={16} color={colors.primary} />
-              <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Back to the {label.toLowerCase()}</Text>
+              <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('Back to the {doc}', { doc: label.toLowerCase() })}</Text>
             </Pressable>
             <Input
-              label="Your full name"
+              label={t('Your full name')}
               value={name}
               onChangeText={setName}
-              placeholder="First and last name"
+              placeholder={t('First and last name')}
               autoComplete="name"
               textContentType="name"
               autoCapitalize="words"
               returnKeyType="done"
             />
             <View>
-              <Text style={[typeScale.labelLarge, { color: colors.textSecondary, marginBottom: spacing.xs }]}>Your signature</Text>
+              <Text style={[typeScale.labelLarge, { color: colors.textSecondary, marginBottom: spacing.xs }]}>{t('Your signature')}</Text>
               <SignaturePad onChange={setSignature} />
             </View>
             <Pressable
@@ -229,14 +231,14 @@ export default function ApprovePage() {
                 {agreed && <Icon name="check" size={14} color="#fff" />}
               </View>
               <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]}>
-                I approve this {label.toLowerCase()}, including the work, pricing and terms shown, for {formatMoney(doc.total)}.
+                {t('I approve this {doc}, including the work, pricing and terms shown, for {total}.', { doc: label.toLowerCase(), total: formatMoney(doc.total) })}
               </Text>
             </Pressable>
             {!!error && <Text style={[typeScale.bodySmall, { color: colors.error }]}>{error}</Text>}
             <View style={styles.row}>
-              <Button title="Request Changes" variant="ghost" onPress={() => { setError(null); setDeclining(true); }} disabled={!!saving} style={{ flex: 1 }} />
+              <Button title={t('Request Changes')} variant="ghost" onPress={() => { setError(null); setDeclining(true); }} disabled={!!saving} style={{ flex: 1 }} />
               <Button
-                title="Approve"
+                title={t('Approve')}
                 icon="check"
                 onPress={() => respond(true)}
                 loading={saving === 'approve'}
@@ -245,24 +247,24 @@ export default function ApprovePage() {
               />
             </View>
             <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
-              Your name, signature, the date and time are recorded with your answer.
+              {t('Your name, signature, the date and time are recorded with your answer.')}
             </Text>
-            <Button title="Download PDF" icon="download" variant="secondary" onPress={savePdf} loading={pdfBusy} fullWidth />
+            <Button title={t('Download PDF')} icon="download" variant="secondary" onPress={savePdf} loading={pdfBusy} fullWidth />
           </>
         )}
 
         {canAnswer && declining && (
           <>
-            <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>Request changes to {label.toLowerCase()} {doc.number}</Text>
-            <Input label="Your name (optional)" value={name} onChangeText={setName} autoComplete="name" autoCapitalize="words" />
-            <Input label="What would you like changed?" value={reason} onChangeText={setReason} placeholder="For example: please add the back yard" multiline />
+            <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{t('Request changes to {doc} {number}', { doc: label.toLowerCase(), number: doc.number })}</Text>
+            <Input label={t('Your name (optional)')} value={name} onChangeText={setName} autoComplete="name" autoCapitalize="words" />
+            <Input label={t('What would you like changed?')} value={reason} onChangeText={setReason} placeholder={t('For example: please add the back yard')} multiline />
             {!!error && <Text style={[typeScale.bodySmall, { color: colors.error }]}>{error}</Text>}
             <View style={styles.row}>
-              <Button title="Back" variant="ghost" onPress={() => setDeclining(false)} disabled={!!saving} style={{ flex: 1 }} />
-              <Button title="Send Request" icon="send" onPress={() => respond(false)} loading={saving === 'decline'} disabled={!!saving || reason.trim().length < 3} style={{ flex: 2 }} />
+              <Button title={t('Back')} variant="ghost" onPress={() => setDeclining(false)} disabled={!!saving} style={{ flex: 1 }} />
+              <Button title={t('Send Request')} icon="send" onPress={() => respond(false)} loading={saving === 'decline'} disabled={!!saving || reason.trim().length < 3} style={{ flex: 2 }} />
             </View>
             <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
-              We'll review your request and send you an updated quote.
+              {t("We'll review your request and send you an updated quote.")}
             </Text>
           </>
         )}
@@ -273,23 +275,25 @@ export default function ApprovePage() {
               <View style={[styles.answer, { backgroundColor: answer.eventType === 'approved' ? colors.primarySurface : colors.surfacePressed }]}>
                 <Icon name={answer.eventType === 'approved' ? 'check-circle' : 'x-circle'} size={18} color={answer.eventType === 'approved' ? colors.primaryDark : colors.textSecondary} />
                 <Text style={[typeScale.bodySmall, { color: colors.textPrimary, flex: 1 }]}>
-                  {answer.eventType === 'approved' ? 'Approved' : 'Changes requested'}{answeredBy ? ` by ${answeredBy}` : ''} on {formatDocDateTime(answer.createdAt)}.
-                  {answer.eventType === 'approved' ? ` Thank you! ${company.name} has been notified.` : ''}
+                  {answer.eventType === 'approved'
+                    ? (answeredBy ? t('Approved by {name} on {date}.', { name: answeredBy, date: formatDocDateTime(answer.createdAt) }) : t('Approved on {date}.', { date: formatDocDateTime(answer.createdAt) }))
+                    : (answeredBy ? t('Changes requested by {name} on {date}.', { name: answeredBy, date: formatDocDateTime(answer.createdAt) }) : t('Changes requested on {date}.', { date: formatDocDateTime(answer.createdAt) }))}
+                  {answer.eventType === 'approved' ? ` ${t('Thank you! {company} has been notified.', { company: company.name })}` : ''}
                 </Text>
               </View>
             )}
             {status === 'expired' && (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>
-                This quote has expired. {company.phone ? `Call ${company.phone} for an updated quote.` : 'Please contact us for an updated quote.'}
+                {t('This quote has expired.')} {company.phone ? t('Call {phone} for an updated quote.', { phone: company.phone }) : t('Please contact us for an updated quote.')}
               </Text>
             )}
-            <Button title="Save or Print PDF" icon="download" variant="secondary" onPress={savePdf} loading={pdfBusy} fullWidth />
+            <Button title={t('Save or Print PDF')} icon="download" variant="secondary" onPress={savePdf} loading={pdfBusy} fullWidth />
           </>
         )}
 
         {(company.phone || company.email) && (
           <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
-            Questions? {[company.phone, company.email].filter(Boolean).join(' · ')}
+            {t('Questions?')} {[company.phone, company.email].filter(Boolean).join(' · ')}
           </Text>
         )}
       </ScrollView>

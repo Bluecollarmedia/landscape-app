@@ -10,12 +10,14 @@ import { CategoryIcon, ProtectedCode } from '@/components/resources/ResourcePart
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { RESOURCE_CATEGORIES } from '@/types/resource';
+import { useT } from '@/i18n';
 
 /**
  * One resource for a worker. If access was removed (or the id was never
  * theirs), this shows a neutral "not available" message without the name.
  */
 export default function WorkerResourceDetailScreen() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const router = useRouter();
@@ -36,7 +38,7 @@ export default function WorkerResourceDetailScreen() {
 
   const header = (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-      <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+      <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel={t('Go back')}>
         <Icon name="arrow-left" size={24} color={colors.textPrimary} />
       </Pressable>
     </View>
@@ -49,7 +51,7 @@ export default function WorkerResourceDetailScreen() {
         {!ready || checking ? (
           <ActivityIndicator style={{ marginTop: spacing['3xl'] }} color={colors.primary} />
         ) : (
-          <EmptyState icon="lock" title="Not available" description="This resource isn't available to you. Ask your manager if you need access." />
+          <EmptyState icon="lock" title={t('Not available')} description={t("This resource isn't available to you. Ask your manager if you need access.")} />
         )}
       </View>
     );
@@ -66,7 +68,7 @@ export default function WorkerResourceDetailScreen() {
           <CategoryIcon category={r.category} size={44} />
           <View style={{ flex: 1 }}>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{r.name}</Text>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{info.label}</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t(info.label)}</Text>
           </View>
         </View>
 
@@ -83,17 +85,17 @@ export default function WorkerResourceDetailScreen() {
                 <View style={styles.metaRow}>
                   <Icon name="credit-card" size={16} color={colors.textTertiary} />
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.sm }]}>
-                    {r.cardLastFour ? `Card ending in ${r.cardLastFour}` : 'Company card'}
+                    {r.cardLastFour ? t('Card ending in {digits}', { digits: r.cardLastFour }) : t('Company card')}
                   </Text>
                 </View>
                 {r.cardHolderName && (
                   <View style={[styles.metaRow, { marginTop: spacing.sm }]}>
                     <Icon name="user" size={16} color={colors.textTertiary} />
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.sm }]}>Carried by {r.cardHolderName}</Text>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginLeft: spacing.sm }]}>{t('Carried by {name}', { name: r.cardHolderName })}</Text>
                   </View>
                 )}
                 <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
-                  Card PINs aren't kept in the app. Ask your manager.
+                  {t("Card PINs aren't kept in the app. Ask your manager.")}
                 </Text>
               </>
             )}
@@ -102,7 +104,7 @@ export default function WorkerResourceDetailScreen() {
 
         {r.description && (
           <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
-            <Text style={[typeScale.overline, { color: colors.textTertiary, marginBottom: spacing.xs }]}>INSTRUCTIONS</Text>
+            <Text style={[typeScale.overline, { color: colors.textTertiary, marginBottom: spacing.xs }]}>{t('INSTRUCTIONS')}</Text>
             <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{r.description}</Text>
           </View>
         )}

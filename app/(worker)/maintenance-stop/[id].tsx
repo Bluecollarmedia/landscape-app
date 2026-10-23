@@ -27,12 +27,13 @@ import { SkipRequestSheet } from '@/components/time/SkipRequestSheet';
 import { loadMySkipRequests, requestSkip, type MySkipRequest } from '@/data/timeTracking';
 import { openDirections } from '@/lib/maps';
 import { haptics } from '@/lib/haptics';
+import { useT, tr } from '@/i18n';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
 const nameOf = (personId?: string) => {
   const p = personId ? db.people[personId] : undefined;
-  return p ? `${p.firstName} ${p.lastName}`.trim() : 'A crew member';
+  return p ? `${p.firstName} ${p.lastName}`.trim() : tr('A crew member');
 };
 
 export default function MaintenanceStopScreen() {
@@ -40,6 +41,7 @@ export default function MaintenanceStopScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const v = useDb();
   const [arriving, setArriving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,17 +57,17 @@ export default function MaintenanceStopScreen() {
 
   const stop = id ? db.maintenance.stopById[id] : undefined;
   const route = stop ? db.maintenance.routeById[stop.routeId] : undefined;
-  const missing = useMemo(() => (stop ? missingRequirements(stop) : []), [v, stop]);
+  const missing = useMemo(() => (stop ? missingRequirements(stop) : []), [v, stop, t]);
   const next = useMemo(() => (stop ? nextStopAfter(stop) : undefined), [v, stop]);
 
   if (!stop || !route) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerRow}>
-          <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back" />
+          <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel={t('Back')} />
         </View>
         <View style={styles.center}>
-          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>This stop isn't on your route.</Text>
+          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>{t("This stop isn't on your route.")}</Text>
         </View>
       </View>
     );
@@ -73,7 +75,7 @@ export default function MaintenanceStopScreen() {
 
   const p = stop.property;
   const locked = stop.status === 'completed' || stop.status === 'skipped';
-  const required = stop.tasks.filter((t) => t.isRequired);
+  const required = stop.tasks.filter((task) => task.isRequired);
   const addressLine = [p?.address, p?.city, p?.state].filter(Boolean).join(', ');
   // Stops are worked in order: a later stop stays locked until the one before it is done (the database enforces it too).
   const isStaff = db.role === 'owner' || db.role === 'admin';
@@ -128,14 +130,14 @@ export default function MaintenanceStopScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back" />
+          <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel={t('Back')} />
           <Text style={[typeScale.labelLarge, { color: colors.textSecondary, flex: 1, textAlign: 'center' }]}>
-            Stop {stop.number} of {route.stops.length}
+            {t('Stop {n} of {total}', { n: stop.number, total: route.stops.length })}
           </Text>
           <View style={{ width: 44 }} />
         </View>
 
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>{p?.name ?? 'Property'}</Text>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>{p?.name ?? t('Property')}</Text>
         {!!addressLine && (
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: 4 }]}>{addressLine}</Text>
         )}
@@ -144,11 +146,11 @@ export default function MaintenanceStopScreen() {
           <PressableScale
             onPress={() => openDirections({ ...p, latitude: p.latitude, longitude: p.longitude }, db.workerSettings.navApp)}
             accessibilityRole="button"
-            accessibilityLabel="Directions"
+            accessibilityLabel={t('Directions')}
             style={[styles.directions, { borderColor: colors.primary }]}
           >
             <Icon name="navigation" size={16} color={colors.primary} />
-            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Directions</Text>
+            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('Directions')}</Text>
           </PressableScale>
         )}
 
@@ -158,24 +160,24 @@ export default function MaintenanceStopScreen() {
             <InlineNotice
               icon="check-circle"
               tone="success"
-              text={`Finished by ${nameOf(stop.completedBy)} at ${clockTime(stop.completedAt)} · ${locationLabel(stop.completionLocationStatus)}`}
+              text={`${t('Finished by {name} at {time}', { name: nameOf(stop.completedBy), time: clockTime(stop.completedAt) })} · ${t(locationLabel(stop.completionLocationStatus))}`}
             />
           )}
           {stop.status === 'skipped' && (
-            <InlineNotice icon="slash" tone="neutral" text={`Skipped${stop.skipReason ? `: ${stop.skipReason}` : ''}`} />
+            <InlineNotice icon="slash" tone="neutral" text={stop.skipReason ? t('Skipped: {reason}', { reason: stop.skipReason }) : t('Skipped')} />
           )}
           {stop.arrivedAt && (
             <InlineNotice
               icon="map-pin"
               tone={stop.arrivalLocationStatus === 'verified' ? 'success' : 'neutral'}
-              text={`Arrived ${clockTime(stop.arrivedAt)} · ${nameOf(stop.arrivedBy)} · ${locationLabel(stop.arrivalLocationStatus)}`}
+              text={`${t('Arrived {time}', { time: clockTime(stop.arrivedAt) })} · ${nameOf(stop.arrivedBy)} · ${t(locationLabel(stop.arrivalLocationStatus))}`}
             />
           )}
         </View>
 
         {/* Services */}
         {stop.services.length > 0 && (
-          <Section title="Services">
+          <Section title={t('Services')}>
             <View style={styles.chips}>
               {stop.services.map((s) => (
                 <View key={s.id} style={[styles.chip, { backgroundColor: colors.primarySurface }]}>
@@ -189,7 +191,7 @@ export default function MaintenanceStopScreen() {
 
         {/* This visit's instructions, then the property's standing notes */}
         {!!stop.instructions && (
-          <Section title="For this visit">
+          <Section title={t('For this visit')}>
             <View style={[styles.note, { backgroundColor: colors.warningLight }]}>
               <Icon name="alert-circle" size={16} color={colors.warning} />
               <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{stop.instructions}</Text>
@@ -197,24 +199,24 @@ export default function MaintenanceStopScreen() {
           </Section>
         )}
         {!!route.notes && (
-          <Section title="Route notes">
+          <Section title={t('Route notes')}>
             <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{route.notes}</Text>
           </Section>
         )}
         {!!p?.accessNotes && (
-          <Section title="Access">
+          <Section title={t('Access')}>
             <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{p.accessNotes}</Text>
           </Section>
         )}
 
         {stop.tasks.length > 0 && (
-          <Section title={required.length ? `Checklist · ${required.filter((t) => t.completedAt).length} of ${required.length} required` : 'Checklist'}>
+          <Section title={required.length ? t('Checklist · {done} of {total} required', { done: required.filter((task) => task.completedAt).length, total: required.length }) : t('Checklist')}>
             <StopChecklist tasks={stop.tasks} locked={locked} stopId={stop.id} requiresPhotos={stop.requiresPhotos} photoCount={stop.photos.length} onError={setError} />
           </Section>
         )}
 
         {(stop.requiresPhotos || stop.photos.length > 0 || !locked) && (
-          <Section title="Photos">
+          <Section title={t('Photos')}>
             <StopPhotos
               stopId={stop.id}
               photos={stop.photos}
@@ -228,10 +230,10 @@ export default function MaintenanceStopScreen() {
         {timeOn && !locked ? (
           <View style={{ marginTop: spacing.xl }}>
             {mySkip ? (
-              <InlineNotice icon="clock" tone="neutral" text="Skip requested. Waiting for the owner. This property is still open until they approve it." />
+              <InlineNotice icon="clock" tone="neutral" text={t('Skip requested. Waiting for the owner. This property is still open until they approve it.')} />
             ) : (
               <Pressable onPress={() => setSkipOpen(true)} accessibilityRole="button" style={{ alignSelf: 'flex-start' }}>
-                <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>Can't service this property? Ask to skip it</Text>
+                <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>{t("Can't service this property? Ask to skip it")}</Text>
               </Pressable>
             )}
           </View>
@@ -252,30 +254,30 @@ export default function MaintenanceStopScreen() {
           borderTopColor: colors.borderLight,
         }]}
       >
-        {!!error && <InlineNotice icon="alert-triangle" tone="error" text={error} style={{ marginBottom: spacing.sm }} />}
+        {!!error && <InlineNotice icon="alert-triangle" tone="error" text={t(error)} style={{ marginBottom: spacing.sm }} />}
         {!leader && !locked && (
           <InlineNotice icon="users" tone="neutral" text={crewStopMessage(stop.status, leaderName, stop.arrivedAt ? clockTime(stop.arrivedAt) : null, stop.arrivedBy ? nameOf(stop.arrivedBy) : null, !!route.lead)} />
         )}
         {leader && stop.status === 'pending' && !blockedBy && clockedIn && (
           <PrimaryButton
-            label={arriving ? 'RECORDING…' : "I'M HERE"}
+            label={arriving ? t('RECORDING…') : t("I'M HERE")}
             icon="map-pin"
             busy={arriving}
             onPress={handleArrive}
           />
         )}
         {leader && stop.status === 'pending' && blockedBy && (
-          <InlineNotice icon="lock" tone="neutral" text={`Finish ${blockedBy.property?.name ?? `stop ${blockedBy.number}`} first. Stops are worked in order.`} />
+          <InlineNotice icon="lock" tone="neutral" text={t('Finish {name} first. Stops are worked in order.', { name: blockedBy.property?.name ?? t('stop {n}', { n: blockedBy.number }) })} />
         )}
         {leader && stop.status === 'pending' && !blockedBy && !clockedIn && (
-          <InlineNotice icon="clock" tone="neutral" text="Clock in for the day first. The Clock In button is on the Today screen." />
+          <InlineNotice icon="clock" tone="neutral" text={t('Clock in for the day first. The Clock In button is on the Today screen.')} />
         )}
         {leader && stop.status === 'arrived' && (
           <FinishStopButton stopId={stop.id} missing={missing} uploading={uploadingPhotoCount(stop)} onPress={handleFinish} />
         )}
         {locked && (
           <PrimaryButton
-            label={next ? `NEXT: ${next.property?.name ?? `STOP ${next.number}`}` : 'BACK TO ROUTE'}
+            label={next ? t('NEXT: {name}', { name: next.property?.name ?? t('STOP {n}', { n: next.number }) }) : t('BACK TO ROUTE')}
             icon={next ? 'arrow-right' : 'list'}
             onPress={goNext}
           />

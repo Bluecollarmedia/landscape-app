@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { StatusBadge } from '@/components/ui';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
@@ -27,6 +28,7 @@ interface Props {
 
 /** One quote / change order / invoice in a list: number, who, date, total, status. */
 export function DocumentRow({ doc, onPress, showProject, onProjectPress }: Props) {
+  const t = useT();
   const { colors } = useTheme();
   const status = displayStatus(doc);
   const customer = doc.customer ? `${doc.customer.firstName} ${doc.customer.lastName}`.trim() : '';
@@ -39,7 +41,7 @@ export function DocumentRow({ doc, onPress, showProject, onProjectPress }: Props
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.backgroundSecondary }]}
       accessibilityRole="button"
-      accessibilityLabel={`${doc.number}, ${STATUS_LABEL[status]}, ${formatMoney(doc.total)}`}
+      accessibilityLabel={`${doc.number}, ${t(STATUS_LABEL[status])}, ${formatMoney(doc.total)}`}
     >
       <View style={[styles.icon, { backgroundColor: colors.primarySurface }]}>
         <Icon name={DOC_ICON[doc.kind]} size={16} color={colors.primaryDark} />
@@ -63,7 +65,7 @@ export function DocumentRow({ doc, onPress, showProject, onProjectPress }: Props
         </Text>
       </View>
       <View style={styles.right}>
-        <StatusBadge label={STATUS_LABEL[status]} status={STATUS_TONE[status]} style={{ alignSelf: 'flex-end' }} />
+        <StatusBadge label={t(STATUS_LABEL[status])} status={STATUS_TONE[status]} style={{ alignSelf: 'flex-end' }} />
         <Text
           style={[typeScale.bodyLarge, styles.total, { color: status === 'void' || status === 'declined' ? colors.textTertiary : colors.textPrimary }]}
           numberOfLines={1}

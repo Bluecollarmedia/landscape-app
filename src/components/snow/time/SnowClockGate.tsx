@@ -8,6 +8,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Animated, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '@/i18n';
 import { Icon, LoadingSpinner } from '@/components/ui';
 import { MyRouteScreen } from '@/components/snow/routes/MyRouteScreen';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -21,6 +22,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
 export function SnowClockGate() {
+  const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
@@ -81,9 +83,9 @@ export function SnowClockGate() {
         <View style={[styles.snowCircle, { backgroundColor: colors.primarySurface }]}>
           <Icon name="cloud-snow" size={40} color={colors.primary} />
         </View>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.xl }]}>No active storm assignment</Text>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.xl }]}>{t('No active storm assignment')}</Text>
         <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md, maxWidth: 320 }]}>
-          Clock In appears once the owner puts you on a route for a storm that has been dispatched.
+          {t('Clock In appears once the owner puts you on a route for a storm that has been dispatched.')}
         </Text>
       </View>
     );
@@ -92,31 +94,31 @@ export function SnowClockGate() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground, paddingTop: insets.top + spacing.xl, paddingBottom: tabBarClearance, paddingHorizontal: spacing.lg }]}>
       {staleCard}
-      <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Snow Mode</Text>
-      <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>Ready to start?</Text>
-      <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.sm }]}>Your hours start counting when you tap Clock In.</Text>
+      <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('Snow Mode')}</Text>
+      <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>{t('Ready to start?')}</Text>
+      <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.sm }]}>{t('Your hours start counting when you tap Clock In.')}</Text>
       {routeLine ? <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.lg }]} numberOfLines={2}>{routeLine}</Text> : null}
 
       <View style={styles.middle}>
         {error ? (
           <View style={styles.errorRow} accessibilityRole="alert">
             <Icon name="alert-circle" size={18} color={colors.error} />
-            <Text style={[typeScale.bodySmall, { color: colors.error, flex: 1 }]}>{error}</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.error, flex: 1 }]}>{t(error)}</Text>
           </View>
         ) : null}
         <Pressable
           onPress={clockIn}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel={busy ? 'Clocking in' : 'Clock In'}
+          accessibilityLabel={busy ? t('Clocking in') : t('Clock In')}
           accessibilityState={{ disabled: busy, busy }}
           style={({ pressed }) => [styles.clockButton, { backgroundColor: pressed ? colors.primaryDark : colors.primary, opacity: busy ? 0.85 : 1 }]}
         >
           {busy ? <ActivityIndicator color={colors.textOnPrimary} /> : <Icon name="clock" size={28} color={colors.textOnPrimary} />}
-          <Text style={[typeScale.headingLarge, { color: colors.textOnPrimary }]}>{busy ? 'Clocking In…' : 'Clock In'}</Text>
+          <Text style={[typeScale.headingLarge, { color: colors.textOnPrimary }]}>{busy ? t('Clocking In…') : t('Clock In')}</Text>
         </Pressable>
         <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center', marginTop: spacing.lg }]}>
-          No location is used. Snow hours are kept apart from landscaping hours.
+          {t('No location is used. Snow hours are kept apart from landscaping hours.')}
         </Text>
       </View>
     </View>

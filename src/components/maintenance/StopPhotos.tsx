@@ -16,6 +16,7 @@ import { removeStopPhoto } from '@/data/maintenance';
 import { pickStopPhotos } from '@/lib/stopPhotoPicker';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
+import { useT } from '@/i18n';
 import type { MaintenancePhoto } from '@/types/maintenance';
 
 interface Props {
@@ -29,21 +30,22 @@ interface Props {
 const isUploaded = (p: MaintenancePhoto) => db.demo || /^https?:\/\//i.test(p.fileUrl);
 
 export function StopPhotos({ stopId, photos, requiresPhotos, minPhotos, locked }: Props) {
+  const t = useT();
   const { colors } = useTheme();
   const [busy, setBusy] = useState(false);
   const saved = photos.filter(isUploaded).length;
   const staff = db.role === 'owner' || db.role === 'admin';
 
   function confirm(title: string, message: string, action: string, run: () => void) {
-    Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: run }]);
+    Alert.alert(title, message, [{ text: t('Cancel'), style: 'cancel' }, { text: action, style: 'destructive', onPress: run }]);
   }
 
   function handleAdd() {
     if (Platform.OS === 'web') return pick('library');
-    Alert.alert('Add Photo', undefined, [
-      { text: 'Take Photo', onPress: () => pick('camera') },
-      { text: 'Choose from Library', onPress: () => pick('library') },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('Add Photo'), undefined, [
+      { text: t('Take Photo'), onPress: () => pick('camera') },
+      { text: t('Choose from Library'), onPress: () => pick('library') },
+      { text: t('Cancel'), style: 'cancel' },
     ]);
   }
 
@@ -61,12 +63,12 @@ export function StopPhotos({ stopId, photos, requiresPhotos, minPhotos, locked }
       <View style={styles.headerRow}>
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1 }]}>
           {requiresPhotos
-            ? `${Math.min(saved, minPhotos)} of ${minPhotos} required photo${minPhotos === 1 ? '' : 's'}`
-            : photos.length ? `${photos.length} photo${photos.length === 1 ? '' : 's'}` : 'Photos are optional here'}
+            ? (minPhotos === 1 ? t('{done} of 1 required photo', { done: Math.min(saved, minPhotos) }) : t('{done} of {total} required photos', { done: Math.min(saved, minPhotos), total: minPhotos }))
+            : photos.length ? (photos.length === 1 ? t('1 photo') : t('{n} photos', { n: photos.length })) : t('Photos are optional here')}
         </Text>
         <View style={[styles.internalPill, { backgroundColor: colors.backgroundTertiary }]}>
           <Icon name="lock" size={11} color={colors.textSecondary} />
-          <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>Company only</Text>
+          <Text style={[typeScale.caption, { color: colors.textSecondary, fontWeight: '600' }]}>{t('Company only')}</Text>
         </View>
       </View>
 
@@ -80,10 +82,10 @@ export function StopPhotos({ stopId, photos, requiresPhotos, minPhotos, locked }
               {uploading && <MediaJobOverlay rowId={p.id} localOnly />}
               {canRemove && !uploading && (
                 <PressableScale
-                  onPress={() => confirm('Remove photo?', 'It will be deleted from this stop.', 'Remove', () => removeStopPhoto(p.id))}
+                  onPress={() => confirm(t('Remove photo?'), t('It will be deleted from this stop.'), t('Remove'), () => removeStopPhoto(p.id))}
                   hitSlop={8}
                   accessibilityRole="button"
-                  accessibilityLabel="Remove photo"
+                  accessibilityLabel={t('Remove photo')}
                   style={styles.remove}
                 >
                   <Icon name="x" size={14} color="#FFFFFF" />
@@ -97,11 +99,11 @@ export function StopPhotos({ stopId, photos, requiresPhotos, minPhotos, locked }
             onPress={handleAdd}
             disabled={busy}
             accessibilityRole="button"
-            accessibilityLabel="Add photo"
+            accessibilityLabel={t('Add photo')}
             style={[styles.tile, styles.addTile, { borderColor: colors.primary, opacity: busy ? 0.6 : 1 }]}
           >
             {busy ? <ActivityIndicator color={colors.primary} /> : <Icon name="camera" size={22} color={colors.primary} />}
-            <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '700', marginTop: 4 }]}>Add photo</Text>
+            <Text style={[typeScale.caption, { color: colors.primary, fontWeight: '700', marginTop: 4 }]}>{t('Add photo')}</Text>
           </PressableScale>
         )}
       </View>

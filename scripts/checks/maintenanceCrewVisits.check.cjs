@@ -4,7 +4,9 @@ const ts = require(process.argv[2] || 'typescript');
 const fs = require('fs');
 const path = require('path');
 const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8');
-const load = (rel) => { const m = { exports: {} }; new Function('module', 'exports', 'require', ts.transpileModule(read(rel), { compilerOptions: { module: 'commonjs', target: 'es2020' } }).outputText)(m, m.exports, () => ({})); return m.exports; };
+// The phone's text translator (tr) is stubbed as English with the {values} filled in, which is what it returns until the phone is set to Spanish.
+const i18nStub = { tr: (text, vars) => (vars ? text.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : text) };
+const load = (rel) => { const m = { exports: {} }; new Function('module', 'exports', 'require', ts.transpileModule(read(rel), { compilerOptions: { module: 'commonjs', target: 'es2020' } }).outputText)(m, m.exports, (name) => (name === '@/i18n' ? i18nStub : {})); return m.exports; };
 let bad = 0;
 const check = (n, ok, d) => { if (!ok) bad++; console.log((ok ? 'PASS' : 'FAIL') + '  ' + n + (ok ? '' : ' - ' + (d || ''))); };
 

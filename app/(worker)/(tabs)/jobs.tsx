@@ -14,6 +14,7 @@ import type { Assignment } from '@/types/schedule';
 import { localDateKey } from '@/lib/ids';
 import { getProjectImageUriById, getWorkerHeaderImageUri } from '@/lib/projectImages';
 import { BrandCover } from '@/components/branding/BrandCover';
+import { useT, tr } from '@/i18n';
 
 function formatTime(time?: string) {
   if (!time) return '';
@@ -33,9 +34,9 @@ function formatDateHeading(dateStr: string): string {
   y.setDate(y.getDate() - 1);
 
   const iso = (x: Date) => localDateKey(x);
-  if (dateStr === iso(today)) return 'Today';
-  if (dateStr === iso(tomorrow)) return 'Tomorrow';
-  if (dateStr === iso(y)) return 'Yesterday';
+  if (dateStr === iso(today)) return tr('Today');
+  if (dateStr === iso(tomorrow)) return tr('Tomorrow');
+  if (dateStr === iso(y)) return tr('Yesterday');
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
@@ -53,18 +54,19 @@ function groupByDate(assignments: Assignment[]) {
 }
 
 function JobCard({ assignment, onPress }: { assignment: Assignment; onPress: () => void }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <Pressable style={[styles.jobCard, { backgroundColor: colors.surface }, shadow.sm]} onPress={onPress}>
       <BrandCover uri={getProjectImageUriById(assignment.projectId)} style={styles.thumb} variant="tile" />
       <View style={styles.jobInfo}>
         <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]} numberOfLines={1}>
-          {assignment.project?.name ?? 'Unknown Project'}
+          {assignment.project?.name ?? t('Unknown Project')}
         </Text>
         <View style={styles.metaRow}>
           <Feather name="clock" size={12} color={colors.textTertiary} />
           <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: 4 }]}>
-            {assignment.isFullDay ? 'Full day' : `${formatTime(assignment.startTime)} – ${formatTime(assignment.endTime)}`}
+            {assignment.isFullDay ? t('Full day') : `${formatTime(assignment.startTime)} – ${formatTime(assignment.endTime)}`}
           </Text>
         </View>
         {assignment.project?.address && (
@@ -90,6 +92,7 @@ function JobCard({ assignment, onPress }: { assignment: Assignment; onPress: () 
 }
 
 export default function WorkerJobsScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
@@ -105,16 +108,16 @@ export default function WorkerJobsScreen() {
       <View style={styles.hero}>
         <BrandCover uri={getWorkerHeaderImageUri()} style={[styles.heroImage, { opacity: 0.16 }]} />
         <View style={[styles.headerContent, { paddingTop: insets.top + spacing.md }]}>
-          <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>My Jobs</Text>
+          <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t('My Jobs')}</Text>
           <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2 }]}>
-            Your upcoming and past assignments
+            {t('Your upcoming and past assignments')}
           </Text>
         </View>
       </View>
 
       <View style={styles.segmentWrap}>
         <SegmentedControl
-          values={['Upcoming', 'Past']}
+          values={[t('Upcoming'), t('Past')]}
           selectedIndex={tab === 'upcoming' ? 0 : 1}
           onChange={(event) => setTab(event.nativeEvent.selectedSegmentIndex === 0 ? 'upcoming' : 'past')}
           tintColor={colors.primary}
@@ -130,8 +133,8 @@ export default function WorkerJobsScreen() {
         <View style={styles.emptyContainer}>
           <EmptyState
             icon="clipboard"
-            title={tab === 'upcoming' ? 'No upcoming jobs' : 'No past jobs yet'}
-            description="Your assigned jobs will appear here."
+            title={tab === 'upcoming' ? t('No upcoming jobs') : t('No past jobs yet')}
+            description={t('Your assigned jobs will appear here.')}
           />
         </View>
       ) : (
@@ -143,7 +146,7 @@ export default function WorkerJobsScreen() {
                   {formatDateHeading(group.date)}
                 </Text>
                 <Text style={[typeScale.bodySmall, { color: colors.textTertiary }]}>
-                  {group.items.length} job{group.items.length > 1 ? 's' : ''}
+                  {group.items.length > 1 ? t('{n} jobs', { n: group.items.length }) : t('{n} job', { n: group.items.length })}
                 </Text>
               </View>
               {group.items.map(a => (

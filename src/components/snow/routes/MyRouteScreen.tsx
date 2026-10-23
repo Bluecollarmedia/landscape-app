@@ -5,6 +5,7 @@
  * allowed (order, one stop at a time, photo minimum, dispatched storm only;
  * update 026). Working layout in the existing app style; no approved mockup.
  */
+import { useT } from '@/i18n';
 import { useBackStep } from '@/hooks/useBackStep';
 import { pickActiveRoute, splitMyRoutes } from '@/lib/snowMyRoute';
 import { canWorkRoute } from '@/lib/snowCrew';
@@ -37,6 +38,7 @@ import { spacing, radius } from '@/theme/spacing';
 import type { SnowService } from '@/types/snow';
 
 export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the worker clocked in (the Route tab only shows this screen once they have). */ clockedInSince?: string; /** Shown first (the "you didn't clock out" card for an earlier shift). */ topNotice?: React.ReactNode } = {}) {
+  const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
@@ -83,7 +85,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
     setBusy(true);
     const res = await run();
     setBusy(false);
-    if (!res.ok) showMessage(failTitle, res.error ?? '');
+    if (!res.ok) showMessage(failTitle, t(res.error ?? ''));
     await reload();
     return res.ok;
   }
@@ -98,11 +100,14 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
   const currentGroup = groups.find((g) => !isGroupClosed(g));
   const current = currentGroup?.[0];
   const progress = routeProgress(groups.map(groupStatus));
+  // routeProgress words its text in English (the check reads it); the screen words it again in the chosen language.
+  const progressBase = t(progress.total === 1 ? '{done} of {total} stop completed' : '{done} of {total} stops completed', { done: progress.completed, total: progress.total });
+  const progressText = progress.skipped ? `${progressBase} · ${t('{n} skipped', { n: progress.skipped })}` : progressBase;
   const working = route?.stormStatus === 'dispatched' && !route.cancelled;
   const { active: activeRoutes, history: pastRoutes } = splitMyRoutes(routes);
   // Update 41: crew can see the route, its stops and instructions; only the lead can act on it.
   const isLead = canWorkRoute(routes.find((r) => r.id === route?.id)?.role);
-  const svcLabel = (x: string) => SERVICE_LABEL[x as SnowService];
+  const svcLabel = (x: string) => t(SERVICE_LABEL[x as SnowService]);
   const { street, place } = current ? splitAddress(current.propertyName, current.propertyAddress) : { street: undefined, place: undefined };
   const groupServices = (g: RouteStop[]) => g.map((v) => v.service ?? route!.service);
   // Photos are added once for the stop, on its first visit. Ones still uploading count as added: they are saved on the phone and
@@ -145,15 +150,15 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
       >
         {topNotice}
         {clockedInSince ? (
-          <View style={[styles.clockLine, { backgroundColor: colors.primarySurface }]} accessible accessibilityLabel={`Clocked in since ${formatClock(clockedInSince)}. Clock out in the Time Clock tab.`}>
+          <View style={[styles.clockLine, { backgroundColor: colors.primarySurface }]} accessible accessibilityLabel={t('Clocked in since {time}. Clock out in the Time Clock tab.', { time: formatClock(clockedInSince) })}>
             <View style={[styles.clockDot, { backgroundColor: colors.success }]} />
             <Text style={[typeScale.caption, { color: colors.textSecondary, flex: 1 }]} numberOfLines={2}>
-              <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>Clocked in since {formatClock(clockedInSince)}.</Text> Clock out in the Time Clock tab.
+              <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>{t('Clocked in since {time}.', { time: formatClock(clockedInSince) })}</Text>{' '}{t('Clock out in the Time Clock tab.')}
             </Text>
           </View>
         ) : null}
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>My Route</Text>
-        {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>{t('My Route')}</Text>
+        {error ? <InlineNotice icon="alert-circle" tone="error" text={t(error)} style={{ marginTop: spacing.md }} /> : null}
 
         {/* Photos of earlier stops (or ended storms) still uploading or failed: always visible, so Retry / Remove is never lost. */}
         <View style={{ marginTop: spacing.sm }}>
@@ -161,9 +166,9 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
         </View>
 
         {historyId ? (
-          <Pressable onPress={() => setHistoryId(null)} style={styles.backToCurrent} accessibilityRole="button" accessibilityLabel="Back to current work">
+          <Pressable onPress={() => setHistoryId(null)} style={styles.backToCurrent} accessibilityRole="button" accessibilityLabel={t('Back to current work')}>
             <Icon name="arrow-left" size={18} color={colors.primary} />
-            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Back to current work</Text>
+            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('Back to current work')}</Text>
           </Pressable>
         ) : null}
 
@@ -189,28 +194,28 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
 
         {!route ? (
           <>
-          <EmptyState icon="navigation" title="No active route" description="When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are under Past work below." />
+          <EmptyState icon="navigation" title={t('No active route')} description={t('When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are under Past work below.')} />
           </>
         ) : (
           <>
             <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginTop: spacing.xs }]} numberOfLines={1}>
               {routeHeaderLine(route.name, route.services.map(svcLabel))}
             </Text>
-            <View style={styles.progressRow} accessible accessibilityLabel={progress.text}>
+            <View style={styles.progressRow} accessible accessibilityLabel={progressText}>
               <ProgressBar progress={progress.percent} height={5} style={{ flex: 1 }} />
-              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{progress.text}</Text>
+              <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{progressText}</Text>
             </View>
             {!working ? (
-              <InlineNotice icon="info" tone="info" text={route.cancelled ? 'This route was cancelled.' : 'This storm has ended. Nothing more to do here.'} style={{ marginTop: spacing.md }} />
+              <InlineNotice icon="info" tone="info" text={route.cancelled ? t('This route was cancelled.') : t('This storm has ended. Nothing more to do here.')} style={{ marginTop: spacing.md }} />
             ) : null}
 
             {working && current && currentGroup ? (
               <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md, gap: spacing.md }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>
-                    {groupStatus(currentGroup) === 'pending' ? 'NEXT STOP' : 'CURRENT STOP'}
+                    {groupStatus(currentGroup) === 'pending' ? t('NEXT STOP') : t('CURRENT STOP')}
                   </Text>
-                  <StatusBadge label={cardStatusWord(groupStatus(currentGroup))} status={STOP_TONE[groupStatus(currentGroup)]} />
+                  <StatusBadge label={t(cardStatusWord(groupStatus(currentGroup)))} status={STOP_TONE[groupStatus(currentGroup)]} />
                 </View>
                 <View style={{ gap: 2 }}>
                   <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{current.propertyName}</Text>
@@ -223,16 +228,16 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
                 {current.ownerNote ? (
                   <InlineNotice icon="file-text" tone="info" text={current.ownerNote} />
                 ) : null}
-                <Button title="Directions" icon="navigation" variant="secondary" size="lg" style={styles.squared} onPress={() => openDirections({ address: current.propertyAddress })} fullWidth />
+                <Button title={t('Directions')} icon="navigation" variant="secondary" size="lg" style={styles.squared} onPress={() => openDirections({ address: current.propertyAddress })} fullWidth />
                 {!isLead ? (
-                  <InlineNotice icon="eye" tone="info" text="You're on this route's crew. The route lead marks arrivals, completes stops and adds photos." />
+                  <InlineNotice icon="eye" tone="info" text={t("You're on this route's crew. The route lead marks arrivals, completes stops and adds photos.")} />
                 ) : primaryActionFor(groupStatus(currentGroup)) === 'arrive' ? (
-                  <Button title="I'm Here" icon="map-pin" size="lg" style={styles.squared} loading={busy} onPress={() => act(() => arriveGroup(currentGroup), 'Can\'t start this stop')} fullWidth />
+                  <Button title={t("I'm Here")} icon="map-pin" size="lg" style={styles.squared} loading={busy} onPress={() => act(() => arriveGroup(currentGroup), t("Can't start this stop"))} fullWidth />
                 ) : (
                   <>
                     {/* The database requires the stop's photos before it can be completed, so they are added here, between arriving and completing. */}
                     <Button
-                      title={addedCount ? `Add photos (${addedCount} added)` : 'Add photos'}
+                      title={addedCount ? t('Add photos ({n} added)', { n: addedCount }) : t('Add photos')}
                       icon="camera"
                       variant="secondary"
                       size="lg"
@@ -243,26 +248,26 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
                         if (!drafts.length) return;
                         // Instant: the photos are queued and upload in the background, so there is nothing to wait for here.
                         const res = await addCompletionMedia(route.companyId, current.id, drafts);
-                        if (!res.ok) showMessage("Couldn't add the photos", res.error);
+                        if (!res.ok) showMessage(t("Couldn't add the photos"), t(res.error));
                       }}
                       fullWidth
                     />
                     <SnowUploadStatus uploading={uploading} failed={failedJobs} />
-                    <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Anything the owner should know" />
+                    <Input label={t('Note (optional)')} value={note} onChangeText={setNote} placeholder={t('Anything the owner should know')} />
                     {needMedia > 0 ? (
                       <Text style={[typeScale.caption, { color: colors.warning }]}>
                         {addedCount > 0
-                          ? `${addedCount} of ${route.minMedia} photos added. You can still complete this stop; add the rest if you can.`
-                          : 'No photos added yet. You can still complete this stop; add photos first if you can.'}
+                          ? t('{added} of {min} photos added. You can still complete this stop; add the rest if you can.', { added: addedCount, min: route.minMedia })
+                          : t('No photos added yet. You can still complete this stop; add photos first if you can.')}
                       </Text>
                     ) : null}
                     <Button
-                      title="Complete Stop"
+                      title={t('Complete Stop')}
                       icon="check-circle"
                       size="lg"
                       style={styles.squared}
                       loading={busy}
-                      onPress={async () => { if (await act(() => finishGroup(currentGroup), 'Can\'t complete yet')) setNote(''); }}
+                      onPress={async () => { if (await act(() => finishGroup(currentGroup), t("Can't complete yet"))) setNote(''); }}
                       fullWidth
                     />
                   </>
@@ -280,7 +285,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
                 {Array.from(new Set(groupServices(currentGroup))).map((sv) => (
                   <View key={sv}>
                     <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>
-                      {svcLabel(sv)} instructions
+                      {t('{service} instructions', { service: svcLabel(sv) })}
                     </Text>
                     <SnowServiceReferenceCard propertyId={current.propertyId} service={sv} />
                   </View>
@@ -288,10 +293,10 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
               </>
             ) : null}
             {working && !current && groups.length ? (
-              <InlineNotice icon="check-circle" tone="success" text="Every stop on this route is done." style={{ marginTop: spacing.md }} />
+              <InlineNotice icon="check-circle" tone="success" text={t('Every stop on this route is done.')} style={{ marginTop: spacing.md }} />
             ) : null}
 
-            <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>All stops</Text>
+            <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>{t('All stops')}</Text>
             <View style={[styles.group, { backgroundColor: colors.surface }]}>
               {groups.map((g, i) => {
                 const s = g[0];
@@ -304,10 +309,10 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
                   onPress={() => setOpenStopId(open ? null : s.id)}
                   style={styles.row}
                   accessibilityRole="button"
-                  accessibilityLabel={`Stop ${i + 1}, ${s.propertyName}. ${open ? 'Hide' : 'Show'} instructions and photos`}
+                  accessibilityLabel={open ? t('Stop {n}, {name}. Hide instructions and photos', { n: i + 1, name: s.propertyName }) : t('Stop {n}, {name}. Show instructions and photos', { n: i + 1, name: s.propertyName })}
                   accessibilityState={{ expanded: open }}
                 >
-                  <View style={[styles.numberMarker, { backgroundColor: colors.backgroundTertiary }]} accessible accessibilityLabel={`Stop ${i + 1}`}>
+                  <View style={[styles.numberMarker, { backgroundColor: colors.backgroundTertiary }]} accessible accessibilityLabel={t('Stop {n}', { n: i + 1 })}>
                     <Text style={[typeScale.labelLarge, { color: colors.textSecondary }]}>{i + 1}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -319,10 +324,10 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
                   {word === 'Completed' ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                       <Icon name="check-circle" size={18} color={colors.success} />
-                      <Text style={[typeScale.labelLarge, { color: colors.success }]}>Completed</Text>
+                      <Text style={[typeScale.labelLarge, { color: colors.success }]}>{t('Completed')}</Text>
                     </View>
                   ) : (
-                    <StatusBadge label={word} status={word === 'Arrived' ? 'info' : word === 'Skipped' ? 'warning' : 'neutral'} />
+                    <StatusBadge label={t(word)} status={word === 'Arrived' ? 'info' : word === 'Skipped' ? 'warning' : 'neutral'} />
                   )}
                   <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} />
                 </Pressable>
@@ -330,7 +335,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
                   <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md }}>
                     {Array.from(new Set(groupServices(g))).map((sv) => (
                       <View key={sv}>
-                        <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>{svcLabel(sv)} instructions and photos</Text>
+                        <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>{t('{service} instructions and photos', { service: svcLabel(sv) })}</Text>
                         <SnowServiceReferenceCard propertyId={s.propertyId} service={sv} />
                       </View>
                     ))}
@@ -346,7 +351,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
         {!historyId && pastRoutes.length > 0 ? (
           <>
             <Pressable onPress={() => setShowHistory(!showHistory)} style={styles.historyHeader} accessibilityRole="button" accessibilityState={{ expanded: showHistory }}>
-              <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>PAST WORK ({pastRoutes.length})</Text>
+              <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>{t('PAST WORK ({n})', { n: pastRoutes.length })}</Text>
               <Icon name={showHistory ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
             </Pressable>
             {showHistory ? (
@@ -360,7 +365,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]} numberOfLines={1}>{r.name}</Text>
-                      <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{r.stormName} · {servicesText(r.services ?? [r.service], svcLabel)} · Ended</Text>
+                      <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{r.stormName} · {servicesText(r.services ?? [r.service], svcLabel)} · {t('Ended')}</Text>
                     </View>
                     <Icon name="chevron-right" size={18} color={colors.textTertiary} />
                   </Pressable>

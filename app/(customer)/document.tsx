@@ -13,6 +13,7 @@ import { Button, EmptyState, LoadingSpinner, StatusBadge } from '@/components/ui
 import { DocumentPreview } from '@/components/financials/DocumentPreview';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { customerCanSee } from '@/components/financials/CustomerDocuments';
+import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useFinancialDoc } from '@/hooks/useFinancials';
 import { db } from '@/data/store';
@@ -26,6 +27,7 @@ import type { FinancialDocType } from '@/types/financial';
 
 export default function CustomerDocumentScreen() {
   const { kind, id } = useLocalSearchParams<{ kind: FinancialDocType; id: string }>();
+  const t = useT();
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -40,12 +42,12 @@ export default function CustomerDocumentScreen() {
 
   const header = (title: string) => (
     <View style={[styles.topBar, { backgroundColor: colors.surface, paddingTop: insets.top }]}>
-      <Pressable onPress={() => router.back()} hitSlop={12} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Go back">
+      <Pressable onPress={() => router.back()} hitSlop={12} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t('Go back')}>
         <Icon name="chevron-left" size={24} color={colors.textPrimary} />
       </Pressable>
       <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]} numberOfLines={1}>{title}</Text>
       {doc && customerCanSee(doc) ? (
-        <Pressable onPress={() => share(doc)} hitSlop={12} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Save or share PDF" disabled={busy}>
+        <Pressable onPress={() => share(doc)} hitSlop={12} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={t('Save or share PDF')} disabled={busy}>
           <Icon name="share-2" size={20} color={busy ? colors.textTertiary : colors.primary} />
         </Pressable>
       ) : <View style={styles.iconBtn} />}
@@ -56,12 +58,12 @@ export default function CustomerDocumentScreen() {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         {header('')}
-        {ready ? <EmptyState icon="file-text" title="Document not available" /> : <LoadingSpinner />}
+        {ready ? <EmptyState icon="file-text" title={t('Document not available')} /> : <LoadingSpinner />}
       </View>
     );
   }
 
-  const label = DOC_LABEL[doc.kind];
+  const label = t(DOC_LABEL[doc.kind]);
   const status = displayStatus(doc);
   const canAnswer = doc.kind !== 'invoice' && status === 'sent';
   const answered = [...events].reverse().find((e) => e.eventType === 'approved' || e.eventType === 'declined');
@@ -72,16 +74,16 @@ export default function CustomerDocumentScreen() {
     if (doc.kind === 'invoice') return;
     const docKind = doc.kind;
     confirmAction(
-      approve ? `Approve ${label.toLowerCase()} ${doc.number}?` : `Decline ${label.toLowerCase()} ${doc.number}?`,
+      approve ? t('Approve {doc} {number}?', { doc: label.toLowerCase(), number: doc.number }) : t('Decline {doc} {number}?', { doc: label.toLowerCase(), number: doc.number }),
       approve
-        ? `You're approving the work and pricing shown, ${formatMoney(doc.total)} total. ${companyName} will be notified.`
-        : `${companyName} will be notified. You can message them with any questions.`,
-      approve ? 'Approve' : 'Decline',
+        ? t("You're approving the work and pricing shown, {total} total. {company} will be notified.", { total: formatMoney(doc.total), company: companyName })
+        : t('{company} will be notified. You can message them with any questions.', { company: companyName }),
+      approve ? t('Approve') : t('Decline'),
       async () => {
         setResponding(approve ? 'approve' : 'decline');
         const { error } = await respondAsCustomer(docKind, doc.id, approve);
         setResponding(null);
-        if (error) showMessage('Not saved', error);
+        if (error) showMessage(t('Not saved'), t(error));
       },
       !approve,
     );
@@ -93,10 +95,10 @@ export default function CustomerDocumentScreen() {
 
       <View style={[styles.summary, { borderBottomColor: colors.separator }]}>
         <View style={{ flex: 1 }}>
-          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{doc.kind === 'invoice' ? 'Total due' : 'Total'}</Text>
+          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{doc.kind === 'invoice' ? t('Total due') : t('Total')}</Text>
           <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontVariant: ['tabular-nums'] }]}>{formatMoney(doc.total)}</Text>
         </View>
-        <StatusBadge label={STATUS_LABEL[status]} status={STATUS_TONE[status]} />
+        <StatusBadge label={t(STATUS_LABEL[status])} status={STATUS_TONE[status]} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -107,26 +109,26 @@ export default function CustomerDocumentScreen() {
         {canAnswer ? (
           <>
             <Text style={[typeScale.caption, { color: colors.textSecondary, textAlign: 'center' }]}>
-              Your answer is recorded with the date and time.
+              {t('Your answer is recorded with the date and time.')}
             </Text>
             <View style={styles.row}>
-              <Button title="Decline" variant="ghost" onPress={() => respond(false)} loading={responding === 'decline'} disabled={!!responding} style={{ flex: 1 }} />
-              <Button title="Approve" icon="check" onPress={() => respond(true)} loading={responding === 'approve'} disabled={!!responding} style={{ flex: 2 }} />
+              <Button title={t('Decline')} variant="ghost" onPress={() => respond(false)} loading={responding === 'decline'} disabled={!!responding} style={{ flex: 1 }} />
+              <Button title={t('Approve')} icon="check" onPress={() => respond(true)} loading={responding === 'approve'} disabled={!!responding} style={{ flex: 2 }} />
             </View>
           </>
         ) : (
           <>
             {answered && (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>
-                {answered.eventType === 'approved' ? 'Approved' : 'Declined'} {formatDocDateTime(answered.createdAt)}
+                {answered.eventType === 'approved' ? t('Approved') : t('Declined')} {formatDocDateTime(answered.createdAt)}
               </Text>
             )}
             {status === 'expired' && (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>
-                This quote has expired. Message us for an updated quote.
+                {t('This quote has expired. Message us for an updated quote.')}
               </Text>
             )}
-            <Button title="Save or Share PDF" icon="share-2" variant="secondary" onPress={() => share(doc)} loading={busy} fullWidth />
+            <Button title={t('Save or Share PDF')} icon="share-2" variant="secondary" onPress={() => share(doc)} loading={busy} fullWidth />
           </>
         )}
       </View>

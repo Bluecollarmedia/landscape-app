@@ -13,6 +13,7 @@ import { askForTaskPhoto } from '@/lib/stopPhotoPicker';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { haptics } from '@/lib/haptics';
+import { useT } from '@/i18n';
 import type { MaintenanceStopTask } from '@/types/maintenance';
 
 interface Props {
@@ -27,60 +28,61 @@ interface Props {
 }
 
 export function StopChecklist({ tasks, locked, stopId, requiresPhotos, photoCount, onError }: Props) {
+  const t = useT();
   const { colors } = useTheme();
   const [saving, setSaving] = useState<string | null>(null);
   const sorted = tasks.slice().sort((a, b) => a.sortOrder - b.sortOrder);
 
-  async function toggle(t: MaintenanceStopTask) {
+  async function toggle(task: MaintenanceStopTask) {
     if (locked || saving) return;
     haptics.light();
-    if (!t.completedAt && photoCount === 0) {
-      setSaving(t.id);
+    if (!task.completedAt && photoCount === 0) {
+      setSaving(task.id);
       const go = await askForTaskPhoto(stopId, requiresPhotos);
       setSaving(null);
       if (!go) return;
     }
-    setSaving(t.id);
-    const res = await setTaskDone(t.id, !t.completedAt);
+    setSaving(task.id);
+    const res = await setTaskDone(task.id, !task.completedAt);
     setSaving(null);
     if (!res.ok) onError?.(res.error);
   }
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-      {sorted.map((t, i) => {
-        const done = !!t.completedAt;
-        const by = t.completedBy ? db.people[t.completedBy] : undefined;
+      {sorted.map((task, i) => {
+        const done = !!task.completedAt;
+        const by = task.completedBy ? db.people[task.completedBy] : undefined;
         return (
           <PressableScale
-            key={t.id}
-            onPress={() => toggle(t)}
+            key={task.id}
+            onPress={() => toggle(task)}
             disabled={locked}
             haptic={false}
             scaleTo={0.98}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: done, disabled: locked }}
-            accessibilityLabel={t.title}
+            accessibilityLabel={task.title}
             style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
           >
             <View style={[styles.box, done
               ? { backgroundColor: colors.primary, borderColor: colors.primary }
               : { borderColor: colors.border }]}
             >
-              {saving === t.id
+              {saving === task.id
                 ? <ActivityIndicator size="small" color={done ? '#FFFFFF' : colors.primary} />
                 : done && <Icon name="check" size={16} color="#FFFFFF" />}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }, done && { color: colors.textSecondary }]}>
-                {t.title}
+                {task.title}
               </Text>
               {done ? (
                 <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
-                  {by ? `${by.firstName} · ` : ''}{clockTime(t.completedAt!)}
+                  {by ? `${by.firstName} · ` : ''}{clockTime(task.completedAt!)}
                 </Text>
-              ) : !t.isRequired ? (
-                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Optional</Text>
+              ) : !task.isRequired ? (
+                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>{t('Optional')}</Text>
               ) : null}
             </View>
           </PressableScale>

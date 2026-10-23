@@ -58,7 +58,7 @@ const page = read('app/approve/[token].tsx');
 check('10 the approval page needs name + signature + agreement to approve, and sends the signature',
   /disabled=\{!nameOk \|\| !signed \|\| !agreed \|\| !!saving\}/.test(page) && /<SignaturePad onChange=\{setSignature\}/.test(page) && /p_signature: approve \? signature \|\| null : null/.test(page));
 check('11 the customer can Request Changes (with what to change) and Download PDF before answering',
-  /title="Request Changes"/.test(page) && /What would you like changed\?/.test(page) && /title="Send Request"/.test(page) && /title="Download PDF"/.test(page));
+  /title=\{t\('Request Changes'\)\}/.test(page) && /What would you like changed\?/.test(page) && /title=\{t\('Send Request'\)\}/.test(page) && /title=\{t\('Download PDF'\)\}/.test(page));
 const html = read('src/lib/documentHtml.ts');
 check('12 the approved PDF prints the signature, re-checked as plain path text first', /isValidSignaturePath\(doc\.approvedSignature\)/.test(html) && /<path d=/.test(html));
 const sql = read('supabase/updates/054_quote_signature.sql');

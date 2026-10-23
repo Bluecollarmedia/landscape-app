@@ -13,6 +13,7 @@ import {
   useWorkerDayDetail, findPhotoForActivity, formatWorkedDuration, type WorkSession,
 } from '@/hooks/useWorkerActivitySummary';
 import type { WorkerActivity, WorkerActivityType } from '@/types/worker';
+import { useT } from '@/i18n';
 
 const EVENT_CONFIG: Record<WorkerActivityType, { icon: keyof typeof Feather.glyphMap; color: string }> = {
   checked_in: { icon: 'log-in', color: '#1976D2' },
@@ -35,6 +36,7 @@ function formatClock(iso: string): string {
 }
 
 export default function DayDetailScreen() {
+  const t = useT();
   const { date } = useLocalSearchParams<{ date: string }>();
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -57,13 +59,13 @@ export default function DayDetailScreen() {
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backRow}>
           <Feather name="chevron-left" size={22} color={colors.textPrimary} />
-          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Activity</Text>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{t('Activity')}</Text>
         </Pressable>
       </View>
 
       {!day ? (
         <View style={styles.center}>
-          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>No activity recorded for this day.</Text>
+          <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>{t('No activity recorded for this day.')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -71,7 +73,7 @@ export default function DayDetailScreen() {
             {formatDateHeading(day.date)}
           </Text>
           <Text style={[typeScale.bodyLarge, { color: colors.primaryDark, fontWeight: '600', marginTop: 2 }]}>
-            {formatWorkedDuration(day.totalWorkedMs)} worked
+            {t('{time} worked', { time: formatWorkedDuration(day.totalWorkedMs) })}
           </Text>
 
           {day.sessions.map(session => (
@@ -91,7 +93,7 @@ export default function DayDetailScreen() {
                     {session.incomplete && (
                       <View style={[styles.incompleteTag, { backgroundColor: colors.warningLight }]}>
                         <Text style={[typeScale.caption, { color: colors.warning, fontWeight: '600' }]}>
-                          Incomplete session
+                          {t('Incomplete session')}
                         </Text>
                       </View>
                     )}

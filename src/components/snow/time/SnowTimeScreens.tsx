@@ -7,6 +7,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { useT } from '@/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Icon, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
 import { CollapsibleFilters } from '@/components/ui/CollapsibleFilters';
@@ -46,20 +47,26 @@ function useShifts() {
 }
 
 function ShiftRow({ s, first, name, action, flag }: { s: SnowShift; first: boolean; name?: string; action?: React.ReactNode; flag?: string }) {
+  const t = useT();
   const { colors } = useTheme();
   return (
     <View style={[styles.row, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }]}>
       <View style={{ flex: 1, gap: 2 }}>
         {name ? <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{name}</Text> : null}
         <Text style={[typeScale.bodySmall, { color: colors.textPrimary }]}>
-          {formatClock(s.clockInAt)} – {s.clockOutAt ? new Date(s.clockOutAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'now'}
+          {formatClock(s.clockInAt)} – {s.clockOutAt ? new Date(s.clockOutAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : t('now')}
         </Text>
         {s.corrected ? (
-          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Corrected: {s.correctionReason}</Text>
+          // The reason is what the owner typed; the two the app writes itself have a Spanish version, anything else shows as written.
+          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{t('Corrected: {reason}', { reason: t(s.correctionReason ?? '') })}</Text>
         ) : null}
         {s.flaggedAt && !s.corrected ? (
           <Text style={[typeScale.caption, { color: colors.warning }]}>
-            {s.claimedOutAt ? `Never clocked out. ${name ?? 'They'} say they stopped ${formatClock(s.claimedOutAt)}. Counts as zero hours until the end time is set.` : s.claimedAt ? 'Never clocked out. Not sure when they stopped. Counts as zero hours until the end time is set.' : 'Never clocked out. Counts as zero hours until the end time is set.'}
+            {s.claimedOutAt
+              ? (name
+                ? t('Never clocked out. {name} say they stopped {time}. Counts as zero hours until the end time is set.', { name, time: formatClock(s.claimedOutAt) })
+                : t('Never clocked out. They say they stopped {time}. Counts as zero hours until the end time is set.', { time: formatClock(s.claimedOutAt) }))
+              : s.claimedAt ? t('Never clocked out. Not sure when they stopped. Counts as zero hours until the end time is set.') : t('Never clocked out. Counts as zero hours until the end time is set.')}
           </Text>
         ) : null}
         {flag ? <Text style={[typeScale.caption, { color: colors.warning }]}>{flag}</Text> : null}
@@ -72,6 +79,7 @@ function ShiftRow({ s, first, name, action, flag }: { s: SnowShift; first: boole
 
 /** Worker "Time" tab. */
 export function SnowTimeClockScreen() {
+  const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
@@ -85,7 +93,7 @@ export function SnowTimeClockScreen() {
   // Not on a running storm route: no Clock In button (an open shift always keeps its Clock Out).
   useEffect(() => { canClockIn().then(setAllowed); }, [shifts.length, open?.id]);
   const blocked = !open && !allowed;
-  const week = shifts.reduce((t, s) => t + shiftHours(s), 0);
+  const week = shifts.reduce((sum, s) => sum + shiftHours(s), 0);
 
   async function toggle() {
     setBusy(true);
@@ -93,7 +101,12 @@ export function SnowTimeClockScreen() {
     const res = open ? await clockOut() : await clockIn();
     setBusy(false);
     // A failure stays on the screen (not only a pop-up that disappears): the worker must never think they are clocked out when they are not.
-    if (!res.ok) { const what = open ? 'Couldn\'t clock out' : 'Couldn\'t clock in'; setClockError(`${what}: ${res.error} You are still ${open ? 'clocked in' : 'not clocked in'}.`); showMessage(what, res.error); }
+    if (!res.ok) {
+      const what = open ? t("Couldn't clock out") : t("Couldn't clock in");
+      const why = t(res.error);
+      setClockError(open ? t('{what}: {error} You are still clocked in.', { what, error: why }) : t('{what}: {error} You are still not clocked in.', { what, error: why }));
+      showMessage(what, why);
+    }
     await clock.refresh();
     reload();
   }
@@ -104,30 +117,30 @@ export function SnowTimeClockScreen() {
         contentContainerStyle={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: tabBarClearance + spacing.lg }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
       >
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Time Clock</Text>
-        {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t('Time Clock')}</Text>
+        {error ? <InlineNotice icon="alert-circle" tone="error" text={t(error)} style={{ marginTop: spacing.md }} /> : null}
         {clockError ? <InlineNotice icon="alert-circle" tone="error" text={clockError} style={{ marginTop: spacing.md }} /> : null}
         {clock.stale ? <View style={{ marginTop: spacing.md }}><SnowStaleShiftCard shift={clock.stale} busy={clock.busy} onAnswer={async (iso) => { const e = await clock.claimStale(clock.stale!.id, iso); reload(); return e; }} /></View> : null}
         {loading ? <LoadingSpinner /> : (
           <>
             <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md, alignItems: 'center', gap: spacing.sm }]}>
-              <Text style={[typeScale.overline, { color: colors.textSecondary }]}>{open ? 'Clocked in' : 'Not clocked in'}</Text>
+              <Text style={[typeScale.overline, { color: colors.textSecondary }]}>{open ? t('Clocked in') : t('Not clocked in')}</Text>
               <Text style={[typeScale.displaySmall, { color: open ? colors.primary : colors.textPrimary }]}>
                 {open ? formatHours(shiftHours(open)) : formatHours(week)}
               </Text>
               <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                {open ? `Since ${formatClock(open.clockInAt)}` : 'This week'}
+                {open ? t('Since {time}', { time: formatClock(open.clockInAt) }) : t('This week')}
               </Text>
               {blocked ? (
                 <>
-                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm }]}>No active storm assignment</Text>
+                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center', marginTop: spacing.sm }]}>{t('No active storm assignment')}</Text>
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>
-                    Clock In appears once the owner puts you on a route for a storm that has been dispatched.
+                    {t('Clock In appears once the owner puts you on a route for a storm that has been dispatched.')}
                   </Text>
                 </>
               ) : (
                 <Button
-                  title={open ? 'Clock Out' : 'Clock In'}
+                  title={open ? t('Clock Out') : t('Clock In')}
                   icon={open ? 'log-out' : 'log-in'}
                   variant={open ? 'danger' : 'primary'}
                   loading={busy}
@@ -137,17 +150,17 @@ export function SnowTimeClockScreen() {
                 />
               )}
               <Text style={[typeScale.caption, { color: colors.textTertiary, textAlign: 'center' }]}>
-                No location is used. Snow hours are kept apart from landscaping hours.
+                {t('No location is used. Snow hours are kept apart from landscaping hours.')}
               </Text>
             </View>
 
-            <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>This week · {formatHours(week)}</Text>
+            <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>{t('This week · {hours}', { hours: formatHours(week) })}</Text>
             {shifts.length ? (
               <View style={[styles.group, { backgroundColor: colors.surface }]}>
                 {shifts.map((s, i) => <ShiftRow key={s.id} s={s} first={i === 0} />)}
               </View>
             ) : (
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginHorizontal: spacing.sm }]}>No shifts yet this week.</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginHorizontal: spacing.sm }]}>{t('No shifts yet this week.')}</Text>
             )}
           </>
         )}

@@ -33,16 +33,22 @@ export function monthHeading(key: string): string {
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+/** The screen passes its translator (t from useT); without one the English text is filled in as written. */
+type Say = (text: string, vars?: Record<string, string | number>) => string;
+const plain: Say = (text, vars) => (vars ? text.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : text);
+
+const updatesText = (t: Say, n: number) => (n === 1 ? t('1 update') : t('{n} updates', { n }));
+const finishedText = (t: Say, n: number) => (n === 1 ? t('1 stop finished') : t('{n} stops finished', { n }));
 
 /** "6 updates · 2 stops finished" */
-export function daySummary(events: { eventType: string }[]): string {
+export function daySummary(events: { eventType: string }[], t: Say = plain): string {
   const finished = events.filter((e) => e.eventType === 'completed').length;
-  return finished ? `${plural(events.length, 'update', 'updates')} · ${plural(finished, 'stop finished', 'stops finished')}` : plural(events.length, 'update', 'updates');
+  return finished ? `${updatesText(t, events.length)} · ${finishedText(t, finished)}` : updatesText(t, events.length);
 }
 
-export function monthSummary(month: FoldMonth<{ eventType: string }>): string {
+export function monthSummary(month: FoldMonth<{ eventType: string }>, t: Say = plain): string {
   const finished = month.days.reduce((n, d) => n + d.events.filter((e) => e.eventType === 'completed').length, 0);
-  const base = `${plural(month.days.length, 'day', 'days')} · ${plural(month.count, 'update', 'updates')}`;
-  return finished ? `${base} · ${plural(finished, 'stop finished', 'stops finished')}` : base;
+  const days = month.days.length === 1 ? t('1 day') : t('{n} days', { n: month.days.length });
+  const base = `${days} · ${updatesText(t, month.count)}`;
+  return finished ? `${base} · ${finishedText(t, finished)}` : base;
 }

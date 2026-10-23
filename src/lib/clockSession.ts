@@ -7,6 +7,7 @@
 //              today's Clock In or route, never feeds today's timer. The database flags it (needs review) and counts it as zero hours
 //              until a person decides the real end time; the original clock-in is never changed and no end time is ever invented.
 //   review   = the database already flagged it (needs review). Same treatment as stale, plus the worker's answer is shown.
+import { getLanguage, tr } from '@/i18n';
 
 export type SessionState = 'current' | 'closed' | 'stale' | 'review';
 
@@ -37,20 +38,21 @@ export const needsAnswer = (s: SessionLike, nowMs: number, staleAfterHours?: num
   return st === 'stale' || st === 'review';
 };
 
-const dayAndTime = (iso: string) => new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const locale = () => (getLanguage() === 'es' ? 'es-US' : 'en-US');
+const dayAndTime = (iso: string) => new Date(iso).toLocaleString(locale(), { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 /** The one sentence shown for a forgotten clock-out, the same on every clock. */
 export function staleHeadline(clockInAt: string): string {
-  return `You didn't clock out on ${new Date(clockInAt).toLocaleDateString('en-US', { weekday: 'long' })}`;
+  return tr("You didn't clock out on {day}", { day: new Date(clockInAt).toLocaleDateString(locale(), { weekday: 'long' }) });
 }
 export function staleDetail(clockInAt: string): string {
-  return `You clocked in ${dayAndTime(clockInAt)} and never clocked out. It counts as zero hours until your boss sets the real end time. Tell them when you stopped; today's work is not affected.`;
+  return tr("You clocked in {when} and never clocked out. It counts as zero hours until your boss sets the real end time. Tell them when you stopped; today's work is not affected.", { when: dayAndTime(clockInAt) });
 }
 
 /** What the card says once the worker has answered. */
 export function answeredText(claimedOutAt?: string | null, note?: string | null): string {
-  const when = claimedOutAt ? `You said you stopped ${dayAndTime(claimedOutAt)}.` : 'You said you are not sure when you stopped.';
-  return `${when}${note ? ` "${note}"` : ''} Your boss will set the real end time.`;
+  const when = claimedOutAt ? tr('You said you stopped {when}.', { when: dayAndTime(claimedOutAt) }) : tr('You said you are not sure when you stopped.');
+  return `${when}${note ? ` "${note}"` : ''} ${tr('Your boss will set the real end time.')}`;
 }
 
 /** The time choices offered for "I stopped at ...": from the clock-in to now, every 30 minutes, newest last. At most 49 choices. */

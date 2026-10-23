@@ -191,7 +191,7 @@ export default function InviteScreen() {
           }
         } catch (photoErr) {
           const why = photoErr instanceof Error ? photoErr.message : 'Unknown error';
-          say('Photo not saved', `You're in, but your profile photo wasn't saved. ${why} You can add it later by tapping your name in Settings.`);
+          say(tr('Photo not saved'), tr("You're in, but your profile photo wasn't saved. {why} You can add it later by tapping your name in Settings.", { why }));
         }
       }
       await goHome();

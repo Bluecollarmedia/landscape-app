@@ -3,6 +3,7 @@
  * table that only the worker and the company OWNER can read, and its file is never shown from a public link: the owner (or the
  * worker) gets a short-lived private link from the media function.
  */
+import { tr } from '@/i18n';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { uploadImage, removeMedia, requireSession } from '@/lib/media';
 import { idFolder, isHoodieSize, isIdKeyFor, type HoodieSize } from '@/lib/workerDetails';
@@ -46,7 +47,7 @@ export async function saveMyId(personId: string, localUri: string, oldKey?: stri
     if (oldKey && oldKey !== key) removeMedia(oldKey).catch(() => {});
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "The ID photo couldn't be uploaded." };
+    return { ok: false, error: err instanceof Error ? err.message : tr("The ID photo couldn't be uploaded.") };
   }
 }
 

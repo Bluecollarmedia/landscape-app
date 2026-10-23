@@ -8,6 +8,7 @@
  * framed area and hands back the new file.
  */
 
+import { tr } from '@/i18n';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -165,7 +166,7 @@ export function PhotoCropper({ image, aspect, title, overlay, onCancel, onDone }
       const saved = await rendered.saveAsync({ compress: 0.82, format: SaveFormat.JPEG });
       onDone(saved.uri);
     } catch (e) {
-      setError("That photo couldn't be cropped. Try another one.");
+      setError(tr("That photo couldn't be cropped. Try another one."));
       setSaving(false);
     }
   }

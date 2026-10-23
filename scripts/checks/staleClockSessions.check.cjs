@@ -11,7 +11,7 @@ let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + detail}`); };
 
 const m = { exports: {} };
-new Function('module', 'exports', 'require', ts.transpileModule(read('src/lib/clockSession.ts'), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports, () => ({}));
+new Function('module', 'exports', 'require', ts.transpileModule(read('src/lib/clockSession.ts'), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports, (n) => (n === '@/i18n' ? { getLanguage: () => 'en', tr: (t, v) => (v ? t.replace(/\{(\w+)\}/g, (x, k) => (k in v ? v[k] : x)) : t) } : {}));
 const { sessionState, isCurrent, needsAnswer, stopTimeChoices, answeredText, WORKDAY_STALE_HOURS, SNOW_STALE_HOURS } = m.exports;
 
 const H = 3600000;

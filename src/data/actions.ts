@@ -3,6 +3,7 @@
  * timeline, owner notifications, and photo records (with upload).
  */
 
+import { tr } from '@/i18n';
 import { db, insertRow, insertRows, updateRow, type TableName } from './store';
 import { uploadImage } from '@/lib/media';
 import type { HistoryEventType, CustomerTimelineType, ProjectPhoto } from '@/types/project';
@@ -129,7 +130,7 @@ export function attachImage(table: TableName, id: string, field: string, localUr
     .catch((err) => {
       console.warn('[photos] upload failed', err);
       const { Alert, Platform } = require('react-native');
-      const msg = `The photo couldn't be uploaded. ${err?.message ?? ''}`.trim();
+      const msg = `${tr("The photo couldn't be uploaded.")} ${err?.message ?? ''}`.trim();
       if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(msg);
       else Alert.alert('Photo not saved', msg);
     });

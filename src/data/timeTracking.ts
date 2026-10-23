@@ -5,6 +5,7 @@
  * Owners read the time tables and make corrections through the time_staff_* functions. Nothing here saves a time locally:
  * an action is shown as done only after the database confirms it. There is no offline queue.
  */
+import { tr } from '@/i18n';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { uuid } from '@/lib/ids';
 
@@ -18,9 +19,9 @@ const OFFLINE = /network request failed|failed to fetch|fetch failed|networkerro
 export type Failure = { ok: false; error: string; notInstalled?: boolean; offline?: boolean };
 export function explainError(e: { message?: string } | null | undefined, fallback: string): Failure {
   const m = e?.message?.trim() ?? '';
-  if (OFFLINE.test(m)) return { ok: false, offline: true, error: 'No connection. This was not saved. Try again when you are back online.' };
-  if (NOT_INSTALLED.test(m)) return { ok: false, notInstalled: true, error: 'Time tracking is not switched on yet (the database update has not been installed).' };
-  if (!m || /^(permission denied|new row violates|JWT)/i.test(m)) return { ok: false, error: fallback };
+  if (OFFLINE.test(m)) return { ok: false, offline: true, error: tr('No connection. This was not saved. Try again when you are back online.') };
+  if (NOT_INSTALLED.test(m)) return { ok: false, notInstalled: true, error: tr('Time tracking is not switched on yet (the database update has not been installed).') };
+  if (!m || /^(permission denied|new row violates|JWT)/i.test(m)) return { ok: false, error: tr(fallback) };
   return { ok: false, error: m };
 }
 
@@ -111,7 +112,7 @@ function parseDay(r: Raw): MyDay {
 
 /** Calls one of the worker functions that answer with the worker's day. `announce` tells open screens to refresh (actions do; plain reads don't). */
 export async function timeRpc(fn: string, args: Record<string, unknown>, fallback: string, announce = true): Promise<Result<MyDay>> {
-  if (!isSupabaseConfigured) return { ok: false, error: 'Time tracking needs the live database.', notInstalled: true };
+  if (!isSupabaseConfigured) return { ok: false, error: tr('Time tracking needs the live database.'), notInstalled: true };
   try {
     const { data, error } = await supabase.rpc(fn, args);
     if (error) {

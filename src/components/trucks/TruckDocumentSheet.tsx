@@ -3,6 +3,7 @@
  * runs out. Used on the truck's page (uploads right away) and when adding a new truck (the pick is kept and uploaded once the truck
  * is saved). Other records (maintenance, repairs, registration ...) use TruckRecordSheet.
  */
+import { useKeepDraft } from '@/hooks/useKeepDraft';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Platform, Alert, ActivityIndicator, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,9 +38,8 @@ export function TruckDocumentSheet({ visible, onClose, onSubmit }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (visible) { setTitle(''); setTitleTouched(false); setExpiresOn(''); setFile(null); setBusy(false); setError(null); }
-  }, [visible]);
+  // Swipe it away and open it again: what you typed is still there (until it is sent or you leave the page).
+  const markSaved = useKeepDraft(visible, 'truck-doc', () => { setTitle(''); setTitleTouched(false); setExpiresOn(''); setFile(null); setBusy(false); setError(null); });
 
   function take(p: Picked) {
     setFile(p);
@@ -82,7 +82,7 @@ export function TruckDocumentSheet({ visible, onClose, onSubmit }: Props) {
     setError(null);
     const err = await onSubmit({ kind, title: title.trim() || suggestedTitle(kind, file.name), uri: file.uri, name: file.name, mimeType: file.mimeType, size: file.size, expiresOn: expiresOn || undefined });
     setBusy(false);
-    if (err) setError(err); else { Keyboard.dismiss(); onClose(); }
+    if (err) setError(err); else { markSaved(); Keyboard.dismiss(); onClose(); }
   }
 
   return (

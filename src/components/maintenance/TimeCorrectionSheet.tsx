@@ -4,6 +4,7 @@
  * required, and what the crew recorded stays visible next to the correction.
  */
 
+import { useKeepDraft } from '@/hooks/useKeepDraft';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -37,14 +38,8 @@ export function TimeCorrectionSheet({ visible, title, description, dateKey, init
   const [saving, setSaving] = useState(false);
   const [androidPicker, setAndroidPicker] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      setTime(initial ? hhmm(new Date(initial)) : '08:00');
-      setNote('');
-      setSaving(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  // Swipe it away and open it again: what you typed is still there (until it is sent or you leave the page).
+  const markSaved = useKeepDraft(visible, 'time-correction', () => { setTime(initial ? hhmm(new Date(initial)) : '08:00'); setNote(''); setSaving(false); });
 
   const at = localDateTime(dateKey, time);
 
@@ -58,7 +53,7 @@ export function TimeCorrectionSheet({ visible, title, description, dateKey, init
     const res = await onSave(at, note.trim());
     setSaving(false);
     if (!res.ok) showMessage('Couldn’t save the correction', res.error);
-    else onClose();
+    else { markSaved(); onClose(); }
   };
 
   let control: React.ReactNode;

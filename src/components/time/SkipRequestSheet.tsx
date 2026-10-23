@@ -1,3 +1,4 @@
+import { useKeepDraft } from '@/hooks/useKeepDraft';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { Button, Input } from '@/components/ui';
@@ -20,7 +21,8 @@ export function SkipRequestSheet({ visible, propertyName, onClose, onSend }: {
   const { colors } = useTheme();
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (visible) { setReason(''); setBusy(false); } }, [visible]);
+  // Swipe it away and open it again: what you typed is still there (until it is sent or you leave the page).
+  const markSent = useKeepDraft(visible, 'skip', () => { setReason(''); setBusy(false); });
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -46,7 +48,7 @@ export function SkipRequestSheet({ visible, propertyName, onClose, onSend }: {
               icon="send"
               loading={busy}
               disabled={reason.trim().length < 3}
-              onPress={async () => { setBusy(true); await onSend(reason.trim()); setBusy(false); }}
+              onPress={async () => { setBusy(true); await onSend(reason.trim()); markSent(); setBusy(false); }}
             />
           </View>
         </View>

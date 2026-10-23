@@ -325,6 +325,81 @@ export default function NewRouteScreen() {
 
         {step === 'build' ? (
           <>
+            {/* Workers first: who works the route, and the leader */}
+            <View style={card}>
+              <View style={styles.cardHeader}>
+                <Text style={sectionTitle}>Crew</Text>
+                {crewAssigned && maintenanceCrew && (
+                  <CrewLabel name={maintenanceCrew.name} color={maintenanceCrew.color} />
+                )}
+              </View>
+              {everyone.length === 0 ? (
+                <InlineNotice icon="users" tone="warning" text="No workers yet. Add a worker on the Workers tab, then put them on a route." />
+              ) : (
+                <>
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Tap everyone who works this route. Anyone on your team can be added.</Text>
+                  {eligibleCrew.length > 0 && !eligibleCrew.every((p) => crewPick.includes(p.id)) && (
+                    <Pressable
+                      onPress={pickMaintenanceCrew}
+                      style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.primary, opacity: pressed ? 0.7 : 1 }]}
+                      accessibilityRole="button"
+                    >
+                      <Icon name="users" size={18} color={colors.primary} />
+                      <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Add the maintenance crew</Text>
+                    </Pressable>
+                  )}
+                  {everyone.map(({ person: p, maintenance }) => {
+                    const on = crewPick.includes(p.id);
+                    return (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => toggleCrew(p.id)}
+                        style={styles.workerRow}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: on }}
+                        accessibilityLabel={`${p.firstName} ${p.lastName}`}
+                      >
+                        <Avatar firstName={p.firstName} lastName={p.lastName} size={32} uri={p.avatarUrl} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{p.firstName} {p.lastName}</Text>
+                          {on && !maintenance ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Maintenance will be turned on for them</Text> : null}
+                        </View>
+                        {leadPersonId === p.id && <LeadBadge />}
+                        <Icon name={on ? 'check-circle' : 'circle'} size={22} color={on ? colors.primary : colors.textTertiary} />
+                      </Pressable>
+                    );
+                  })}
+                </>
+              )}
+              {crewAssigned ? (
+                <>
+                  <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>Crew Leader (required)</Text>
+                  <View style={styles.chipWrap}>
+                    {crewMembers.map(p => ({ id: p.id as string | null, label: p.firstName })).map(o => {
+                      const on = leadPersonId === o.id;
+                      return (
+                        <Pressable
+                          key={o.id ?? 'none'}
+                          onPress={() => { haptics.select(); setLeadPersonId(o.id); }}
+                          style={[styles.chip, { backgroundColor: on ? colors.primarySurface : colors.backgroundTertiary, borderColor: on ? colors.primary : 'transparent' }]}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: on }}
+                        >
+                          <Text style={[typeScale.bodySmall, { color: on ? colors.primaryDark : colors.textSecondary, fontWeight: '600' }]}>{o.label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                    The crew leader is the only crew member who checks the crew in at each property and finishes it. Every route needs one.
+                  </Text>
+                  <Pressable onPress={unassignCrew} style={styles.linkRow} accessibilityRole="button">
+                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary, fontWeight: '600' }]}>Unassign crew</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
+
             {/* 1. Date */}
             <View style={card}>
               <View style={styles.cardHeader}>
@@ -517,81 +592,6 @@ export default function NewRouteScreen() {
                 />
               </View>
             )}
-
-            {/* 5 + 6. Crew and optional lead */}
-            <View style={card}>
-              <View style={styles.cardHeader}>
-                <Text style={sectionTitle}>Crew</Text>
-                {crewAssigned && maintenanceCrew && (
-                  <CrewLabel name={maintenanceCrew.name} color={maintenanceCrew.color} />
-                )}
-              </View>
-              {everyone.length === 0 ? (
-                <InlineNotice icon="users" tone="warning" text="No workers yet. Add a worker on the Workers tab, then put them on a route." />
-              ) : (
-                <>
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Tap everyone who works this route. Anyone on your team can be added.</Text>
-                  {eligibleCrew.length > 0 && !eligibleCrew.every((p) => crewPick.includes(p.id)) && (
-                    <Pressable
-                      onPress={pickMaintenanceCrew}
-                      style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.primary, opacity: pressed ? 0.7 : 1 }]}
-                      accessibilityRole="button"
-                    >
-                      <Icon name="users" size={18} color={colors.primary} />
-                      <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Add the maintenance crew</Text>
-                    </Pressable>
-                  )}
-                  {everyone.map(({ person: p, maintenance }) => {
-                    const on = crewPick.includes(p.id);
-                    return (
-                      <Pressable
-                        key={p.id}
-                        onPress={() => toggleCrew(p.id)}
-                        style={styles.workerRow}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: on }}
-                        accessibilityLabel={`${p.firstName} ${p.lastName}`}
-                      >
-                        <Avatar firstName={p.firstName} lastName={p.lastName} size={32} uri={p.avatarUrl} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{p.firstName} {p.lastName}</Text>
-                          {on && !maintenance ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Maintenance will be turned on for them</Text> : null}
-                        </View>
-                        {leadPersonId === p.id && <LeadBadge />}
-                        <Icon name={on ? 'check-circle' : 'circle'} size={22} color={on ? colors.primary : colors.textTertiary} />
-                      </Pressable>
-                    );
-                  })}
-                </>
-              )}
-              {crewAssigned ? (
-                <>
-                  <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>Crew Leader (required)</Text>
-                  <View style={styles.chipWrap}>
-                    {crewMembers.map(p => ({ id: p.id as string | null, label: p.firstName })).map(o => {
-                      const on = leadPersonId === o.id;
-                      return (
-                        <Pressable
-                          key={o.id ?? 'none'}
-                          onPress={() => { haptics.select(); setLeadPersonId(o.id); }}
-                          style={[styles.chip, { backgroundColor: on ? colors.primarySurface : colors.backgroundTertiary, borderColor: on ? colors.primary : 'transparent' }]}
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected: on }}
-                        >
-                          <Text style={[typeScale.bodySmall, { color: on ? colors.primaryDark : colors.textSecondary, fontWeight: '600' }]}>{o.label}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
-                    The crew leader is the only crew member who checks the crew in at each property and finishes it. Every route needs one.
-                  </Text>
-                  <Pressable onPress={unassignCrew} style={styles.linkRow} accessibilityRole="button">
-                    <Text style={[typeScale.bodySmall, { color: colors.textSecondary, fontWeight: '600' }]}>Unassign crew</Text>
-                  </Pressable>
-                </>
-              ) : null}
-            </View>
 
             {/* Truck for the day (optional): workers use it automatically when they clock in. */}
             {db.trucks.length > 0 && (

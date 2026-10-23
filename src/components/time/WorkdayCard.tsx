@@ -11,6 +11,7 @@ import { haptics } from '@/lib/haptics';
 import { StaleSessionCard } from '@/components/time/StaleSessionCard';
 import type { TruckOptions } from '@/data/timeTracking';
 import { useT, tr } from '@/i18n';
+import { useMyMaintenanceRoute } from '@/hooks/useMaintenance';
 
 function say(title: string, message: string) {
   if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(`${title}\n\n${message}`);
@@ -26,7 +27,8 @@ const dayAndTime = (iso: string) => `${new Date(iso).toLocaleDateString('en-US',
  */
 export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { compact?: boolean; preShiftTitle?: string; preShiftText?: string } = {}) {
   const { colors } = useTheme();
-  const { workday: w } = useWorkerContext();
+  const { workday: w, todayAssignments } = useWorkerContext();
+  const myRoute = useMyMaintenanceRoute();
   const t = useT();
   const [pickTruck, setPickTruck] = useState<TruckOptions | null>(null);
   const [loadingTrucks, setLoadingTrucks] = useState(false);
@@ -49,6 +51,8 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
   const current = w.day?.current;
   // No route or job today: no Clock In button at all (the database refuses a clock-in too).
   const noWork = !active && w.day?.canClockIn === false;
+  // Clocked out for the day, but work was added afterwards (a new job today, or route stops still open): offer to clock back in right away.
+  const moreWork = todayAssignments.some((a) => a.status !== 'completed' && a.status !== 'cancelled') || !!myRoute?.stops.some((st) => st.status === 'pending' || st.status === 'arrived');
 
   async function onClockIn() {
     haptics.select();
@@ -191,7 +195,11 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
               </Text>
             </View>
           </View>
-          {w.day?.canClockIn !== false ? (
+          {w.day?.canClockIn !== false && moreWork ? (
+            <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} accessibilityRole="button" style={[styles.secondary, { backgroundColor: colors.primaryDark, borderColor: colors.primaryDark, marginTop: spacing.sm, alignItems: 'center' }]}>
+              <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('You have more work today. Clock back in')}</Text>
+            </Pressable>
+          ) : w.day?.canClockIn !== false ? (
             <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} hitSlop={8} style={{ marginTop: spacing.sm }}>
               <Text style={[typeScale.labelSmall, { color: colors.primary }]}>{t('Clocked out by mistake? Clock back in')}</Text>
             </Pressable>

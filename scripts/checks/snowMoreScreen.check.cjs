@@ -20,7 +20,7 @@ check('5 settings/records rows, titles and subtitles', [
 ].every(has));
 check('6 destinations unchanged', ['/snow/owner/activity', '/snow/owner/hours', '/snow/owner/review', '/snow/owner/message-customers', '/snow/owner/manage-storms', '/snow/owner/edit-profile'].every((r) => has(`router.push('${r}'`)) && !has('/snow/owner/settings'));
 check('7 one Legal & Support row (opens the Snow Legal & Support page: Privacy Policy, Terms of Use, Help & Support)', has('title="Legal & Support"') && has('/snow/legal-support') && !has('/legal/privacy') && fs.existsSync(path.join(__dirname, '../../app/snow/legal-support/index.tsx')) && fs.existsSync(path.join(__dirname, '../../app/snow/legal-support/[slug].tsx')));
-check('8 sign out and delete account kept', has('title="Sign Out"') && has('onPress={signOut}') && has('<DeleteAccountRow />'));
+check('8 sign out (which warns first while a clock is running) and delete account kept', has('title="Sign Out"') && has('onPress={guardedSignOut}') && has('<DeleteAccountRow />'));
 check('9 alerts use the existing toggle (persistence untouched) with its explanation', has('<OwnerStopAlertsToggle companyId={db.companyId} bare />') && has('<OwnerCustomerMessages />') && has('<StopRuleToggle companyId={db.companyId} />') && /Alert me when a stop is finished/.test(notify) && /Just for you\. Stops are still recorded on the dashboard and activity log when this is off\./.test(notify));
 check('10 mode switch uses the existing logic', has('useModeSwitch()') && /export function useModeSwitch/.test(modeSrc) && /Switch to Landscaping Mode|Landscaping/.test(modeSrc));
 check('11 bottom padding clears the tab bar', has('useTabBarClearance()') && has('paddingBottom: tabBarClearance'));

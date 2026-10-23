@@ -13,6 +13,7 @@ import { MyRouteScreen } from '@/components/snow/routes/MyRouteScreen';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { useSnowClock } from '@/hooks/useSnowClock';
+import { SnowStaleShiftCard } from '@/components/snow/time/SnowStaleShiftCard';
 import { loadMyRoutes } from '@/data/snowRoutes';
 import { pickActiveRoute, splitMyRoutes } from '@/lib/snowMyRoute';
 import { clockGateState, clockInErrorText, stormRouteLine } from '@/lib/snowClockView';
@@ -23,7 +24,9 @@ export function SnowClockGate() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
-  const { open, allowed, loading, busy, clockInNow } = useSnowClock();
+  const { open, stale, allowed, loading, busy, clockInNow, claimStale } = useSnowClock();
+  // A shift that was never clocked out of is NEVER "clocked in" (useSnowClock keeps it out of `open`): one calm card, today's work carries on.
+  const staleCard = stale ? <SnowStaleShiftCard shift={stale} busy={busy} onAnswer={(iso) => claimStale(stale.id, iso)} /> : null;
   const state = clockGateState({ loading, clockedIn: !!open, allowed });
   const [error, setError] = useState('');
   const [routeLine, setRouteLine] = useState('');
@@ -66,7 +69,7 @@ export function SnowClockGate() {
   if (state === 'route' && open) {
     return (
       <Animated.View style={{ flex: 1, opacity: reveal, transform: [{ translateY: reveal.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>
-        <MyRouteScreen clockedInSince={open.clockInAt} />
+        <MyRouteScreen clockedInSince={open.clockInAt} topNotice={staleCard} />
       </Animated.View>
     );
   }
@@ -74,6 +77,7 @@ export function SnowClockGate() {
   if (state === 'none') {
     return (
       <View style={[styles.screen, styles.center, { backgroundColor: colors.groupedBackground, paddingBottom: tabBarClearance }]}>
+        {staleCard ? <View style={{ width: '100%', marginBottom: spacing.xl }}>{staleCard}</View> : null}
         <View style={[styles.snowCircle, { backgroundColor: colors.primarySurface }]}>
           <Icon name="cloud-snow" size={40} color={colors.primary} />
         </View>
@@ -87,6 +91,7 @@ export function SnowClockGate() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground, paddingTop: insets.top + spacing.xl, paddingBottom: tabBarClearance, paddingHorizontal: spacing.lg }]}>
+      {staleCard}
       <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Snow Mode</Text>
       <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>Ready to start?</Text>
       <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.sm }]}>Your hours start counting when you tap Clock In.</Text>

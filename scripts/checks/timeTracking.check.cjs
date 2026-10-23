@@ -8,7 +8,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 let bad = 0;
 const check = (n, ok, detail) => { if (!ok) bad++; console.log((ok ? 'PASS' : 'FAIL') + '  ' + n + (ok ? '' : ' - ' + (detail || ''))); };
 
-const sql = ['063_time_tracking_core', '064_time_corrections_approval_alerts', '065_time_tracking_followups'].map((f) => read(`supabase/updates/${f}.sql`)).join('\n');
+const sql = ['063_time_tracking_core', '064_time_corrections_approval_alerts', '065_time_tracking_followups', '090_stale_clock_sessions'].map((f) => read(`supabase/updates/${f}.sql`)).join('\n');
 const fnames = new Set([...sql.matchAll(/create or replace function public\.(time_[a-z_]+)\(/g)].map((m) => m[1]));
 const data = read('src/data/timeTracking.ts') + read('src/data/maintenance.ts') + read('src/data/timePhotos.ts');
 const calls = new Set([...data.matchAll(/(?:rpc\(|timeRpc\(|rpcDone\(|callDay\()\s*'(time_[a-z_]+)'/g)].map((m) => m[1]));

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ export default function MoreScreen() {
   const { colors } = useTheme();
   const tabBarClearance = useTabBarClearance();
   const { user, signOut, memberRole } = useAuth();
+  const guardedSignOut = useGuardedSignOut();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const openIssueCount = useOpenIssueCount();
@@ -99,7 +101,7 @@ export default function MoreScreen() {
 
         <View style={[styles.hairline, styles.signOutTop, { backgroundColor: colors.borderLight }]} />
         <Pressable
-          onPress={signOut}
+          onPress={guardedSignOut}
           accessibilityRole="button"
           accessibilityLabel="Sign out"
           style={({ pressed }) => [styles.signOut, pressed && { backgroundColor: colors.surfacePressed }]}

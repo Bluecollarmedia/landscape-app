@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { todayKey } from '@/lib/ids';
 import { netMs, grossMs, type TimeBreak } from '@/lib/timeCalc';
+import { isCurrent, needsAnswer, WORKDAY_STALE_HOURS } from '@/lib/clockSession';
 import {
   onTimeChanged, clockIn as apiClockIn, clockOut as apiClockOut, completeVisit as apiCompleteVisit, endBreak as apiEndBreak, loadMyDay, loadTruckOptions,
-  startBreak as apiStartBreak, startVisit as apiStartVisit,
+  startBreak as apiStartBreak, startVisit as apiStartVisit, claimStaleEnd as apiClaimStale,
   type Gps, type MyDay, type MyWorkday, type Result, type TruckOptions,
 } from '@/data/timeTracking';
 
@@ -21,7 +22,10 @@ export interface Workday {
   error: string | null;
   /** Add this to Date.now() to get server time (a wrong phone clock can't skew the timers). */
   clockOffsetMs: number;
+  /** The workday that is really running now. A day that was never clocked out of (stale or flagged) is NEVER this: see `stale`. */
   active?: MyWorkday;
+  /** A day the worker never clocked out of. It blocks nothing and counts for nothing today; the screens show ONE card asking when they stopped. */
+  stale?: MyWorkday;
   /** The workday that counts for "today" (the open one, else the latest closed one today). */
   today?: MyWorkday;
   onBreak: boolean;
@@ -33,6 +37,8 @@ export interface Workday {
   clockOut: () => Promise<Result<MyDay>>;
   startBreak: () => Promise<Result<MyDay>>;
   endBreak: () => Promise<Result<MyDay>>;
+  /** Tell the owner when you really stopped a day you never clocked out of (null = not sure). Saved only; no hours change. */
+  claimStale: (workdayId: string, stoppedAtIso: string | null, note?: string) => Promise<Result<MyDay>>;
   startVisit: (source: 'maintenance_stop' | 'assignment', refId: string, gps?: Gps) => Promise<Result<MyDay>>;
   completeVisit: (visitId: string, note?: string, gps?: Gps) => Promise<Result<MyDay>>;
 }
@@ -88,8 +94,19 @@ export function useMyWorkday(enabled: boolean): Workday {
   }, []);
   const doApply = useCallback((r: Result<MyDay>) => (r.ok ? apply(r) : r), [apply]);
 
-  const active = day?.days.find((d) => !d.clockOutAt);
-  const todays = useMemo(() => (day?.days ?? []).filter((d) => d.workDate === day?.workDate || !d.clockOutAt), [day]);
+  // What counts as "clocked in" is decided in ONE place (lib/clockSession), the same for every clock: a day open for longer than the owner's
+  // "open workday hours" (or already flagged by the database) is stale and never the running day.
+  const staleHours = day?.settings.staleAfterHours ?? WORKDAY_STALE_HOURS;
+  const asSession = (d: MyWorkday) => ({ clockInAt: d.clockInAt, clockOutAt: d.clockOutAt, flagged: d.status === 'needs_review' });
+  const { active, stale, todays } = useMemo(() => {
+    const nowMs = Date.now() + (day?.clockOffsetMs ?? 0);
+    const days = day?.days ?? [];
+    return {
+      active: days.find((d) => !d.clockOutAt && isCurrent(asSession(d), nowMs, staleHours)),
+      stale: days.find((d) => needsAnswer(asSession(d), nowMs, staleHours)),
+      todays: days.filter((d) => d.status !== 'needs_review' && (d.workDate === day?.workDate || (!d.clockOutAt && isCurrent(asSession(d), nowMs, staleHours)))),
+    };
+  }, [day, staleHours]);
   const today = active ?? todays[todays.length - 1];
   const netMsAt = useCallback((nowMs: number) => todays.reduce((t, d) => {
     const breaks: TimeBreak[] = d.breaks.map((b) => ({ startedAt: b.startedAt, endedAt: b.endedAt ?? null, paid: b.paid }));
@@ -101,12 +118,13 @@ export function useMyWorkday(enabled: boolean): Workday {
   const clockOut = useCallback(() => act(() => apiClockOut().then(doApply)), [act, doApply]);
   const startBreak = useCallback(() => act(() => apiStartBreak().then(doApply)), [act, doApply]);
   const endBreak = useCallback(() => act(() => apiEndBreak().then(doApply)), [act, doApply]);
+  const claimStale = useCallback((workdayId: string, stoppedAtIso: string | null, note?: string) => act(() => apiClaimStale(workdayId, stoppedAtIso, note).then(doApply)), [act, doApply]);
   const startVisit = useCallback((source: 'maintenance_stop' | 'assignment', refId: string, gps?: Gps) => act(() => apiStartVisit(source, refId, gps).then(doApply)), [act, doApply]);
   const completeVisit = useCallback((visitId: string, note?: string, gps?: Gps) => act(() => apiCompleteVisit(visitId, note, gps).then(doApply)), [act, doApply]);
   const loadTrucks = useCallback(() => loadTruckOptions(todayKey()), []);
 
   return useMemo<Workday>(() => ({
-    installed, day, loading, busy, error, clockOffsetMs: day?.clockOffsetMs ?? 0, active, today,
-    onBreak: !!active?.breaks.some((b) => !b.endedAt), netMsAt, refresh, loadTrucks, clockIn, clockOut, startBreak, endBreak, startVisit, completeVisit,
-  }), [installed, day, loading, busy, error, active, today, netMsAt, refresh, loadTrucks, clockIn, clockOut, startBreak, endBreak, startVisit, completeVisit]);
+    installed, day, loading, busy, error, clockOffsetMs: day?.clockOffsetMs ?? 0, active, stale, today,
+    onBreak: !!active?.breaks.some((b) => !b.endedAt), netMsAt, refresh, loadTrucks, clockIn, clockOut, startBreak, endBreak, claimStale, startVisit, completeVisit,
+  }), [installed, day, loading, busy, error, active, stale, today, netMsAt, refresh, loadTrucks, clockIn, clockOut, startBreak, endBreak, claimStale, startVisit, completeVisit]);
 }

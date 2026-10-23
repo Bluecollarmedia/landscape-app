@@ -1,4 +1,5 @@
 import { LegalSection } from '@/components/legal/LegalSection';
+import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -30,6 +31,7 @@ export default function SettingsScreen() {
   const { colors } = useTheme();
   const tabBarClearance = useTabBarClearance();
   const { user, signOut, switchDevRole, switchDevState, appState } = useAuth();
+  const guardedSignOut = useGuardedSignOut();
   useDb();
   const company = db.company;
   const { yard } = useCompanyYard();
@@ -217,7 +219,7 @@ export default function SettingsScreen() {
         <LegalSection />
 
         <SettingsGroup>
-          <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
+          <SettingsRow icon="log-out" title="Sign Out" destructive onPress={guardedSignOut} />
         </SettingsGroup>
         <ListSection>
           <DeleteCompanyRow />

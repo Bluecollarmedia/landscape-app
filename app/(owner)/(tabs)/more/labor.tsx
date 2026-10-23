@@ -49,7 +49,7 @@ export default function LaborOverviewScreen() {
   const clockedIn = rows.filter((r) => !r.workday.clockOutAt);
   const onProperty = clockedIn.filter((r) => r.currentLabel);
   const ready = rows.filter((r) => r.state === 'ready');
-  const needs = rows.filter((r) => r.state === 'needs_correction' || r.state === 'reapproval');
+  const needs = rows.filter((r) => r.state === 'needs_correction' || r.state === 'needs_end_time' || r.state === 'reapproval');
   const approved = rows.filter((r) => r.state === 'approved');
   const visitsToday = L.snapshot?.visits.filter((v) => v.visitDate === date) ?? [];
 

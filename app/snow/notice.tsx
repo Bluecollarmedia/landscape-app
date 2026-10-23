@@ -1,4 +1,5 @@
 import { LegalSection } from '@/components/legal/LegalSection';
+import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { ListSection } from '@/components/ui';
 import React from 'react';
@@ -20,6 +21,7 @@ import { spacing } from '@/theme/spacing';
 export default function SnowModeNoticeScreen() {
   const { colors } = useTheme();
   const { signOut } = useAuth();
+  const guardedSignOut = useGuardedSignOut();
   const insets = useSafeAreaInsets();
   useDb();
   const company = db.company?.name;
@@ -41,7 +43,7 @@ export default function SnowModeNoticeScreen() {
       <View style={{ paddingHorizontal: spacing.lg }}>
         <LegalSection />
         <SettingsGroup>
-          <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
+          <SettingsRow icon="log-out" title="Sign Out" destructive onPress={guardedSignOut} />
         </SettingsGroup>
         <ListSection>
           <DeleteAccountRow />

@@ -35,7 +35,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { SnowService } from '@/types/snow';
 
-export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked in (the Route tab only shows this screen once they have). */ clockedInSince?: string } = {}) {
+export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the worker clocked in (the Route tab only shows this screen once they have). */ clockedInSince?: string; /** Shown first (the "you didn't clock out" card for an earlier shift). */ topNotice?: React.ReactNode } = {}) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
@@ -140,6 +140,7 @@ export function MyRouteScreen({ clockedInSince }: { /** When the worker clocked 
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
         keyboardShouldPersistTaps="handled"
       >
+        {topNotice}
         {clockedInSince ? (
           <View style={[styles.clockLine, { backgroundColor: colors.primarySurface }]} accessible accessibilityLabel={`Clocked in since ${formatClock(clockedInSince)}. Clock out in the Time Clock tab.`}>
             <View style={[styles.clockDot, { backgroundColor: colors.success }]} />

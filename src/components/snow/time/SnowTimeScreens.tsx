@@ -13,6 +13,8 @@ import { CollapsibleFilters } from '@/components/ui/CollapsibleFilters';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
+import { useSnowClock } from '@/hooks/useSnowClock';
+import { SnowStaleShiftCard } from './SnowStaleShiftCard';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   canClockIn, clockIn, clockOut, correctShift, formatClock, formatHours, loadShifts, shiftHours, startOfWeekIso, type SnowShift,
@@ -55,6 +57,11 @@ function ShiftRow({ s, first, name, action, flag }: { s: SnowShift; first: boole
         {s.corrected ? (
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Corrected: {s.correctionReason}</Text>
         ) : null}
+        {s.flaggedAt && !s.corrected ? (
+          <Text style={[typeScale.caption, { color: colors.warning }]}>
+            {s.claimedOutAt ? `Never clocked out. ${name ?? 'They'} say they stopped ${formatClock(s.claimedOutAt)}. Counts as zero hours until the end time is set.` : s.claimedAt ? 'Never clocked out. Not sure when they stopped. Counts as zero hours until the end time is set.' : 'Never clocked out. Counts as zero hours until the end time is set.'}
+          </Text>
+        ) : null}
         {flag ? <Text style={[typeScale.caption, { color: colors.warning }]}>{flag}</Text> : null}
         {action}
       </View>
@@ -71,7 +78,10 @@ export function SnowTimeClockScreen() {
   const { shifts, error, loading, reload } = useShifts();
   const [busy, setBusy] = useState(false);
   const [allowed, setAllowed] = useState(true);
-  const open = shifts.find((s) => !s.originalOut);
+  // One clock, read the same way on every Snow screen. A shift never clocked out of is never `open` (it is `stale`).
+  const clock = useSnowClock();
+  const open = clock.open ?? undefined;
+  const [clockError, setClockError] = useState<string | null>(null);
   // Not on a running storm route: no Clock In button (an open shift always keeps its Clock Out).
   useEffect(() => { canClockIn().then(setAllowed); }, [shifts.length, open?.id]);
   const blocked = !open && !allowed;
@@ -79,9 +89,12 @@ export function SnowTimeClockScreen() {
 
   async function toggle() {
     setBusy(true);
+    setClockError(null);
     const res = open ? await clockOut() : await clockIn();
     setBusy(false);
-    if (!res.ok) showMessage(open ? 'Couldn\'t clock out' : 'Couldn\'t clock in', res.error);
+    // A failure stays on the screen (not only a pop-up that disappears): the worker must never think they are clocked out when they are not.
+    if (!res.ok) { const what = open ? 'Couldn\'t clock out' : 'Couldn\'t clock in'; setClockError(`${what}: ${res.error} You are still ${open ? 'clocked in' : 'not clocked in'}.`); showMessage(what, res.error); }
+    await clock.refresh();
     reload();
   }
 
@@ -93,6 +106,8 @@ export function SnowTimeClockScreen() {
       >
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>Time Clock</Text>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginTop: spacing.md }} /> : null}
+        {clockError ? <InlineNotice icon="alert-circle" tone="error" text={clockError} style={{ marginTop: spacing.md }} /> : null}
+        {clock.stale ? <View style={{ marginTop: spacing.md }}><SnowStaleShiftCard shift={clock.stale} busy={clock.busy} onAnswer={async (iso) => { const e = await clock.claimStale(clock.stale!.id, iso); reload(); return e; }} /></View> : null}
         {loading ? <LoadingSpinner /> : (
           <>
             <View style={[styles.card, { backgroundColor: colors.surface, marginTop: spacing.md, alignItems: 'center', gap: spacing.sm }]}>
@@ -225,6 +240,16 @@ export function SnowHoursScreen() {
   const groups = groupByWorkerDay(shown, nameOf);
   const totalMs = shown.reduce((t, s) => t + shiftMs(s), 0);
 
+  /** Uses the end time the employee gave for a shift they never clocked out of. Their original clock-in stays on record; this adds a correction. */
+  function acceptClaimedTime(s: SnowShift) {
+    const who = names[s.personId] ?? 'this person';
+    confirmAction(`Use ${who}'s time?`, `They say they stopped ${s.claimedOutAt ? formatClock(s.claimedOutAt) : ''}. This adds a correction; the original stays on record.`, 'Use it', async () => {
+      const res = await correctShift(s.id, s.clockInAt, s.claimedOutAt ?? null, 'Used the time the employee gave');
+      if (!res.ok) showMessage("Couldn't save the correction", res.error);
+      reload();
+    });
+  }
+
   function clockOutNow(s: SnowShift) {
     const who = names[s.personId] ?? 'this person';
     confirmAction(`Clock out ${who} now?`, 'Their original clock-in stays on record; this adds a correction.', 'Clock out', async () => {
@@ -331,6 +356,7 @@ export function SnowHoursScreen() {
                               <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
                                 <Button title="Correct times" size="sm" variant="secondary" onPress={() => setEditing(s)} />
                                 {!s.originalOut ? <Button title="Clock out now" size="sm" variant="secondary" onPress={() => clockOutNow(s)} /> : null}
+                                {s.flaggedAt && !s.corrected && s.claimedOutAt ? <Button title="Use their time" size="sm" variant="secondary" onPress={() => acceptClaimedTime(s)} /> : null}
                               </View>
                             )}
                           />

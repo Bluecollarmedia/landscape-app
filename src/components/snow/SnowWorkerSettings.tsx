@@ -5,6 +5,7 @@
  * controls. Services come from get_my_snow_access (update 020).
  */
 import { LegalSection } from '@/components/legal/LegalSection';
+import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { ListSection } from '@/components/ui';
 import { displayName, profileNudge, roleLabel } from '@/lib/snowWorkerProfile';
@@ -63,6 +64,7 @@ export function SnowWorkerSettings() {
   const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
   const { user, signOut } = useAuth();
+  const guardedSignOut = useGuardedSignOut();
   const { access, error } = useMySnowAccess(db.companyId);
   const router = useRouter();
   const nudge = profileNudge(user);
@@ -129,7 +131,7 @@ export function SnowWorkerSettings() {
         <LegalSection />
 
         <SettingsGroup>
-          <SettingsRow icon="log-out" title="Sign Out" destructive onPress={signOut} />
+          <SettingsRow icon="log-out" title="Sign Out" destructive onPress={guardedSignOut} />
         </SettingsGroup>
         <ListSection>
           <DeleteAccountRow />

@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/providers/ThemeProvider';
 import { answerWebDialog, subscribeDialogs, type DialogRequest } from '@/lib/webDialog';
+import { useT } from '@/i18n';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
 /** Draws the website's dialogs (confirm / message), one at a time. Renders nothing on a phone. Mounted once at the root. */
 export function WebDialogHost() {
   const { colors } = useTheme();
+  const t = useT();
   const [queue, setQueue] = useState<DialogRequest[]>([]);
   useEffect(() => (Platform.OS === 'web' ? subscribeDialogs(setQueue) : undefined), []);
   const current = queue[0];
@@ -18,8 +20,8 @@ export function WebDialogHost() {
     <Modal transparent animationType="fade" visible onRequestClose={() => answerWebDialog(cancel ?? current.buttons[0])}>
       <View style={styles.backdrop}>
         <View style={[styles.box, { backgroundColor: colors.surface }]} accessibilityRole="alert">
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{current.title}</Text>
-          {current.message ? <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.sm }]}>{current.message}</Text> : null}
+          <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t(current.title)}</Text>
+          {current.message ? <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.sm }]}>{t(current.message)}</Text> : null}
           <View style={[styles.buttons, current.buttons.length > 2 && { flexDirection: 'column' }]}>
             {current.buttons.map((b, i) => {
               const destructive = b.style === 'destructive';
@@ -34,7 +36,7 @@ export function WebDialogHost() {
                     { backgroundColor: primary ? (destructive ? colors.error : colors.primaryDark) : colors.backgroundTertiary, opacity: pressed ? 0.85 : 1 },
                   ]}
                 >
-                  <Text style={[typeScale.labelLarge, { color: primary ? '#FFFFFF' : colors.textPrimary }]}>{b.text ?? 'OK'}</Text>
+                  <Text style={[typeScale.labelLarge, { color: primary ? '#FFFFFF' : colors.textPrimary }]}>{t(b.text ?? 'OK')}</Text>
                 </Pressable>
               );
             })}

@@ -1,3 +1,4 @@
+import { LanguageRow } from '@/components/ui/LanguageSwitch';
 import { LegalSection } from '@/components/legal/LegalSection';
 import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import React, { useState } from 'react';
@@ -125,6 +126,10 @@ export default function WorkerSettingsScreen() {
           />
         </ListSection>
       )}
+
+      <ListSection>
+        <LanguageRow />
+      </ListSection>
 
       <LegalSection />
 

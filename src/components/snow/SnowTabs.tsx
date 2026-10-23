@@ -1,3 +1,4 @@
+import { useT } from '@/i18n';
 import React from 'react';
 import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
@@ -28,6 +29,7 @@ export interface SnowTab {
  */
 export function SnowTabs({ tabs }: { tabs: SnowTab[] }) {
   const { colors } = useTheme();
+  const tx = useT();
 
   if (NativeTabs != null && Platform.OS !== 'web') {
     return (
@@ -38,7 +40,7 @@ export function SnowTabs({ tabs }: { tabs: SnowTab[] }) {
               sf={t.sf}
               src={<NativeTabs.Trigger.VectorIcon family={Feather} name={t.feather} />}
             />
-            <NativeTabs.Trigger.Label>{t.title}</NativeTabs.Trigger.Label>
+            <NativeTabs.Trigger.Label>{tx(t.title)}</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
         ))}
       </NativeTabs>
@@ -66,7 +68,7 @@ export function SnowTabs({ tabs }: { tabs: SnowTab[] }) {
           key={t.name}
           name={t.name}
           options={{
-            title: t.title,
+            title: tx(t.title),
             ...(t.hidden ? { href: null } : {}),
             tabBarIcon: ({ color, size }) => <Feather name={t.feather} size={size} color={color} />,
           }}

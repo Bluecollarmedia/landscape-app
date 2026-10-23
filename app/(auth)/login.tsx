@@ -18,6 +18,8 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { startWelcome, cancelWelcome } from '@/lib/welcomeAnimation';
+import { LanguageSwitch } from '@/components/ui/LanguageSwitch';
+import { useT } from '@/i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 240);
@@ -27,6 +29,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { signIn } = useAuth();
   const router = useRouter();
+  const t = useT();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,7 +40,7 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     if (!email.trim() || !password.trim()) {
-      setError('Please enter your email and password.');
+      setError(t('Please enter your email and password.'));
       return;
     }
 
@@ -52,7 +55,7 @@ export default function LoginScreen() {
       await signIn(email.trim(), password);
     } catch (err: any) {
       cancelWelcome();
-      setError(err?.message ?? 'Something went wrong. Please try again.');
+      setError(err?.message ?? t('Something went wrong. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -65,11 +68,14 @@ export default function LoginScreen() {
       keyboardAvoiding
       contentStyle={{ ...styles.content, paddingTop: insets.top + spacing.lg }}
     >
-      {/* Back to welcome */}
-      <Pressable onPress={() => router.back()} style={styles.backRow}>
-        <Icon name="arrow-left" size={20} color={colors.textSecondary} />
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>Back</Text>
-      </Pressable>
+      {/* Back to welcome, and the language switch (English by default) */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Pressable onPress={() => router.back()} style={styles.backRow}>
+          <Icon name="arrow-left" size={20} color={colors.textSecondary} />
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>{t('Back')}</Text>
+        </Pressable>
+        <LanguageSwitch />
+      </View>
 
       {/* Logo */}
       <View style={styles.logoSection}>
@@ -83,10 +89,10 @@ export default function LoginScreen() {
       {/* Welcome text */}
       <View style={styles.header}>
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>
-          Welcome Back
+          {t('Welcome Back')}
         </Text>
         <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-          Sign in to your account
+          {t('Sign in to your account')}
         </Text>
       </View>
 
@@ -100,7 +106,7 @@ export default function LoginScreen() {
         ) : null}
 
         <Input
-          label="Email"
+          label={t('Email')}
           placeholder="you@example.com"
           value={email}
           onChangeText={setEmail}
@@ -114,8 +120,8 @@ export default function LoginScreen() {
 
         <Input
           ref={passwordRef}
-          label="Password"
-          placeholder="Enter your password"
+          label={t('Password')}
+          placeholder={t('Enter your password')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -128,12 +134,12 @@ export default function LoginScreen() {
           icon="lock"
         />
 
-        <Pressable onPress={() => router.push('/(auth)/forgot-password' as any)} hitSlop={8} style={{ alignSelf: 'flex-end' }} accessibilityRole="button" accessibilityLabel="Forgot password">
-          <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>Forgot password?</Text>
+        <Pressable onPress={() => router.push('/(auth)/forgot-password' as any)} hitSlop={8} style={{ alignSelf: 'flex-end' }} accessibilityRole="button" accessibilityLabel={t('Forgot password?')}>
+          <Text style={[typeScale.bodySmall, { color: colors.primary, fontWeight: '600' }]}>{t('Forgot password?')}</Text>
         </Pressable>
 
         <Button
-          title="Sign In"
+          title={t('Sign In')}
           onPress={handleLogin}
           loading={loading}
           fullWidth
@@ -145,8 +151,8 @@ export default function LoginScreen() {
       <View style={styles.footer}>
         <Pressable onPress={() => router.replace('/(auth)/welcome')}>
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-            Don't have an account?{' '}
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>Get started</Text>
+            {t("Don't have an account?")}{' '}
+            <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('Get started')}</Text>
           </Text>
         </Pressable>
       </View>

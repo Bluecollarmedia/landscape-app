@@ -1,3 +1,4 @@
+import { useT } from '@/i18n';
 import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -12,6 +13,7 @@ try {
 } catch {}
 
 function OwnerNativeTabs() {
+  const t = useT();
   const { colors } = useTheme();
 
   return (
@@ -25,7 +27,7 @@ function OwnerNativeTabs() {
           sf={{ default: 'house', selected: 'house.fill' }}
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="home" />}
         />
-        <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('Dashboard')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="projects">
@@ -33,7 +35,7 @@ function OwnerNativeTabs() {
           sf={{ default: 'folder', selected: 'folder.fill' }}
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="folder" />}
         />
-        <NativeTabs.Trigger.Label>Projects</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('Projects')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="maintenance">
@@ -41,7 +43,7 @@ function OwnerNativeTabs() {
           sf={{ default: 'leaf', selected: 'leaf.fill' }}
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="feather" />}
         />
-        <NativeTabs.Trigger.Label>Maintenance</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('Maintenance')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="workers">
@@ -49,7 +51,7 @@ function OwnerNativeTabs() {
           sf={{ default: 'person.2', selected: 'person.2.fill' }}
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="users" />}
         />
-        <NativeTabs.Trigger.Label>Workers</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('Workers')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="more">
@@ -57,13 +59,14 @@ function OwnerNativeTabs() {
           sf="ellipsis"
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="menu" />}
         />
-        <NativeTabs.Trigger.Label>More</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('More')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
 
 function OwnerJSTabs() {
+  const t = useT();
   const { colors } = useTheme();
 
   return (
@@ -92,7 +95,7 @@ function OwnerJSTabs() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: t('Dashboard'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),
@@ -101,7 +104,7 @@ function OwnerJSTabs() {
       <Tabs.Screen
         name="projects"
         options={{
-          title: 'Projects',
+          title: t('Projects'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="folder" size={size} color={color} />
           ),
@@ -110,7 +113,7 @@ function OwnerJSTabs() {
       <Tabs.Screen
         name="maintenance"
         options={{
-          title: 'Maintenance',
+          title: t('Maintenance'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="feather" size={size} color={color} />
           ),
@@ -119,7 +122,7 @@ function OwnerJSTabs() {
       <Tabs.Screen
         name="workers"
         options={{
-          title: 'Workers',
+          title: t('Workers'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="users" size={size} color={color} />
           ),
@@ -128,7 +131,7 @@ function OwnerJSTabs() {
       <Tabs.Screen
         name="more"
         options={{
-          title: 'More',
+          title: t('More'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="menu" size={size} color={color} />
           ),

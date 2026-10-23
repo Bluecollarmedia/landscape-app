@@ -88,7 +88,7 @@ Quotes & invoices follow the same rule: `document` (view a quote / change order 
 Scrollable tab screens need `useTabBarClearance()` (`src/hooks/`) as bottom padding so the last item clears the floating Liquid Glass tab bar; `ScreenContainer` already applies it.
 
 ## EAS / Build State
-- EAS project: `@drakematcher/brighton-lawn-landscape` (expo.dev account `drakematcher`, not `abbacohen2` — an earlier EAS project existed under `abbacohen2` but this app's `owner`/`projectId` in `app.json` were repointed to a fresh project under `drakematcher`, which is the account with working Apple Developer Program access).
+- EAS project: `@abbacohen/brighton-lawn-landscape` (expo.dev account `abbacohen`). The project used to live under `drakematcher`, which the owner can no longer sign in to, so `owner`/`projectId` in `app.json` were repointed to a fresh project under `abbacohen` (2026-10-23). iOS signing credentials are created again by the first build.
 - Apple Team: `93LDR9MQMF` (David Cohen, Individual).
 - `eas build`/`eas submit` need interactive Apple sign-in the first time (distribution certificate, provisioning profile, App Store Connect app lookup) — can't be run `--non-interactive` from a fresh environment.
 - As of the last iOS build (`eas build --platform ios --profile production`), the build succeeded but was **not yet submitted** to App Store Connect/TestFlight — check `eas submit:list --platform ios` before assuming it's live.

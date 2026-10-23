@@ -44,6 +44,7 @@ const stormId = st?.storm?.id ?? st?.id ?? (await one(`select id from public.sno
 const route = (await one(`insert into public.snow_routes (company_id, storm_id, name, service, lead_person_id, media_required, min_media) values ($1,$2,'North','plowing',$3,true,2) returning id`, [co, stormId, lead.pid])).id;
 const mkVisit = async (pos) => (await db.exec('reset role'), await one(`insert into public.snow_visits (company_id, storm_id, route_id, property_id, service, status, position) values ($1,$2,$3,$4,'plowing','pending',$5) returning id`, [co, stormId, route, sp, pos])).id;
 const v1 = await mkVisit(1);
+const v2 = await mkVisit(2); // made now: the storm now ends by itself when its last stop is done (update 93)
 await rpc(owner.u, `select public.snow_dispatch_storm($1::uuid) as x`, [stormId]);
 const timeline = async () => (await rpc(cathy.u, `select * from public.snow_customer_timeline()`)).rows;
 
@@ -70,7 +71,6 @@ const cust = await rpc(cathy.u, `select public.snow_add_completion_media($1::uui
 check('9 a customer cannot attach photos', !cust.ok, JSON.stringify(cust));
 
 // The other rules of a completion are unchanged
-const v2 = await mkVisit(2);
 const early = await rpc(lead.u, `select public.snow_complete_visit($1::uuid, null) as x`, [v2]);
 check('10 "Tap I\'m Here first" still applies when the owner requires arrival', !early.ok && /I'm Here/.test(early.msg), JSON.stringify(early));
 await rpc(lead.u, `select public.snow_arrive_visit($1::uuid) as x`, [v2]);

@@ -40,6 +40,7 @@ const stormId = st?.storm?.id ?? st?.id ?? (await one(`select id from public.sno
 const route = (await one(`insert into public.snow_routes (company_id, storm_id, name, service, lead_person_id) values ($1,$2,'North','plowing',$3) returning id`, [co, stormId, lead.pid])).id;
 const mkVisit = async (pos) => (await one(`insert into public.snow_visits (company_id, storm_id, route_id, property_id, service, status, position) values ($1,$2,$3,$4,'plowing','pending',$5) returning id`, [co, stormId, route, sp, pos])).id;
 const v1 = await mkVisit(1);
+const v2 = await mkVisit(2); // made now: the storm now ends by itself when its last stop is done (update 93)
 await rpc(owner.u, `select public.snow_dispatch_storm($1::uuid) as x`, [stormId]);
 const timeline = async () => (await rpc(cathy.u, `select * from public.snow_customer_timeline()`)).rows;
 
@@ -71,7 +72,6 @@ check('8 the owner can still withdraw a photo, and the customer stops seeing it'
 // Manual mode: the old way still works
 await rpc(owner.u, `update public.snow_settings set auto_share_with_customers = false where company_id = $1`, [co]).catch(() => null);
 await db.query(`update public.snow_settings set auto_share_with_customers = false where company_id = $1`, [co]);
-const v2 = await mkVisit(2);
 await rpc(lead.u, `select public.snow_arrive_visit($1::uuid) as x`, [v2]);
 await rpc(lead.u, `select public.snow_add_completion_media($1::uuid, 'photo', $2, 1000, null, null) as x`, [v2, `${co}/completion/${v2}/a.jpg`]);
 await rpc(lead.u, `select public.snow_complete_visit($1::uuid, null) as x`, [v2]);

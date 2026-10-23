@@ -15,6 +15,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { haptics } from '@/lib/haptics';
+import { deleteUnusedMember } from '@/data/deleteMember';
 import { todayKey, localDateKey } from '@/lib/ids';
 import { loadBirthdays } from '@/data/birthday';
 import { OwnerWorkerExtras } from '@/components/account/WorkerExtras';
@@ -112,16 +113,35 @@ export default function WorkerDetailScreen() {
       updateWorker(p.id, { status: 'inactive' });
       router.back();
     };
-    const msg = `Deactivate ${p.firstName} ${p.lastName}? They will lose access but historical records will be preserved.`;
-    if (Platform.OS === 'web') {
-      if (confirm(msg)) doDeactivate();
-    } else {
-      Alert.alert(
-        'Deactivate Worker',
-        `${p.firstName} ${p.lastName} will lose access. Historical records (hours, payroll, attendance) will be preserved.`,
-        [{ text: 'Cancel', style: 'cancel' }, { text: 'Deactivate', style: 'destructive', onPress: doDeactivate }],
-      );
-    }
+    Alert.alert(
+      'Deactivate Worker',
+      `${p.firstName} ${p.lastName} will lose access. Historical records (hours, payroll, attendance) will be preserved.`,
+      [{ text: 'Cancel', style: 'cancel' }, { text: 'Deactivate', style: 'destructive', onPress: doDeactivate }],
+    );
+  }
+
+  /** Deletes a worker with no login and no records. Anyone else can only be deactivated, which keeps their history and payroll. */
+  function handleDelete() {
+    Alert.alert(
+      `Delete ${p.firstName} ${p.lastName}?`,
+      'This removes them completely and cannot be undone. It only works for a worker who never logged in and has no hours, jobs or other records.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await deleteUnusedMember(p.id);
+            if (res.ok) { haptics.destructive(); router.back(); return; }
+            if (res.hasHistory && isActive) {
+              Alert.alert("Can't delete", res.error, [{ text: 'Cancel', style: 'cancel' }, { text: 'Deactivate instead', onPress: handleDeactivate }]);
+            } else {
+              Alert.alert(res.hasHistory ? "Can't delete" : "Couldn't delete", res.error);
+            }
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -279,15 +299,17 @@ export default function WorkerDetailScreen() {
               </Text>
             )}
 
-            <Pressable
-              style={[styles.scheduleWorkBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push(`/(owner)/schedule-create?workerId=${p.id}&date=${today}` as any)}
-            >
-              <Icon name="calendar" size={16} color={colors.textOnPrimary} />
-              <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary, fontWeight: '700', marginLeft: spacing.xs }]}>
-                Schedule Work
-              </Text>
-            </Pressable>
+            {isActive ? (
+              <Pressable
+                style={[styles.scheduleWorkBtn, { backgroundColor: colors.primary }]}
+                onPress={() => router.push(`/(owner)/schedule-create?workerId=${p.id}&date=${today}` as any)}
+              >
+                <Icon name="calendar" size={16} color={colors.textOnPrimary} />
+                <Text style={[typeScale.labelLarge, { color: colors.textOnPrimary, fontWeight: '700', marginLeft: spacing.xs }]}>
+                  Schedule Work
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
 
           {/* Tomorrow */}
@@ -365,6 +387,13 @@ export default function WorkerDetailScreen() {
               </Text>
             </View>
           )}
+
+          <Pressable onPress={handleDelete} style={[styles.deactivateRow, { backgroundColor: colors.backgroundTertiary }]} accessibilityRole="button" accessibilityLabel="Delete worker">
+            <Icon name="trash-2" size={16} color={semantic.error} />
+            <Text style={[typeScale.labelLarge, { color: semantic.error, fontWeight: '700', marginLeft: spacing.xs }]}>
+              Delete Worker
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
     </View>

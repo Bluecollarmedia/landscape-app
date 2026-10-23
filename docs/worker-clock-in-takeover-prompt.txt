@@ -1,0 +1,38 @@
+PROMPT: THE SNOW WORKER'S "CLOCK IN" SCREEN (BEFORE THE ROUTE)
+
+Design one iPhone screen (portrait, light theme) for the snow worker's app. It is what the worker sees FIRST, in place of the Route screen, until they clock in. It takes over the whole screen. The moment they clock in, it goes away and the normal Route screen (their stops, Directions, I'm Here, All Stops) appears. After that, this screen never shows again until they clock out and come back.
+
+THE IDEA IN ONE LINE
+You cannot see your route until you have clocked in. One screen, one job, one giant button: Clock In.
+
+WHAT IS ON THE SCREEN (nothing else)
+- Very light cool-grey background, same as the rest of the app. White is used only for the one card behind the button.
+- Small blue brand line at the top: "Snow Mode".
+- Large bold title: "Ready to start?" (or "Clock in for the storm"). One short grey line under it: "Your hours start counting when you tap Clock In."
+- The storm name and the worker's route name in small grey text under that, for example "Oct 21 Plowing - North Route", so they know which storm they are clocking in for. These come from the real assigned storm, never made-up text.
+- In the middle of the screen, the star of the screen: one very large, wide, squared-off blue rectangular button (moderately rounded corners, NOT a pill and NOT a circle) with a clock icon and the white label "Clock In". It is tall (about 72-88 pt) and nearly full width so it is easy to hit with gloves on. It is the only button on the screen.
+- Under the button, one small muted line: "No location is used. Snow hours are kept apart from landscaping hours."
+- The bottom tab bar (Route, Time Clock, Settings) stays visible exactly as it is. Route is the highlighted tab.
+
+WHAT IT DOES
+1. Worker taps Clock In. The button shows a loading spinner and cannot be tapped twice.
+2. Only when the app confirms the clock-in worked does the screen change. If it fails (no signal, not allowed), the button comes back and a short red message appears above it, for example "Couldn't clock in. Check your connection and try again."
+3. On success the whole Clock In screen goes away with a quick, smooth transition (fade and gentle slide up, about 0.3 s) and the real Route screen is already there underneath: "My Route", the route name and service, the thin progress bar, the Next Stop card, Plowing Instructions and All Stops.
+4. At the top of that Route screen there is one quiet line instead of any button: "Clocked in since 4:12 PM. Clock out in the Time Clock tab." No second Clock In button, no Clock Out button on the Route screen.
+5. To stop working, the worker goes to the Time Clock tab and taps Clock Out there. After they clock out and return to the Route tab, this Clock In screen is back.
+
+WHEN THE WORKER CANNOT CLOCK IN YET
+If the owner has not put the worker on a route in a dispatched storm, there is nothing to clock in for. Do not show a Clock In button. Show the same full screen with a calm icon (a snowflake or cloud-snow), the title "No active storm assignment", and one grey line: "Clock In appears once the owner puts you on a route for a storm that has been dispatched." The tab bar stays.
+
+WHAT THIS SCREEN MUST NOT HAVE
+No route, no stops, no map, no progress bar, no list, no instructions, no extra buttons, no menus, no tips, no pop-ups. If it is not the title, the storm and route name, the Clock In button, the one-line note, or the tab bar, it does not belong.
+
+STYLE
+Clean, premium, native iPhone look. Dark navy text, muted blue-grey secondary text, the brand blue for the button, generous spacing, high contrast, big readable type. Calm and obvious: a worker half asleep at 4 AM should know exactly what to do in one second.
+
+STATES TO SHOW IN THE MOCKUPS
+A. Ready to clock in (the main screen above).
+B. Loading after tapping Clock In (spinner inside the button).
+C. Error (red message above the button).
+D. No active storm assignment (no button).
+E. The transition result: the Route screen with the one-line "Clocked in since..." note at the top.

@@ -2122,7 +2122,9 @@ export default function ProjectDetailScreen() {
                               </Text>
                             </View>
                             {linkedPhoto && (
-                              <OptimizedImage source={getMockPhotoImageUri(linkedPhoto, 120)} style={styles.activityThumb} />
+                              <Pressable onPress={() => openPhotoReview(linkedPhoto)} accessibilityRole="button" accessibilityLabel="View photo">
+                                <OptimizedImage source={getMockPhotoImageUri(linkedPhoto, 120)} style={styles.activityThumb} />
+                              </Pressable>
                             )}
                           </View>
                         );

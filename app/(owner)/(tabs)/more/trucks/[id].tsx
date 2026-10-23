@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -7,6 +7,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useTrucks } from '@/hooks/useTrucks';
 import { Card, StatusBadge, EmptyState, OptimizedImage, GlassIconButton } from '@/components/ui';
 import { TruckPrivateSection } from '@/components/trucks/TruckPrivateSection';
+import { PhotoPager } from '@/components/media/PhotoPager';
 import { useIsOwner } from '@/data/truckFiles';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -36,6 +37,7 @@ export default function TruckDetailScreen() {
   const insets = useSafeAreaInsets();
   const { allTrucks } = useTrucks();
   const isOwner = useIsOwner();
+  const [viewPhoto, setViewPhoto] = useState(false);
 
   const truck = allTrucks.find((t) => t.id === id);
 
@@ -64,7 +66,9 @@ export default function TruckDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {truck.photoUrl ? (
-          <OptimizedImage source={truck.photoUrl} style={styles.photo} />
+          <Pressable onPress={() => setViewPhoto(true)} accessibilityRole="button" accessibilityLabel="View photo">
+            <OptimizedImage source={truck.photoUrl} style={styles.photo} />
+          </Pressable>
         ) : (
           <View style={[styles.photo, styles.photoPlaceholder, { backgroundColor: colors.backgroundTertiary }]}>
             <Icon name="truck" size={36} color={colors.textTertiary} />
@@ -97,6 +101,7 @@ export default function TruckDetailScreen() {
         )}
         {isOwner && <TruckPrivateSection truckId={truck.id} />}
       </ScrollView>
+      {truck.photoUrl ? <PhotoPager photos={[{ id: 'truck', url: truck.photoUrl }]} startId={viewPhoto ? 'truck' : null} onClose={() => setViewPhoto(false)} /> : null}
     </View>
   );
 }

@@ -1,0 +1,37 @@
+NEXT BUILD CHECKLIST
+(All of this is merged to master. The old build on your phone can't show any of it - it needs the new build.)
+
+A. WHAT TO LOOK FOR ON THE PHONE
+
+Customers and invites
+[ ] You make ONE private invite link per customer. The customer opens it, signs up, and lands in their own account. Their name stays what YOU typed.
+[ ] A customer shows up once. A property belongs to one customer. You type the customer once, then pick them everywhere.
+
+Snow
+[ ] New storm: "Create Route" goes straight to crew lead, crew and Add Property. No dashboard while it is a draft.
+[ ] Snow list shows only Snow properties. Add Property can pull in a customer's saved properties.
+[ ] Worker: Clock In screen first, then My Route (next stop, finish with photos).
+[ ] Finish a stop and the photos reach the customer on their own - nobody picks pictures. Snow Settings has the on/off switch and a withdraw.
+[ ] Customer's Snow page: storm status, timeline, photos, their own alert switches. No spinners anywhere.
+[ ] Crew phones get Snow alerts.
+
+Settings and screens
+[ ] Every Settings has ONE "Legal & Support" row -> Privacy / Terms / Help. Back returns to Settings (owner, worker, customer, Snow).
+[ ] Welcome and sign-up Privacy / Terms links open as a pop-up. Closing lands you on the same screen.
+[ ] Customer Account: no "Snow updates" or "Maintenance updates" rows. Profile photo no longer hugs the card edge.
+[ ] Announcements is one page. Saving anything closes the keyboard and the editor.
+
+The rest
+[ ] Trucks: one pencil to edit, Insurance card, Maintenance log (reminder at 8 AM on the due date).
+[ ] Quotes and Invoices: green + at the top right. Sending an invoice emails the customer a private link.
+[ ] Maintenance: short Add Service screen, three schedule choices.
+[ ] Typing an address shows suggestions (only once the Google key is in the build).
+
+B. BEFORE THE BUILD (your list)
+1. Tell me "ready for the next build". I hand you the database steps, one per tab, in order.
+2. Publish the website (Netlify -> brighton-app -> Deploys; if the newest master deploy isn't live, Trigger deploy). Do it AFTER step 1. Invite links open on that site, and it is still the Oct 19 version today.
+3. Supabase -> Authentication -> URL Configuration -> add this redirect:  brighton-lawn://auth-callback
+4. Google Cloud key: limit it to Places API (New) and iOS bundle com.brightonlawn.app. Send it to me - it goes in the build settings, never in GitHub.
+5. Redeploy two Supabase edge functions: send-document-email and send-snow-notification.
+6. App Store Connect: public privacy-policy web address, demo account + live backend in the review notes, privacy labels (add Google).
+7. Then say "build". I never start a build on my own.

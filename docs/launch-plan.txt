@@ -1,0 +1,28 @@
+LAUNCH PLAN (nothing here has been run, merged or built yet)
+
+THE SIX DECISIONS: my picks, so you don't have to think about them
+1. Properties: one new "properties" table (SQL 075 already builds it this way). Maintenance and snow properties point at it.
+2. Company name: kept on the customer's own record, not a separate table. Simple, nothing new to maintain.
+3. Snow customers: use the same customer record as everyone else (one person = one customer).
+4. Backfill (matching old data to the new records): SQL 076 only creates the tool. It does nothing until it is run with "apply" turned on. We run it in preview mode first, you look at what it would match, then decide.
+5. Add Service (#148): merge it. Its checks pass now.
+6. Order and test backend: no separate test backend (you said no earlier). Order below.
+
+SQL ORDER (one file per tab, when you say go)
+ 1. 075  guards + properties table (safe, additive)
+ 2. 076  backfill tool (creates a function only; changes no data)
+ 3. 077  truck maintenance table
+ 4. 078  invite links (turns the old code paths OFF)
+ 5. 079  one place for every property (unified properties need it)
+ 6. 080  snow fixes (admin permission, company delete, old sign-in call off)
+ 7. 081  invoice email links (redeploy send-document-email with it)
+Run 078 right before the new app build goes out. Until 078 runs, the old join codes still work in the old app; after it runs, the OLD app can no longer join people by code, so the new build must follow soon after.
+
+MERGE ORDER
+ #148 Add Service, #150 Quotes/Invoices, #151 Trucks, #149 Properties, #152 Invite links, #153 Storm setup, #154 One property, #155 Snow audit fixes, #156 Invoice email.
+Merging #152 puts the invite page on the website; it only works after SQL 078 is run.
+
+THEN
+ - Build 16 (all app changes) and TestFlight.
+ - Test on a real phone: add a worker, text the link, sign up from it, then turn on Maintenance/Snow for that worker.
+ - Later (optional): a SQL to drop the old unused code tables; the customers/properties backfill preview.

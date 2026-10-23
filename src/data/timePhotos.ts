@@ -21,7 +21,6 @@ const SAYS: Record<Phase, RegExp> = { start: /start photo/i, complete: /completi
 function ask(phase: Phase): Promise<boolean> {
   const title = phase === 'start' ? 'Start photo needed' : 'Completion photo needed';
   const body = phase === 'start' ? 'Take a photo of the property before you start.' : 'Take a photo of the finished work before you complete this property.';
-  if (Platform.OS === 'web') return Promise.resolve(!!(globalThis as { confirm?: (m: string) => boolean }).confirm?.(`${title}\n\n${body}`));
   return new Promise((resolve) => {
     Alert.alert(title, body, [
       { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },

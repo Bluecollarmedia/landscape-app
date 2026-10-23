@@ -44,7 +44,6 @@ export default function ReportsScreen() {
 
   function confirmRemove(r: ReportItem) {
     const what = r.content_type === 'photo' ? 'Stop sharing this photo with the customer' : 'Delete this message for everyone';
-    if (Platform.OS === 'web') { if (window.confirm(`${what}?`)) act(r, true); return; }
     Alert.alert(`${what}?`, 'The report will be marked handled.', [
       { text: 'Cancel', style: 'cancel' },
       { text: r.content_type === 'photo' ? 'Stop sharing' : 'Delete', style: 'destructive', onPress: () => act(r, true) },

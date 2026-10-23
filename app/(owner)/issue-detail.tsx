@@ -37,10 +37,6 @@ export default function IssueDetailScreen() {
 
   function confirmDelete() {
     const run = () => { deleteIssue(issue!.id); router.back(); };
-    if (Platform.OS === 'web') {
-      if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.('Delete this report?')) run();
-      return;
-    }
     Alert.alert('Delete this report?', 'This removes it for everyone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: run },

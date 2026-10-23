@@ -334,10 +334,6 @@ export default function ProjectDetailScreen() {
   const canComplete = p.status === 'active' || p.status === 'on_hold';
 
   function askToConfirm(title: string, message: string, ok: string, onOk: () => void) {
-    if (Platform.OS === 'web') {
-      if (window.confirm(`${title}\n\n${message}`)) onOk();
-      return;
-    }
     Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       { text: ok, onPress: onOk },
@@ -1803,10 +1799,6 @@ export default function ProjectDetailScreen() {
   }
 
   function confirmAction(title: string, message: string, ok: string, onOk: () => void) {
-    if (Platform.OS === 'web') {
-      if (window.confirm(`${title}\n\n${message}`)) onOk();
-      return;
-    }
     Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       { text: ok, style: 'destructive', onPress: onOk },

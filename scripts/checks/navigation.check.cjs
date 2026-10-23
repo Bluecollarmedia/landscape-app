@@ -11,7 +11,7 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
 
 const layout = read('app/_layout.tsx');
 check('1 the root layout never returns a bare <Slot /> for public pages (that rebuilt the navigator)', !/if \(isPublicPage\) \{\s*return <Slot \/>;/.test(layout));
-check('2 the same tree is returned for public and normal pages: <Slot /> (inside the always-present insets wrapper, whose value only changes) then optional overlays (the worker mode toggle, the welcome)', /<>\s*(\{\/\*[^]*?\*\/\}\s*)?<SafeAreaInsetsContext\.Provider value=\{[^\n]*\}>\s*<Slot \/>\s*<\/SafeAreaInsetsContext\.Provider>\s*\{isPublicPage \? null : <WorkerModeToggle \/>\}\s*\{isPublicPage \? null : <SignInWelcome \/>\}\s*<\/>/.test(layout));
+check('2 the same tree is returned for public and normal pages: <Slot /> (inside the always-present insets wrapper, whose value only changes) then optional overlays (the worker mode toggle, the welcome) and the dialog host for the website (always there)', /<>\s*(\{\/\*[^]*?\*\/\}\s*)?<SafeAreaInsetsContext\.Provider value=\{[^\n]*\}>\s*<Slot \/>\s*<\/SafeAreaInsetsContext\.Provider>\s*\{isPublicPage \? null : <WorkerModeToggle \/>\}\s*\{isPublicPage \? null : <SignInWelcome \/>\}\s*<WebDialogHost \/>\s*<\/>/.test(layout));
 check('3 the splash still shows for normal pages while loading, but not for public pages', /!isPublicPage && \(isLoading \|\| !splashDone\)/.test(layout));
 check('4 Snow Mode has ONE More screen with every setting; there is no second Settings screen and no duplicate Team or Properties routes (the tabs cover them)',
   !fs.existsSync(path.join(__dirname, '../../app/snow/owner/settings.tsx')) && !fs.existsSync(path.join(__dirname, '../../src/components/snow/settings/SnowSettingsScreen.tsx'))

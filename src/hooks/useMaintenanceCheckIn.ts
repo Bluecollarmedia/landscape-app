@@ -38,10 +38,6 @@ type Choice = 'continue' | 'cancel';
  * end: "continue" is always offered, Open Settings too when location is off.
  */
 function askToContinue(prompt: { title: string; message: string; openSettings?: boolean }, continueLabel: string): Promise<Choice> {
-  if (Platform.OS === 'web') {
-    const confirm = (globalThis as { confirm?: (m: string) => boolean }).confirm;
-    return Promise.resolve(!confirm || confirm(`${prompt.title}\n\n${prompt.message}`) ? 'continue' : 'cancel');
-  }
   return new Promise((resolve) => {
     Alert.alert(prompt.title, prompt.message, [
       { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },

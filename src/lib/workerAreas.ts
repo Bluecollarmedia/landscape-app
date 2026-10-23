@@ -16,3 +16,30 @@ export function worksOnLandscaping(m?: Areas): boolean {
   if (!m) return false;
   return m.worksLandscaping ?? m.workerType !== 'maintenance';
 }
+
+/**
+ * An assignment gives the worker the job, whatever areas they are set to work in (the owner added them to it, so it must show).
+ * Open = today or later, not finished, cancelled or handed to someone else.
+ */
+export function hasOpenProjectWork(
+  assignments: { personId: string; scheduledDate: string; status: string }[],
+  personId: string | undefined,
+  today: string,
+): boolean {
+  if (!personId) return false;
+  return assignments.some((a) => a.personId === personId && a.scheduledDate >= today && !['completed', 'cancelled', 'reassigned'].includes(a.status)
+    && !(a.scheduledDate === today && a.status === 'completed'));
+}
+
+/**
+ * Which home a worker lands on. Only a worker who works Maintenance and nothing else, and has no project job coming up,
+ * lands on the Maintenance home; everyone else lands on the main home, which links to a route when they have one.
+ */
+export function workerLanding(input: { maintenance: boolean; landscaping: boolean; hasProjectWork: boolean }): 'maintenance' | 'landscaping' {
+  return input.maintenance && !input.landscaping && !input.hasProjectWork ? 'maintenance' : 'landscaping';
+}
+
+/** May this worker open the Maintenance screens? Their area, or a route they were put on. */
+export function mayOpenMaintenance(input: { maintenance: boolean; onRoute: boolean }): boolean {
+  return input.maintenance || input.onRoute;
+}

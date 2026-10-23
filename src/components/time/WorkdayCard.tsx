@@ -10,6 +10,7 @@ import { clockText, durationText, intervalMs } from '@/lib/timeCalc';
 import { haptics } from '@/lib/haptics';
 import { StaleSessionCard } from '@/components/time/StaleSessionCard';
 import type { TruckOptions } from '@/data/timeTracking';
+import { useT, tr } from '@/i18n';
 
 function say(title: string, message: string) {
   if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(`${title}\n\n${message}`);
@@ -26,6 +27,7 @@ const dayAndTime = (iso: string) => `${new Date(iso).toLocaleDateString('en-US',
 export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { compact?: boolean; preShiftTitle?: string; preShiftText?: string } = {}) {
   const { colors } = useTheme();
   const { workday: w } = useWorkerContext();
+  const t = useT();
   const [pickTruck, setPickTruck] = useState<TruckOptions | null>(null);
   const [loadingTrucks, setLoadingTrucks] = useState(false);
   // Only this card ticks every second (the timer); nothing else in the app is redrawn.
@@ -53,7 +55,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
     setLoadingTrucks(true);
     const opts = await w.loadTrucks();
     setLoadingTrucks(false);
-    if (!opts.ok) { say("Couldn't start your workday", opts.error); return; }
+    if (!opts.ok) { say(tr("Couldn't start your workday"), opts.error); return; }
     // The owner already assigned a truck: use it, no choice to make. Otherwise let the worker pick (or go without).
     if (opts.data.assignedTruckId || opts.data.trucks.length === 0) { await doClockIn(undefined); return; }
     setPickTruck(opts.data);
@@ -61,18 +63,18 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
   async function doClockIn(truckId?: string) {
     setPickTruck(null);
     const r = await w.clockIn(truckId);
-    if (r.ok) haptics.success(); else say("Couldn't start your workday", r.error);
+    if (r.ok) haptics.success(); else say(tr("Couldn't start your workday"), r.error);
   }
   function onClockOut() {
     haptics.select();
     const total = durationText(todayNetMs);
-    const go = async () => { const r = await w.clockOut(); if (r.ok) haptics.success(); else say("Can't clock out yet", r.error); };
-    Alert.alert('Clock out?', `Your total for today is ${total}.`, [{ text: 'Not yet', style: 'cancel' }, { text: 'Clock Out', style: 'destructive', onPress: go }]);
+    const go = async () => { const r = await w.clockOut(); if (r.ok) haptics.success(); else say(tr("Can't clock out yet"), r.error); };
+    Alert.alert(tr('Clock out?'), tr('Your total for today is {total}.', { total }), [{ text: tr('Not yet'), style: 'cancel' }, { text: tr('Clock Out'), style: 'destructive', onPress: go }]);
   }
   async function onBreak() {
     haptics.select();
     const r = w.onBreak ? await w.endBreak() : await w.startBreak();
-    if (!r.ok) say(w.onBreak ? "Couldn't end the break" : "Couldn't start the break", r.error);
+    if (!r.ok) say(w.onBreak ? tr("Couldn't end the break") : tr("Couldn't start the break"), r.error);
   }
 
   return (
@@ -91,8 +93,8 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
           <View style={styles.head}>
             <View style={[styles.icon, { backgroundColor: colors.backgroundTertiary }]}><Feather name="calendar" size={18} color={colors.textSecondary} /></View>
             <View style={{ flex: 1 }}>
-              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>No work scheduled today</Text>
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Clock In appears once you are put on a route or a job for the day.</Text>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t('No work scheduled today')}</Text>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t('Clock In appears once you are put on a route or a job for the day.')}</Text>
             </View>
           </View>
         </>
@@ -108,7 +110,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
             </View>
           </View>
           <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} style={[styles.primary, { backgroundColor: colors.primary, opacity: w.busy || loadingTrucks ? 0.6 : 1 }]} accessibilityRole="button">
-            {w.busy || loadingTrucks ? <ActivityIndicator color="#FFFFFF" /> : <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>Clock In</Text>}
+            {w.busy || loadingTrucks ? <ActivityIndicator color="#FFFFFF" /> : <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('Clock In')}</Text>}
           </Pressable>
         </>
       ) : null}
@@ -118,18 +120,18 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
           <View style={styles.head}>
             <View style={[styles.dot, { backgroundColor: w.onBreak ? colors.warning : colors.success }]} />
             <View style={{ flex: 1 }}>
-              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{w.onBreak ? 'On break' : 'On the clock'}</Text>
+              <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{w.onBreak ? t('On break') : t('On the clock')}</Text>
               <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-                since {fromEarlier ? dayAndTime(active.clockInAt) : timeOfDay(active.clockInAt)}{active.truck ? ` · ${active.truck.name}` : ''}
+                {t('since')} {fromEarlier ? dayAndTime(active.clockInAt) : timeOfDay(active.clockInAt)}{active.truck ? ` · ${active.truck.name}` : ''}
               </Text>
             </View>
             {w.day?.settings.breaksEnabled ? (
               <Pressable onPress={onBreak} disabled={w.busy} hitSlop={8} accessibilityRole="button" style={[styles.secondary, { borderColor: colors.border, opacity: w.busy ? 0.5 : 1 }]}>
-                <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{w.onBreak ? 'End Break' : 'Break'}</Text>
+                <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{w.onBreak ? t('End Break') : t('Break')}</Text>
               </Pressable>
             ) : null}
             <Pressable onPress={onClockOut} disabled={w.busy} hitSlop={8} accessibilityRole="button" style={[styles.secondary, { borderColor: colors.border, opacity: w.busy ? 0.5 : 1 }]}>
-              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Clock Out</Text>
+              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{t('Clock Out')}</Text>
             </Pressable>
           </View>
         </>
@@ -140,10 +142,10 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
           <View style={styles.head}>
             <View style={[styles.dot, { backgroundColor: w.onBreak ? colors.warning : colors.success }]} />
             <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>{w.onBreak ? 'ON BREAK' : 'WORKDAY'}</Text>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>since {fromEarlier ? dayAndTime(active.clockInAt) : timeOfDay(active.clockInAt)}</Text>
+            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{t('since')} {fromEarlier ? dayAndTime(active.clockInAt) : timeOfDay(active.clockInAt)}</Text>
           </View>
-          <Text style={[styles.timer, { color: colors.textPrimary }]} accessibilityLabel={`Workday total ${durationText(todayNetMs)}`}>{clockText(todayNetMs)}</Text>
-          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Workday total</Text>
+          <Text style={[styles.timer, { color: colors.textPrimary }]} accessibilityLabel={`${t('Workday total')} ${durationText(todayNetMs)}`}>{clockText(todayNetMs)}</Text>
+          <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{t('Workday total')}</Text>
 
           {active.truck ? (
             <View style={styles.row}>
@@ -169,11 +171,11 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
             ) : null}
             <Pressable onPress={onClockOut} disabled={w.busy} style={[styles.secondary, { borderColor: colors.border, opacity: w.busy ? 0.5 : 1 }]} accessibilityRole="button">
               <Feather name="log-out" size={15} color={colors.textPrimary} />
-              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>Clock Out</Text>
+              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{t('Clock Out')}</Text>
             </Pressable>
           </View>
           {current && !w.onBreak ? (
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>Complete the property you are at before clocking out.</Text>
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>{t('Complete the property you are at before clocking out.')}</Text>
           ) : null}
         </>
       ) : null}
@@ -183,7 +185,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
           <View style={styles.head}>
             <View style={[styles.icon, { backgroundColor: colors.successLight ?? colors.primarySurface }]}><Feather name="check" size={18} color={colors.success} /></View>
             <View style={{ flex: 1 }}>
-              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>Workday complete</Text>
+              <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t('Workday complete')}</Text>
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
                 Total {durationText(todayNetMs)} · {timeOfDay(closedToday.clockInAt)} to {closedToday.clockOutAt ? timeOfDay(closedToday.clockOutAt) : ''}
               </Text>
@@ -191,7 +193,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
           </View>
           {w.day?.canClockIn !== false ? (
             <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} hitSlop={8} style={{ marginTop: spacing.sm }}>
-              <Text style={[typeScale.labelSmall, { color: colors.primary }]}>Clocked out by mistake? Clock back in</Text>
+              <Text style={[typeScale.labelSmall, { color: colors.primary }]}>{t('Clocked out by mistake? Clock back in')}</Text>
             </Pressable>
           ) : null}
         </>
@@ -202,18 +204,18 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
       <BottomSheetModal visible={!!pickTruck} onRequestClose={() => setPickTruck(null)}>
         <Pressable style={styles.backdrop} onPress={() => setPickTruck(null)}>
           <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
-            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>Which truck are you taking?</Text>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md }]}>No truck has been assigned to you today.</Text>
-            {pickTruck?.trucks.map((t) => (
-              <Pressable key={t.id} disabled={t.inUse} onPress={() => doClockIn(t.id)} style={[styles.truckRow, { borderColor: colors.borderLight, opacity: t.inUse ? 0.45 : 1 }]} accessibilityRole="button">
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>{t('Which truck are you taking?')}</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md }]}>{t('No truck has been assigned to you today.')}</Text>
+            {pickTruck?.trucks.map((truck) => (
+              <Pressable key={truck.id} disabled={truck.inUse} onPress={() => doClockIn(truck.id)} style={[styles.truckRow, { borderColor: colors.borderLight, opacity: truck.inUse ? 0.45 : 1 }]} accessibilityRole="button">
                 <Feather name="truck" size={18} color={colors.textPrimary} />
-                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{t.name}</Text>
-                {t.inUse ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>In use</Text> : null}
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{truck.name}</Text>
+                {truck.inUse ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{t('In use')}</Text> : null}
               </Pressable>
             ))}
             <Pressable onPress={() => doClockIn(undefined)} style={[styles.truckRow, { borderColor: colors.borderLight }]} accessibilityRole="button">
               <Feather name="slash" size={18} color={colors.textSecondary} />
-              <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>No truck today</Text>
+              <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>{t('No truck today')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>

@@ -5,7 +5,7 @@
  * layout in the existing app style; no approved mockup yet.
  */
 import { AddSnowProperty } from './AddSnowProperty';
-import { customerNameOf, useAllProperties } from '@/data/properties';
+import { customerNameOf, enableSnowForProperty, useAllProperties } from '@/data/properties';
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -39,6 +39,7 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
+  const [turningOn, setTurningOn] = useState<string | null>(null);
   const allProperties = useAllProperties();
 
   const reload = useCallback(async () => {
@@ -71,8 +72,27 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
     .map((r) => ({ ...r, customer: customerNameOf(allProperties.find((p) => p.id === r.propertyId)?.customerId) || undefined }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Every property in the company is listed here, Snow or not (one shared list). The ones without Snow can be switched on with a tap.
+  const onSnow = new Set(rows.map((r) => r.propertyId).filter((x): x is string => !!x));
+  const others = allProperties
+    .filter((p) => !onSnow.has(p.id))
+    .map((p) => ({ id: p.id, name: p.name || p.address, address: [p.address, p.city, p.state].filter(Boolean).join(', '), customer: customerNameOf(p.customerId) || undefined }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   const q = query.trim().toLowerCase();
-  const shown = q ? all.filter((r) => `${r.name} ${r.address} ${r.customer ?? ''}`.toLowerCase().includes(q)) : all;
+  const matches = (r: { name: string; address: string; customer?: string }) => `${r.name} ${r.address} ${r.customer ?? ''}`.toLowerCase().includes(q);
+  const shown = q ? all.filter(matches) : all;
+  const shownOthers = q ? others.filter(matches) : others;
+
+  async function turnOn(propertyId: string) {
+    if (turningOn) return;
+    setTurningOn(propertyId);
+    const res = await enableSnowForProperty(propertyId);
+    setTurningOn(null);
+    if (!res.ok) return showMessage("Couldn't turn Snow on", res.error);
+    await reload();
+    open(res.snowPropertyId);
+  }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
@@ -97,9 +117,9 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
           />
         ) : null}
 
-        {all.length > 6 ? <SearchBar value={query} onChangeText={setQuery} placeholder="Search properties" style={{ marginTop: spacing.md }} /> : null}
+        {all.length + others.length > 6 ? <SearchBar value={query} onChangeText={setQuery} placeholder="Search properties" style={{ marginTop: spacing.md }} /> : null}
 
-        {loading ? <LoadingSpinner /> : !all.length && !adding ? (
+        {loading ? <LoadingSpinner /> : !all.length && !others.length && !adding ? (
           <EmptyState icon="home" title="No snow properties yet" description="Add the lots, driveways and walks your crews clear. You can import a customer's existing property." />
         ) : (
           <View style={[styles.group, { backgroundColor: colors.surface, marginTop: spacing.md }]}>
@@ -124,6 +144,31 @@ export function SnowPropertiesScreen({ asTab = true }: { asTab?: boolean } = {})
             ))}
           </View>
         )}
+
+        {!loading && shownOthers.length ? (
+          <>
+            <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.xl, marginBottom: spacing.xs }]}>NOT ON SNOW YET</Text>
+            <View style={[styles.group, { backgroundColor: colors.surface }]}>
+              {shownOthers.map((r, i) => (
+                <Pressable
+                  key={r.id}
+                  onPress={() => turnOn(r.id)}
+                  disabled={turningOn != null}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${r.name}. Snow is off. Tap to turn Snow on.`}
+                  style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight }, turningOn === r.id && { opacity: 0.6 }]}
+                >
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>{r.name}</Text>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{[r.customer, r.address].filter(Boolean).join(' · ')}</Text>
+                    <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{turningOn === r.id ? 'Turning Snow on…' : 'Snow is off · tap to turn it on'}</Text>
+                  </View>
+                  <Icon name="plus-circle" size={20} color={colors.primary} />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );

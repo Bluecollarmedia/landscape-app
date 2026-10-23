@@ -24,7 +24,7 @@ import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
 import { ProjectPrivateNotes } from '@/components/projects/ProjectPrivateNotes';
 import { useIsProjectOwner } from '@/data/ownerProjectNotes';
 import { MessageThread } from '@/components/messages/MessageThread';
-import { db } from '@/data/store';
+import { db, rowsOf } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
@@ -201,6 +201,11 @@ function completedLabel(task: ProjectTask): string {
   const d = new Date(task.completedAt);
   const when = `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
   return `Completed${who} · ${when}`;
+}
+
+/** The customer joins the app once (their own login); after that every job they are on shows up by itself, so a project never asks for its own setup. */
+function customerHasApp(personId?: string): boolean {
+  return !!personId && !!rowsOf('people').find((x) => x.id === personId)?.userId;
 }
 
 export default function ProjectDetailScreen() {
@@ -890,6 +895,7 @@ export default function ProjectDetailScreen() {
 
   function renderCustomerOverview() {
     const access = customerAccess.getAccessForProject(p.id);
+    const hasApp = customerHasApp(p.customer?.id);
     const sharedPhotoCount = photoStats.shared;
 
     return (
@@ -967,12 +973,12 @@ export default function ProjectDetailScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Project Access</Text>
                   <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
-                    {access?.claimedBy
-                      ? `${p.customer.firstName} can view this project in the customer portal.`
-                      : 'This customer has not set up portal access yet.'}
+                    {access?.claimedBy || hasApp
+                      ? `${p.customer.firstName} sees this project in the app automatically.`
+                      : `${p.customer.firstName} hasn't joined the app yet. They join once with one link; after that every job they are on shows up by itself.`}
                   </Text>
                 </View>
-                <StatusBadge label={access?.claimedBy ? 'Active' : 'Not Set Up'} status={access?.claimedBy ? 'success' : 'neutral'} />
+                <StatusBadge label={access?.claimedBy || hasApp ? 'Connected' : 'Waiting'} status={access?.claimedBy || hasApp ? 'success' : 'neutral'} />
               </View>
 
               {access?.claimedBy && (
@@ -995,10 +1001,10 @@ export default function ProjectDetailScreen() {
                 </Pressable>
               )}
 
-              {!access?.claimedBy && (
+              {!access?.claimedBy && !hasApp && (
                 <Pressable style={[styles.manageAccessPillFull, { backgroundColor: colors.backgroundTertiary }]} onPress={() => setShowManageAccess(true)}>
                   <Icon name="link" size={14} color={colors.textSecondary} />
-                  <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontWeight: '600', marginLeft: spacing.xs }]}>Set Up Access</Text>
+                  <Text style={[typeScale.labelSmall, { color: colors.textPrimary, fontWeight: '600', marginLeft: spacing.xs }]}>Send App Link</Text>
                 </Pressable>
               )}
             </View>
@@ -3004,7 +3010,7 @@ ${message}`)) run();
                   <View style={styles.manageAccessRow}>
                     <Text style={[typeScale.labelSmall, { color: colors.textTertiary }]}>Status</Text>
                     <View style={{ marginTop: spacing.xs, alignSelf: 'flex-start' }}>
-                      <StatusBadge label={access?.claimedBy ? 'Active' : 'Not Set Up'} status={access?.claimedBy ? 'success' : 'neutral'} />
+                      <StatusBadge label={access?.claimedBy || customerHasApp(p.customer.id) ? 'Connected' : 'Waiting'} status={access?.claimedBy || customerHasApp(p.customer.id) ? 'success' : 'neutral'} />
                     </View>
                   </View>
 

@@ -1,5 +1,5 @@
 import { TermsAgreement, TERMS_REQUIRED_MESSAGE } from '@/components/legal/TermsAgreement';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image, Dimensions, Alert, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
@@ -33,6 +33,9 @@ export default function CreateCompanyScreen() {
   const signedIn = isSupabaseConfigured && isAuthenticated && !!user;
 
   const [step, setStep] = useState<Step>('company');
+  const scrollRef = useRef<any>(null);
+  // Each step opens at the top.
+  useEffect(() => { scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false }); }, [step]);
 
   // Company info
   const [companyName, setCompanyName] = useState('');
@@ -232,7 +235,7 @@ export default function CreateCompanyScreen() {
         Step {stepNumber} of 3 — {stepLabels[step]}
       </Text>
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView ref={scrollRef} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {error ? (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
             <Icon name="alert-circle" size={16} color={semantic.error} />

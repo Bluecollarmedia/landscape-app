@@ -51,7 +51,7 @@ const comp = read('src/components/projects/ProjectPrivateNotes.tsx');
 check('12 the screen shows only to the owner, with notes (add/edit/delete), pictures (take/choose, caption, delete) and the list (sort, open, print/share PDF, delete)',
   /if \(!isOwner\) return null;/.test(comp) && /Add Note/.test(comp) && /updateOwnerNote/.test(comp) && /pickImage\(source/.test(comp) && /updateOwnerPhotoCaption/.test(comp) && /Sort Notes into a Materials List/.test(comp) && /Print \/ Share as PDF/.test(comp) && /deleteMaterialList/.test(comp) && !/allowsEditing/.test(comp));
 const quote = read('app/(owner)/document-edit.tsx');
-check('13 notes are available while quoting (details and line items steps of a quote)', (quote.match(/<ProjectPrivateNotes /g) || []).length === 2 && /step === 0 && doc\.kind === 'quote'/.test(quote) && /step === 1 && doc\.kind === 'quote'/.test(quote));
+check('13 notes are available while quoting (the details step of a quote only: the line items step no longer repeats them)', (quote.match(/<ProjectPrivateNotes /g) || []).length === 1 && /step === 0 && doc\.kind === 'quote'/.test(quote) && !/step === 1 && doc\.kind === 'quote'/.test(quote));
 const proj = read('app/(owner)/(tabs)/projects/[id].tsx');
 check('14 the project has a My Notes section (More menu, owner only) holding the same notes after approval', /key: 'notes', label: 'My Notes'/.test(proj) && /item\.key !== 'notes' \|\| isProjectOwner/.test(proj) && /moreSubSection === 'notes' && isProjectOwner/.test(proj));
 console.log(bad ? '\n' + bad + ' failed' : '\nall passed');

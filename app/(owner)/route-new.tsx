@@ -1,5 +1,5 @@
 import { db, useDb } from '@/data/store';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, Platform, ScrollView } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
@@ -168,6 +168,9 @@ export default function NewRouteScreen() {
   const [truckId, setTruckId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [step, setStep] = useState<'build' | 'review'>('build');
+  const scrollRef = useRef<any>(null);
+  // Each step opens at the top.
+  useEffect(() => { scrollRef.current?.scrollTo?.({ x: 0, y: 0, animated: false }); }, [step]);
   const [saving, setSaving] = useState(false);
   const [newItem, setNewItem] = useState<Record<string, string>>({});
 
@@ -312,6 +315,7 @@ export default function NewRouteScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <KeyboardAwareScrollView
+        ref={scrollRef}
         bottomOffset={KEYBOARD_GAP}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}

@@ -163,4 +163,6 @@ export const ES: Record<string, string> = {
   'Confirm': 'Confirmar',
   'Open my worker view': 'Abrir mi vista de trabajador',
   'Back to admin view': 'Volver a la vista de administrador',
+  'Your route': 'Tu ruta',
+  'Open my route': 'Abrir mi ruta',
 };

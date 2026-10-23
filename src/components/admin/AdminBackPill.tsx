@@ -10,8 +10,8 @@ import { useT } from '@/i18n';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
-/** An admin working a job from the worker view gets a small way back to the admin view. Nothing for a real worker. */
-export function AdminBackPill() {
+/** An admin working a job or a Snow route from the worker view gets a small way back to the admin view. Nothing for a real worker. */
+export function AdminBackPill({ to = '/(owner)', onBack }: { to?: string; onBack?: () => void } = {}) {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -19,7 +19,7 @@ export function AdminBackPill() {
   if (db.role !== 'admin') return null;
   return (
     <Pressable
-      onPress={() => { haptics.select(); router.replace('/(owner)' as any); }}
+      onPress={() => { haptics.select(); onBack?.(); router.replace(to as any); }}
       accessibilityRole="button"
       accessibilityLabel={t('Back to admin view')}
       style={[styles.pill, { backgroundColor: colors.primaryDark, top: insets.top + spacing.xs }, shadow.md]}

@@ -3,6 +3,7 @@
  * and any other storms. Data comes from useSnowDashboard (src/data/snowDashboard.ts); the numbers shown are the
  * app's own (see src/lib/snowDashboardView.ts, which only picks and shapes them). Nothing here changes a record.
  */
+import { AdminSnowRouteCard } from './AdminSnowRouteCard';
 import { servicesLabel, stormServices } from '@/lib/snowServices';
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
@@ -100,6 +101,7 @@ export function SnowDashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {header}
+        <AdminSnowRouteCard />
         {state.kind === 'error' && (
           <Pressable onPress={reload} accessibilityRole="button" accessibilityLabel="Couldn't refresh. Tap to try again">
             <InlineNotice icon="alert-circle" tone="error" text={`Couldn't refresh: ${state.message}. Tap to try again.`} style={{ marginTop: spacing.md }} />

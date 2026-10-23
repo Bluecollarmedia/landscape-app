@@ -14,7 +14,7 @@ import { confirmAction, showMessage } from '@/components/financials/ActionSheet'
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
 import {
-  addStops, cancelRoute, loadLeadLoad, loadLeadsForServices, loadRoute, loadRouteCrew, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, stopNeedsPhotos, updateRoute, updateStop,
+  addStops, cancelRoute, loadLeadLoad, loadLeadsForServices, grantSnowAccessForRoute, loadRoute, loadRouteCrew, loadSnowCrewPool, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, stopNeedsPhotos, updateRoute, updateStop,
   type RouteCrewMember, type RouteStop,
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
@@ -44,6 +44,8 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
   const insets = useSafeAreaInsets();
   const [route, setRoute] = useState<RouteDetail | null>(null);
   const [leads, setLeads] = useState<SnowLead[]>([]);
+  // Everyone on the team can be added to the crew; those not on the snow team yet get Snow access when they are added.
+  const [pool, setPool] = useState<SnowLead[]>([]);
   const [eligible, setEligible] = useState<EligibleProperty[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +80,8 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
     ]);
     const c = await loadRouteCrew(r.data.id);
     if (c.ok) setCrew(c.data);
+    const everyone = await loadSnowCrewPool();
+    if (everyone.ok) setPool(everyone.data);
     if (l.ok) setLeads(l.data);
     if (e.ok) setEligible(e.data);
     if (load.ok) setLeadLoad(load.data);
@@ -120,6 +124,10 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
   async function changeCrew(personId: string, add: boolean) {
     if (!route) return;
     setBusy(true);
+    if (add && !leads.some((l) => l.personId === personId)) {
+      const granted = await grantSnowAccessForRoute(personId);
+      if (!granted.ok) { setBusy(false); return showMessage("Couldn't add them", granted.error); }
+    }
     const res = await setRouteCrew(route.id, nextCrew(crew.map((c) => c.personId), personId, add));
     setBusy(false);
     if (!res.ok) return showMessage("Couldn't change the crew", res.error);
@@ -254,7 +262,8 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
   const editable = !route.cancelled && route.stormStatus !== 'ended';
   const leadName = leads.find((l) => l.personId === route.leadPersonId)?.name;
   const team = routeTeam(route.leadPersonId, leadName, crew);
-  const crewPeople = crewChoices(leads, route.leadPersonId, crew.map((c) => c.personId));
+  const crewPeople = crewChoices(pool.length ? pool : leads, route.leadPersonId, crew.map((c) => c.personId));
+  const onSnowTeam = new Set(leads.map((l) => l.personId));
   // A property can be on a route more than once (repeat passes), so every
   // eligible property stays pickable; we just show how many visits it has.
   const visitsOn = new Map<string, number>();
@@ -331,16 +340,17 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
               <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.md }]}>
                 {crewPeople.map((l, i) => (
                   <Pressable key={l.personId} style={[styles.row, i > 0 && sep]} onPress={() => changeCrew(l.personId, true)} accessibilityRole="button">
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{l.name}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{l.name}</Text>
+                      {onSnowTeam.has(l.personId) ? null : <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Gets Snow access when added</Text>}
+                    </View>
                     <Icon name="plus" size={18} color={colors.primary} />
                   </Pressable>
                 ))}
               </View>
             ) : (
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>
-                {leads.length === 0
-                  ? `Nobody on the snow team does ${servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')} yet.`
-                  : `No one else on the snow team does ${servicesText(route.services, (x) => svcLabel(x).toLowerCase()).replace(' + ', ' and ')}.`}
+                No one else to add. Everyone on your team is already on this route.
               </Text>
             )
           ) : null}

@@ -579,6 +579,9 @@ export default function ProjectDetailScreen() {
                 key={dateStr}
                 style={[styles.dateChip, { backgroundColor: isSelected ? colors.primary : colors.backgroundTertiary }]}
                 onPress={() => { haptics.select(); setScheduleDate(dateStr); setExpandedAssignmentId(null); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={`${formatFullDayHeading(dateStr)}${isSelected ? ', selected' : ''}`}
               >
                 <Text style={[typeScale.caption, { color: isSelected ? 'rgba(255,255,255,0.85)' : colors.textSecondary }]}>
                   {label.top}

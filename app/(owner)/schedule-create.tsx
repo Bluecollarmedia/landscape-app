@@ -69,6 +69,9 @@ function dateToTimeStr(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** Repeating work belongs to Maintenance contracts. A project or a one-off job (a patio, a construction job, a snow run) is scheduled day by day. */
+const ALLOW_REPEAT = false;
+
 export default function ScheduleCreateScreen() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -80,6 +83,8 @@ export default function ScheduleCreateScreen() {
     moveFrom?: string;
   }>();
   const isMove = !!params.moveFrom;
+  // Opened from inside a project: the project is already known, so it is not asked again (the id is bound here in the background).
+  const projectKnown = !isMove && !!params.projectId;
 
   const schedule = useSchedule();
   const { crews, crewOf } = useCrews();
@@ -98,7 +103,8 @@ export default function ScheduleCreateScreen() {
   const [projectId, setProjectId] = useState(params.projectId ?? '');
   const [workerIds, setWorkerIds] = useState<string[]>(params.workerId ? [params.workerId] : []);
   const [date, setDate] = useState(params.date ?? today);
-  const [isFullDay, setIsFullDay] = useState(false);
+  // A day's work is a full day unless the owner picks hours.
+  const [isFullDay, setIsFullDay] = useState(true);
   const [startTime, setStartTime] = useState('07:00');
   const [endTime, setEndTime] = useState('15:00');
   const [truckId, setTruckId] = useState('');
@@ -111,7 +117,6 @@ export default function ScheduleCreateScreen() {
   const [endDate, setEndDate] = useState(() => addMonthsKey(params.date ?? today, 3));
 
   const [showProjectSheet, setShowProjectSheet] = useState(false);
-  const [showWorkerSheet, setShowWorkerSheet] = useState(false);
   const [showTruckSheet, setShowTruckSheet] = useState(false);
   const [showAndroidDate, setShowAndroidDate] = useState(false);
   const [showAndroidEndDate, setShowAndroidEndDate] = useState(false);
@@ -321,10 +326,104 @@ export default function ScheduleCreateScreen() {
           {isMove ? 'Move Worker' : 'Schedule Work'}
         </Text>
         <Text style={[typeScale.bodyLarge, { color: colors.textTertiary, marginTop: 2 }]}>
-          {isMove ? 'Reassign this worker to a different project' : 'Assign your crew to a project'}
+          {isMove ? 'Reassign this worker to a different project' : projectKnown && selectedProject ? `For ${selectedProject.name}` : 'Assign your crew to a project'}
         </Text>
 
-        {/* Project */}
+        {/* Workers: first, and the whole list is right here (no second screen to open) */}
+        <Section
+          icon="users"
+          title="Workers"
+          required={!isMove}
+          accessoryLabel={isMove ? undefined : (workerIds.length > 0 ? `${workerIds.length} selected` : undefined)}
+        >
+          {isMove && selectedWorkers.length > 0 ? (
+            <View style={styles.workerChips}>
+              {selectedWorkers.map(w => (
+                <View key={w.personId} style={[styles.workerChip, { backgroundColor: colors.backgroundTertiary }]}>
+                  <Avatar firstName={w.person!.firstName} lastName={w.person!.lastName} size={26} uri={w.person!.avatarUrl} />
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>{w.person!.firstName}</Text>
+                  {!isMove && (
+                    <Pressable onPress={() => toggleWorker(w.personId)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Remove ${w.person!.firstName}`}>
+                      <Icon name="x" size={14} color={colors.textTertiary} />
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {!isMove && selectedWorkers.some(w => existingOnJob(w.personId, projectId, date)) && (
+            <View style={[styles.conflictBox, { backgroundColor: semantic.warningLight, borderColor: semantic.warning }]}>
+              <Icon name="alert-triangle" size={14} color={semantic.warning} />
+              <Text style={[typeScale.caption, { color: colors.textPrimary, flex: 1 }]}>
+                {selectedWorkers.filter(w => existingOnJob(w.personId, projectId, date)).map(w => w.person!.firstName).join(', ')} already scheduled at {selectedProject?.name} on this day.
+              </Text>
+            </View>
+          )}
+          {!isMove ? crewChips() : null}
+          {!isMove ? (
+            <View>
+        {activeWorkers.map(w => {
+          const p = w.person!;
+          const crew = crewOf(w.personId);
+          const selected = workerIds.includes(w.personId);
+          const conflicts = schedule.detectConflicts({
+            personId: w.personId,
+            scheduledDate: date,
+            startTime: isFullDay ? undefined : startTime,
+            endTime: isFullDay ? undefined : endTime,
+            isFullDay,
+          }).filter(c => c.type === 'time_overlap');
+          const conflict = conflicts[0];
+          const onJob = existingOnJob(w.personId, projectId, date);
+          const showAsUnavailable = !!conflict && !selected && !onJob;
+
+          return (
+            <Pressable
+              key={w.personId}
+              style={[styles.workerPickerRow, (showAsUnavailable || (onJob && !selected)) && { opacity: 0.55 }]}
+              onPress={() => toggleWorker(w.personId)}
+              disabled={!!onJob && !selected}
+              accessibilityRole="button"
+              accessibilityLabel={`${p.firstName} ${p.lastName}${onJob ? ', already on this job' : conflict ? ', unavailable' : ''}`}
+            >
+              <Avatar firstName={p.firstName} lastName={p.lastName} size={36} uri={p.avatarUrl} />
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
+                  {p.firstName} {p.lastName}
+                </Text>
+                {crew && <CrewLabel name={crew.name} color={crew.color} style={{ marginTop: 2 }} />}
+                {onJob ? (
+                  <>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
+                      Scheduled {formatAssignmentTime(onJob)} · {onJob.project?.name}
+                    </Text>
+                    <Text style={[typeScale.caption, { color: semantic.warning, fontWeight: '700' }]}>Already on this job</Text>
+                  </>
+                ) : conflict && (
+                  <>
+                    <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
+                      Scheduled {formatAssignmentTime(conflict.assignment)} · {conflict.assignment.project?.name}
+                    </Text>
+                    <Text style={[typeScale.caption, { color: semantic.warning, fontWeight: '700' }]}>Unavailable</Text>
+                  </>
+                )}
+              </View>
+              {showAsUnavailable ? (
+                <View style={[styles.overridePill, { borderColor: semantic.warning }]}>
+                  <Text style={[typeScale.caption, { color: semantic.warning, fontWeight: '700' }]}>Select Anyway</Text>
+                </View>
+              ) : (
+                <Icon name={selected ? 'check-circle' : 'circle'} size={24} color={selected ? colors.primary : colors.border} />
+              )}
+            </Pressable>
+          );
+        })}
+            </View>
+          ) : null}
+        </Section>
+
+        {/* Project: only asked when this was not opened from inside a project */}
+        {projectKnown ? null : (
         <Section
           icon="home"
           title="Project"
@@ -354,6 +453,7 @@ export default function ScheduleCreateScreen() {
             </Pressable>
           ) : null}
         </Section>
+        )}
 
         {!isMove && (
           <>
@@ -441,7 +541,8 @@ export default function ScheduleCreateScreen() {
               )}
             </Section>
 
-            {/* Repeat */}
+            {/* Repeat: only for recurring Maintenance contracts, which are scheduled from Maintenance. Projects and one-off jobs go day by day. */}
+            {ALLOW_REPEAT ? (
             <Section icon="repeat" title="Repeat">
               <SegmentedControl
                 values={REPEAT_OPTIONS.map(o => o.label)}
@@ -573,48 +674,9 @@ export default function ScheduleCreateScreen() {
                 </>
               )}
             </Section>
+            ) : null}
           </>
         )}
-
-        {/* Workers */}
-        <Section
-          icon="users"
-          title="Workers"
-          required={!isMove}
-          accessoryLabel={isMove ? undefined : (workerIds.length > 0 ? `${workerIds.length} selected` : 'Select Workers')}
-          onPressAccessory={() => setShowWorkerSheet(true)}
-        >
-          {selectedWorkers.length > 0 && (
-            <View style={styles.workerChips}>
-              {selectedWorkers.map(w => (
-                <View key={w.personId} style={[styles.workerChip, { backgroundColor: colors.backgroundTertiary }]}>
-                  <Avatar firstName={w.person!.firstName} lastName={w.person!.lastName} size={26} uri={w.person!.avatarUrl} />
-                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>{w.person!.firstName}</Text>
-                  {!isMove && (
-                    <Pressable onPress={() => toggleWorker(w.personId)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Remove ${w.person!.firstName}`}>
-                      <Icon name="x" size={14} color={colors.textTertiary} />
-                    </Pressable>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-          {!isMove && selectedWorkers.some(w => existingOnJob(w.personId, projectId, date)) && (
-            <View style={[styles.conflictBox, { backgroundColor: semantic.warningLight, borderColor: semantic.warning }]}>
-              <Icon name="alert-triangle" size={14} color={semantic.warning} />
-              <Text style={[typeScale.caption, { color: colors.textPrimary, flex: 1 }]}>
-                {selectedWorkers.filter(w => existingOnJob(w.personId, projectId, date)).map(w => w.person!.firstName).join(', ')} already scheduled at {selectedProject?.name} on this day.
-              </Text>
-            </View>
-          )}
-          {crewChips()}
-          {!isMove && (
-            <Pressable style={[styles.addWorkersPill, { backgroundColor: colors.backgroundTertiary }]} onPress={() => setShowWorkerSheet(true)}>
-              <Icon name="plus" size={14} color={colors.textPrimary} />
-              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Add Workers</Text>
-            </Pressable>
-          )}
-        </Section>
 
         {!isMove && (
           <>
@@ -770,75 +832,6 @@ export default function ScheduleCreateScreen() {
         ))}
       </SheetModal>
 
-      {/* Worker picker (multi-select) */}
-      <SheetModal
-        visible={showWorkerSheet}
-        onClose={() => setShowWorkerSheet(false)}
-        title="Select Workers"
-        headerRight={
-          <Pressable onPress={() => setShowWorkerSheet(false)} accessibilityRole="button" accessibilityLabel="Done">
-            <Text style={[typeScale.bodyLarge, { color: colors.primary, fontWeight: '700' }]}>Done</Text>
-          </Pressable>
-        }
-      >
-        {crewChips()}
-        {activeWorkers.map(w => {
-          const p = w.person!;
-          const crew = crewOf(w.personId);
-          const selected = workerIds.includes(w.personId);
-          const conflicts = schedule.detectConflicts({
-            personId: w.personId,
-            scheduledDate: date,
-            startTime: isFullDay ? undefined : startTime,
-            endTime: isFullDay ? undefined : endTime,
-            isFullDay,
-          }).filter(c => c.type === 'time_overlap');
-          const conflict = conflicts[0];
-          const onJob = existingOnJob(w.personId, projectId, date);
-          const showAsUnavailable = !!conflict && !selected && !onJob;
-
-          return (
-            <Pressable
-              key={w.personId}
-              style={[styles.workerPickerRow, (showAsUnavailable || (onJob && !selected)) && { opacity: 0.55 }]}
-              onPress={() => toggleWorker(w.personId)}
-              disabled={!!onJob && !selected}
-              accessibilityRole="button"
-              accessibilityLabel={`${p.firstName} ${p.lastName}${onJob ? ', already on this job' : conflict ? ', unavailable' : ''}`}
-            >
-              <Avatar firstName={p.firstName} lastName={p.lastName} size={36} uri={p.avatarUrl} />
-              <View style={{ flex: 1 }}>
-                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>
-                  {p.firstName} {p.lastName}
-                </Text>
-                {crew && <CrewLabel name={crew.name} color={crew.color} style={{ marginTop: 2 }} />}
-                {onJob ? (
-                  <>
-                    <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
-                      Scheduled {formatAssignmentTime(onJob)} · {onJob.project?.name}
-                    </Text>
-                    <Text style={[typeScale.caption, { color: semantic.warning, fontWeight: '700' }]}>Already on this job</Text>
-                  </>
-                ) : conflict && (
-                  <>
-                    <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>
-                      Scheduled {formatAssignmentTime(conflict.assignment)} · {conflict.assignment.project?.name}
-                    </Text>
-                    <Text style={[typeScale.caption, { color: semantic.warning, fontWeight: '700' }]}>Unavailable</Text>
-                  </>
-                )}
-              </View>
-              {showAsUnavailable ? (
-                <View style={[styles.overridePill, { borderColor: semantic.warning }]}>
-                  <Text style={[typeScale.caption, { color: semantic.warning, fontWeight: '700' }]}>Select Anyway</Text>
-                </View>
-              ) : (
-                <Icon name={selected ? 'check-circle' : 'circle'} size={24} color={selected ? colors.primary : colors.border} />
-              )}
-            </Pressable>
-          );
-        })}
-      </SheetModal>
     </View>
   );
 }

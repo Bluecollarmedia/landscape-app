@@ -164,6 +164,28 @@ export async function loadSnowLeads(service: SnowService): Promise<Result<SnowLe
     .sort((a, b) => a.name.localeCompare(b.name)));
 }
 
+/** Every active worker, admin and owner: anyone can be put on a Snow route crew (someone not on the snow team yet is given Snow access first). */
+export async function loadSnowCrewPool(): Promise<Result<SnowLead[]>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data: members, error } = await supabase.from('company_members').select('person_id')
+    .in('role', ['worker', 'admin', 'owner']).eq('status', 'active');
+  if (error) return fail(message(error, 'Couldn\'t load your team.'));
+  const ids = [...new Set((members ?? []).map((m) => m.person_id as string))];
+  if (!ids.length) return ok([]);
+  const { data: people, error: pe } = await supabase.from('people').select('id, first_name, last_name').in('id', ids);
+  if (pe) return fail(message(pe, 'Couldn\'t load your team.'));
+  return ok((people ?? [])
+    .map((p) => ({ personId: p.id, name: `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unnamed' }))
+    .sort((a, b) => a.name.localeCompare(b.name)));
+}
+
+/** Gives someone Snow access (every snow service) so they can be put on a route. The owner chose that putting a worker on a route does this. */
+export async function grantSnowAccessForRoute(personId: string): Promise<Result<undefined>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { error } = await supabase.rpc('snow_grant_access', { p_person_id: personId, p_services: ['plowing', 'shoveling', 'salting'] });
+  return error ? fail(message(error, 'Couldn\'t give them Snow access.')) : ok(undefined);
+}
+
 /** People who can lead (or crew) a route that does all of these services together. */
 export async function loadLeadsForServices(services: SnowService[]): Promise<Result<SnowLead[]>> {
   const lists: SnowLead[][] = [];

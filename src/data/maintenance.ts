@@ -39,6 +39,17 @@ export function maintenanceWorkers(): PersonSummary[] {
     .map((m) => m.person!);
 }
 
+/**
+ * Everyone the owner may put on a route: EVERY active worker, Maintenance workers first. Nobody is hidden for what they usually work on;
+ * putting someone on a route turns Maintenance on for them (ensureMaintenanceArea), and the route is what gives them access to it.
+ */
+export function routeCandidates(): { person: PersonSummary; maintenance: boolean }[] {
+  return db.members
+    .filter((m) => m.role === 'worker' && m.status === 'active' && m.person)
+    .map((m) => ({ person: m.person!, maintenance: worksOnMaintenance(m) }))
+    .sort((a, b) => Number(b.maintenance) - Number(a.maintenance) || a.person.firstName.localeCompare(b.person.firstName));
+}
+
 /** The company's maintenance crew (crews.is_maintenance), if one is set up. */
 export function maintenanceCrew() {
   return db.crews.find((c) => c.isMaintenance);
@@ -112,6 +123,17 @@ export async function setWorkerAreas(personId: string, areas: { landscaping: boo
   const { error } = await rpc('set_worker_areas', { p_person_id: personId, p_landscaping: areas.landscaping, p_maintenance: areas.maintenance });
   await refresh('company_members', 'crew_members');
   return error ? fail(error.message) : ok(undefined);
+}
+
+/** Turns Maintenance on for any of these workers who do not work it yet (keeping their other areas). Used when the owner puts them on a route. */
+export async function ensureMaintenanceArea(personIds: string[]): Promise<Result> {
+  for (const pid of Array.from(new Set(personIds))) {
+    const m = db.members.find((x) => x.personId === pid && x.role === 'worker');
+    if (!m || worksOnMaintenance(m)) continue;
+    const r = await setWorkerAreas(pid, { landscaping: worksOnLandscaping(m), maintenance: true });
+    if (!r.ok) return fail(`Couldn't add ${db.people[pid]?.firstName ?? 'that worker'} to Maintenance: ${r.error}`);
+  }
+  return ok(undefined);
 }
 
 // ── Properties, contracts, rules ────────────────────────────────────────────
@@ -284,6 +306,13 @@ export function createRoute(input: NewRouteInput): Result<MaintenanceRoute> {
   input.stops.forEach((s, i) => insertStop(route.id, i, s));
   insertRows('maintenance_route_crew', crewIds.map((personId) => ({ routeId: route.id, personId, addedBy: db.personId || undefined })));
   return ok(route);
+}
+
+/** createRoute for a crew chosen from every worker: anyone not on Maintenance yet is added to it first. */
+export async function createRouteWithCrew(input: NewRouteInput): Promise<Result<MaintenanceRoute>> {
+  const ensured = await ensureMaintenanceArea([...(input.crewIds ?? []), ...(input.leadPersonId ? [input.leadPersonId] : [])]);
+  if (!ensured.ok) return ensured;
+  return createRoute(input);
 }
 
 export function updateRoute(id: string, patch: Partial<Pick<MaintenanceRoute, 'serviceDate' | 'name' | 'notes'>>) {

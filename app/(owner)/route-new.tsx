@@ -1,4 +1,4 @@
-import { db } from '@/data/store';
+import { db, useDb } from '@/data/store';
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, Platform, ScrollView } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -9,7 +9,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Input, Avatar, CrewLabel, InlineNotice, Switch } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useMaintenanceDue, useMaintenanceWorkers } from '@/hooks/useMaintenance';
-import { createRoute } from '@/data/maintenance';
+import { createRouteWithCrew, routeCandidates } from '@/data/maintenance';
 import { dueLabel } from '@/lib/maintenanceSchedule';
 import type { DueStatus, PropertyDueInfo } from '@/types/maintenance';
 import { offsetDateKey, todayKey } from '@/lib/ids';
@@ -158,12 +158,16 @@ export default function NewRouteScreen() {
     }
     return { photos, checklist };
   }, [due]);
-  const { eligibleCrew: crewMembers, maintenanceCrew } = useMaintenanceWorkers();
+  const { eligibleCrew, maintenanceCrew } = useMaintenanceWorkers();
+  const dbVersion = useDb();
+  // Every active worker can be put on a route (Maintenance workers listed first); the picked ones are the crew.
+  const everyone = useMemo(() => routeCandidates(), [dbVersion]);
+  const [crewPick, setCrewPick] = useState<string[]>([]);
+  const crewMembers = everyone.filter((w) => crewPick.includes(w.person.id)).map((w) => w.person);
 
   const [stops, setStops] = useState<StopDraft[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
-  const [crewAssigned, setCrewAssigned] = useState(false);
   const [leadPersonId, setLeadPersonId] = useState<string | null>(null);
   const [truckId, setTruckId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -172,6 +176,7 @@ export default function NewRouteScreen() {
   const [newItem, setNewItem] = useState<Record<string, string>>({});
 
   const byId = useMemo(() => Object.fromEntries(candidates.map(c => [c.propertyId, c])), [candidates]);
+  const crewAssigned = crewPick.length > 0;
   const needsAttention = candidates.filter(c => c.urgency === 'overdue' || c.urgency === 'due');
   const overdueCount = candidates.filter(c => c.urgency === 'overdue').length;
   const listed = showAll ? candidates : needsAttention;
@@ -222,15 +227,20 @@ export default function NewRouteScreen() {
     setServiceDate(key);
   }
 
-  function assignCrew() {
-    if (crewMembers.length === 0) return;
+  function toggleCrew(id: string) {
+    haptics.select();
+    setCrewPick((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+    if (leadPersonId === id) setLeadPersonId(null);
+  }
+
+  function pickMaintenanceCrew() {
     haptics.success();
-    setCrewAssigned(true);
+    setCrewPick(eligibleCrew.map((p) => p.id));
   }
 
   function unassignCrew() {
     haptics.select();
-    setCrewAssigned(false);
+    setCrewPick([]);
     setLeadPersonId(null);
   }
 
@@ -245,9 +255,9 @@ export default function NewRouteScreen() {
 
   function save() {
     if (saving) return;
-    const run = () => {
+    const run = async () => {
       setSaving(true);
-      const result = createRoute({
+      const result = await createRouteWithCrew({
         serviceDate,
         notes: notes.trim() || undefined,
         stops: stops.map(s => ({
@@ -516,30 +526,46 @@ export default function NewRouteScreen() {
                   <CrewLabel name={maintenanceCrew.name} color={maintenanceCrew.color} />
                 )}
               </View>
-              {crewMembers.length === 0 ? (
-                <InlineNotice
-                  icon="users"
-                  tone="warning"
-                  text="No approved maintenance workers yet. Add or approve a maintenance worker, then put them in the maintenance crew."
-                />
-              ) : !crewAssigned ? (
-                <Pressable
-                  onPress={assignCrew}
-                  style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.primary, opacity: pressed ? 0.7 : 1 }]}
-                  accessibilityRole="button"
-                >
-                  <Icon name="users" size={18} color={colors.primary} />
-                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Assign Maintenance Crew</Text>
-                </Pressable>
+              {everyone.length === 0 ? (
+                <InlineNotice icon="users" tone="warning" text="No workers yet. Add a worker on the Workers tab, then put them on a route." />
               ) : (
                 <>
-                  {crewMembers.map(p => (
-                    <View key={p.id} style={styles.workerRow}>
-                      <Avatar firstName={p.firstName} lastName={p.lastName} size={32} uri={p.avatarUrl} />
-                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{p.firstName} {p.lastName}</Text>
-                      {leadPersonId === p.id && <LeadBadge />}
-                    </View>
-                  ))}
+                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Tap everyone who works this route. Anyone on your team can be added.</Text>
+                  {eligibleCrew.length > 0 && !eligibleCrew.every((p) => crewPick.includes(p.id)) && (
+                    <Pressable
+                      onPress={pickMaintenanceCrew}
+                      style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.primary, opacity: pressed ? 0.7 : 1 }]}
+                      accessibilityRole="button"
+                    >
+                      <Icon name="users" size={18} color={colors.primary} />
+                      <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Add the maintenance crew</Text>
+                    </Pressable>
+                  )}
+                  {everyone.map(({ person: p, maintenance }) => {
+                    const on = crewPick.includes(p.id);
+                    return (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => toggleCrew(p.id)}
+                        style={styles.workerRow}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: on }}
+                        accessibilityLabel={`${p.firstName} ${p.lastName}`}
+                      >
+                        <Avatar firstName={p.firstName} lastName={p.lastName} size={32} uri={p.avatarUrl} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{p.firstName} {p.lastName}</Text>
+                          {on && !maintenance ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>Maintenance will be turned on for them</Text> : null}
+                        </View>
+                        {leadPersonId === p.id && <LeadBadge />}
+                        <Icon name={on ? 'check-circle' : 'circle'} size={22} color={on ? colors.primary : colors.textTertiary} />
+                      </Pressable>
+                    );
+                  })}
+                </>
+              )}
+              {crewAssigned ? (
+                <>
                   <Text style={[typeScale.labelSmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>Crew Leader (required)</Text>
                   <View style={styles.chipWrap}>
                     {crewMembers.map(p => ({ id: p.id as string | null, label: p.firstName })).map(o => {
@@ -564,7 +590,7 @@ export default function NewRouteScreen() {
                     <Text style={[typeScale.bodySmall, { color: colors.textSecondary, fontWeight: '600' }]}>Unassign crew</Text>
                   </Pressable>
                 </>
-              )}
+              ) : null}
             </View>
 
             {/* Truck for the day (optional): workers use it automatically when they clock in. */}

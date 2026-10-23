@@ -111,7 +111,8 @@ export function ScreenHeader({ title, subtitle, right, onBack, hideBack }: Scree
 
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-      <View style={styles.buttonRow}>
+      {/* With no Back button the action sits on the RIGHT, like every other tab (it used to jump to the left). */}
+      <View style={[styles.buttonRow, hideBack && { justifyContent: 'flex-end' }]}>
         {hideBack ? null : (
           <GlassIconButton
             icon="chevron-left"

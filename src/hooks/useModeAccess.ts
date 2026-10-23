@@ -3,8 +3,6 @@ import { db, useDb, updateRow } from '@/data/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { CompanyMode } from '@/types/company';
 import type { UserRole } from '@/types';
-import { canToggleMode, type WorkerShellChoice } from '@/lib/modeChoice';
-import { useWorkerModeChoice } from '@/hooks/useWorkerModeChoice';
 
 /**
  * Landscaping Mode vs Snow Mode.
@@ -22,9 +20,8 @@ import { useWorkerModeChoice } from '@/hooks/useWorkerModeChoice';
  *   Person                    Company in Landscaping   Company in Snow
  *   Owner/admin               landscaping owner app    snow owner app
  *   Landscaping-only worker   landscaping app          "Snow Mode is on" notice
- *   Worker with snow access   landscaping app          snow worker app (a small toggle lets them step back to
- *                                                       landscaping; snow access is per worker (Snow Team)
- *                                                       when Snow Mode is switched on, until the owner removes it)
+ *   Worker with snow access   landscaping app          snow worker app (no switch: when the owner turns Snow Mode on, that is
+ *                                                       what they see; snow access is per worker (Snow Team))
  *   Snow-only worker          snow worker app          snow worker app
  *   Customer                  landscaping app          landscaping app (snow
  *                                                       updates are added there)
@@ -57,10 +54,9 @@ export function modeAccessFor(role: UserRole | null | undefined, granted?: Parti
 }
 
 /** The routing table above, as a function. */
-export function shellFor(role: UserRole | null | undefined, mode: CompanyMode, access: ModeAccess, choice: WorkerShellChoice = 'snow'): Shell {
+export function shellFor(role: UserRole | null | undefined, mode: CompanyMode, access: ModeAccess): Shell {
   if (role === 'customer') return 'landscaping';
-  // A worker who can use both modes may step back to landscaping with the toggle while Snow Mode is on.
-  if (role === 'worker' && mode === 'snow' && access.snow && access.landscaping && choice === 'landscaping') return 'landscaping';
+  // Snow Mode on means Snow Mode for everyone who has snow access. There is no switch to step out of it.
   if (access.snow && (mode === 'snow' || !access.landscaping)) return 'snow';
   if (mode === 'snow' && role === 'worker') return 'snow_notice';
   return 'landscaping';
@@ -143,10 +139,8 @@ export function useModeAccess(role: UserRole | null | undefined, granted?: Parti
   const mode = companyMode();
   const { access: looked, ready } = useWorkerSnowAccess(role, mode);
   const access = modeAccessFor(role, { ...looked, ...granted });
-  const { choice, setChoice, loaded } = useWorkerModeChoice(db.company?.activeModeChangedAt);
-  // While Snow Mode is on, a worker's screen depends on two answers that arrive a moment after launch: their snow access, and (when
-  // they can use both) which way they last switched the toggle on this phone. Until both are in, no screen is chosen, so the
-  // "Snow Mode is on" notice or the wrong shell never flashes before the real one.
-  const pending = role === 'worker' && mode === 'snow' && (!ready || (access.snow === true && access.landscaping !== false && !loaded));
-  return { mode, access, shell: shellFor(role, mode, access, choice), pending, choice, setChoice, canToggle: canToggleMode(role, mode, access) };
+  // While Snow Mode is on, a worker's screen depends on one answer that arrives a moment after launch: their snow access. Until it is in,
+  // no screen is chosen, so the "Snow Mode is on" notice or the wrong shell never flashes before the real one.
+  const pending = role === 'worker' && mode === 'snow' && !ready;
+  return { mode, access, shell: shellFor(role, mode, access), pending };
 }

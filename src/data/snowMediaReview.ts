@@ -130,3 +130,10 @@ export async function withdrawMedia(mediaId: string): Promise<Result> {
   const { error } = await supabase.rpc('snow_withdraw_media', { p_media_id: mediaId });
   return error ? fail(message(error, "Couldn't withdraw the photo.")) : ok(undefined);
 }
+
+/** Owner/admin: deletes a stop's photo or video for good (update 96). A customer who was sent it can no longer see it. */
+export async function deleteMedia(mediaId: string): Promise<Result> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { error } = await supabase.rpc('snow_delete_media', { p_media_id: mediaId });
+  return error ? fail(message(error, "Couldn't delete the photo.")) : ok(undefined);
+}

@@ -418,4 +418,8 @@ export const ES_WORKER: Record<string, string> = {
   'Photo not saved': 'Foto no guardada',
   "You're in, but your profile photo wasn't saved. {why} You can add it later by tapping your name in Settings.": 'Ya entraste, pero tu foto de perfil no se guardó. {why} Puedes agregarla después tocando tu nombre en Ajustes.',
   'You have more work today. Clock back in': 'Tienes más trabajo hoy. Registra tu entrada otra vez',
+  'Open photo': 'Abrir foto',
+  'Delete this photo?': '¿Eliminar esta foto?',
+  'It is removed for good.': 'Se elimina para siempre.',
+  "Couldn't delete": 'No se pudo eliminar',
 };

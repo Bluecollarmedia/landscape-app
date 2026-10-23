@@ -139,3 +139,10 @@ export function reopenIssue(id: string) {
 export function deleteIssue(id: string) {
   deleteRow('property_issues', id);
 }
+
+/** Takes one photo off a report (owner/admin, or the person who reported it). The report stays. */
+export function removeIssuePhoto(issueId: string, photoKey: string) {
+  const issue = rowsOf('property_issues').find((r) => r.id === issueId) as { photos?: { key?: string; url: string }[] } | undefined;
+  if (!issue) return;
+  updateRow('property_issues', issueId, { photos: (issue.photos ?? []).filter((p) => (p.key || p.url) !== photoKey) });
+}

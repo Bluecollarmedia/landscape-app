@@ -3,6 +3,7 @@
  * Resolved (with an optional note), reopen it, open the place, or delete it.
  */
 
+import { PhotoPager } from '@/components/media/PhotoPager';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, StyleSheet, Platform, Alert, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -11,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, GlassIconButton, Icon, PressableScale } from '@/components/ui';
 import { issueWhen } from '@/components/issues/IssueRow';
 import { useTheme } from '@/providers/ThemeProvider';
-import { deleteIssue, issueTypeLabel, reopenIssue, resolveIssue, useIssues } from '@/data/issues';
+import { deleteIssue, issueTypeLabel, removeIssuePhoto, reopenIssue, resolveIssue, useIssues } from '@/data/issues';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -70,7 +71,7 @@ export default function IssueDetailScreen() {
         {issue.photos.length > 0 && (
           <View style={styles.photos}>
             {issue.photos.map((p) => (
-              <PressableScale key={p.key || p.url} onPress={() => setViewer(p.url)} accessibilityRole="imagebutton" accessibilityLabel="View photo">
+              <PressableScale key={p.key || p.url} onPress={() => setViewer(p.key || p.url)} accessibilityRole="imagebutton" accessibilityLabel="View photo">
                 <Image source={{ uri: p.url }} style={styles.photo} contentFit="cover" cachePolicy="memory-disk" />
               </PressableScale>
             ))}
@@ -115,11 +116,15 @@ export default function IssueDetailScreen() {
         </PressableScale>
       </ScrollView>
 
-      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
-        <PressableScale onPress={() => setViewer(null)} haptic={false} accessibilityRole="button" accessibilityLabel="Close photo" style={styles.viewer}>
-          {viewer && <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} contentFit="contain" />}
-        </PressableScale>
-      </Modal>
+      <PhotoPager
+        photos={issue.photos.map((p) => ({ id: p.key || p.url, url: p.url }))}
+        startId={viewer}
+        onClose={() => setViewer(null)}
+        actionsFor={(ph) => [{
+          key: 'delete', label: 'Delete', icon: 'trash-2', destructive: true,
+          onPress: () => Alert.alert('Delete this photo?', 'It is removed from the report for good.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => removeIssuePhoto(issue.id, ph.id) }]),
+        }]}
+      />
     </View>
   );
 }

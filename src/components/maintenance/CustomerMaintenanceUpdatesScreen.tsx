@@ -2,8 +2,9 @@
  * Customer: Maintenance updates. Finished visits to their property, newest
  * first, with the services done and only the photos the owner shared.
  */
+import { PhotoPager } from '@/components/media/PhotoPager';
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
 import { PrivatePhoto } from '@/components/media/PrivatePhoto';
@@ -24,6 +25,7 @@ export function CustomerMaintenanceUpdatesScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [updates, setUpdates] = useState<CustomerMaintenanceUpdate[]>([]);
+  const [viewing, setViewing] = useState<{ stopId: string; photoId: string } | null>(null);
   const [properties, setProperties] = useState<MyMaintenanceProperty[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,13 +70,16 @@ export function CustomerMaintenanceUpdatesScreen() {
             {u.photos.length ? (
               <View style={styles.thumbs}>
                 {u.photos.map((p) => (
-                  <PrivatePhoto key={p.id} fileUrl={p.url} fileKey={p.key} style={styles.thumb as never} accessibilityLabel={t('Photo from your visit')} />
+                  <Pressable key={p.id} onPress={() => setViewing({ stopId: u.stopId, photoId: p.id })} accessibilityRole="button" accessibilityLabel={t('Open photo')}>
+                    <PrivatePhoto fileUrl={p.url} fileKey={p.key} style={styles.thumb as never} accessibilityLabel={t('Photo from your visit')} />
+                  </Pressable>
                 ))}
               </View>
             ) : null}
           </View>
         ))}
       </ScrollView>
+      <PhotoPager photos={(updates.find((u) => u.stopId === viewing?.stopId)?.photos ?? []).map((p) => ({ id: p.id, url: p.url, key: p.key }))} startId={viewing?.photoId ?? null} onClose={() => setViewing(null)} />
     </View>
   );
 }

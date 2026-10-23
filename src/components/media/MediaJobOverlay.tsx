@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, Alert, Platform } from 'react-native';
 import { Icon } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { mediaQueue, useMediaJob } from '@/lib/mediaQueueRuntime';
 import { formatBytes } from '@/lib/mediaPlan';
 import { useT } from '@/i18n';
+
+const alertedFailures = new Set<string>();
 
 /** Shows the real reason a photo/video could not be saved, so a failure is never just "Not saved" with no cause. */
 function showWhyNotSaved(t: (s: string) => string, reason: string | undefined) {
@@ -21,6 +23,12 @@ function showWhyNotSaved(t: (s: string) => string, reason: string | undefined) {
 export function MediaJobOverlay({ rowId, onDiscard, localOnly }: { rowId?: string; onDiscard?: () => void; localOnly?: boolean }) {
   const t = useT();
   const job = useMediaJob(rowId);
+  // The first time a photo fails, say why straight away (once per photo), so a failure is never just a red box with no reason.
+  const failedReason = job?.status === 'failed' ? (job.error ?? '') : null;
+  useEffect(() => {
+    if (job && failedReason !== null && !alertedFailures.has(job.id)) { alertedFailures.add(job.id); showWhyNotSaved(t, failedReason); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.id, failedReason]);
   // A local file with no job behind it (for example the app lost its queue) must still say it is not saved.
   if (!job && localOnly) {
     return (

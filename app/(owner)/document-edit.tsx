@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Button, ListSection, EmptyState, InlineNotice } from '@/components/ui';
@@ -50,6 +50,16 @@ export default function DocumentEditScreen() {
   const [editing, setEditing] = useState<{ item: LineItem; isNew: boolean } | null>(null);
   const touched = useRef(false);
   const suggestions = useMemo(() => recentLineItems(), []);
+
+  // Swiping the editor down closes it like the X does: the draft is saved first (or an untouched new one is dropped). If something is
+  // invalid (for example a tax rate over 100) the swipe is stopped and the message is shown, so nothing typed is lost.
+  const navigation = useNavigation();
+  const leaving = useRef(false);
+  const leaveRef = useRef<() => boolean>(() => true);
+  useEffect(() => navigation.addListener('beforeRemove', (e) => {
+    if (leaving.current) return;
+    if (leaveRef.current()) leaving.current = true; else e.preventDefault();
+  }), [navigation]);
 
   // Load the draft once.
   useEffect(() => {
@@ -133,16 +143,21 @@ export default function DocumentEditScreen() {
     }
   };
 
-  const close = () => {
+  /** Saves the draft (or drops a brand-new one that was never filled in). False = something is invalid and the editor must stay open. */
+  const leaveOk = (): boolean => {
     // A brand-new draft that was never filled in isn't kept.
     if (fresh === '1' && !touched.current && form.lineItems.length === 0) {
       deleteDraft(doc.kind, doc.id);
       // The prospect made just for this quote goes too; an existing project is never touched.
       if (newProject === '1') discardEmptyProspect(doc.projectId);
-      router.back();
-      return;
+      return true;
     }
-    if (persist()) router.back();
+    return persist();
+  };
+  leaveRef.current = leaveOk;
+
+  const close = () => {
+    if (leaveOk()) { leaving.current = true; router.back(); }
   };
 
   const goTo = (next: number) => {

@@ -17,3 +17,11 @@ export function crewStopMessage(status: string, leaderName?: string | null, arri
   if (status === 'arrived') return `In progress${arrivedTime ? ` since ${arrivedTime}` : ''}${arrivedBy ? ` (checked in by ${arrivedBy})` : ''}. ${who[0].toUpperCase() + who.slice(1)} finishes the stop.`;
   return status === 'completed' ? 'Finished.' : 'Skipped.';
 }
+
+/** What the crew leader reads after tapping "Clock out the whole crew": who is out, and who could not be (and why). */
+export function crewClockOutMessage(closed: string[], stillWorking: { name: string; why: string }[]): string {
+  const list = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+  const out = closed.length ? `Clocked out: ${list(closed)}.` : 'Nobody was still clocked in.';
+  if (!stillWorking.length) return out;
+  return `${out} Not clocked out: ${list(stillWorking.map((s) => `${s.name} (${s.why})`))}. They clock out themselves.`;
+}

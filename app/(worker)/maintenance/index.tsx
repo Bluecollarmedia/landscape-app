@@ -20,6 +20,7 @@ import { BrandCover } from '@/components/branding/BrandCover';
 import { JobMap } from '@/components/maps/JobMap';
 import { YardStartCard } from '@/components/maintenance/YardStartCard';
 import { WorkdayCard } from '@/components/time/WorkdayCard';
+import { CrewClockOutCard } from '@/components/maintenance/CrewClockOutCard';
 import { RouteProgress } from '@/components/maintenance/RouteProgress';
 import { StopRow, StopStatusPill } from '@/components/maintenance/StopRow';
 import { displayStatus } from '@/components/maintenance/types';
@@ -275,6 +276,9 @@ export default function MaintenanceTodayScreen() {
                   </View>
                 </View>
               )}
+
+              {/* The last stop is done: the leader decides when the crew's workdays end (nothing is clocked out by itself). */}
+              {allDone && timeOn && leader && route ? <CrewClockOutCard routeId={route.id} /> : null}
             </View>
           )}
 

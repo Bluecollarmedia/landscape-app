@@ -22,6 +22,7 @@ import { applyPendingSignup } from '@/data/pendingSignup';
 import { useModeAccess } from '@/hooks/useModeAccess';
 import { installGlobalErrorHandler } from '@/lib/errorReporting';
 import { installWebAlert } from '@/lib/webDialog';
+import { syncLanguageToAccount } from '@/i18n';
 import { db } from '@/data/store';
 import { todayKey } from '@/lib/ids';
 import { hasOpenProjectWork } from '@/lib/workerAreas';
@@ -48,6 +49,8 @@ function RootNavigator() {
   const { colors } = useTheme();
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
+  // Tell the server which language this person uses, so its push notices come in it (update 95).
+  useEffect(() => { if (appState === 'active' && isAuthenticated && user) syncLanguageToAccount(); }, [appState, isAuthenticated, user?.id]);
   usePrefetchKeyImages();
 
   // Photo, birthday, hoodie and ID set aside while the account waited for email confirmation are saved on first sign-in.

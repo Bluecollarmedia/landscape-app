@@ -102,10 +102,13 @@ async function sendPush(db: Db, n: Notification): Promise<string> {
     .eq('recipient_id', n.recipient_id)
     .eq('status', 'unread');
 
+  // The person's language (update 95): Español gets Spanish text for the notices we know; anything else goes as written.
+  const { data: who } = await db.from('people').select('language').eq('id', n.recipient_id).maybeSingle();
+  const text = who?.language === 'es' ? spanishPush(n.title, n.body) : { title: n.title, body: n.body };
   const messages = tokens.map(({ token }) => ({
     to: token,
-    title: n.title,
-    body: n.body || undefined,
+    title: text.title,
+    body: text.body || undefined,
     sound: 'default',
     badge: count ?? undefined,
     data: {
@@ -187,4 +190,30 @@ async function sendEmail(db: Db, n: Notification): Promise<string> {
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
+
+// ── Spanish push texts (same as _shared/pushSpanish.ts; this function is pasted by hand, so it carries its own copy) ──
+const RULES: [RegExp, string][] = [
+  [/^Please confirm your schedule$/, 'Confirma tu horario'],
+  [/^(.+) (today|tomorrow|[A-Z][a-z]{2} \d{1,2}), full day\. Open the app to confirm\.$/, '$1 $2, todo el día. Abre la app para confirmar.'],
+  [/^(.+) (today|tomorrow|[A-Z][a-z]{2} \d{1,2}), starts (.+)\. Open the app to confirm\.$/, '$1 $2, empieza a las $3. Abre la app para confirmar.'],
+  [/^Check your progress$/, 'Revisa tu avance'],
+  [/^Take a moment to check how the work at (.+) is going\.?$/, 'Tómate un momento para ver cómo va el trabajo en $1.'],
+  [/^Storm dispatched: (.+)$/, 'Tormenta enviada: $1'],
+  [/^You lead (.+) · (\d+) stops?\. Open My Route\.$/, 'Diriges $1 · $2 paradas. Abre Mi ruta.'],
+  [/^You are on the crew of (.+) · (\d+) stops?\.$/, 'Estás en el equipo de $1 · $2 paradas.'],
+  [/^You now lead (.+)$/, 'Ahora diriges $1'],
+  [/^You were added to (.+)$/, 'Te agregaron a $1'],
+  [/^(.+)\. Open My Route\.$/, '$1. Abre Mi ruta.'],
+  [/^Our crew has arrived$/, 'Nuestro equipo ya llegó'],
+  [/^(.+) completed$/, '$1 completado'],
+  [/^(.+) at (.+)$/, '$1 en $2'],
+];
+
+function spanishPush(title: string, body: string): { title: string; body: string } {
+  const tr = (s: string) => {
+    for (const [re, to] of RULES) if (re.test(s)) return s.replace(re, to);
+    return s;
+  };
+  return { title: tr(title), body: body ? tr(body) : body };
 }

@@ -3,6 +3,7 @@
  * relative to the job's next scheduled day; any date and time can be set.
  */
 
+import { useKeepDraft } from '@/hooks/useKeepDraft';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -40,13 +41,8 @@ export function ReminderSheet({ visible, initial, initialNote, jobDate, hasRemin
   const [note, setNote] = useState('');
   const [androidPicker, setAndroidPicker] = useState<'date' | 'time' | null>(null);
 
-  useEffect(() => {
-    if (visible) {
-      setAt(initial);
-      setNote(initialNote ?? '');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  // Swipe the sheet down and open it again: what you typed is still there (until it is saved or you leave the page).
+  const markSaved = useKeepDraft(visible, 'reminder', () => { setAt(initial); setNote(initialNote ?? ''); });
 
   const daysBefore = (n: number) => {
     if (!jobDate) return;
@@ -63,6 +59,7 @@ export function ReminderSheet({ visible, initial, initialNote, jobDate, hasRemin
       showMessage('Pick a later time', 'The reminder time has already passed.');
       return;
     }
+    markSaved();
     onSave(at, note);
   };
 
@@ -123,7 +120,7 @@ export function ReminderSheet({ visible, initial, initialNote, jobDate, hasRemin
           ? 'You’ll get a notification on your phone at this time (your other phones pick it up next time the app opens). It also shows in Materials.'
           : 'On the website the reminder shows in Materials. Phone notifications come from the Brighton iPhone app.'}
       </Text>
-      {hasReminder && <Button title="Remove Reminder" variant="ghost" onPress={onClear} fullWidth />}
+      {hasReminder && <Button title="Remove Reminder" variant="ghost" onPress={() => { markSaved(); onClear(); }} fullWidth />}
       {Platform.OS === 'android' && androidPicker && (
         <DateTimePicker value={at} mode={androidPicker} display="default" minimumDate={androidPicker === 'date' ? new Date() : undefined} onChange={onPick} />
       )}

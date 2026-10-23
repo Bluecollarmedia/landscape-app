@@ -1,5 +1,6 @@
 /** Add / edit a saved vendor or pickup place (reused across projects). */
 
+import { useKeepDraft } from '@/hooks/useKeepDraft';
 import React, { useEffect, useState } from 'react';
 import { Button, ListSection } from '@/components/ui';
 import { InputRow, NoteField } from '@/components/financials/FormBits';
@@ -16,9 +17,8 @@ export function VendorSheet({ visible, vendor, onSave, onDelete, onClose }: {
   onClose: () => void;
 }) {
   const [f, setF] = useState<VendorInput>({ name: '' });
-  useEffect(() => {
-    if (visible) setF(vendor ? { ...vendor } : { name: '' });
-  }, [visible, vendor]);
+  // Swipe the sheet down and open it again: what you typed is still there (until it is saved or you leave the page).
+  const markSaved = useKeepDraft(visible, vendor?.id ?? 'new', () => setF(vendor ? { ...vendor } : { name: '' }));
   const set = (k: keyof VendorInput) => (t: string) => setF((x) => ({ ...x, [k]: t }));
 
   const save = () => {
@@ -26,6 +26,7 @@ export function VendorSheet({ visible, vendor, onSave, onDelete, onClose }: {
       showMessage('Name needed', 'Enter the vendor or supply yard’s name.');
       return;
     }
+    markSaved();
     onSave(f);
   };
 

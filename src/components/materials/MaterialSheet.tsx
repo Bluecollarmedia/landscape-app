@@ -4,6 +4,7 @@
  * notes (never shown to the customer).
  */
 
+import { useKeepDraft } from '@/hooks/useKeepDraft';
 import React, { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 import { Button, ListSection } from '@/components/ui';
@@ -45,15 +46,15 @@ export function MaterialSheet({ visible, item, onSave, onDelete, onClose }: {
   const [vendorId, setVendorId] = useState<string | undefined>();
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    if (!visible) return;
+  // Swipe the sheet down and open it again: what you typed is still there (until it is saved or you leave the page).
+  const markSaved = useKeepDraft(visible, item?.id ?? 'new', () => {
     setName(item?.name ?? '');
     setQty(item?.quantity != null ? String(item.quantity) : '');
     setUnit(item?.unit ?? '');
     setStatus(item?.status ?? 'to_order');
     setVendorId(item?.vendorId);
     setNotes(item?.notes ?? '');
-  }, [visible, item]);
+  });
 
   const save = () => {
     if (!name.trim()) {
@@ -68,6 +69,7 @@ export function MaterialSheet({ visible, item, onSave, onDelete, onClose }: {
         return;
       }
     }
+    markSaved();
     onSave({ name: name.trim(), quantity, unit: unit.trim() || undefined, status, vendorId, notes: notes.trim() || undefined });
   };
 

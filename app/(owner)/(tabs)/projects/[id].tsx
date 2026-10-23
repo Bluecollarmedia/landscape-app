@@ -1,3 +1,4 @@
+import { useBackStep } from '@/hooks/useBackStep';
 import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { IssuesSection } from '@/components/issues/IssuesSection';
 import React, { useEffect, useState } from 'react';
@@ -231,6 +232,11 @@ export default function ProjectDetailScreen() {
   const [showCustomerPreview, setShowCustomerPreview] = useState(false);
   const [moreSubSection, setMoreSubSection] = useState<MoreSubSection | null>(section && MORE_DEEP_LINKS.includes(section) ? section as MoreSubSection : null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  // The back swipe steps back INSIDE the project first (out of a More section, out of Updates & Requests) instead of leaving it.
+  const backStep = useBackStep(
+    (activeSection === 'more' && moreSubSection != null) || (activeSection === 'customer' && customerDrilldown),
+    () => { if (activeSection === 'more' && moreSubSection != null) setMoreSubSection(null); else setCustomerDrilldown(false); },
+  );
   // Opened again with ?section=financials|materials (e.g. a reminder tap) while already showing.
   useEffect(() => {
     if (section && MORE_DEEP_LINKS.includes(section)) {
@@ -2334,7 +2340,7 @@ export default function ProjectDetailScreen() {
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerTop}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={backStep.leave}
             style={styles.backButton}
             accessibilityLabel="Back to projects"
           >

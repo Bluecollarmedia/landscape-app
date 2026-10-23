@@ -1,3 +1,4 @@
+import { useBackStep } from '@/hooks/useBackStep';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { Switch } from '@/components/ui/Switch';
@@ -21,6 +22,8 @@ export default function NotificationPreferencesScreen() {
 
   const [tab, setTab] = useState<Tab>('defaults');
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
+  // The back swipe leaves one worker's settings for the list first, not the whole screen.
+  useBackStep(selectedWorker != null, () => setSelectedWorker(null));
 
   useDb();
   const workers = db.members.filter((m) => m.role === 'worker' && m.status === 'active' && !!m.person);

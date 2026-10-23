@@ -1,5 +1,6 @@
 /** A project's vendor and pickup details for its materials. */
 
+import { useKeepDraft } from '@/hooks/useKeepDraft';
 import React, { useEffect, useState } from 'react';
 import { Button, ListSection } from '@/components/ui';
 import { InputRow, NoteField } from '@/components/financials/FormBits';
@@ -17,9 +18,8 @@ export function PickupSheet({ visible, plan, onSave, onNewVendor, onClose }: {
   onClose: () => void;
 }) {
   const [d, setD] = useState<PickupDraft>({});
-  useEffect(() => {
-    if (visible) setD({ vendorId: plan.vendorId, pickupLocation: plan.pickupLocation, pickupInstructions: plan.pickupInstructions, handlingNotes: plan.handlingNotes });
-  }, [visible, plan]);
+  // Swipe the sheet down and open it again: what you typed is still there (until it is saved or you leave the page).
+  const markSaved = useKeepDraft(visible, 'pickup', () => setD({ vendorId: plan.vendorId, pickupLocation: plan.pickupLocation, pickupInstructions: plan.pickupInstructions, handlingNotes: plan.handlingNotes }));
 
   const vendor = db.vendors.find((v) => v.id === d.vendorId);
 
@@ -27,12 +27,12 @@ export function PickupSheet({ visible, plan, onSave, onNewVendor, onClose }: {
     <FormSheet
       visible={visible}
       title="Vendor & Pickup"
-      onSave={() => onSave({
+      onSave={() => { markSaved(); onSave({
         vendorId: d.vendorId,
         pickupLocation: d.pickupLocation?.trim() || undefined,
         pickupInstructions: d.pickupInstructions?.trim() || undefined,
         handlingNotes: d.handlingNotes?.trim() || undefined,
-      })}
+      }); }}
       onClose={onClose}
     >
       <SheetLabel>PREFERRED VENDOR</SheetLabel>

@@ -5,6 +5,7 @@
  * allowed (order, one stop at a time, photo minimum, dispatched storm only;
  * update 026). Working layout in the existing app style; no approved mockup.
  */
+import { useBackStep } from '@/hooks/useBackStep';
 import { pickActiveRoute, splitMyRoutes } from '@/lib/snowMyRoute';
 import { canWorkRoute } from '@/lib/snowCrew';
 import { groupStatus, groupStops, isGroupClosed, servicesText } from '@/lib/snowStopGroups';
@@ -43,6 +44,8 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
   const [routeId, setRouteId] = useState<string | null>(null);
   // A past route the worker opened from History (read-only). Never chosen automatically.
   const [historyId, setHistoryId] = useState<string | null>(null);
+  // The back swipe closes an earlier route you are looking at before it leaves the screen.
+  useBackStep(historyId != null, () => setHistoryId(null));
   const [showHistory, setShowHistory] = useState(false);
   const [route, setRoute] = useState<RouteDetail | null>(null);
   const [error, setError] = useState<string | null>(null);

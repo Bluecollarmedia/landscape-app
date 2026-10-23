@@ -9,6 +9,7 @@
  * approved and the owner starts the project.
  */
 
+import { useBackStep } from '@/hooks/useBackStep';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -46,6 +47,8 @@ export default function NewDocumentScreen() {
   const [search, setSearch] = useState('');
   // Quotes only: start from an existing project or a new one.
   const [quoteFor, setQuoteFor] = useState<'existing' | 'new' | undefined>();
+  // The back swipe goes back a step inside this screen before it closes it.
+  useBackStep(quoteFor !== undefined, () => setQuoteFor(undefined));
   const [newProject, setNewProject] = useState(false);
   const created = useRef(false);
 

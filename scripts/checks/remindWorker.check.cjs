@@ -17,7 +17,7 @@ check('5 already confirmed / finished are explained', /already confirmed/.test(r
 const hook = read('src/hooks/useOwnerDashboard.ts');
 const home = read('app/(owner)/(tabs)/index.tsx');
 check('6 the "hasn\'t confirmed" item carries the job to remind about', /remind: \{ assignmentId: unconfirmed\.id/.test(hook));
-check('7 the button reminds instead of opening the worker page', /item\.remind \? sendRemind\(item\) : router\.push\(item\.route as any\)/.test(home) && /remindWorker\(item\.remind\.assignmentId/.test(home));
+check('7 the button reminds instead of opening the worker page', /item\.remind \|\| item\.confirmOwn \? sendRemind\(item\) : router\.push\(item\.route as any\)/.test(home) && /remindWorker\(item\.remind\.assignmentId/.test(home));
 check('8 it shows Sending… then Sent and cannot be double-tapped', /reminding === item\.id \? 'Sending…'/.test(home) && /disabled=\{reminding === item\.id\}/.test(home) && /reminded\[item\.id\] \? 'Sent'/.test(home));
 check('9 the database function is called with the job id', /rpc<RemindResult>\('remind_worker_assignment', \{ p_assignment: assignmentId \}\)/.test(read('src/data/remindWorker.ts')));
 console.log(bad ? `\n${bad} failed` : '\nall passed');

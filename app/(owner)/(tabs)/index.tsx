@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
-import { refresh as refreshTables } from '@/data/store';
+import { refresh as refreshTables, updateRow } from '@/data/store';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
@@ -104,6 +104,11 @@ export default function OwnerDashboard() {
 
   /** Remind: sends the worker a push and stays here; the owner is told plainly what happened. */
   async function sendRemind(item: AttentionItem) {
+    // An owner or admin who is on the job themselves confirms it here (they cannot remind themselves).
+    if (item.confirmOwn) {
+      updateRow('assignments', item.confirmOwn.assignmentId, { confirmationState: 'confirmed' });
+      return;
+    }
     if (!item.remind || reminding) return;
     setReminding(item.id);
     const res = await remindWorker(item.remind.assignmentId, item.remind.firstName);
@@ -133,11 +138,11 @@ export default function OwnerDashboard() {
         </View>
         <Pressable
           style={[styles.attentionAction, { backgroundColor: colors.surface, opacity: reminding === item.id ? 0.6 : 1 }]}
-          onPress={() => (item.remind ? sendRemind(item) : router.push(item.route as any))}
+          onPress={() => (item.remind || item.confirmOwn ? sendRemind(item) : router.push(item.route as any))}
           disabled={reminding === item.id}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={item.remind ? `Remind ${item.remind.firstName || 'the worker'} to confirm` : item.actionLabel}
+          accessibilityLabel={item.confirmOwn ? 'Confirm my job' : item.remind ? `Remind ${item.remind.firstName || 'the worker'} to confirm` : item.actionLabel}
         >
           <Text style={[typeScale.labelSmall, { color: c.icon }]}>{reminding === item.id ? 'Sending…' : reminded[item.id] ? 'Sent' : item.actionLabel}</Text>
         </Pressable>

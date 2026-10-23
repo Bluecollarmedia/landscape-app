@@ -24,6 +24,8 @@ export interface AttentionItem {
   route: string;
   /** Remind: the button sends this worker a push for this job instead of opening a page. */
   remind?: { assignmentId: string; firstName: string };
+  /** The signed-in owner/admin is the one on the job: the button confirms it for them (they cannot remind themselves). */
+  confirmOwn?: { assignmentId: string };
 }
 
 export type CrewStatus = 'on_site' | 'late' | 'awaiting_confirmation' | 'scheduled' | 'completed';
@@ -162,15 +164,16 @@ export function useOwnerDashboard() {
       const unconfirmed = sorted.find(a => a.confirmationState === 'awaiting');
       if (unconfirmed) {
         const name = unconfirmed.person ? `${unconfirmed.person.firstName} ${unconfirmed.person.lastName}` : 'A worker';
+        const mine = personId === db.personId;
         items.push({
           id: `unconfirmed_${personId}`,
-          title: `${name} hasn't confirmed`,
+          title: mine ? "You haven't confirmed" : `${name} hasn't confirmed`,
           subtitle: `${unconfirmed.project?.name ?? 'Today’s job'} · Starts ${unconfirmed.isFullDay ? 'Full Day' : formatTime(unconfirmed.startTime)}`,
           icon: 'alert-circle',
           severity: 'warning',
-          actionLabel: 'Remind',
+          actionLabel: mine ? 'Confirm' : 'Remind',
           route: `/(owner)/workers/${personId}`,
-          remind: { assignmentId: unconfirmed.id, firstName: unconfirmed.person?.firstName ?? '' },
+          ...(mine ? { confirmOwn: { assignmentId: unconfirmed.id } } : { remind: { assignmentId: unconfirmed.id, firstName: unconfirmed.person?.firstName ?? '' } }),
         });
         handledWorkers.add(personId);
         continue;

@@ -1,3 +1,4 @@
+import { showWebDialog } from '@/lib/webDialog';
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, Platform, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,7 +65,8 @@ export function ActionSheet({ visible, title, message, actions, onClose, childre
 /** Native confirm dialog (window.confirm on the web). */
 export function confirmAction(title: string, message: string, confirmLabel: string, onConfirm: () => void, destructive = false) {
   if (Platform.OS === 'web') {
-    if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`${title}\n\n${message}`)) onConfirm();
+    // The app's own dialog (the browser's confirm() can be blocked or suppressed, which made buttons seem dead).
+    showWebDialog(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: confirmLabel, style: destructive ? 'destructive' : 'default', onPress: onConfirm }]);
     return;
   }
   Alert.alert(title, message, [
@@ -76,7 +78,7 @@ export function confirmAction(title: string, message: string, confirmLabel: stri
 /** Native alert (window.alert on the web). */
 export function showMessage(title: string, message: string) {
   if (Platform.OS === 'web') {
-    (globalThis as { alert?: (m: string) => void }).alert?.(`${title}\n\n${message}`);
+    showWebDialog(title, message);
     return;
   }
   Alert.alert(title, message);

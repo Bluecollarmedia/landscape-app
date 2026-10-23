@@ -62,12 +62,6 @@ export default function NotificationCenterScreen() {
   function confirmClearAll() {
     const title = 'Clear all notifications?';
     const message = 'This will remove all notifications from your notification center. Your messages and project data will not be deleted.';
-    if (Platform.OS === 'web') {
-      if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`${title}
-
-${message}`)) clearAll();
-      return;
-    }
     Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Clear All', style: 'destructive', onPress: clearAll },

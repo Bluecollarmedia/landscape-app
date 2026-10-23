@@ -67,7 +67,6 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
     haptics.select();
     const total = durationText(todayNetMs);
     const go = async () => { const r = await w.clockOut(); if (r.ok) haptics.success(); else say("Can't clock out yet", r.error); };
-    if (Platform.OS === 'web') { if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`Clock out? Your total for today is ${total}.`)) go(); return; }
     Alert.alert('Clock out?', `Your total for today is ${total}.`, [{ text: 'Not yet', style: 'cancel' }, { text: 'Clock Out', style: 'destructive', onPress: go }]);
   }
   async function onBreak() {

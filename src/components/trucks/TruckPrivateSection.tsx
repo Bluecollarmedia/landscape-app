@@ -24,7 +24,6 @@ import type { TruckDocument, TruckMaintenance } from '@/types/truck';
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 function confirm(title: string, message: string, action: string, run: () => void) {
-  if (Platform.OS === 'web') { if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`${title}\n\n${message}`)) run(); return; }
   Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: run }]);
 }
 

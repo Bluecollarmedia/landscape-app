@@ -22,6 +22,11 @@ import { applyPendingSignup } from '@/data/pendingSignup';
 import { useModeAccess } from '@/hooks/useModeAccess';
 import { WorkerModeToggle, WORKER_TOGGLE_BAND } from '@/components/snow/WorkerModeToggle';
 import { installGlobalErrorHandler } from '@/lib/errorReporting';
+import { installWebAlert } from '@/lib/webDialog';
+import { WebDialogHost } from '@/components/ui/WebDialogHost';
+
+// On the website Alert.alert does nothing by itself; this points it at the app's own dialog (a phone keeps the system alert).
+installWebAlert();
 
 ExpoSplashScreen.preventAutoHideAsync();
 installGlobalErrorHandler();
@@ -129,6 +134,7 @@ function RootNavigator() {
       </SafeAreaInsetsContext.Provider>
       {isPublicPage ? null : <WorkerModeToggle />}
       {isPublicPage ? null : <SignInWelcome />}
+      <WebDialogHost />
     </>
   );
 }

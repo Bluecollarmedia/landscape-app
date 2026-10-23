@@ -47,10 +47,6 @@ export function MessageCustomersPanel() {
   function confirmSend() {
     if (problem) { setNote({ tone: 'error', text: problem }); return; }
     const { title: t, message } = confirmText(audience);
-    if (Platform.OS === 'web') {
-      if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`${t}\n\n${message}`)) send();
-      return;
-    }
     Alert.alert(t, message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Send', onPress: send }]);
   }
 

@@ -79,7 +79,6 @@ export default function CustomerDetailScreen() {
     };
     if (next) { await apply(); return; }
     const t = turnOffText(p.firstName);
-    if (Platform.OS === 'web') { if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`${t.title}\n\n${t.message}`)) await apply(); return; }
     Alert.alert(t.title, t.message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Turn Off', style: 'destructive', onPress: () => { void apply(); } }]);
   }
 

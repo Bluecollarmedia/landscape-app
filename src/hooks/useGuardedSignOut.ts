@@ -42,10 +42,6 @@ export function useGuardedSignOut() {
     const running = await openClocksNow(user?.role);
     if (!running.length) { await signOut(); return; }
     const message = `${running.join('\n')}\n\nSigning out does not clock you out. Clock out first, or sign out anyway and the clock keeps running.`;
-    if (Platform.OS === 'web') {
-      if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(`You're still clocked in\n\n${message}\n\nSign out anyway?`)) await signOut();
-      return;
-    }
     Alert.alert("You're still clocked in", message, [
       { text: 'Stay signed in', style: 'cancel' },
       { text: 'Sign out anyway', style: 'destructive', onPress: () => { void signOut(); } },

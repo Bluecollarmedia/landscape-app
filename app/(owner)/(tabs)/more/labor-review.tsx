@@ -46,7 +46,6 @@ export default function LaborReviewScreen() {
       L.reload();
     };
     const msg = `Approve ${readyRows.length} day(s) that are ready? You can reopen any day later.`;
-    if (Platform.OS === 'web') { if ((globalThis as { confirm?: (m: string) => boolean }).confirm?.(msg)) go(); return; }
     Alert.alert('Approve all ready days?', msg, [{ text: 'Cancel', style: 'cancel' }, { text: 'Approve', onPress: go }]);
   }
 

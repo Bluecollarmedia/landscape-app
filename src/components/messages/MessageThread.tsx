@@ -42,10 +42,6 @@ export function MessageList({ projectId, emptyTitle = 'No messages yet', emptyTe
   function handleLongPress(m: ProjectMessage) {
     if (m.senderId !== db.personId) return;
     const doDelete = () => remove(m.id);
-    if (Platform.OS === 'web') {
-      if (window.confirm('Delete this message?')) doDelete();
-      return;
-    }
     Alert.alert('Delete this message?', 'It will be removed for everyone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: doDelete },

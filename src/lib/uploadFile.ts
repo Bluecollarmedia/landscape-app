@@ -14,6 +14,17 @@ import { withTimeout } from './mediaQueue';
 
 export interface PutResult { status: number; body: string }
 
+/** Waits between tries (so a dropped connection is tried up to three times in all). */
+const RETRY_DELAYS_MS = [800, 2500];
+/** A connection that dropped or never connected, as the phone words it. */
+export function isDroppedConnection(message: string): boolean {
+  return /network connection was lost|network request failed|connection (was )?(lost|reset|closed|aborted)|not connected to the internet|could not connect|offline|socket|econn|fetch failed/i.test(message);
+}
+/** A hiccup on the storage server's side (never a refusal like 400/403). */
+export function shouldRetryStatus(status: number): boolean {
+  return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
 export async function putFile(localUri: string, url: string, contentType: string, timeoutMs: number): Promise<PutResult> {
   if (Platform.OS === 'web') {
     const stop = new AbortController();
@@ -37,17 +48,28 @@ export async function putFile(localUri: string, url: string, contentType: string
   } catch (err) {
     throw new Error(`The phone could not read the file (${err instanceof Error ? err.message : String(err)})`);
   }
-  const task = file.createUploadTask(url, { httpMethod: 'PUT', headers: { 'Content-Type': contentType } });
-  try {
-    const res = await withTimeout(task.uploadAsync(), timeoutMs, () => {
-      try { task.cancel(); } catch { /* already finished */ }
-      return new Error(`Sending the file timed out after ${Math.round(timeoutMs / 1000)} seconds`);
-    });
-    return { status: res.status, body: res.body ?? '' };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(/timed out/.test(msg) ? msg : `Sending the file failed (${msg})`);
+  // A phone's connection drops for a moment all the time (walking between wifi and cellular, a tunnel, a weak signal): "the network
+  // connection was lost". That is not a reason to lose a photo, so a dropped connection or a server hiccup is tried again, with a fresh
+  // upload each time, before giving up. A timeout or a refusal from the server (4xx) is never repeated.
+  let lastError = 'unknown';
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt - 1]));
+    const task = file.createUploadTask(url, { httpMethod: 'PUT', headers: { 'Content-Type': contentType } });
+    try {
+      const res = await withTimeout(task.uploadAsync(), timeoutMs, () => {
+        try { task.cancel(); } catch { /* already finished */ }
+        return new Error(`Sending the file timed out after ${Math.round(timeoutMs / 1000)} seconds`);
+      });
+      if (shouldRetryStatus(res.status) && attempt < RETRY_DELAYS_MS.length) { lastError = `the server answered ${res.status}`; continue; }
+      return { status: res.status, body: res.body ?? '' };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/timed out/.test(msg)) throw new Error(msg);
+      lastError = msg;
+      if (!isDroppedConnection(msg) || attempt >= RETRY_DELAYS_MS.length) throw new Error(`Sending the file failed (${msg})`);
+    }
   }
+  throw new Error(`Sending the file failed (${lastError})`);
 }
 
 /** The size of a local file in bytes, or undefined when it cannot be read. Phone: from disk; web: from the Blob. */

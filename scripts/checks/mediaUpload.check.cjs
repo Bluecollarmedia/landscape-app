@@ -37,6 +37,8 @@ const load = (r2) => {
     if (name === './ids') return { uuid: () => 'uuid-1' };
     if (name === './uploadErrors') return errors;
     if (name === './uploadLimit') return { tooLargeMessage: () => null };
+    // The phone's file upload is faked with the fake fetch (the harness has no phone): same answer shape as the real one.
+    if (name === './uploadFile') return { putFile: async (uri, url, ct) => { const r = await globalThis.fetch(url, { method: 'PUT', headers: { 'Content-Type': ct }, body: {} }); return { status: r.status, body: typeof r.text === 'function' ? await r.text() : '' }; }, localFileSize: async () => 10 };
     // The real timeout helper, so the time limits in snowMedia work in this harness too.
     if (name === './mediaQueue') return { withTimeout: (work, ms, onTimeout) => new Promise((res, rej) => { const t = setTimeout(() => rej(onTimeout()), ms); work.then((v) => { clearTimeout(t); res(v); }, (e) => { clearTimeout(t); rej(e); }); }) };
     // Compression is not what this check is about: treat every picture as already prepared.

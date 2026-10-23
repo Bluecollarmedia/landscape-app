@@ -13,6 +13,6 @@ check('4 exactly at the limit is allowed', u.tooLargeMessage(25 * MB, 25) === nu
 const screen = read('app/(owner)/(tabs)/more/storage.tsx'), media = read('src/lib/media.ts'), fn = read('supabase/functions/media/index.ts'), sql = read('supabase/updates/053_max_file_size.sql');
 check('5 the Storage screen lets the owner pick or type the size and shows the saved one (no longer a fixed 10 MB)', /MAX_FILE_PRESETS_MB\.map/.test(screen) && /accessibilityLabel="Custom max file size in MB"/.test(screen) && /setMaxMb\(typedMax\)/.test(screen) && !/formatBytes\(settings\?\.maxFileSizeBytes/.test(screen));
 check('6 it is saved on the company row (follows the owner across devices) and the column is in the store', /maxFileSizeMb: next/.test(read('src/hooks/useStorage.ts')) && /'maxFileSizeMb'/.test(read('src/data/store.ts')) && /max_file_size_mb/.test(sql) && /between 1 and 200/.test(sql));
-check('7 uploads are checked against it before anything is sent', /tooLargeMessage\(blob\.size, db\?\.company\?\.maxFileSizeMb\)/.test(media) && /if \(tooBig\) throw new Error\(tooBig\)/.test(media));
+check('7 uploads are checked against it before anything is sent', /tooLargeMessage\(size, db\?\.company\?\.maxFileSizeMb\)/.test(media) && /localFileSize\(localUri\)/.test(media) && /if \(tooBig\) throw new Error\(tooBig\)/.test(media));
 check('8 the upload function checks it again for company folders', /max_file_size_mb/.test(fn) && /body\.size > limitMb \* 1024 \* 1024/.test(fn));
 console.log(bad ? `\n${bad} failed` : '\nall passed'); process.exit(bad ? 1 : 0);

@@ -88,18 +88,23 @@ export async function requireSession(): Promise<void> {
 }
 
 async function uploadToR2(localUri: string, folder: string, contentType: string): Promise<{ url: string; key: string }> {
-  const blob = await (await fetch(localUri)).blob();
+  const { putFile, localFileSize } = require('./uploadFile') as typeof import('./uploadFile');
+  const size = await localFileSize(localUri);
   // The owner's max file size (More > Storage). The media function checks it again on the server.
   const { db } = require('@/data/store') as typeof import('@/data/store');
-  const tooBig = tooLargeMessage(blob.size, db?.company?.maxFileSizeMb);
+  const tooBig = size != null ? tooLargeMessage(size, db?.company?.maxFileSizeMb) : null;
   if (tooBig) throw new Error(tooBig);
   const { data, error } = await supabase.functions.invoke('media', {
-    body: { action: 'put', folder, contentType, size: blob.size },
+    body: { action: 'put', folder, contentType, ...(size != null ? { size } : {}) },
   });
   if (error || !data?.uploadUrl) throw new Error(error?.message ?? data?.error ?? 'no upload link');
 
-  const res = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: blob });
-  if (!res.ok) throw new Error(`The storage server answered ${res.status}`);
+  // Sent by the phone's own file upload on a phone (JavaScript fetch + Blob is unreliable there); fetch on the web.
+  const sent = await putFile(localUri, data.uploadUrl, contentType, contentType.startsWith('video/') ? 300_000 : 90_000);
+  if (sent.status < 200 || sent.status >= 300) {
+    const code = sent.body.match(/<Code>([^<]+)<\/Code>/)?.[1];
+    throw new Error(`The storage server answered ${sent.status}${code ? ` (${code})` : ''}`);
+  }
   return { url: data.publicUrl as string, key: data.key as string };
 }
 

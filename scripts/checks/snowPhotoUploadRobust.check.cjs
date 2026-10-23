@@ -14,10 +14,10 @@ const status = read('src/components/snow/SnowUploadStatus.tsx');
 const screen = read('src/components/snow/routes/MyRouteScreen.tsx');
 const sql = read('supabase/updates/088_complete_stop_without_waiting_for_photos.sql');
 
-check('1 every network step of a Snow upload has a time limit (reserve, read, link, send)', ['Reserving the file', 'Reading the photo', 'Asking for the upload link'].every((w) => media.includes(`'${w}'`)) && /stop\.abort\(\)/.test(media) && /signal: stop\.signal/.test(media));
+check('1 every network step of a Snow upload has a time limit (reserve, link, send)', ['Reserving the file', 'Asking for the upload link'].every((w) => media.includes(`'${w}'`)) && /putFile\(localUri, link\.data\.uploadUrl, contentType, sendMs\(contentType\)\)/.test(media) && /timed out after/.test(read('src/lib/uploadFile.ts')));
 check('2 if cloud storage fails, the file goes to the private bucket directly (a cloud problem never stops a photo)', /putViaBackup\(/.test(media) && /cloudWhy = reasonOf\(err\)/.test(media) && /putViaCloud\(/.test(media));
 check('3 a failed function call reports the status and the server\'s own reason (not "non-2xx status code")', /functionFailure\(link\.error, link\.data\)/.test(media) && /res\.status\}: \$\{body\?\.error/.test(media));
-check('4 cloud storage\'s own answer is shown (status and error code), not "check your connection"', /Cloud storage answered \$\{res\.status\}/.test(media) && !/Please check your connection and try again/.test(media));
+check('4 cloud storage\'s own answer is shown (status and error code), not "check your connection"', /Cloud storage answered \$\{sent\.status\}/.test(media) && /<Code>/.test(media) && !/Please check your connection and try again/.test(media));
 check('5 when both routes fail the message says what each one said', /Cloud storage: \$\{cloudWhy\}\. Backup: /.test(media));
 check('6 the shared queue cannot hang: preparing, uploading and saving each have a limit', /withTimeout\(this\.d\.prepare\(j\), PREPARE_LIMIT_MS/.test(queue) && /withTimeout\(this\.d\.upload\(j, uri\), UPLOAD_LIMIT_MS/.test(queue) && /withTimeout\(this\.d\.complete\(j, j\.uploaded\), RECORD_LIMIT_MS/.test(queue));
 check('7 a photo that is still going up can be removed (not only failed ones), and shows what it is doing and the last reason', /Remove this \$\{NOUN\(j\)\.toLowerCase\(\)\}/.test(status) && /uploading\.map\(\(j\)/.test(status) && /Trying again \(\$\{j\.attempts\} of 4\)/.test(status));

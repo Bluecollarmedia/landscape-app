@@ -46,7 +46,7 @@ export async function putFile(localUri: string, url: string, contentType: string
     file = new File(localUri);
     if (!file.exists) throw new Error('the file is gone');
   } catch (err) {
-    throw new Error(`The phone could not read the file (${err instanceof Error ? err.message : String(err)})`);
+    throw new Error(`The phone could not read the file (${err instanceof Error ? err.message : String(err)}) ...${localUri.slice(-48)}`);
   }
   // A phone's connection drops for a moment all the time (walking between wifi and cellular, a tunnel, a weak signal): "the network
   // connection was lost". That is not a reason to lose a photo, so a dropped connection or a server hiccup is tried again, with a fresh

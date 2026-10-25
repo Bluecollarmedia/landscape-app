@@ -98,6 +98,10 @@ export async function startMediaQueue(): Promise<void> {
   started = true;
   await mediaQueue.start();
   try {
+    const { sweepKeptFiles } = require('./keepPickedFile') as typeof import('./keepPickedFile');
+    sweepKeptFiles(mediaQueue.pending().flatMap((j) => [j.sourceUri, j.preparedUri]));
+  } catch { /* housekeeping only */ }
+  try {
     const { restoreMediaTarget } = require('@/data/mediaTargets') as typeof import('@/data/mediaTargets');
     for (const j of mediaQueue.pending()) restoreMediaTarget(j);
   } catch { /* previews only */ }

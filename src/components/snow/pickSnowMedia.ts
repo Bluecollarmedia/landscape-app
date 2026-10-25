@@ -4,6 +4,7 @@
  */
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { keepPicked } from '@/lib/keepPickedFile';
 import { formatBytes } from '@/types/storage';
 import { tr } from '@/i18n';
 import type { SnowMediaDraft } from '@/data/snowProperties';
@@ -74,7 +75,7 @@ export async function pickSnowMedia(): Promise<SnowMediaDraft[]> {
         : tr('A image is {size}; the most one file can be is {max}.', { size, max }));
       continue;
     }
-    drafts.push({ uri: asset.uri, mediaType, mimeType: asset.mimeType ?? undefined, sizeBytes });
+    drafts.push({ uri: keepPicked(asset.uri, mediaType), mediaType, mimeType: asset.mimeType ?? undefined, sizeBytes });
   }
   if (skipped.length > 0) notify(tr("Some files weren't added"), skipped.join('\n'));
   return drafts;

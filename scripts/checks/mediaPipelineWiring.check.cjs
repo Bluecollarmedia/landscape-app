@@ -21,10 +21,10 @@ check('9 the local preview row is never saved to the database before the file is
 check('10 pending uploads are saved to AsyncStorage and resumed when the person signs in / the app returns to the front', /AsyncStorage\.setItem\(KEY/.test(runtime) && /startMediaQueue\(\)/.test(store) && /AppState\.addEventListener/.test(runtime));
 check('11 a pending item is never uploaded under a different company (folder must start with the signed-in company)', /startsWith\(`\$\{db\.companyId\}\/`\)/.test(runtime));
 check('12 thumbnails say Preparing / Uploading / Not saved with Retry (task media and stop photos share one overlay)', /MediaJobOverlay/.test(read('src/components/tasks/TaskMedia.tsx')) && /MediaJobOverlay/.test(read('src/components/maintenance/StopPhotos.tsx')));
-check('13 video compression is never skipped silently: without the library it fails with a message and offers retry / original', /CompressionError\('Video compression is not part of this version of the app/.test(compress));
+check('13 videos are never compressed: they are uploaded exactly as picked (the owner asked for no video compression)', /Videos are never compressed/.test(compress) && !/CompressionError\('Video compression is not part/.test(compress));
 check('14 pickers hand over the original (quality 1) so the shared compressor is the only lossy step', ['src/lib/stopPhotoPicker.ts', 'src/data/taskMedia.ts', 'src/components/snow/pickSnowMedia.ts'].every((f) => /quality: 1/.test(read(f))));
 const pkg = JSON.parse(read('package.json')), app = JSON.parse(read('app.json')), lock = JSON.parse(read('package-lock.json'));
 check('15 the video library is declared exactly (1.19.4, the non-Nitro line that supports the new architecture), autolinked (its Expo plugin does nothing, so it is not listed), and locked', pkg.dependencies['react-native-compressor'] === '1.19.4' && lock.packages['node_modules/react-native-compressor']?.version === '1.19.4');
-check('16 every video is compressed (no minimum size) and the result is a prepared file the queue cleans up', /minimumFileSizeForCompress: 0/.test(compress) && /outFile\('mp4'\)/.test(compress));
+check('16 a video is passed through untouched: the prepared file is the original, never a compressed copy', /async function prepareVideo\(job: MediaJob\): Promise<Prepared> \{\s*return \{ uri: job\.sourceUri/.test(compress));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

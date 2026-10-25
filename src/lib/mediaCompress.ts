@@ -70,32 +70,9 @@ export async function prepareImage(job: MediaJob): Promise<Prepared> {
   }
 }
 
+/** Videos are never compressed: they go up exactly as they were recorded or picked. */
 export async function prepareVideo(job: MediaJob): Promise<Prepared> {
-  if (Platform.OS === 'web') throw new CompressionError('Video compression is not available in the web version. You can upload the original instead.');
-  let compressor: { Video: { compress: (uri: string, opts: Record<string, unknown>, onProgress?: (p: number) => void) => Promise<string> } } | undefined;
-  try { compressor = require('react-native-compressor'); } catch { compressor = undefined; }
-  if (!compressor?.Video) {
-    throw new CompressionError('Video compression is not part of this version of the app, so this video was not uploaded. You can upload the original (larger) or try again after updating the app.');
-  }
-  const plan = planVideo({ width: job.width ?? VIDEO_FALLBACK, height: job.height ?? VIDEO_FALLBACK });
-  try {
-    // maxSize is the longest side: 854 keeps landscape at 854x480 and portrait at 480x854, aspect ratio unchanged.
-    // minimumFileSizeForCompress 0: every video is compressed, however small. The library keeps audio and the aspect ratio.
-    let uri = await compressor.Video.compress(job.sourceUri, { compressionMethod: 'manual', maxSize: Math.max(plan.width, plan.height), bitrate: plan.bitrate, minimumFileSizeForCompress: 0 });
-    // Move the result next to the app's other prepared files so the queue deletes it when the job ends.
-    const dest = outFile('mp4');
-    try { new File(uri).copy(dest); try { new File(uri).delete(); } catch { /* cache file */ } uri = dest.uri; } catch { /* use it where it is */ }
-    const bytes = sizeOf(uri);
-    const before = job.bytesIn ?? sizeOf(job.sourceUri);
-    if (bytes !== undefined && before !== undefined && bytes >= before) {
-      // Already tighter than the target: keep the original instead of a bigger "compressed" copy (still a valid, compatible file).
-      try { new File(uri).delete(); } catch { /* ignore */ }
-      return { uri: job.sourceUri, bytes: before, width: job.width, height: job.height, mimeType: job.mimeType ?? 'video/mp4' };
-    }
-    return { uri, bytes, width: plan.width, height: plan.height, mimeType: 'video/mp4' };
-  } catch (err) {
-    throw new CompressionError(`The video couldn't be compressed (${(err as Error)?.message ?? 'unknown error'}).`);
-  }
+  return { uri: job.sourceUri, bytes: job.bytesIn ?? sizeOf(job.sourceUri), width: job.width, height: job.height, mimeType: job.mimeType ?? 'video/mp4' };
 }
 
 // If the picker did not report the video's size, plan for a 1080p source (the result only sets maxSize, which never enlarges).

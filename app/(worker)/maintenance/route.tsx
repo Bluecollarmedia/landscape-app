@@ -23,6 +23,10 @@ export default function MaintenanceRouteScreen() {
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const stops = day.stops.map((s, i) => ({ id: s.stop.id, number: i + 1, place: s.stop.property ?? {}, done: s.done }));
   const placeable = stops.filter((s) => s.place && Object.keys(s.place).length > 0);
+  // How the day is going: stops finished (or skipped) out of all of today's stops, across every route the worker is on.
+  const total = day.stops.length;
+  const finished = day.stops.filter((s) => s.done).length;
+  const progressLabel = total === 1 ? t('{done} of 1 stop done', { done: finished }) : t('{done} of {total} stops done', { done: finished, total });
 
   return (
     <ScreenContainer scrollable padded variant="grouped">
@@ -30,6 +34,15 @@ export default function MaintenanceRouteScreen() {
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t('Route')}</Text>
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{dateStr}</Text>
       </View>
+
+      {total > 0 ? (
+        <View style={[styles.progress, { backgroundColor: colors.surface }, shadow.sm]} accessible accessibilityLabel={progressLabel}>
+          <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{progressLabel}</Text>
+          <View style={[styles.track, { backgroundColor: colors.border }]}>
+            <View style={[styles.fill, { backgroundColor: colors.primary, width: `${Math.round((finished / total) * 100)}%` }]} />
+          </View>
+        </View>
+      ) : null}
 
       {day.routes.length === 0 ? (
         <EmptyState icon="map" title={t('No route today')} description={t('When the owner puts you on a maintenance route, its stops show up here on the map.')} />
@@ -70,6 +83,9 @@ export default function MaintenanceRouteScreen() {
 }
 
 const styles = StyleSheet.create({
+  progress: { borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.lg },
+  track: { height: 8, borderRadius: 4, overflow: 'hidden', marginTop: spacing.sm },
+  fill: { height: '100%', borderRadius: 4 },
   card: { borderRadius: radius.xl, padding: spacing.lg, marginTop: spacing.lg },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   metaText: { marginLeft: spacing.xs, flexShrink: 1 },

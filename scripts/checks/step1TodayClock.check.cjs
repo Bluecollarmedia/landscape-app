@@ -53,9 +53,14 @@ check('16 the route tab is a map of the day\'s stops', /<RouteMap stops=/.test(r
 check('17 step 1 is app-only: it adds no database update file', fs.readdirSync(path.join(__dirname, '../../supabase/updates')).filter((f) => /^(09[8-9]|1\d\d)_/.test(f)).length === 0);
 // ── The next-stop card follows where the worker is (driving there / on site) ──────────────────────────
 const card2 = read('src/components/today/StopCard.tsx');
-check('18 on site, the card opens into the job: the SAME checklist, photo and finish components as the stop screen', /<StopChecklist /.test(card2) && /<StopPhotos /.test(card2) && /<FinishStopButton /.test(card2) && /const onSite = stop\.status === 'arrived'/.test(card2));
+check('18 on site, the card opens into the job: the SAME checklist and photo components as the stop screen', /<StopChecklist /.test(card2) && /<StopPhotos /.test(card2) && /const onSite = stop\.status === 'arrived'/.test(card2));
 check('19 driving there: name, address, work, task count and the way in (access notes) show; the checklist does not', /accessNotes/.test(card2) && /!onSite && tasksLine/.test(card2) && /\{onSite \? \(\s*<>/.test(card2));
-check('20 the rules are unchanged: blockers come from missingRequirements, finishing from the same onFinish, leader-only buttons', /missingRequirements\(stop\)/.test(card2) && /onFinish\(\)/.test(card2) && /leader \?/.test(card2));
-
+const bar = read('src/components/today/ActionBar.tsx');
+check('20 the rules are unchanged: what is missing comes from missingRequirements, leader-only buttons, the same onFinish', /missingRequirements\(stop\)/.test(bar) && /if \(!leader\)/.test(bar) && /onPress=\{onFinish\}/.test(bar));
+check('21 I\'M HERE / FINISH STOP are pinned at the bottom of Today, not inside the card, measured against the window like the older pinned button', /actionArea/.test(today) && /measureInWindow/.test(today) && /bar=\{bar\}/.test(today) && !/FinishStopButton|I'M HERE/.test(card2.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')));
+check('22 the button really greys out: FINISH STOP until nothing is missing and nothing is uploading; I\'M HERE while checking in; everything for a non-leader (with who it waits for)', /disabled=\{missing\.length > 0 \|\| uploading > 0 \|\| finishing\}/.test(bar) && /busy=\{!!starting\} disabled=\{!!starting\}/.test(bar) && /disabled\s+reason=\{crewStopMessage/.test(bar) && /backgroundColor: off \? colors\.border/.test(bar));
+check('23 the checklist and photos fold away by themselves once met, and unfold when tapped', /if \(tasksSatisfied\) setTasksOpen\(false\)/.test(card2) && /if \(photosSatisfied\) setPhotosOpen\(false\)/.test(card2) && /onToggle=\{\(\) => setTasksOpen\(\(v\) => !v\)\}/.test(card2));
+check('24 a finished stop unfolds to show its tasks, photos and who finished, with a Details link to the stop screen', /setUnfolded\(\(v\) => !v\)/.test(card2) && /doneTasks\.map/.test(card2) && /t\('Details'\)/.test(card2));
+check('25 the Route tab shows how many stops are done out of today\'s stops (all routes)', /stops done/.test(read('app/(worker)/maintenance/route.tsx')) && /day\.stops\.filter\(\(s\) => s\.done\)/.test(read('app/(worker)/maintenance/route.tsx')));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

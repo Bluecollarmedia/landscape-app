@@ -17,7 +17,8 @@ const clock = (hhmm?: string) => {
 
 /**
  * A landscaping job on the combined Today. Same three looks as a route stop (finished row, quiet row, big next card). Tapping opens the
- * job's own screen, where the check-in and the job's work already live; nothing about a job's rules changes here.
+ * job's own screen, where the check-in and the job's work already live; nothing about a job's rules changes here. The big OPEN JOB button
+ * is the pinned bar at the bottom of the screen, like I'M HERE for a stop.
  */
 export function JobCard({ job, state, onOpen }: { job: Assignment; state: StopCardState; onOpen: () => void }) {
   const t = useT();
@@ -52,7 +53,7 @@ export function JobCard({ job, state, onOpen }: { job: Assignment; state: StopCa
     );
   }
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
+    <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel={name} style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
       <View style={styles.titleRow}>
         <View style={[styles.iconBig, { backgroundColor: colors.primaryDark }]}><Feather name="briefcase" size={18} color="#FFFFFF" /></View>
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]} numberOfLines={2}>{name}</Text>
@@ -67,12 +68,7 @@ export function JobCard({ job, state, onOpen }: { job: Assignment; state: StopCa
         <Feather name="clock" size={15} color={colors.textSecondary} />
         <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, flex: 1 }]}>{when}</Text>
       </View>
-      <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel={t('Open job')}
-        style={({ pressed }) => [styles.button, { backgroundColor: colors.primaryDark, opacity: pressed ? 0.9 : 1 }]}>
-        <Feather name="arrow-right-circle" size={18} color="#FFFFFF" />
-        <Text style={[typeScale.labelLarge, styles.buttonText]}>{t('OPEN JOB')}</Text>
-      </Pressable>
-    </View>
+    </Pressable>
   );
 }
 
@@ -81,8 +77,6 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   iconBig: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  button: { height: 58, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.lg },
-  buttonText: { color: '#FFFFFF', fontWeight: '800', letterSpacing: 0.5 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.md, marginBottom: spacing.sm },
   icon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   check: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

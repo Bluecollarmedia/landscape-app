@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -11,12 +12,15 @@ import { WorkdayCard } from '@/components/time/WorkdayCard';
 import { TodayHeader } from '@/components/today/TodayHeader';
 import { StopCard, type StopCardState } from '@/components/today/StopCard';
 import { JobCard } from '@/components/today/JobCard';
+import { ActionBar, StopActionBar } from '@/components/today/ActionBar';
 import type { DayItem } from '@/lib/dayWork';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { useT } from '@/i18n';
 
 const SHEET_RADIUS = 28;
+/** Room the pinned button takes at the bottom of the scroll (button, the reason line above it, and a little air). */
+const ACTION_AREA = 150;
 
 function useGreeting() {
   const t = useT();
@@ -24,14 +28,36 @@ function useGreeting() {
   return h < 12 ? t('Good morning') : h < 17 ? t('Good afternoon') : t('Good evening');
 }
 
-function Sheet({ header, children }: { header: React.ReactNode; children: React.ReactNode }) {
+function Sheet({ header, children, bar }: { header: React.ReactNode; children: React.ReactNode; bar?: React.ReactNode }) {
   const { colors } = useTheme();
   const clearance = useTabBarClearance();
+  // The button is pinned to the bottom of the WINDOW, not of this container: native tabs sometimes end the container above the tab bar, which
+  // used to leave a floating button too high. Measure how far the container's bottom sits above the window bottom and subtract it.
+  const { height: windowHeight } = useWindowDimensions();
+  const ref = useRef<View>(null);
+  const [gapBelow, setGapBelow] = useState(0);
+  const measure = useCallback(() => {
+    ref.current?.measureInWindow((_x, y, _w, h) => {
+      if (!h) return;
+      const gap = Math.max(0, Math.round(windowHeight - (y + h)));
+      setGapBelow((prev) => (prev === gap ? prev : gap));
+    });
+  }, [windowHeight]);
+  const bottomOffset = Math.max((Platform.OS === 'ios' ? clearance - spacing.sm : spacing.md) - gapBelow, spacing.md);
+  const scrollPadding = Math.max(clearance - gapBelow, spacing.md) + (bar ? ACTION_AREA : 0) + spacing.xl;
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.groupedBackground }} contentContainerStyle={{ paddingBottom: clearance + spacing.xl }} showsVerticalScrollIndicator={false}>
-      {header}
-      <View style={[styles.sheet, { backgroundColor: colors.groupedBackground }]}>{children}</View>
-    </ScrollView>
+    <View ref={ref} onLayout={measure} style={{ flex: 1, backgroundColor: colors.groupedBackground }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: scrollPadding }} showsVerticalScrollIndicator={false}>
+        {header}
+        <View style={[styles.sheet, { backgroundColor: colors.groupedBackground }]}>{children}</View>
+      </ScrollView>
+      {bar ? (
+        <View style={[styles.actionArea, { bottom: bottomOffset }]} pointerEvents="box-none">
+          <LinearGradient pointerEvents="none" colors={['transparent', colors.groupedBackground, colors.groupedBackground]} locations={[0, 0.35, 1]} style={styles.actionFade} />
+          {bar}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -101,10 +127,19 @@ export function WorkerToday({ combined = false }: { combined?: boolean }) {
     return <ClockInScreen moreWork={closedToday} />;
   }
 
-  const nextId = items.find((i) => !i.done)?.id;
+  const nextItem = items.find((i) => !i.done);
+  const nextId = nextItem?.id;
+  let bar: React.ReactNode = null;
+  if (nextItem?.kind === 'stop') {
+    const { stop, route } = nextItem;
+    bar = <StopActionBar stop={stop} route={route} leader={actions.isLeader(route)} starting={actions.startingStopId === stop.id} onArrive={() => actions.arrive(stop)} onFinish={() => actions.finish(stop)} />;
+  } else if (nextItem?.kind === 'job') {
+    const { job } = nextItem;
+    bar = <ActionBar label={t('OPEN JOB')} icon="arrow-right-circle" onPress={() => router.push(`/(worker)/job/${job.id}` as any)} />;
+  }
   let lastRouteId: string | undefined;
   return (
-    <Sheet header={<TodayHeader title={t('Today')} subtitle={anyWork ? undefined : greeting} />}>
+    <Sheet header={<TodayHeader title={t('Today')} subtitle={anyWork ? undefined : greeting} />} bar={bar}>
       {!anyWork ? (
         <Message icon="calendar" title={t('No route today')} text={t("You're all set. There are no stops for you today.")} />
       ) : (
@@ -125,13 +160,8 @@ export function WorkerToday({ combined = false }: { combined?: boolean }) {
                 {showRoute ? <Text style={[typeScale.overline, { color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.sm }]}>{(item.route.name || t('Route')).toUpperCase()}</Text> : null}
                 <StopCard
                   stop={item.stop}
-                  route={item.route}
                   state={state}
-                  leader={actions.isLeader(item.route)}
-                  starting={actions.startingStopId === item.stop.id}
                   onOpen={() => actions.open(item.stop)}
-                  onArrive={() => actions.arrive(item.stop)}
-                  onFinish={() => actions.finish(item.stop)}
                   onDirections={() => actions.directions(item.stop)}
                 />
               </View>
@@ -149,4 +179,6 @@ const styles = StyleSheet.create({
   sheet: { marginTop: -SHEET_RADIUS, borderTopLeftRadius: SHEET_RADIUS, borderTopRightRadius: SHEET_RADIUS, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   message: { alignItems: 'center', paddingVertical: spacing['3xl'], paddingHorizontal: spacing.lg },
   messageIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  actionArea: { position: 'absolute', left: spacing.lg, right: spacing.lg, alignItems: 'stretch' },
+  actionFade: { position: 'absolute', left: -spacing.lg, right: -spacing.lg, top: -spacing.xl, bottom: -spacing['3xl'] },
 });

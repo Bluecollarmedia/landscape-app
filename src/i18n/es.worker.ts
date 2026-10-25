@@ -373,6 +373,7 @@ export const ES_WORKER: Record<string, string> = {
   'All done for today!': '¡Todo listo por hoy!',
   'Great work. Your work is complete.': 'Buen trabajo. Tu trabajo está completo.',
   'Great work. Your workday closes by itself.': 'Buen trabajo. Tu jornada se cierra sola.',
+  'Finished': 'Terminado',
   'Open job': 'Abrir trabajo',
   'OPEN JOB': 'ABRIR TRABAJO',
   '1 task': '1 tarea',

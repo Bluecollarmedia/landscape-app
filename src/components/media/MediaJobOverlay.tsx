@@ -69,10 +69,25 @@ export function MediaJobOverlay({ rowId, onDiscard, localOnly }: { rowId?: strin
   }
 
   const label = job.status === 'preparing' ? t('Preparing') : t('Uploading');
+  // While the file is being sent the phone reports how much has gone: a real bar with a percent. Before that (preparing, or the
+  // first moment of the upload), a spinner.
+  const pct = job.status === 'uploading' && typeof job.progress === 'number' ? Math.round(Math.max(0, Math.min(1, job.progress)) * 100) : null;
   return (
-    <View style={[StyleSheet.absoluteFill, styles.box, { backgroundColor: 'rgba(0,0,0,0.45)' }]} accessibilityLabel={job.bytesOut && job.bytesIn ? t('{label}, {from} to {to}', { label, from: formatBytes(job.bytesIn), to: formatBytes(job.bytesOut) }) : label}>
-      <ActivityIndicator color="#FFFFFF" />
-      <Text style={[typeScale.caption, styles.text]}>{label}</Text>
+    <View style={[StyleSheet.absoluteFill, styles.box, { backgroundColor: 'rgba(0,0,0,0.45)' }]} accessibilityLabel={pct !== null ? `${label} ${pct}%` : job.bytesOut && job.bytesIn ? t('{label}, {from} to {to}', { label, from: formatBytes(job.bytesIn), to: formatBytes(job.bytesOut) }) : label}>
+      {pct !== null ? (
+        <>
+          <Text style={[typeScale.caption, styles.text, { fontWeight: '700' }]}>{pct}%</Text>
+          <View style={styles.track}>
+            <View style={[styles.fill, { width: `${pct}%` }]} />
+          </View>
+          <Text style={[typeScale.caption, styles.text]}>{label}</Text>
+        </>
+      ) : (
+        <>
+          <ActivityIndicator color="#FFFFFF" />
+          <Text style={[typeScale.caption, styles.text]}>{label}</Text>
+        </>
+      )}
     </View>
   );
 }
@@ -83,4 +98,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   btn: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.25)' },
   btnText: { color: '#FFFFFF', fontWeight: '700' },
+  track: { alignSelf: 'stretch', marginHorizontal: 6, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 2, backgroundColor: '#FFFFFF' },
 });

@@ -37,7 +37,7 @@ function guessContentType(uri: string, mimeType?: string): { contentType: string
  * its public URL. `folder` groups files, e.g. `${companyId}/projects/${projectId}`.
  * Already-remote URLs (http/https) are returned unchanged.
  */
-export async function uploadImage(localUri: string, folder: string, mimeType?: string): Promise<{ url: string; key: string }> {
+export async function uploadImage(localUri: string, folder: string, mimeType?: string, onProgress?: (p: number) => void): Promise<{ url: string; key: string }> {
   if (!isSupabaseConfigured || /^https?:\/\//i.test(localUri)) {
     return { url: localUri, key: localUri };
   }
@@ -54,7 +54,7 @@ export async function uploadImage(localUri: string, folder: string, mimeType?: s
     }
   }
   try {
-    if (r2Enabled) return await uploadToR2(localUri, folder, contentType);
+    if (r2Enabled) return await uploadToR2(localUri, folder, contentType, onProgress);
 
     const key = `${folder}/${uuid()}.${ext}`;
 
@@ -87,7 +87,7 @@ export async function requireSession(): Promise<void> {
   if (!data?.session) throw new Error(SIGNED_OUT_UPLOAD_MESSAGE);
 }
 
-async function uploadToR2(localUri: string, folder: string, contentType: string): Promise<{ url: string; key: string }> {
+async function uploadToR2(localUri: string, folder: string, contentType: string, onProgress?: (p: number) => void): Promise<{ url: string; key: string }> {
   const { putFile, localFileSize } = require('./uploadFile') as typeof import('./uploadFile');
   const size = await localFileSize(localUri);
   // The owner's max file size (More > Storage). The media function checks it again on the server.
@@ -100,7 +100,7 @@ async function uploadToR2(localUri: string, folder: string, contentType: string)
   if (error || !data?.uploadUrl) throw new Error(error?.message ?? data?.error ?? 'no upload link');
 
   // Sent by the phone's own file upload on a phone (JavaScript fetch + Blob is unreliable there); fetch on the web.
-  const sent = await putFile(localUri, data.uploadUrl, contentType, contentType.startsWith('video/') ? 300_000 : 90_000);
+  const sent = await putFile(localUri, data.uploadUrl, contentType, contentType.startsWith('video/') ? 300_000 : 90_000, onProgress);
   if (sent.status < 200 || sent.status >= 300) {
     const code = sent.body.match(/<Code>([^<]+)<\/Code>/)?.[1];
     throw new Error(`The storage server answered ${sent.status}${code ? ` (${code})` : ''}`);

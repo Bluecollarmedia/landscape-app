@@ -25,7 +25,7 @@ export function shouldRetryStatus(status: number): boolean {
   return status === 408 || status === 429 || (status >= 500 && status <= 599);
 }
 
-export async function putFile(localUri: string, url: string, contentType: string, timeoutMs: number): Promise<PutResult> {
+export async function putFile(localUri: string, url: string, contentType: string, timeoutMs: number, onProgress?: (p: number) => void): Promise<PutResult> {
   if (Platform.OS === 'web') {
     const stop = new AbortController();
     const timer = setTimeout(() => stop.abort(), timeoutMs);
@@ -59,6 +59,8 @@ export async function putFile(localUri: string, url: string, contentType: string
       httpMethod: 'PUT',
       headers: { 'Content-Type': contentType },
       uploadType: legacy.FileSystemUploadType.BINARY_CONTENT,
+    }, (sent) => {
+      if (onProgress && sent.totalBytesExpectedToSend > 0) onProgress(sent.totalBytesSent / sent.totalBytesExpectedToSend);
     });
     try {
       const res = await withTimeout(task.uploadAsync(), timeoutMs, () => {

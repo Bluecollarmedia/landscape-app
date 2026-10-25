@@ -37,7 +37,7 @@ export async function chooseProfilePhoto(source: ProfilePhotoSource, opts: { aft
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     if (result.canceled || !result.assets?.[0]) return { status: 'cancelled' };
 
-    const a = { ...result.assets[0], uri: keepPicked(result.assets[0].uri) };
+    const a = { ...result.assets[0], uri: await keepPicked(result.assets[0].uri) };
     // `uri` is the automatic centred square (the fallback); `raw` is the untouched picture for the crop screen.
     return { status: 'picked', uri: await squareAvatarUri(a.uri, a.width, a.height), raw: { uri: a.uri, width: a.width, height: a.height } };
   } catch (err) {

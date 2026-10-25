@@ -25,7 +25,7 @@ export async function pickImage(source: 'camera' | 'library', opts: { afterSheet
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     if (result.canceled || !result.assets?.[0]) return { status: 'cancelled' };
     const a = result.assets[0];
-    return { status: 'picked', uri: keepPicked(a.uri), width: a.width, height: a.height, mimeType: a.mimeType, fileName: a.fileName ?? undefined, size: a.fileSize };
+    return { status: 'picked', uri: await keepPicked(a.uri), width: a.width, height: a.height, mimeType: a.mimeType, fileName: a.fileName ?? undefined, size: a.fileSize };
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err ?? '');
     return { status: 'error', message: `${source === 'camera' ? tr("Couldn't open the camera. Please try again.") : tr("Couldn't open your photos. Please try again.")}${raw ? ` (${raw})` : ''}` };

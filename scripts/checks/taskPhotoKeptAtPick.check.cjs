@@ -9,12 +9,12 @@ let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + detail}`); };
 
 const helper = read('src/lib/keepPickedFile.ts');
-check('1 the helper copies a picked file into the media-queue folder and never throws', /new File\(uri\)\.copy\(dest\)/.test(helper) && /'media-queue'/.test(helper) && /catch \{\s*return undefined;/.test(helper));
-check('2 the original address is the fallback for screens that never failed before', /copyPickedFile\(uri, kind\) \?\? uri/.test(helper));
+check('1 the helper copies a picked file into the media-queue folder, falls back to re-saving the picture, and says why when both fail', /new File\(uri\)\.copy\(dest\)/.test(helper) && /'media-queue'/.test(helper) && /ImageManipulator\.manipulate\(uri\)/.test(helper) && /return \{ why:/.test(helper));
+check('2 the original address is the fallback for screens that never failed before', /\(await keepPickedFileAsync\(uri, kind\)\)\.uri \?\? uri/.test(helper));
 check('3 old copies are swept after 3 days, never one a pending upload still needs', /KEEP_MS = 3 \* 24/.test(helper) && /needed\.has\(item\.uri\)/.test(helper) && /sweepKeptFiles\(mediaQueue\.pending\(\)/.test(read('src/lib/mediaQueueRuntime.ts')));
 
 const sites = {
-  'src/data/taskMedia.ts': /copyPickedFile\(asset\.uri, mediaType\)/,
+  'src/data/taskMedia.ts': /keepPickedFileAsync\(asset\.uri, mediaType\)/,
   'src/components/snow/pickSnowMedia.ts': /keepPicked\(asset\.uri, mediaType\)/,
   'src/components/issues/ReportIssueScreen.tsx': /keepPicked\(a\.uri\)/,
   'src/components/media/HeaderPhotoField.tsx': /keepPicked\(asset\.uri\)/,
@@ -35,7 +35,7 @@ const missing = pickers.filter((f) => !/keepPicked|copyPickedFile/.test(read(f))
 check('5 every file that opens the photo library or camera uses it', missing.length === 0, missing.join(', '));
 
 const tm = read('src/data/taskMedia.ts');
-check('6 on a task, the copy happens before the storage check, and an unreadable file is turned away with a message', tm.indexOf('copyPickedFile(asset.uri') < tm.indexOf('await storageProblem(') && /couldn't be read from your phone/.test(tm));
+check('6 on a task, the copy happens before the storage check, and an unreadable file is turned away with a message', tm.indexOf('keepPickedFileAsync(asset.uri') < tm.indexOf('await storageProblem(') && /couldn't be read from your phone \(\$\{kept\.why\}\)/.test(tm));
 check('7 the "file is gone" error says which file', /\.\.\.\$\{localUri\.slice\(-48\)\}/.test(read('src/lib/uploadFile.ts')));
 const comp = read('src/lib/mediaCompress.ts');
 check('8 videos are never compressed: they go up exactly as picked', /Videos are never compressed/.test(comp) && !/compressor\.Video\.compress/.test(comp));

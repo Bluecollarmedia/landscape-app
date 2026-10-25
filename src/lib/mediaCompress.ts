@@ -53,10 +53,18 @@ export async function prepareImage(job: MediaJob): Promise<Prepared> {
     const saved = await ref.saveAsync({ compress: plan.action === 'compress' ? plan.quality : 0.5, format: SaveFormat.JPEG });
     let uri = saved.uri;
     if (Platform.OS !== 'web') {
+      // The LEGACY file API, like the picker copy: on some phones the new File API cannot see files the image tools just wrote, so a copy made
+      // with it can be missing (the upload then said "the file is gone"). Whatever happens, never hand on an address that is not a real file.
+      const legacy = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
       const dest = outFile('jpg');
-      new File(saved.uri).copy(dest);
-      try { new File(saved.uri).delete(); } catch { /* cache file; harmless */ }
-      uri = dest.uri;
+      try {
+        await legacy.copyAsync({ from: saved.uri, to: dest.uri });
+        const info = await legacy.getInfoAsync(dest.uri);
+        if (info.exists && (info.size ?? 0) > 0) {
+          uri = dest.uri;
+          try { await legacy.deleteAsync(saved.uri, { idempotent: true }); } catch { /* cache file; harmless */ }
+        }
+      } catch { /* keep the prepared file where it is */ }
     }
     const bytes = Platform.OS === 'web' ? undefined : sizeOf(uri);
     // A "compressed" file that came out BIGGER than a small original is not an improvement: keep the original in that case.

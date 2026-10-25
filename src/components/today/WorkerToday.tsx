@@ -47,7 +47,7 @@ function Sheet({ header, children, bar }: { header: React.ReactNode; children: R
   const scrollPadding = Math.max(clearance - gapBelow, spacing.md) + (bar ? ACTION_AREA : 0) + spacing.xl;
   return (
     <View ref={ref} onLayout={measure} style={{ flex: 1, backgroundColor: colors.groupedBackground }}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: scrollPadding }} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: scrollPadding }} showsVerticalScrollIndicator={false}>
         {header}
         <View style={[styles.sheet, { backgroundColor: colors.groupedBackground }]}>{children}</View>
       </ScrollView>

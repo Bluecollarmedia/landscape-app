@@ -28,7 +28,7 @@ export default function MoreScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView
+      <ScrollView bounces={false}
         contentContainerStyle={{ paddingBottom: tabBarClearance + spacing.lg }}
         showsVerticalScrollIndicator={false}
       >

@@ -238,7 +238,7 @@ export default function CreateCompanyScreen() {
         {t('Step {n} of 3', { n: stepNumber })} — {stepLabels[step]}
       </Text>
 
-      <KeyboardAwareScrollView ref={scrollRef} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bounces={false} ref={scrollRef} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {error ? (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
             <Icon name="alert-circle" size={16} color={semantic.error} />

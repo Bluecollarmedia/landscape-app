@@ -168,7 +168,7 @@ export function EditProfileScreen({ requireAll = true, backLabel = 'Settings' }:
         <View style={{ width: 60 }} />
       </View>
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.photoSection}>
           <Pressable style={styles.avatarWrap} onPress={() => setPhotoSheetOpen(true)}>
             <Avatar firstName={firstName} lastName={lastName} size={96} uri={avatarUrl} />

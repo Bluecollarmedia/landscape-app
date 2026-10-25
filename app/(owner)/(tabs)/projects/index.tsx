@@ -91,7 +91,7 @@ export default function ProjectsListScreen() {
           />
         </View>
       ) : (
-        <SectionList
+        <SectionList bounces={false}
           sections={sections}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (

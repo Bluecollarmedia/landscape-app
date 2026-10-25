@@ -152,7 +152,7 @@ export default function WorkersListScreen() {
           />
         </View>
       ) : (
-        <FlatList
+        <FlatList bounces={false}
           data={displayedWorkers}
           keyExtractor={(item) => item.person.id}
           contentContainerStyle={styles.listContent}

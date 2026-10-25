@@ -51,7 +51,7 @@ export default function RoutesScreen() {
         subtitle="Each day’s stops, crew and what got done"
         right={<RaisedAddButton onPress={newRoute} accessibilityLabel="New route" />}
       />
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance + spacing['3xl'] }]}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance + spacing['3xl'] }]}>
         {m.routes.length === 0 ? (
           <EmptyState
             icon="map"

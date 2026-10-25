@@ -94,7 +94,7 @@ export function TruckDocumentSheet({ visible, onClose, onSubmit }: Props) {
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>Add insurance</Text>
             <Pressable onPress={onClose} disabled={busy} hitSlop={10}><Text style={[typeScale.bodySmall, { color: colors.textSecondary, fontWeight: '600' }]}>Cancel</Text></Pressable>
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 520 }} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}>
+          <ScrollView bounces={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 520 }} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}>
             <View style={[styles.fileBox, { borderColor: file ? colors.primary : colors.border, backgroundColor: colors.backgroundSecondary }]}>
               {file ? (
                 <View style={styles.fileRow}>

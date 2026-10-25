@@ -33,7 +33,7 @@ export default function AdminPowersScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>Admin powers</Text>
         <View style={{ width: 24 }} />
       </View>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.lg }]}>
           Admins run the day to day: projects, schedules, customers, assignments. These five more sensitive powers are on by default; switch off any you want to keep for yourself.
           Admins can never delete the company, deactivate or replace the owner, or make themselves an owner, whatever these say.

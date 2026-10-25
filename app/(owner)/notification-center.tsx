@@ -103,7 +103,7 @@ export default function NotificationCenterScreen() {
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {sorted.map((n) => {
           const eventConfig = EVENT_ICONS[n.eventType] ?? FALLBACK_ICON;
           const isUnread = n.status === 'unread';

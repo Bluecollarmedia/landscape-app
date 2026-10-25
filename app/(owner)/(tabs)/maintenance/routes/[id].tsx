@@ -88,7 +88,7 @@ export default function RouteDetailScreen() {
         title={formatServiceDate(route.serviceDate, { relative: true, today })}
         subtitle={[route.name, formatServiceDate(route.serviceDate)].filter(Boolean).join(' · ')}
       />
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance + spacing['3xl'] }]}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance + spacing['3xl'] }]}>
         {/* Summary */}
         <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
           <View style={styles.rowBetween}>

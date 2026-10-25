@@ -125,7 +125,7 @@ export default function MaintenanceStopScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView
+      <ScrollView bounces={false}
         contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: 220 + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >

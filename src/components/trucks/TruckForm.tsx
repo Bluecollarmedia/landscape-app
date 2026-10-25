@@ -128,7 +128,7 @@ export function TruckForm({ truckId }: { truckId?: string }) {
         <View style={{ width: 44 }} />
       </View>
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Pressable style={[styles.photoBox, { borderColor: colors.borderLight }]} onPress={() => setPhotoSheet(true)} accessibilityRole="button" accessibilityLabel={photoUri ? 'Change the truck photo' : 'Add a truck photo'}>
           {photoUri ? (
             <>

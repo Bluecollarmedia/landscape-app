@@ -45,7 +45,7 @@ export default function SnowOwnerMoreScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScrollView
+      <ScrollView bounces={false}
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: tabBarClearance + spacing.lg }}

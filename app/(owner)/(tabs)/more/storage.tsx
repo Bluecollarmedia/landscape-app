@@ -77,7 +77,7 @@ export default function StorageScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <Header colors={colors} insets={insets} onBack={() => router.back()} />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {error && (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
             <Icon name="alert-circle" size={16} color={semantic.error} />

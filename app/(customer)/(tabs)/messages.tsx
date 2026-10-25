@@ -81,7 +81,7 @@ export default function CustomerMessagesScreen() {
 
       {projectId ? (
         <>
-          <ScrollView
+          <ScrollView bounces={false}
             ref={scrollRef}
             style={{ flex: 1 }}
             keyboardShouldPersistTaps="handled"

@@ -72,7 +72,7 @@ export default function DocumentDefaultsScreen() {
         }
       />
 
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollView bounces={false}
         bottomOffset={KEYBOARD_GAP}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: clearance + spacing['2xl'] }}

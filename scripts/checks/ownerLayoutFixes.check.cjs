@@ -9,7 +9,7 @@ check('2 Quotes & Invoices no longer floats buttons over the tab bar (a + in the
 const st = read('app/(owner)/(tabs)/more/snow-team.tsx');
 check('3 Snow Team always clears the tab bar (Show past requests reachable)', /contentContainerStyle=\{\[styles\.content, \{ paddingBottom: tabBarClearance \+ spacing\.lg \}\]\}/.test(st) && !/asTab && \{ paddingBottom/.test(st));
 const dash = read('app/(owner)/(tabs)/index.tsx');
-check('4 Dashboard scrolls to the top whenever it is focused and when its tab is tapped again', /useFocusEffect\(toTop\)/.test(dash) && /addListener\('tabPress'/.test(dash) && /<ScrollView ref=\{scrollRef\}/.test(dash));
+check('4 Dashboard scrolls to the top whenever it is focused and when its tab is tapped again', /useFocusEffect\(toTop\)/.test(dash) && /addListener\('tabPress'/.test(dash) && /<ScrollView( bounces=\{false\})? ref=\{scrollRef\}/.test(dash));
 const tr = read('app/(owner)/(tabs)/more/trucks/index.tsx');
 check('5 Trucks has no entrance bounce', !/FadeInItem/.test(tr));
 const aw = read('app/(owner)/worker-new.tsx');

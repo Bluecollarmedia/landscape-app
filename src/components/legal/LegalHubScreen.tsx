@@ -21,7 +21,7 @@ export function LegalHubScreen({ basePath }: { basePath: string }) {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader title={t('Legal & Support')} />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['3xl'] }} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing['3xl'] }} showsVerticalScrollIndicator={false}>
         <ListSection>
           {LEGAL_ROWS.map((r) => (
             <ListRow key={r.slug} icon={r.icon} title={t(r.title)} subtitle={t(r.subtitle)} showChevron onPress={() => router.push(legalDocPath(basePath, r.slug) as any)} />

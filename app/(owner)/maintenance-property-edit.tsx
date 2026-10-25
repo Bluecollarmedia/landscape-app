@@ -235,7 +235,7 @@ export default function MaintenancePropertyEditScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollView bounces={false}
         bottomOffset={KEYBOARD_GAP}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing['3xl'] }]}
         showsVerticalScrollIndicator={false}

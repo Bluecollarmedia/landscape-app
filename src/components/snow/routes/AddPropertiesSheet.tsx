@@ -157,7 +157,7 @@ export function AddPropertiesSheet({ visible, onClose, properties, services, ser
               )
             ) : null}
 
-            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }} keyboardShouldPersistTaps="handled">
+            <ScrollView bounces={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }} keyboardShouldPersistTaps="handled">
               {rows.length === 0 ? (
                 <View style={styles.empty}>
                   <Icon name="home" size={40} color={colors.textTertiary} />

@@ -64,7 +64,7 @@ export default function TruckDetailScreen() {
         <GlassIconButton icon="edit-2" onPress={() => router.push({ pathname: '/(owner)/more/trucks/edit', params: { id: truck.id } } as any)} accessibilityLabel="Edit this truck" />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {truck.photoUrl ? (
           <Pressable onPress={() => setViewPhoto(true)} accessibilityRole="button" accessibilityLabel="View photo">
             <OptimizedImage source={truck.photoUrl} style={styles.photo} />

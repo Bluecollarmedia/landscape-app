@@ -187,7 +187,7 @@ export default function ApprovePage() {
         <DocumentPreview html={html} />
       </View>
 
-      <ScrollView
+      <ScrollView bounces={false}
         style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.separator }]}
         contentContainerStyle={[styles.inner, styles.barContent, { paddingBottom: insets.bottom + spacing.md }]}
         keyboardShouldPersistTaps="handled"

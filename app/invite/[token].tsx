@@ -219,7 +219,7 @@ export default function InviteScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing.xl }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={[styles.scroll, { paddingTop: insets.top + spacing.xl }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* English | Español: someone can read this page in Spanish before they sign up. English is the default. */}
         <View style={{ alignItems: 'flex-end', marginBottom: spacing.md }}><LanguageSwitch /></View>
         <RNImage source={require('../../assets/images/logo-full.png')} style={styles.logo} resizeMode="contain" />

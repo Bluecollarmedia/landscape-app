@@ -792,7 +792,7 @@ export default function ProjectDetailScreen() {
                   <Icon name="x" size={24} color={colors.textSecondary} />
                 </Pressable>
               </View>
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <ScrollView bounces={false} style={styles.modalBody} showsVerticalScrollIndicator={false}>
                 {availableWorkers.length === 0 ? (
                   <Text style={[typeScale.bodySmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>
                     Every active worker is already on this project's team.
@@ -2397,7 +2397,7 @@ export default function ProjectDetailScreen() {
         />
       )}
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP}
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -2456,7 +2456,7 @@ export default function ProjectDetailScreen() {
             </View>
 
             {selectedTask && (
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <ScrollView bounces={false} style={styles.modalBody} showsVerticalScrollIndicator={false}>
                 <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Title</Text>
                 <TextInput
                   style={[styles.composerInput, { backgroundColor: colors.surface, borderColor: colors.borderLight, color: colors.textPrimary, marginTop: spacing.xs }]}
@@ -2610,7 +2610,7 @@ export default function ProjectDetailScreen() {
               </Pressable>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView bounces={false} style={styles.modalBody} showsVerticalScrollIndicator={false}>
               <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Title</Text>
               <TextInput
                 style={[styles.composerInput, { backgroundColor: colors.surface, borderColor: colors.borderLight, color: colors.textPrimary, marginTop: spacing.xs }]}
@@ -2692,7 +2692,7 @@ export default function ProjectDetailScreen() {
               </Pressable>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView bounces={false} style={styles.modalBody} showsVerticalScrollIndicator={false}>
               {newPhotoUri && (
                 <OptimizedImage source={newPhotoUri} style={[styles.reviewImage, { marginTop: spacing.lg }]} />
               )}
@@ -2780,7 +2780,7 @@ export default function ProjectDetailScreen() {
             </View>
 
             {reviewPhoto && (
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <ScrollView bounces={false} style={styles.modalBody} showsVerticalScrollIndicator={false}>
                 <Pressable style={styles.detailPhotoWrap} onPress={() => setShowPhotoViewer(true)}>
                   <OptimizedImage
                     source={reviewPhoto.fileUrl}
@@ -2978,7 +2978,7 @@ export default function ProjectDetailScreen() {
             {p.customer && (() => {
               const access = customerAccess.getAccessForProject(p.id);
               return (
-                <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                <ScrollView bounces={false} style={styles.modalBody} showsVerticalScrollIndicator={false}>
                   <View style={styles.manageAccessRow}>
                     <Text style={[typeScale.labelSmall, { color: colors.textTertiary }]}>Customer</Text>
                     <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, marginTop: 2 }]}>
@@ -3035,7 +3035,7 @@ export default function ProjectDetailScreen() {
               </Pressable>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView bounces={false} style={styles.modalBody} showsVerticalScrollIndicator={false}>
               <View style={[styles.previewBanner, { backgroundColor: colors.primarySurface }]}>
                 <Icon name="eye" size={14} color={colors.primary} />
                 <Text style={[typeScale.caption, { color: colors.primary, marginLeft: spacing.xs, flex: 1 }]}>

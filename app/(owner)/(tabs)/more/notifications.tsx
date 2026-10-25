@@ -52,7 +52,7 @@ export default function NotificationPreferencesScreen() {
         onChange={setTab}
       />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {tab === 'defaults' && (
           <>
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>

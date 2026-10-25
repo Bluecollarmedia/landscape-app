@@ -249,7 +249,7 @@ export default function DocumentEditScreen() {
       </View>
 
       {/* The owner's private notes for this project (what to order, measurements, materials, pictures). Never on the document. */}
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollView bounces={false}
         ref={scrollRef}
         bottomOffset={KEYBOARD_GAP}
         keyboardShouldPersistTaps="handled"

@@ -398,7 +398,7 @@ export default function SnowActivityScreen() {
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.md }]}>
               Filter by {pickingFilter?.label.toLowerCase()}
             </Text>
-            <ScrollView style={{ maxHeight: 420 }}>
+            <ScrollView bounces={false} style={{ maxHeight: 420 }}>
               {pickingFilter && [{ value: undefined as string | undefined, label: `Any ${pickingFilter.label.toLowerCase()}`, count: undefined as number | undefined }]
                 .concat(pickOptions.map((o) => ({ value: o.value, label: optionLabel(o), count: o.count })))
                 .map((o) => {

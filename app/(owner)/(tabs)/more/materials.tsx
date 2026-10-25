@@ -32,7 +32,7 @@ export default function MaterialsOverviewScreen() {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader title="Materials" subtitle="Jobs that need materials ordered or picked up, soonest first." />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: clearance + spacing['2xl'], gap: spacing.md }}>
+      <ScrollView bounces={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: clearance + spacing['2xl'], gap: spacing.md }}>
         {!db.ready ? (
           <LoadingSpinner />
         ) : rows.length === 0 ? (

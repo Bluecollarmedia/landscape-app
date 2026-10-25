@@ -64,7 +64,7 @@ export default function SnowPropertyScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollView bounces={false}
         bottomOffset={KEYBOARD_GAP}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing['3xl'] }}
         showsVerticalScrollIndicator={false}

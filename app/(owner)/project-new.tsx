@@ -202,7 +202,7 @@ export default function NewProjectScreen() {
         </View>
       </View>
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.form}>
           {isEdit && (
             <Card title="Status & Progress" style={{ marginBottom: spacing.lg }}>

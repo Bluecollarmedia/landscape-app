@@ -72,7 +72,7 @@ export function ScreenContainer({
 
   const scrollContent = scrollable ? (
     // Scrolls the focused field above the keyboard.
-    <KeyboardAwareScrollView
+    <KeyboardAwareScrollView bounces={false}
       bottomOffset={KEYBOARD_GAP}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"

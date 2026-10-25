@@ -99,7 +99,7 @@ export default function YardLocationScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>Yard Location</Text>
       </View>
 
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollView bounces={false}
         bottomOffset={KEYBOARD_GAP}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance + spacing.lg }]}
         keyboardShouldPersistTaps="handled"

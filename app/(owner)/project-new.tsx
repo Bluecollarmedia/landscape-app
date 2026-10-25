@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Platform, Image }
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import * as ImagePicker from 'expo-image-picker';
+import { keepPicked } from '@/lib/keepPickedFile';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -75,7 +76,7 @@ export default function NewProjectScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
-    if (!result.canceled && result.assets?.[0]) setPhotoUri(result.assets[0].uri);
+    if (!result.canceled && result.assets?.[0]) setPhotoUri(keepPicked(result.assets[0].uri));
   }
 
   const customers = useMemo(

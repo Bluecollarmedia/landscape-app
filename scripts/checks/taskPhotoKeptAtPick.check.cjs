@@ -1,16 +1,43 @@
 // Run: node scripts/checks/taskPhotoKeptAtPick.check.cjs
-// A task photo is copied into the app's own folder the moment it is picked (before the storage check), so the phone clearing the picker's
-// temporary copy can no longer leave the upload with "the file is gone". The error also names the file when it still happens.
+// Anything a person picks (photo library or camera) is copied into the app's own folder the moment it is picked, so the phone clearing the
+// picker's temporary copy can no longer leave an upload with "the file is gone". Every screen that picks a photo or video does it.
+// Videos are never compressed.
 const fs = require('fs');
 const path = require('path');
 const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8');
 let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + detail}`); };
+
+const helper = read('src/lib/keepPickedFile.ts');
+check('1 the helper copies a picked file into the media-queue folder and never throws', /new File\(uri\)\.copy\(dest\)/.test(helper) && /'media-queue'/.test(helper) && /catch \{\s*return undefined;/.test(helper));
+check('2 the original address is the fallback for screens that never failed before', /copyPickedFile\(uri, kind\) \?\? uri/.test(helper));
+check('3 old copies are swept after 3 days, never one a pending upload still needs', /KEEP_MS = 3 \* 24/.test(helper) && /needed\.has\(item\.uri\)/.test(helper) && /sweepKeptFiles\(mediaQueue\.pending\(\)/.test(read('src/lib/mediaQueueRuntime.ts')));
+
+const sites = {
+  'src/data/taskMedia.ts': /copyPickedFile\(asset\.uri, mediaType\)/,
+  'src/components/snow/pickSnowMedia.ts': /keepPicked\(asset\.uri, mediaType\)/,
+  'src/components/issues/ReportIssueScreen.tsx': /keepPicked\(a\.uri\)/,
+  'src/components/media/HeaderPhotoField.tsx': /keepPicked\(asset\.uri\)/,
+  'src/lib/profilePhoto.ts': /keepPicked\(result\.assets\[0\]\.uri\)/,
+  'src/lib/stopPhotoPicker.ts': /keepPicked\(a\.uri\)/,
+  'src/lib/pickImage.ts': /keepPicked\(a\.uri\)/,
+  'src/data/timePhotos.ts': /keepPicked\(shot\.assets\[0\]\.uri\)/,
+  'app/(owner)/(tabs)/projects/[id].tsx': /keepPicked\(result\.assets\[0\]\.uri\)/,
+  'app/(owner)/project-new.tsx': /keepPicked\(result\.assets\[0\]\.uri\)/,
+  'app/(worker)/task/[id].tsx': /keepPicked\(result\.assets\[0\]\.uri\)/,
+};
+for (const [file, re] of Object.entries(sites)) check(`4 ${file} keeps the picked file at once`, re.test(read(file)));
+
+// No picker anywhere is left without it.
+const walk = (d, out = []) => { for (const e of fs.readdirSync(path.join(__dirname, '../..', d), { withFileTypes: true })) { const p = `${d}/${e.name}`; if (e.isDirectory()) walk(p, out); else if (/\.(ts|tsx)$/.test(e.name)) out.push(p); } return out; };
+const pickers = [...walk('src'), ...walk('app')].filter((f) => /launch(ImageLibrary|Camera)Async\(/.test(read(f)));
+const missing = pickers.filter((f) => !/keepPicked|copyPickedFile/.test(read(f)));
+check('5 every file that opens the photo library or camera uses it', missing.length === 0, missing.join(', '));
+
 const tm = read('src/data/taskMedia.ts');
-check('1 each picked file is copied into the app folder (media-queue) as soon as it is picked', /function keepPickedFile/.test(tm) && /new File\(uri\)\.copy\(dest\)/.test(tm) && /'media-queue'/.test(tm));
-check('2 the copy happens before the storage check', tm.indexOf('keepPickedFile(asset.uri') > 0 && tm.indexOf('keepPickedFile(asset.uri') < tm.indexOf('await storageProblem('));
-check('3 a file that cannot be read is turned away with a message, not queued', /couldn't be read from your phone/.test(tm));
-check('4 the queue leaves a file already in the app folder where it is (no second copy)', /includes\('\/media-queue\/'\)/.test(read('src/lib/mediaQueue.ts')));
-check('5 the "file is gone" error says which file', /\.\.\.\$\{localUri\.slice\(-48\)\}/.test(read('src/lib/uploadFile.ts')));
+check('6 on a task, the copy happens before the storage check, and an unreadable file is turned away with a message', tm.indexOf('copyPickedFile(asset.uri') < tm.indexOf('await storageProblem(') && /couldn't be read from your phone/.test(tm));
+check('7 the "file is gone" error says which file', /\.\.\.\$\{localUri\.slice\(-48\)\}/.test(read('src/lib/uploadFile.ts')));
+const comp = read('src/lib/mediaCompress.ts');
+check('8 videos are never compressed: they go up exactly as picked', /Videos are never compressed/.test(comp) && !/compressor\.Video\.compress/.test(comp));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

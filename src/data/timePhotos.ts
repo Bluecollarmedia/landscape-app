@@ -8,6 +8,7 @@
 import { tr } from '@/i18n';
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { keepPicked } from '@/lib/keepPickedFile';
 import { supabase } from '@/lib/supabase';
 import { uploadImage } from '@/lib/media';
 import { db, refresh } from '@/data/store';
@@ -38,7 +39,7 @@ export async function takeTimedPhoto(target: TimedPhotoTarget, phase: Phase): Pr
   }
   const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
   if (shot.canceled || !shot.assets?.[0]) return { ok: false, error: 'No photo was taken.' };
-  const uri = shot.assets[0].uri;
+  const uri = keepPicked(shot.assets[0].uri);
   try {
     const companyId = db.companyId;
     if (target.kind === 'maintenance') {

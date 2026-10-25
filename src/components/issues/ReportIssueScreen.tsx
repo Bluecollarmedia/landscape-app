@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Image, StyleSheet, Platform, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { keepPicked } from '@/lib/keepPickedFile';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassIconButton, Icon, InlineNotice, PressableScale } from '@/components/ui';
@@ -54,7 +55,7 @@ export function ReportIssueScreen() {
     }
     const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 1, allowsMultipleSelection: source === 'library', selectionLimit: 6 };
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
-    if (!result.canceled) setPhotos((cur) => [...cur, ...result.assets.map((a) => a.uri)].slice(0, 8));
+    if (!result.canceled) setPhotos((cur) => [...cur, ...result.assets.map((a) => keepPicked(a.uri))].slice(0, 8));
   }
 
   async function send() {

@@ -14,6 +14,7 @@ import { haptics } from '@/lib/haptics';
 import { db } from '@/data/store';
 import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
 import { PhotoPager } from '@/components/media/PhotoPager';
+import { keepPicked } from '@/lib/keepPickedFile';
 import { useT, tr } from '@/i18n';
 
 export default function TaskDetailScreen() {
@@ -97,7 +98,7 @@ export default function TaskDetailScreen() {
         : await ImagePicker.launchImageLibraryAsync(options);
       if (!result.canceled && result.assets[0]) {
         haptics.success();
-        captureTaskPhoto(task!.id, result.assets[0].uri);
+        captureTaskPhoto(task!.id, keepPicked(result.assets[0].uri));
       }
     } catch {
       if (Platform.OS === 'web') {

@@ -45,6 +45,7 @@ import { ProspectBanner } from '@/components/financials/ProspectBanner';
 import { ProjectMaterials } from '@/components/materials/ProjectMaterials';
 import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
 import { pickTaskMedia, saveTaskMedia, removeTaskMedia, type TaskMediaDraft } from '@/data/taskMedia';
+import { keepPicked } from '@/lib/keepPickedFile';
 
 const today = todayKey();
 
@@ -328,7 +329,7 @@ export default function ProjectDetailScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.7 });
     if (result.canceled || !result.assets?.[0]) return;
-    attachImage('projects', p.id, 'coverPhotoUrl', result.assets[0].uri, `projects/${p.id}`);
+    attachImage('projects', p.id, 'coverPhotoUrl', keepPicked(result.assets[0].uri), `projects/${p.id}`);
   }
 
   function handleSaveNotes() {
@@ -1562,7 +1563,7 @@ export default function ProjectDetailScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (result.canceled || !result.assets?.[0]) return;
-    setNewPhotoUri(result.assets[0].uri);
+    setNewPhotoUri(keepPicked(result.assets[0].uri));
     setNewPhotoType('progress');
     setNewPhotoTaskId('');
     setNewPhotoCaption('');

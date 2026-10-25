@@ -13,6 +13,7 @@ import { db, insertRow, deleteRow } from './store';
 import { removeMedia } from '@/lib/media';
 import { getStorageInfo } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
+import { copyPickedFile } from '@/lib/keepPickedFile';
 import { formatBytes } from '@/types/storage';
 import type { TaskAttachment } from '@/types/project';
 
@@ -101,7 +102,7 @@ export async function pickTaskMedia(alreadyPicked: number): Promise<TaskMediaDra
       skipped.push(`A ${mediaType} is ${formatBytes(sizeBytes)}; the most one file can be is ${formatBytes(MAX_TASK_FILE_BYTES)}.`);
       continue;
     }
-    const kept = keepPickedFile(asset.uri, mediaType);
+    const kept = copyPickedFile(asset.uri, mediaType);
     if (!kept) {
       skipped.push(`A ${mediaType} couldn't be read from your phone. Pick it again.`);
       continue;
@@ -124,25 +125,6 @@ export async function pickTaskMedia(alreadyPicked: number): Promise<TaskMediaDra
   }
   if (skipped.length > 0) notify('Some files weren\'t added', skipped.join('\n'));
   return drafts;
-}
-
-/**
- * Copies a picked file into the app's own folder straight away. The picker's temporary copy can be cleared by the phone while the app is
- * still checking storage, which left the upload with "the file is gone". Returns the new address, or undefined when it can't be read.
- */
-function keepPickedFile(uri: string, kind: 'image' | 'video'): string | undefined {
-  if (Platform.OS === 'web' || /^(https?|data|blob):/i.test(uri)) return uri;
-  try {
-    const { File, Directory, Paths } = require('expo-file-system') as typeof import('expo-file-system');
-    const ext = (uri.split('?')[0].match(/\.([A-Za-z0-9]{2,5})$/)?.[1] ?? (kind === 'video' ? 'mp4' : 'jpg')).toLowerCase();
-    const dir = new Directory(Paths.document, 'media-queue');
-    if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
-    const dest = new File(dir, `pick-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`);
-    new File(uri).copy(dest);
-    return dest.exists ? dest.uri : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 /** Why `bytes` more wouldn't fit under the company's storage limit, if so. */

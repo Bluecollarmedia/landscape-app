@@ -113,7 +113,7 @@ export function SnowDashboardScreen() {
         {active && headline ? (
           <>
             <ActiveStormCard storm={active} headline={headline} />
-            <CrewsSection storm={active} headline={headline} onOpenStorm={() => openStorm(active.id)} />
+            <CrewsSection storm={active} headline={headline} onOpenStorm={() => openStorm(active.id)} onViewAll={() => router.push({ pathname: '/snow/owner/live/[id]', params: { id: active.id } } as never)} />
           </>
         ) : (
           <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }]}>
@@ -217,8 +217,8 @@ function ActiveStormCard({ storm, headline }: { storm: StormOverview; headline: 
   );
 }
 
-function CrewsSection({ storm, headline, onOpenStorm }: {
-  storm: StormOverview; headline: StormHeadline; onOpenStorm: () => void;
+function CrewsSection({ storm, headline, onOpenStorm, onViewAll }: {
+  storm: StormOverview; headline: StormHeadline; onOpenStorm: () => void; onViewAll: () => void;
 }) {
   const { colors } = useTheme();
   const rows = crewRows(storm);
@@ -227,7 +227,7 @@ function CrewsSection({ storm, headline, onOpenStorm }: {
       <View style={styles.sectionHead}>
         <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Routes</Text>
         {rows.length > 0 ? (
-          <Pressable onPress={onOpenStorm} hitSlop={8} accessibilityRole="button" accessibilityLabel="View all routes" style={styles.viewAll}>
+          <Pressable onPress={onViewAll} hitSlop={8} accessibilityRole="button" accessibilityLabel="View all routes" style={styles.viewAll}>
             <Text style={[typeScale.labelLarge, { color: colors.primary }]}>View all</Text>
             <Icon name="chevron-right" size={16} color={colors.primary} />
           </Pressable>

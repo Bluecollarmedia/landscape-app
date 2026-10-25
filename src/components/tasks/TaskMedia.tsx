@@ -40,9 +40,11 @@ interface TaskMediaStripProps {
   onAdd?: () => void;
   /** Shows a remove button on each tile when given. */
   onRemove?: (key: string) => void;
+  /** The items are drafts that have not been saved yet (a task being created): no "Not saved" warning, there is nothing to save yet. */
+  drafts?: boolean;
 }
 
-export function TaskMediaStrip({ items, onOpen, onAdd, onRemove }: TaskMediaStripProps) {
+export function TaskMediaStrip({ items, onOpen, onAdd, onRemove, drafts }: TaskMediaStripProps) {
   const t = useT();
   const { colors } = useTheme();
   return (
@@ -63,7 +65,7 @@ export function TaskMediaStrip({ items, onOpen, onAdd, onRemove }: TaskMediaStri
               </View>
             )}
             {/* Still a local file? Says Preparing / Uploading / Not saved (Retry) so a preview is never mistaken for a saved file. */}
-            <MediaJobOverlay rowId={item.key} localOnly={!/^https?:\/\//i.test(item.uri) && !/^(data|blob):/i.test(item.uri) && !isDemoMode()} />
+            {drafts ? null : <MediaJobOverlay rowId={item.key} localOnly={!/^https?:\/\//i.test(item.uri) && !/^(data|blob):/i.test(item.uri) && !isDemoMode()} />}
           </Pressable>
           {onRemove && (
             <Pressable

@@ -2635,6 +2635,7 @@ export default function ProjectDetailScreen() {
                 Show the crew what to do. Videos can be up to a minute long.
               </Text>
               <TaskMediaStrip
+                drafts
                 items={newTaskMedia}
                 onOpen={(index) => setTaskMediaViewer({ items: newTaskMedia, index })}
                 onAdd={handleAddNewTaskMedia}

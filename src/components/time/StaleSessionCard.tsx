@@ -80,7 +80,7 @@ export function StaleSessionCard({ session, busy, nowMs, onAnswer, error }: {
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md }]}>
               {t('This is only sent to your boss. They set the real time.')}
             </Text>
-            <ScrollView style={{ maxHeight: 360 }}>
+            <ScrollView bounces={false} style={{ maxHeight: 360 }}>
               {choices.length === 0 ? (
                 <Text style={[typeScale.bodySmall, { color: colors.textTertiary, textAlign: 'center', padding: spacing.lg }]}>{t('No times to choose from.')}</Text>
               ) : choices.map((c) => (

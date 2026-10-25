@@ -106,7 +106,7 @@ export default function MaintenancePropertyScreen() {
         right={<GlassIconButton icon="edit-2" onPress={edit} accessibilityLabel="Edit property and services" />}
       />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: clearance + spacing['2xl'] }}>
+      <ScrollView bounces={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: clearance + spacing['2xl'] }}>
         {!p.isActive && (
           <View style={[styles.banner, { backgroundColor: colors.backgroundTertiary }]}>
             <Icon name="pause-circle" size={16} color={colors.textSecondary} />

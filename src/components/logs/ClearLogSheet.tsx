@@ -120,7 +120,7 @@ export function ClearLogSheet({ visible, onClose, title, what = 'log', modes, ye
               ) : null}
               {error ? <Text style={[typeScale.caption, { color: colors.error, marginTop: spacing.sm }]}>{error}</Text> : null}
               <Text style={[typeScale.overline, { color: colors.textTertiary, marginTop: spacing.lg, marginBottom: spacing.xs }]}>WHICH PERIOD?</Text>
-              <ScrollView style={{ maxHeight: 340 }}>
+              <ScrollView bounces={false} style={{ maxHeight: 340 }}>
                 {scopes.map((s, i) => (
                   <Pressable
                     key={scopeLabel(s)}

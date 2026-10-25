@@ -116,7 +116,7 @@ export default function PayrollScreen() {
         </Pressable>
       </View>
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryRow, { gap: spacing.md }]}>
           <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }, shadow.sm]}>
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>ESTIMATED TOTAL</Text>

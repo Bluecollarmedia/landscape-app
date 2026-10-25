@@ -131,7 +131,7 @@ export default function TaskDetailScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <Header onBack={() => router.back()} colors={colors} insets={insets} />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{task.title}</Text>
         <View style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}>
           <StatusBadge label={badge.label} status={badge.status} />

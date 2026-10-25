@@ -83,7 +83,7 @@ export default function FinancialsOverviewScreen() {
         }
       />
 
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollView bounces={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: clearance + spacing['3xl'] }}
         showsVerticalScrollIndicator={false}

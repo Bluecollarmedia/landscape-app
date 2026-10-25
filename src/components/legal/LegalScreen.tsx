@@ -31,7 +31,7 @@ export function LegalScreen({ slug, onClose }: { slug: LegalDoc['slug']; /** Set
           <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{t('Back')}</Text>
         </Pressable>
       </View>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing['3xl'] }]}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing['3xl'] }]}>
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t(doc.title)}</Text>
         <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.sm }]}>{doc.intro}</Text>
 

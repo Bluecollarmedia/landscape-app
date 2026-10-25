@@ -101,7 +101,7 @@ export default function JobDetailScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
+      <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['4xl'] }}>
         <View style={styles.hero}>
           <BrandCover uri={getProjectImageUriById(assignment.projectId)} style={styles.heroImage} />
           <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.sm }]}>

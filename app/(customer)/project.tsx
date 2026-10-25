@@ -471,7 +471,7 @@ export default function CustomerProjectScreen() {
 
       <SectionTabs tabs={activeSections} activeTab={activeSection} onTabChange={setActiveSection} />
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {sectionRenderers[activeSection]?.()}
       </KeyboardAwareScrollView>
       <PhotoPager photos={viewing?.photos ?? []} startId={viewing?.startId ?? null} onClose={() => setViewing(null)} />

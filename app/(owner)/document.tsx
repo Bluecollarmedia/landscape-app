@@ -345,7 +345,7 @@ export default function DocumentScreen() {
       </ActionSheet>
 
       <ActionSheet visible={menu === 'history'} title="History" actions={[]} onClose={() => setMenu(null)}>
-        <ScrollView style={{ maxHeight: 360 }} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        <ScrollView bounces={false} style={{ maxHeight: 360 }} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
           {events.length === 0 && <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>No history yet.</Text>}
           {events.map((e) => (
             <View key={e.id} style={styles.event}>

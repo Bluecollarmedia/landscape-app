@@ -77,7 +77,7 @@ export default function WorkerResourceAccessScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+      <ScrollView bounces={false} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
         {resources.length === 0 ? (
           <EmptyState
             icon="key"

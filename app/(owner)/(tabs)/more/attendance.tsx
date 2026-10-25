@@ -91,7 +91,7 @@ export default function AttendanceScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.statusChips}>
           {statusCounts.checked_in > 0 && (
             <View style={[styles.chip, { backgroundColor: semantic.successLight }]}>

@@ -97,7 +97,7 @@ export function LineItemSheet({ visible, item, isNew, suggestions, onSave, onDel
             <Pressable onPress={save} hitSlop={10}><Text style={[typeScale.labelLarge, { color: colors.primary }]}>{isNew ? 'Add' : 'Done'}</Text></Pressable>
           </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+          <ScrollView bounces={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
             <TextInput
               value={description}
               onChangeText={setDescription}

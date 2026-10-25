@@ -68,7 +68,7 @@ export default function DayDetailScreen() {
           <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>{t('No activity recorded for this day.')}</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>
             {formatDateHeading(day.date)}
           </Text>

@@ -201,7 +201,7 @@ export function ProjectPrivateNotes({ projectId, projectName, address }: Props) 
             <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]} numberOfLines={1}>{shown?.title}</Text>
             <View style={{ width: 44 }} />
           </View>
-          <ScrollView contentContainerStyle={{ paddingVertical: spacing.md, gap: spacing.md }}>
+          <ScrollView bounces={false} contentContainerStyle={{ paddingVertical: spacing.md, gap: spacing.md }}>
             {shown && groupByCategory(shown.items).map((g) => (
               <View key={g.category}>
                 <Text style={[typeScale.overline, { color: colors.primaryDark, marginBottom: spacing.xs }]}>{g.category.toUpperCase()}</Text>

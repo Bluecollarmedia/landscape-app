@@ -144,7 +144,7 @@ export default function ResourceEditScreen() {
         <View style={{ width: 52 }} />
       </View>
 
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollView bounces={false}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing['3xl'] }]}
         keyboardShouldPersistTaps="handled"
         bottomOffset={spacing.xl}

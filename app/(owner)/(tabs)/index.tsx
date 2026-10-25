@@ -238,7 +238,7 @@ export default function OwnerDashboard() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
           <View>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>

@@ -51,7 +51,7 @@ export default function AnnouncementsScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>Announcements</Text>
       </View>
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={[styles.segment, { backgroundColor: colors.backgroundTertiary }]}>
           {(['workers', 'customers'] as const).map((key) => {
             const on = audience === key;

@@ -71,7 +71,7 @@ export default function SearchScreen() {
           />
         </View>
       ) : (
-        <FlatList
+        <FlatList bounces={false}
           data={results}
           keyExtractor={(item) => `${item.type}_${item.id}`}
           contentContainerStyle={styles.listContent}

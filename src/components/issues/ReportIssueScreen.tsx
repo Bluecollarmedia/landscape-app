@@ -84,7 +84,7 @@ export function ReportIssueScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView
+      <ScrollView bounces={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: 140 }}
       >

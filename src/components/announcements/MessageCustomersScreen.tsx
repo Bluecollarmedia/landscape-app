@@ -114,7 +114,7 @@ export function MessageCustomersScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader title="Message Customers" subtitle="A push notification and a banner in their app" />
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing['5xl'] }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={{ paddingBottom: insets.bottom + spacing['5xl'] }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <MessageCustomersPanel />
       </ScrollView>
     </View>

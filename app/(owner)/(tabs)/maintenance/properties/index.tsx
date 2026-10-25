@@ -74,7 +74,7 @@ export default function MaintenancePropertiesScreen() {
         right={<RaisedAddButton onPress={add} accessibilityLabel="Add a maintenance property" />}
       />
 
-      <ScrollView
+      <ScrollView bounces={false}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: clearance + spacing['2xl'], gap: spacing.md }}
         keyboardShouldPersistTaps="handled"
       >

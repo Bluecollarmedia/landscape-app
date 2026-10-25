@@ -88,7 +88,7 @@ export default function AddWorkerScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>Add Worker</Text>
       </View>
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Card title="Who is joining?" style={styles.section}>
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.md }]}>
             Just a name and a phone number. We make a private link that works once. They tap it, set up their login, and fill in the rest themselves.

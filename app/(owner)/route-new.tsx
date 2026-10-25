@@ -314,7 +314,7 @@ export default function NewRouteScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollView bounces={false}
         ref={scrollRef}
         bottomOffset={KEYBOARD_GAP}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + 120 }]}

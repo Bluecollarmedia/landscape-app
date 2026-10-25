@@ -311,7 +311,7 @@ export default function ScheduleCreateScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg }]} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.lg }]} showsVerticalScrollIndicator={false}>
         <View style={styles.titleRow}>
           <Pressable
             onPress={() => router.back()}
@@ -899,7 +899,7 @@ function SheetModal({
           </Pressable>
         )}
       </View>
-      <ScrollView
+      <ScrollView bounces={false}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: insets.bottom + spacing.lg }}
         showsVerticalScrollIndicator={false}

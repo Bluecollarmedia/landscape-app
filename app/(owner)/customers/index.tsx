@@ -47,7 +47,7 @@ export default function CustomersListScreen() {
           />
         </View>
       ) : (
-        <FlatList
+        <FlatList bounces={false}
           data={customers}
           keyExtractor={(item) => item.person.id}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + spacing['3xl'] }]}

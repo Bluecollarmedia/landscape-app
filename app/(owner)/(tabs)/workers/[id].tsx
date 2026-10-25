@@ -177,7 +177,7 @@ export default function WorkerDetailScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Profile header */}
           <View style={[styles.profileCard, { backgroundColor: colors.surface }, shadow.sm]}>

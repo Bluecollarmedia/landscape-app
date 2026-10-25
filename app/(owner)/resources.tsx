@@ -96,7 +96,7 @@ export default function CompanyResourcesScreen() {
         <Button title="Add Resource" icon="plus" size="sm" onPress={addResource} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing['3xl'] }]} keyboardShouldPersistTaps="handled">
+      <ScrollView bounces={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing['3xl'] }]} keyboardShouldPersistTaps="handled">
         {body}
       </ScrollView>
     </View>

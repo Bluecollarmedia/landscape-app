@@ -60,7 +60,7 @@ export function TruckMaintenanceSheet({ visible, editing, onClose, onSubmit }: P
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]}>{editing ? 'Change maintenance' : 'Add maintenance'}</Text>
             <Pressable onPress={onClose} hitSlop={10}><Text style={[typeScale.bodySmall, { color: colors.textSecondary, fontWeight: '600' }]}>Cancel</Text></Pressable>
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 560 }} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}>
+          <ScrollView bounces={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 560 }} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}>
             <Input label="Title" value={title} onChangeText={(t) => { setTitle(t); setError(null); }} placeholder="For example: Oil change" />
             <View style={styles.chips}>
               {TITLE_SUGGESTIONS.map((s) => (

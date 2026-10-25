@@ -86,7 +86,7 @@ export default function ResourceAccessScreen() {
         <SearchBar value={search} onChangeText={setSearch} placeholder="Search workers" style={{ marginTop: spacing.md }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+      <ScrollView bounces={false} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
         {activeWorkers.length === 0 ? (
           <EmptyState icon="users" title="No active workers" description="Workers appear here once they've joined your team." />
         ) : visible.length === 0 ? (

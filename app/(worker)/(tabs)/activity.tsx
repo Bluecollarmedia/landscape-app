@@ -157,7 +157,7 @@ export default function WorkerActivityScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }]}>
           <Text style={[typeScale.overline, { color: colors.primaryDark }]}>{t(summary.rangeLabel).toUpperCase()}</Text>
           <Text style={[typeScale.displayLarge, { color: colors.textPrimary, marginTop: 2 }]}>

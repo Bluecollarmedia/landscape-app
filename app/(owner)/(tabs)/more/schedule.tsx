@@ -390,7 +390,7 @@ export default function ScheduleScreen() {
         />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {viewMode === 'day' ? renderDayView() : renderWeekView()}
       </ScrollView>
 

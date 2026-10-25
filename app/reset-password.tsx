@@ -54,7 +54,7 @@ export default function ResetPasswordScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing['3xl'], paddingBottom: insets.bottom + spacing['3xl'] }]} keyboardShouldPersistTaps="handled">
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing['3xl'], paddingBottom: insets.bottom + spacing['3xl'] }]} keyboardShouldPersistTaps="handled">
         <Text style={[typeScale.overline, { color: colors.textTertiary }]}>{BUSINESS.appName.toUpperCase()}</Text>
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.xs }]}>Choose a new password</Text>
 

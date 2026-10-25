@@ -75,7 +75,7 @@ export default function SettingsScreen() {
         <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Go back" />
       </View>
 
-      <ScrollView
+      <ScrollView bounces={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance + spacing.lg }]}
         showsVerticalScrollIndicator={false}
       >

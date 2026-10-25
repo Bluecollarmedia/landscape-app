@@ -386,7 +386,7 @@ function LandscapingToday() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
+      <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         <View style={[styles.hero, { height: showWorking ? HERO_HEIGHT_COMPACT : HERO_HEIGHT }]}>
           <BrandCover uri={(primaryAssignment && getProjectImageUriById(primaryAssignment.projectId)) || getWorkerHeaderImageUri()} style={styles.heroImage} />
           <LinearGradient

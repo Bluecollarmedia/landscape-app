@@ -95,7 +95,7 @@ export default function HoursScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }]}>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>TEAM TOTAL</Text>
           <Text style={[typeScale.displaySmall, { color: colors.primary }]}>

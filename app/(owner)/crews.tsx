@@ -38,7 +38,7 @@ export default function CrewsScreen() {
         <Button title="New Crew" icon="plus" size="sm" onPress={addCrew} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing['3xl'] }]}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing['3xl'] }]}>
         {crews.length === 0 ? (
           <EmptyState
             icon="users"

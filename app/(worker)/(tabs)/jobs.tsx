@@ -184,7 +184,7 @@ export default function WorkerJobsScreen() {
           />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={[styles.listContent, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
+        <ScrollView bounces={false} contentContainerStyle={[styles.listContent, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
           {groups.map(group => (
             <View key={group.date} style={styles.dateGroup}>
               <View style={styles.dateHeaderRow}>

@@ -87,7 +87,7 @@ export default function PropertyHistoryScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScreenHeader title={property.name} subtitle={[property.address, property.city, property.state].filter(Boolean).join(', ')} />
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance + spacing['3xl'] }]}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance + spacing['3xl'] }]}>
         <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm, { gap: spacing.xs }]}>
           <View style={styles.rowBetween}>
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>

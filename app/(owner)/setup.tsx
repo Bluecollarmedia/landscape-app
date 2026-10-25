@@ -105,7 +105,7 @@ export default function CompanySetupScreen() {
         ))}
       </View>
 
-      <KeyboardAwareScrollView bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {step.key === 'trucks' && <TrucksStep />}
         {step.key === 'workers' && <WorkersStep />}
         {step.key === 'payRates' && <PayRatesStep onGoToWorkers={() => setIndex(1)} />}

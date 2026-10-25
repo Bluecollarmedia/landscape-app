@@ -252,7 +252,7 @@ export default function NewDocumentScreen() {
       {!!project && (
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm }]}>{project.name}</Text>
       )}
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + spacing['2xl'] }]} keyboardShouldPersistTaps="handled">
+      <ScrollView bounces={false} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + spacing['2xl'] }]} keyboardShouldPersistTaps="handled">
         {body}
       </ScrollView>
     </View>

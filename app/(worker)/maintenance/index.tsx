@@ -176,7 +176,7 @@ function LegacyMaintenanceToday() {
 
   return (
     <View ref={screenRef} onLayout={measureGap} style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: scrollPadding }}>
+      <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: scrollPadding }}>
         <View style={styles.hero}>
           <BrandCover uri={getWorkerHeaderImageUri()} style={styles.heroImage} />
           <LinearGradient

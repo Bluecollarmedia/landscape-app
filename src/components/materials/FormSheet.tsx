@@ -39,7 +39,7 @@ export function FormSheet({ visible, title, saveLabel = 'Save', onSave, onClose,
               )}
             </View>
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
+          <ScrollView bounces={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
             {children}
           </ScrollView>
         </View>

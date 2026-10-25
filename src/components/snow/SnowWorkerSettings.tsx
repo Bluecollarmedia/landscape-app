@@ -75,7 +75,7 @@ export function SnowWorkerSettings() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
-      <ScrollView
+      <ScrollView bounces={false}
         contentContainerStyle={{ paddingTop: insets.top + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: tabBarClearance + spacing.lg }}
         showsVerticalScrollIndicator={false}
       >

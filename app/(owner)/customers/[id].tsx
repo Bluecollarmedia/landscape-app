@@ -139,7 +139,7 @@ You can turn their portal access off instead.` : res.error);
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Profile header */}
           <View style={[styles.profileCard, { backgroundColor: colors.surface }, shadow.sm]}>

@@ -63,7 +63,7 @@ export default function WorkerResourceDetailScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       {header}
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing['3xl'] }]}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing['3xl'] }]}>
         <View style={styles.titleRow}>
           <CategoryIcon category={r.category} size={44} />
           <View style={{ flex: 1 }}>

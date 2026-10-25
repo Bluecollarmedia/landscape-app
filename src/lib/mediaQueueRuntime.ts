@@ -40,9 +40,10 @@ export const mediaQueue = new MediaQueue({
 
   adopt: async (job) => {
     if (Platform.OS === 'web' || /^(https?|data|blob):/i.test(job.sourceUri)) return job.sourceUri;
-    const dest = inboxFile(job.id, extOf(job.sourceUri, job.kind));
-    try { if (dest.exists) dest.delete(); new File(job.sourceUri).copy(dest); } catch { return job.sourceUri; /* keep working from where it is */ }
-    return dest.uri;
+    // The same keeper every picker uses (legacy copy first; the new File API cannot read picker files on some phones).
+    const { keepPickedFileAsync } = require('./keepPickedFile') as typeof import('./keepPickedFile');
+    const kept = await keepPickedFileAsync(job.sourceUri, job.kind === 'video' ? 'video' : 'image');
+    return kept.uri ?? job.sourceUri;
   },
 
   prepare: async (job) => {

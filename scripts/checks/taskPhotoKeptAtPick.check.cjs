@@ -37,6 +37,10 @@ check('5 every file that opens the photo library or camera uses it', missing.len
 const tm = read('src/data/taskMedia.ts');
 check('6 on a task, the copy happens before the storage check, and an unreadable file is turned away with a message', tm.indexOf('keepPickedFileAsync(asset.uri') < tm.indexOf('await storageProblem(') && /couldn't be read from your phone \(\$\{kept\.why\}\)/.test(tm));
 check('7 the "file is gone" error says which file', /\.\.\.\$\{localUri\.slice\(-48\)\}/.test(read('src/lib/uploadFile.ts')));
+check('9 the legacy file API makes the copy first (the new File API cannot read picker files on some phones)', helper.indexOf("expo-file-system/legacy") > -1 && helper.indexOf('legacy.copyAsync') < helper.indexOf('new File(uri).copy(dest)'));
+const up = read('src/lib/uploadFile.ts');
+check('10 the upload itself reads and sends the file with the legacy API too', /legacy\.getInfoAsync\(localUri\)/.test(up) && /legacy\.createUploadTask\(url, localUri/.test(up) && /BINARY_CONTENT/.test(up));
+check('11 the queue adopts picked files through the same keeper', /keepPickedFileAsync\(job\.sourceUri/.test(read('src/lib/mediaQueueRuntime.ts')));
 const comp = read('src/lib/mediaCompress.ts');
 check('8 videos are never compressed: they go up exactly as picked', /Videos are never compressed/.test(comp) && !/compressor\.Video\.compress/.test(comp));
 console.log(bad ? `\n${bad} failed` : '\nall passed');

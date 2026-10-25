@@ -11,8 +11,12 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
 
 function load(script) {
   let tasks = 0;
-  const File = class { constructor() { this.exists = true; } createUploadTask() { const n = ++tasks; return { cancel() {}, uploadAsync: () => script(n) }; } };
-  const fakes = { 'react-native': { Platform: { OS: 'ios' } }, './mediaQueue': { withTimeout: (p, ms, mk) => p }, 'expo-file-system': { File } };
+  const legacy = {
+    getInfoAsync: async () => ({ exists: true, size: 5 }),
+    createUploadTask: (url, fileUri, opts) => { const n = ++tasks; return { cancelAsync: async () => {}, uploadAsync: () => script(n) }; },
+    FileSystemUploadType: { BINARY_CONTENT: 0 },
+  };
+  const fakes = { 'react-native': { Platform: { OS: 'ios' } }, './mediaQueue': { withTimeout: (p, ms, mk) => p }, 'expo-file-system/legacy': legacy, 'expo-file-system': {} };
   const m = { exports: {} };
   const realSet = global.setTimeout;
   new Function('module', 'exports', 'require', 'setTimeout', ts.transpileModule(read('src/lib/uploadFile.ts'), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports, (n) => fakes[n], (f) => realSet(f, 0));

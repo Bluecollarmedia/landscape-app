@@ -40,11 +40,12 @@ export async function putFile(localUri: string, url: string, contentType: string
     }
   }
 
-  const { File } = require('expo-file-system') as typeof import('expo-file-system');
-  let file: InstanceType<typeof File>;
+  // The LEGACY file API, on purpose: on some phones the new File API cannot read files the photo picker hands over (.exists says
+  // false on a file that is right there), which showed up as "the file is gone" on perfectly good photos.
+  const legacy = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
   try {
-    file = new File(localUri);
-    if (!file.exists) throw new Error('the file is gone');
+    const info = await legacy.getInfoAsync(localUri);
+    if (!info.exists) throw new Error('the file is gone');
   } catch (err) {
     throw new Error(`The phone could not read the file (${err instanceof Error ? err.message : String(err)}) ...${localUri.slice(-48)}`);
   }
@@ -54,12 +55,17 @@ export async function putFile(localUri: string, url: string, contentType: string
   let lastError = 'unknown';
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt - 1]));
-    const task = file.createUploadTask(url, { httpMethod: 'PUT', headers: { 'Content-Type': contentType } });
+    const task = legacy.createUploadTask(url, localUri, {
+      httpMethod: 'PUT',
+      headers: { 'Content-Type': contentType },
+      uploadType: legacy.FileSystemUploadType.BINARY_CONTENT,
+    });
     try {
       const res = await withTimeout(task.uploadAsync(), timeoutMs, () => {
-        try { task.cancel(); } catch { /* already finished */ }
+        void task.cancelAsync().catch(() => undefined);
         return new Error(`Sending the file timed out after ${Math.round(timeoutMs / 1000)} seconds`);
       });
+      if (!res) { lastError = 'the upload was cancelled'; continue; }
       if (shouldRetryStatus(res.status) && attempt < RETRY_DELAYS_MS.length) { lastError = `the server answered ${res.status}`; continue; }
       return { status: res.status, body: res.body ?? '' };
     } catch (err) {
@@ -76,6 +82,11 @@ export async function putFile(localUri: string, url: string, contentType: string
 export async function localFileSize(localUri: string): Promise<number | undefined> {
   try {
     if (Platform.OS === 'web') return (await (await fetch(localUri)).blob()).size;
+    {
+      const legacy = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
+      const info = await legacy.getInfoAsync(localUri);
+      if (info.exists && typeof info.size === 'number') return info.size;
+    }
     const { File } = require('expo-file-system') as typeof import('expo-file-system');
     return new File(localUri).size ?? undefined;
   } catch {

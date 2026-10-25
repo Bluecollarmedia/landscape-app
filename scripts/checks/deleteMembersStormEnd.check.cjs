@@ -13,7 +13,7 @@ const customer = read('app/(owner)/customers/[id].tsx');
 const sql = read('supabase/updates/092_delete_unused_members.sql');
 const storm = read('supabase/updates/093_storm_ends_when_all_stops_done.sql');
 
-check('1 the app asks the database to delete, and reports "has history" separately from other failures', /rpc\('delete_unused_member', \{ p_person_id: personId \}\)/.test(data) && /\^HAS_HISTORY:/.test(data) && /hasHistory: history/.test(data));
+check('1 the app asks the database to delete, and reports "has history" separately from other failures', /rpc\('delete_unused_member', \{ p_person_id: personId \}\)/.test(data) && /\^HAS_HISTORY:/.test(data) && /hasHistory: true/.test(data) && !/replace\(\/\^HAS_HISTORY/.test(data));
 check('2 you can never delete yourself', /personId === db\.personId/.test(data));
 check('3 the worker profile has Delete Worker, which offers Deactivate instead when there is history', /handleDelete/.test(worker) && /Delete Worker/.test(worker) && /Deactivate instead/.test(worker));
 check('4 a deactivated worker is not offered Schedule Work', /\{isActive \? \(\s*<Pressable\s*style=\{\[styles\.scheduleWorkBtn/.test(worker));

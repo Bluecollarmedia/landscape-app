@@ -65,7 +65,7 @@ export default function MaintenanceActivityScreen() {
   const m = useMaintenance();
 
   const days = useMemo(() => {
-    const myRoutes = new Set(m.routes.filter(r => r.crewIds.includes(db.personId)).map(r => r.id));
+    const myRoutes = new Set(m.routes.filter(r => r.crewIds.includes(db.personId) || r.leadPersonId === db.personId).map(r => r.id));
     const events = m.events
       .filter(e => EVENT_META[e.eventType] && (e.personId === db.personId || (e.routeId && myRoutes.has(e.routeId))))
       .slice(0, HISTORY_LIMIT);

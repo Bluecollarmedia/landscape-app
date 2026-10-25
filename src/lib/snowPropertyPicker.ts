@@ -4,7 +4,8 @@
  */
 import type { SnowService } from '@/types/snow';
 
-export type PropertyFilter = 'all' | 'service' | 'customer';
+/** 'service' = the route's own service(s); 'svc:salting' etc. = one other service; 'all' = everything eligible. */
+export type PropertyFilter = 'all' | 'service' | 'customer' | `svc:${SnowService}`;
 
 export interface PickableProperty {
   propertyId: string;
@@ -35,6 +36,10 @@ export function filterProperties<T extends PickableProperty>(all: T[], st: Picke
       if (st.filter === 'service') {
         // A property with no per-service list is eligible for the route's own service.
         if (p.services && !p.services.some((s) => st.services.includes(s))) return false;
+      }
+      if (st.filter.startsWith('svc:')) {
+        const one = st.filter.slice(4) as SnowService;
+        if (p.services && !p.services.includes(one)) return false;
       }
       if (st.filter === 'customer' && st.customer) {
         if (!(st.contacts[p.propertyId] ?? []).includes(st.customer)) return false;

@@ -12,7 +12,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { loadPropertyContactNames } from '@/data/snowProperties';
 import type { EligibleProperty } from '@/data/snowStorms';
 import { addButtonLabel, filterProperties, type PropertyFilter } from '@/lib/snowPropertyPicker';
-import type { SnowService } from '@/types/snow';
+import { SNOW_SERVICES, type SnowService } from '@/types/snow';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -38,7 +38,7 @@ export function AddPropertiesSheet({ visible, onClose, properties, services, ser
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<PropertyFilter>('all');
+  const [filter, setFilter] = useState<PropertyFilter>('service');
   const [customer, setCustomer] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
   const [contacts, setContacts] = useState<Record<string, string[]>>({});
@@ -47,7 +47,7 @@ export function AddPropertiesSheet({ visible, onClose, properties, services, ser
   // Fresh each time the sheet opens; the route itself is never touched by opening or closing it.
   useEffect(() => {
     if (!visible) return;
-    setQuery(''); setFilter('all'); setCustomer(null); setChosen([]);
+    setQuery(''); setFilter('service'); setCustomer(null); setChosen([]);
     let alive = true;
     setLoadingContacts(true);
     loadPropertyContactNames().then((r) => { if (alive) { setContacts(r.ok ? r.data : {}); setLoadingContacts(false); } });
@@ -68,9 +68,13 @@ export function AddPropertiesSheet({ visible, onClose, properties, services, ser
 
   const toggle = (id: string) => setChosen((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   const sep = { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderLight };
+  // The route's own service comes first and is what the sheet opens on (a plowing route opens on Plowing), then the other services,
+  // then All, then Customer.
+  const otherServices = SNOW_SERVICES.filter((s) => !services.includes(s));
   const filters: { key: PropertyFilter; label: string }[] = [
-    { key: 'all', label: 'All' },
     { key: 'service', label: serviceName },
+    ...otherServices.map((s): { key: PropertyFilter; label: string } => ({ key: `svc:${s}`, label: s === 'shoveling' ? 'Sidewalks' : serviceLabel(s) })),
+    { key: 'all', label: 'All' },
     { key: 'customer', label: 'Customer' },
   ];
 
@@ -115,7 +119,7 @@ export function AddPropertiesSheet({ visible, onClose, properties, services, ser
               ) : null}
             </View>
 
-            <View style={[styles.segment, { backgroundColor: colors.groupedBackground }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false} style={styles.segmentScroll} contentContainerStyle={[styles.segment, { backgroundColor: colors.groupedBackground }]} keyboardShouldPersistTaps="handled">
               {filters.map((f) => {
                 const on = filter === f.key;
                 return (
@@ -130,7 +134,7 @@ export function AddPropertiesSheet({ visible, onClose, properties, services, ser
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
 
             {filter === 'customer' ? (
               loadingContacts ? <LoadingSpinner /> : customers.length ? (
@@ -228,8 +232,9 @@ const styles = StyleSheet.create({
   grip: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginTop: spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   search: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, paddingHorizontal: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
-  segment: { flexDirection: 'row', marginHorizontal: spacing.lg, marginVertical: spacing.md, padding: 4, borderRadius: radius.lg },
-  segBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.md },
+  segmentScroll: { flexGrow: 0, marginHorizontal: spacing.lg, marginVertical: spacing.md, borderRadius: radius.lg },
+  segment: { flexDirection: 'row', padding: 4, borderRadius: radius.lg },
+  segBtn: { alignItems: 'center', paddingVertical: 10, paddingHorizontal: spacing.lg, borderRadius: radius.md },
   chips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
   chip: { paddingHorizontal: spacing.md, minHeight: 36, justifyContent: 'center', borderRadius: radius.full, borderWidth: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, minHeight: 60 },

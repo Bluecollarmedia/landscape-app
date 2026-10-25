@@ -171,17 +171,17 @@ export function SnowDashboardScreen() {
 }
 
 /** The whole-storm picture: name, services, status, the four numbers, one bar and a sentence. */
-/** Read-only: the dashboard has one way into the storm ("View all" under Crews), so the card itself doesn't navigate. */
+/** Read-only: the dashboard has one way into the storm ("View all" under Routes), so the card itself doesn't navigate. */
 function ActiveStormCard({ storm, headline }: { storm: StormOverview; headline: StormHeadline }) {
   const { colors } = useTheme();
   const services = servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x]);
-  const crews = `${headline.routeCount} ${headline.routeCount === 1 ? 'Crew' : 'Crews'}`;
+  const routes = `${headline.routeCount} ${headline.routeCount === 1 ? 'Route' : 'Routes'}`;
   const stateTone = headline.stateLabel === 'Completed' ? snowStatus.completed : headline.stateLabel === 'In Progress' ? snowStatus.dispatched : snowStatus.scheduled;
   const stats: { icon: React.ComponentProps<typeof Icon>['name']; color: string; value: string; label: string }[] = [
     { icon: 'check-circle', color: colors.success, value: String(headline.completed), label: 'Completed' },
     { icon: 'clock', color: colors.textSecondary, value: String(headline.remaining), label: 'Remaining' },
     { icon: 'percent', color: colors.primary, value: `${headline.percent}%`, label: 'Complete' },
-    { icon: 'map-pin', color: colors.primary, value: String(headline.routeCount), label: 'Routes / Crews' },
+    { icon: 'map-pin', color: colors.primary, value: String(headline.routeCount), label: 'Routes' },
   ];
   return (
     <View style={[styles.heroCard, { backgroundColor: colors.surface }]}>
@@ -189,7 +189,7 @@ function ActiveStormCard({ storm, headline }: { storm: StormOverview; headline: 
         <View style={{ flex: 1 }}>
           <Text style={[typeScale.headingLarge, { color: '#FFFFFF' }]} numberOfLines={2}>{storm.name}</Text>
           <Text style={[typeScale.bodyMedium, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]} numberOfLines={1}>
-            {services}{headline.routeCount ? ` · ${crews}` : ''}
+            {services}{headline.routeCount ? ` · ${routes}` : ''}
             {storm.reopenedCount > 0 ? ` · Reopened${storm.reopenedCount > 1 ? ` ${storm.reopenedCount}×` : ''}` : ''}
           </Text>
         </View>
@@ -225,7 +225,7 @@ function CrewsSection({ storm, headline, onOpenStorm }: {
   return (
     <>
       <View style={styles.sectionHead}>
-        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Crews</Text>
+        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Routes</Text>
         {rows.length > 0 ? (
           <Pressable onPress={onOpenStorm} hitSlop={8} accessibilityRole="button" accessibilityLabel="View all routes" style={styles.viewAll}>
             <Text style={[typeScale.labelLarge, { color: colors.primary }]}>View all</Text>
@@ -243,7 +243,7 @@ function CrewsSection({ storm, headline, onOpenStorm }: {
       ) : (
         <>
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-            Each crew's progress. Tap View all to open the routes.
+            Each route's progress. Tap View all to open them.
           </Text>
           <View style={{ gap: spacing.sm }}>
             {rows.map((r) => <CrewRowView key={r.id} row={r} />)}
@@ -259,7 +259,7 @@ function CrewsSection({ storm, headline, onOpenStorm }: {
   );
 }
 
-/** Read-only progress for one crew; the way in is "View all" in the Crews header. */
+/** Read-only progress for one route; the way in is "View all" in the Routes header. */
 function CrewRowView({ row }: { row: CrewRow }) {
   const { colors } = useTheme();
   const tone = STATUS_TONE[row.status];

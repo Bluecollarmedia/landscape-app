@@ -1121,6 +1121,9 @@ export default function WorkerTodayScreen() {
   const { workday } = useWorkerContext();
   const day = useDayWork();
   const timeOn = workday.installed === true;
+  // A project job is worked (checked into, ticked off, finished) on the job screen below, not on the read-only job page, so when the next
+  // thing on the list is a job and the worker is clocked in, that screen is the one to show. Route stops keep the new Today.
+  if (timeOn && day.hasStops && workday.active && day.next?.kind === 'job') return <LandscapingToday />;
   if (timeOn && day.hasStops) return <WorkerToday combined={day.both} />;
   const closedToday = !!workday.today?.clockOutAt;
   if (timeOn && !workday.active && day.anyWork && !(closedToday && !day.openWork)) return <ClockInScreen moreWork={closedToday} />;

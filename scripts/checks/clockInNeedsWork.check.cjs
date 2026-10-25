@@ -8,7 +8,7 @@ const check = (n, ok) => { if (!ok) bad++; console.log((ok ? 'PASS' : 'FAIL') + 
 const card = read('src/components/time/WorkdayCard.tsx');
 const snow = read('src/components/snow/time/SnowTimeScreens.tsx');
 const sql = read('supabase/updates/067_clock_in_needs_work.sql');
-check('1 the workday card shows "No work scheduled today" and no Clock In button when canClockIn is false', /No work scheduled today/.test(card) && /!active && !closedToday && !noWork/.test(card));
+check('1 the workday card shows "No work scheduled today" and no Clock In button when canClockIn is false', /No work scheduled today/.test(card) && /!active && !noWork && \(!closedToday/.test(card));
 check('2 the snow Time Clock shows "No active storm assignment" and hides Clock In unless a shift is open', /No active storm assignment/.test(snow) && /blocked = !open && !allowed/.test(snow));
 check('3 the database enforces both (maintenance/landscaping and snow), not just the screens', /_time_may_clock_in/.test(sql) && /_snow_may_clock_in/.test(sql) && /You have no work scheduled today/.test(sql) && /No active storm assignment/.test(sql));
 check('4 the database test exists', fs.existsSync(path.join(__dirname, '../../supabase/tests/067_clock_in_needs_work.pglite.mjs')));

@@ -21,6 +21,7 @@ import { BrandCover } from '@/components/branding/BrandCover';
 import { JobMap } from '@/components/maps/JobMap';
 import { YardStartCard } from '@/components/maintenance/YardStartCard';
 import { WorkdayCard } from '@/components/time/WorkdayCard';
+import { WorkerToday } from '@/components/today/WorkerToday';
 import { CrewClockOutCard } from '@/components/maintenance/CrewClockOutCard';
 import { OtherWorkCard } from '@/components/worker/OtherWorkCard';
 import { useWorkerLanding } from '@/hooks/useWorkerLanding';
@@ -54,7 +55,7 @@ function firstName(personId?: string): string | undefined {
  * button at the bottom follows the day: Start Day, then I'm Here and Finish
  * Stop for each stop in the owner's order.
  */
-export default function MaintenanceTodayScreen() {
+function LegacyMaintenanceToday() {
   const t = useT();
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -534,3 +535,12 @@ const styles = StyleSheet.create({
   actionTitle: { color: '#FFFFFF', marginLeft: spacing.sm, fontWeight: '700', letterSpacing: 0.5 },
   secondaryLink: { alignSelf: 'center', marginTop: spacing.sm, paddingVertical: spacing.xs },
 });
+
+/**
+ * Today for a maintenance worker. With the time clock installed this is the simple Today (clock-in first, then the route). The older
+ * screen above is kept only for a database that has not got the time clock yet (legacy Start Day / I'm Here flow).
+ */
+export default function MaintenanceTodayScreen() {
+  const { workday } = useWorkerContext();
+  return workday.installed === false ? <LegacyMaintenanceToday /> : <WorkerToday />;
+}

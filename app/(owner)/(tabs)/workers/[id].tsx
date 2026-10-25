@@ -20,6 +20,7 @@ import { deleteUnusedMember } from '@/data/deleteMember';
 import { todayKey, localDateKey } from '@/lib/ids';
 import { loadBirthdays } from '@/data/birthday';
 import { OwnerWorkerExtras } from '@/components/account/WorkerExtras';
+import { OwnerClockCard } from '@/components/time/OwnerClockCard';
 import { formatBirthday, birthdaySoon } from '@/lib/birthday';
 
 const today = todayKey();
@@ -332,6 +333,8 @@ export default function WorkerDetailScreen() {
               </Pressable>
             ) : null}
           </View>
+
+          {isActive ? <OwnerClockCard personId={p.id} firstName={p.firstName} /> : null}
 
           {/* Tomorrow */}
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }, shadow.sm]}>

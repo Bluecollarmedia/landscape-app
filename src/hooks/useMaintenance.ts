@@ -93,6 +93,17 @@ export function useMyMaintenanceRoute(serviceDate: string = todayKey()): Mainten
   ), [v, serviceDate]);
 }
 
+/**
+ * EVERY route the worker is on for a day (a worker can be on more than one), oldest first. Use this wherever the answer must cover all of
+ * the worker's work. useMyMaintenanceRoute (the first one only) stays for screens that handle a single route.
+ */
+export function useMyMaintenanceRoutes(serviceDate: string = todayKey()): MaintenanceRouteDetail[] {
+  const v = useDb();
+  return useMemo(() => db.maintenance.routes
+    .filter((r) => r.serviceDate === serviceDate && r.status !== 'cancelled' && r.crewIds.includes(db.personId))
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.id < b.id ? -1 : 1)), [v, serviceDate]);
+}
+
 export interface RouteAttendanceRow {
   personId: string;
   person?: MaintenanceRouteDetail['crew'][number];

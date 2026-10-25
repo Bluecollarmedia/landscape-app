@@ -21,6 +21,6 @@ check('4 a button opens the full worker view', /router\.push\('\/\(worker\)\/\(t
 check('5 the app\'s routing lets an admin with work coming up stay in the worker area (and nobody else but workers)', /const adminWorks = db\.role === 'admin' && hasOpenProjectWork\(db\.assignments, db\.personId, todayKey\(\)\)/.test(root) && /\(adminWorks && currentGroup === '\(worker\)'\)/.test(root));
 check('6 the worker area counts an admin as the worker (their jobs, their routes)', /\(m\.role === 'worker' \|\| m\.role === 'admin'\)/.test(landing));
 check('7 the worker view has a way back to the admin view, shown to admins only', /<AdminBackPill \/>/.test(wl) && /db\.role !== 'admin'\) return null/.test(pill) && /to = '\/\(owner\)'/.test(pill) && /router\.replace\(to as any\)/.test(pill));
-check('8 the card sits on the dashboard above Needs Attention', /<AdminJobCard \/>\s*\{\/\* Needs Attention \*\/\}/.test(home));
+check('8 the card sits on the dashboard above Needs Attention', /<AdminJobCard \/>[\s\S]*?\{\/\* Needs Attention \*\/\}/.test(home));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

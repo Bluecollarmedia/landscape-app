@@ -1,4 +1,6 @@
 import { WorkdayCard } from '@/components/time/WorkdayCard';
+import { WorkerToday, ClockInScreen } from '@/components/today/WorkerToday';
+import { useDayWork } from '@/hooks/useDayWork';
 import { OtherWorkCard } from '@/components/worker/OtherWorkCard';
 import { useWorkerLanding } from '@/hooks/useWorkerLanding';
 import { useMyMaintenanceRoute } from '@/hooks/useMaintenance';
@@ -77,7 +79,7 @@ function minutesUntil(time: string): number {
   return Math.round((target.getTime() - now.getTime()) / 60000);
 }
 
-export default function WorkerTodayScreen() {
+function LandscapingToday() {
   const t = useT();
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -360,7 +362,7 @@ export default function WorkerTodayScreen() {
           </View>
         </View>
 
-        <View style={{ width: '100%', marginTop: spacing.lg }}><WorkdayCard /></View>
+        <View style={{ width: '100%', marginTop: spacing.lg }}><WorkdayCard gate /></View>
 
         <Pressable onPress={handleBackToToday} style={{ width: '100%' }}>
           <LinearGradient
@@ -453,7 +455,7 @@ export default function WorkerTodayScreen() {
         </View>
 
         <View style={[styles.content, { paddingTop: showWorking ? spacing.xl : PILL_OVERHANG + spacing.xl }]}>
-          <WorkdayCard />
+          <WorkdayCard gate />
           {onRoute ? (
             <OtherWorkCard
               icon="map"
@@ -1108,3 +1110,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
 });
+
+/**
+ * Today for a worker on project jobs.
+ *  - A worker with route stops today gets the simple Today: just the stops, or the one combined list when they also have jobs.
+ *  - With the time clock installed, a worker who is not clocked in sees only a Clock In button (never the work); once a day is running
+ *    the clock disappears and the existing job screen below is shown unchanged.
+ */
+export default function WorkerTodayScreen() {
+  const { workday } = useWorkerContext();
+  const day = useDayWork();
+  const timeOn = workday.installed === true;
+  if (timeOn && day.hasStops) return <WorkerToday combined={day.both} />;
+  const closedToday = !!workday.today?.clockOutAt;
+  if (timeOn && !workday.active && day.anyWork && !(closedToday && !day.openWork)) return <ClockInScreen moreWork={closedToday} />;
+  return <LandscapingToday />;
+}

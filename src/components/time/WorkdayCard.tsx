@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet, Alert, Platform, ActivityIndicator }
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorkerContext } from '@/providers/WorkerProvider';
-import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { TruckPickSheet } from '@/components/time/TruckPickSheet';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { clockText, durationText, intervalMs } from '@/lib/timeCalc';
@@ -11,7 +11,7 @@ import { haptics } from '@/lib/haptics';
 import { StaleSessionCard } from '@/components/time/StaleSessionCard';
 import type { TruckOptions } from '@/data/timeTracking';
 import { useT, tr } from '@/i18n';
-import { useMyMaintenanceRoute } from '@/hooks/useMaintenance';
+import { useMyMaintenanceRoutes } from '@/hooks/useMaintenance';
 
 function say(title: string, message: string) {
   if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(`${title}\n\n${message}`);
@@ -24,11 +24,16 @@ const dayAndTime = (iso: string) => `${new Date(iso).toLocaleDateString('en-US',
  * The employee's workday: Clock In at the yard, the running day total, the truck, an optional break, and Clock Out. The timer runs
  * from the stored clock-in time (server time), so closing and reopening the app never resets it, and walking between properties
  * never restarts it. Shows nothing until the database update is installed (the older check-in screens keep working then).
+ *
+ * gate = the Today screens' version: ONLY the Clock In button (before clocking in, or again when work remains). Once there is a running
+ * day it shows nothing at all: no timer, no total, no Clock Out, no "didn't clock out" card. It reads the same clock state as everything
+ * else (w.active is only ever a current, non-stale session), so hiding it never changes whether the worker is clocked in. The only
+ * clock-out is the small row in Settings.
  */
-export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { compact?: boolean; preShiftTitle?: string; preShiftText?: string } = {}) {
+export function WorkdayCard({ compact = false, gate = false, preShiftTitle, preShiftText }: { compact?: boolean; gate?: boolean; preShiftTitle?: string; preShiftText?: string } = {}) {
   const { colors } = useTheme();
   const { workday: w, todayAssignments } = useWorkerContext();
-  const myRoute = useMyMaintenanceRoute();
+  const myRoutes = useMyMaintenanceRoutes();
   const t = useT();
   const [pickTruck, setPickTruck] = useState<TruckOptions | null>(null);
   const [loadingTrucks, setLoadingTrucks] = useState(false);
@@ -52,7 +57,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
   // No route or job today: no Clock In button at all (the database refuses a clock-in too).
   const noWork = !active && w.day?.canClockIn === false;
   // Clocked out for the day, but work was added afterwards (a new job today, or route stops still open): offer to clock back in right away.
-  const moreWork = todayAssignments.some((a) => a.status !== 'completed' && a.status !== 'cancelled') || !!myRoute?.stops.some((st) => st.status === 'pending' || st.status === 'arrived');
+  const moreWork = todayAssignments.some((a) => a.status !== 'completed' && a.status !== 'cancelled') || myRoutes.some((r) => r.stops.some((st) => st.status === 'pending' || st.status === 'arrived'));
 
   async function onClockIn() {
     haptics.select();
@@ -83,7 +88,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
-      {w.stale ? (
+      {w.stale && !gate ? (
         <StaleSessionCard
           session={{ id: w.stale.id, clockInAt: w.stale.clockInAt, claimedOutAt: w.stale.claimedOutAt, claimNote: w.stale.claimNote, answered: !!w.stale.claimedAt }}
           busy={w.busy}
@@ -92,7 +97,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
           error={w.error}
         />
       ) : null}
-      {noWork && !closedToday ? (
+      {noWork && !closedToday && !gate ? (
         <>
           <View style={styles.head}>
             <View style={[styles.icon, { backgroundColor: colors.backgroundTertiary }]}><Feather name="calendar" size={18} color={colors.textSecondary} /></View>
@@ -104,7 +109,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
         </>
       ) : null}
 
-      {!active && !closedToday && !noWork ? (
+      {!active && !noWork && (!closedToday || (gate && moreWork && w.day?.canClockIn !== false)) ? (
         <>
           <View style={styles.head}>
             <View style={[styles.icon, { backgroundColor: colors.primarySurface }]}><Feather name="sunrise" size={18} color={colors.primaryDark} /></View>
@@ -119,7 +124,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
         </>
       ) : null}
 
-      {active && compact ? (
+      {active && compact && !gate ? (
         <>
           <View style={styles.head}>
             <View style={[styles.dot, { backgroundColor: w.onBreak ? colors.warning : colors.success }]} />
@@ -141,7 +146,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
         </>
       ) : null}
 
-      {active && !compact ? (
+      {active && !compact && !gate ? (
         <>
           <View style={styles.head}>
             <View style={[styles.dot, { backgroundColor: w.onBreak ? colors.warning : colors.success }]} />
@@ -184,7 +189,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
         </>
       ) : null}
 
-      {closedToday ? (
+      {closedToday && !gate ? (
         <>
           <View style={styles.head}>
             <View style={[styles.icon, { backgroundColor: colors.successLight ?? colors.primarySurface }]}><Feather name="check" size={18} color={colors.success} /></View>
@@ -209,25 +214,7 @@ export function WorkdayCard({ compact = false, preShiftTitle, preShiftText }: { 
 
       {w.error ? <Text style={[typeScale.caption, { color: colors.error, marginTop: spacing.sm }]}>{w.error}</Text> : null}
 
-      <BottomSheetModal visible={!!pickTruck} onRequestClose={() => setPickTruck(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setPickTruck(null)}>
-          <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
-            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, textAlign: 'center' }]}>{t('Which truck are you taking?')}</Text>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md }]}>{t('No truck has been assigned to you today.')}</Text>
-            {pickTruck?.trucks.map((truck) => (
-              <Pressable key={truck.id} disabled={truck.inUse} onPress={() => doClockIn(truck.id)} style={[styles.truckRow, { borderColor: colors.borderLight, opacity: truck.inUse ? 0.45 : 1 }]} accessibilityRole="button">
-                <Feather name="truck" size={18} color={colors.textPrimary} />
-                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>{truck.name}</Text>
-                {truck.inUse ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{t('In use')}</Text> : null}
-              </Pressable>
-            ))}
-            <Pressable onPress={() => doClockIn(undefined)} style={[styles.truckRow, { borderColor: colors.borderLight }]} accessibilityRole="button">
-              <Feather name="slash" size={18} color={colors.textSecondary} />
-              <Text style={[typeScale.bodyLarge, { color: colors.textSecondary }]}>{t('No truck today')}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </BottomSheetModal>
+      <TruckPickSheet options={pickTruck} onPick={doClockIn} onClose={() => setPickTruck(null)} />
     </View>
   );
 }

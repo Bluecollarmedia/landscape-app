@@ -29,7 +29,7 @@ check('8 toggling adds at the end and removes again', toggleService(['plowing'],
 // const counts = routesPerService(['plowing', 'shoveling'], [{ service: 'plowing' }, { service: 'plowing' }, { service: 'shoveling' }]);
 
 const day = new Date('2026-01-12T12:00:00');
-check('16 default name for one service matches the old style', defaultStormNameFor(['plowing'], label, day) === 'Jan 12 Plowing' && defaultStormNameFor(['shoveling'], label, day) === 'Jan 12 Sidewalks');
+check('16 default name is the same "Storm" name whatever the service', defaultStormNameFor(['plowing'], label, day) === 'Jan 12 Storm' && defaultStormNameFor(['shoveling'], label, day) === 'Jan 12 Storm');
 check('17 default name for several services', defaultStormNameFor(['plowing', 'shoveling'], label, day) === 'Jan 12 Storm');
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');

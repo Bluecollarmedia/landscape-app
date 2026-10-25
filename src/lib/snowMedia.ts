@@ -58,7 +58,7 @@ const sendMs = (contentType: string) => (contentType.startsWith('video/') ? 300_
  * The cloud route: a 1-byte stand-in goes to the private bucket (so the database's permission rules decide who may write and read the
  * file), then the real file goes to cloud storage through a short-lived link. Every step says what it was doing if it fails.
  */
-async function putViaCloud(localUri: string, key: string, contentType: string): Promise<void> {
+async function putViaCloud(localUri: string, key: string, contentType: string, onProgress?: (p: number) => void): Promise<void> {
   const reserved = await within(
     supabase.storage.from(SNOW_MEDIA_BUCKET).upload(key, new Uint8Array([0]).buffer, { contentType, upsert: false }),
     30_000, 'Reserving the file',
@@ -68,7 +68,7 @@ async function putViaCloud(localUri: string, key: string, contentType: string): 
     const link = await within(supabase.functions.invoke('media', { body: { action: 'snow-put', key, contentType } }), 30_000, 'Asking for the upload link');
     if (link.error || !link.data?.uploadUrl) throw new Error(`The upload link was refused (${await functionFailure(link.error, link.data)})`);
     // The file is sent by the phone's own file upload (not JavaScript fetch + Blob, which is unreliable on a phone): see uploadFile.ts.
-    const sent = await putFile(localUri, link.data.uploadUrl, contentType, sendMs(contentType));
+    const sent = await putFile(localUri, link.data.uploadUrl, contentType, sendMs(contentType), onProgress);
     if (sent.status < 200 || sent.status >= 300) {
       const code = sent.body.match(/<Code>([^<]+)<\/Code>/)?.[1];
       throw new Error(`Cloud storage answered ${sent.status}${code ? ` (${code})` : ''}`);
@@ -101,7 +101,7 @@ async function putViaBackup(localUri: string, key: string, contentType: string):
  * file goes to the private bucket directly, so a cloud-storage problem never stops a photo. If both fail, the message says what each
  * one said, so the real cause is on the screen and not hidden behind "check your connection".
  */
-export async function uploadSnowMedia(localUri: string, folder: string, mimeType?: string): Promise<string> {
+export async function uploadSnowMedia(localUri: string, folder: string, mimeType?: string, onProgress?: (p: number) => void): Promise<string> {
   if (!isSupabaseConfigured) throw new Error('Snow media needs the live database.');
   let { contentType, ext } = contentTypeOf(localUri, mimeType);
   await requireSession();
@@ -119,7 +119,7 @@ export async function uploadSnowMedia(localUri: string, folder: string, mimeType
   if (r2Enabled) {
     const key = `${folder}/${uuid()}.${ext}`;
     try {
-      await putViaCloud(localUri, key, contentType);
+      await putViaCloud(localUri, key, contentType, onProgress);
       return key;
     } catch (err) {
       cloudWhy = reasonOf(err);

@@ -51,7 +51,7 @@ export const mediaQueue = new MediaQueue({
     return { uri: out.uri, bytes: out.bytes, width: out.width, height: out.height, mimeType: out.mimeType };
   },
 
-  upload: async (job, uri) => {
+  upload: async (job, uri, onProgress) => {
     // A pending item belongs to the company it was picked in: never send it under a different sign-in.
     const { db } = require('@/data/store') as typeof import('@/data/store');
     if (db.companyId && !job.folder.startsWith(`${db.companyId}/`)) throw new PermanentError('This photo belongs to a different account, so it was not uploaded.');
@@ -59,11 +59,11 @@ export const mediaQueue = new MediaQueue({
       // Snow photos live in the private snow-media bucket, not the public one.
       const { uploadSnowMedia } = require('./snowMedia') as typeof import('./snowMedia');
       const snowMime = job.kind === 'video' ? (job.useOriginal ? job.mimeType : 'video/mp4') : (uri === job.sourceUri ? job.mimeType : 'image/jpeg');
-      return { url: '', key: await uploadSnowMedia(uri, job.folder, snowMime) };
+      return { url: '', key: await uploadSnowMedia(uri, job.folder, snowMime, onProgress) };
     }
     const { uploadImage } = require('./media') as typeof import('./media');
     const mime = job.kind === 'video' ? (job.useOriginal ? job.mimeType : 'video/mp4') : (uri === job.sourceUri ? job.mimeType : 'image/jpeg');
-    return uploadImage(uri, job.folder, mime);
+    return uploadImage(uri, job.folder, mime, onProgress);
   },
 
   complete: async (job, uploaded) => {

@@ -50,6 +50,8 @@ export interface MediaJob {
   canUseOriginal?: boolean;
   useOriginal?: boolean;
   uploaded?: { url: string; key: string };
+  /** How much of the file has been sent (0..1), while uploading. Live only; never saved. */
+  progress?: number;
   nextTryAt?: number;
   createdAt: number;
   updatedAt: number;
@@ -67,8 +69,8 @@ export interface QueueDeps {
   adopt: (job: MediaJob) => Promise<string>;
   /** Compresses; throws CompressionError when it cannot. */
   prepare: (job: MediaJob) => Promise<{ uri: string; bytes?: number; width?: number; height?: number; mimeType?: string }>;
-  /** Sends the file to storage. */
-  upload: (job: MediaJob, uri: string) => Promise<{ url: string; key: string }>;
+  /** Sends the file to storage. Reports how much has been sent (0..1) when it can. */
+  upload: (job: MediaJob, uri: string, onProgress?: (p: number) => void) => Promise<{ url: string; key: string }>;
   /** Saves and CONFIRMS the database record. Must resolve only once saved (an already-saved record counts as saved). */
   complete: (job: MediaJob, uploaded: { url: string; key: string }) => Promise<void>;
   /** Deletes a stored file (used when a job is cancelled after upload but before its record was saved). */
@@ -174,7 +176,7 @@ export class MediaQueue {
   retry(id: string): void {
     const j = this.get(id);
     if (!j || j.status !== 'failed') return;
-    this.patch(id, { status: j.stage === 'prepare' ? 'preparing' : 'uploading', error: undefined, attempts: 0, nextTryAt: undefined, canUseOriginal: false });
+    this.patch(id, { status: j.stage === 'prepare' ? 'preparing' : 'uploading', error: undefined, attempts: 0, nextTryAt: undefined, canUseOriginal: false, progress: undefined });
     this.pump();
   }
 
@@ -237,9 +239,9 @@ export class MediaQueue {
 
       if (j.stage === 'upload') {
         const uri = j.preparedUri ?? j.sourceUri;
-        const up = await withTimeout(this.d.upload(j, uri), UPLOAD_LIMIT_MS, () => new Error(`The upload timed out after ${Math.round(UPLOAD_LIMIT_MS / 60_000)} minutes`));
+        const up = await withTimeout(this.d.upload(j, uri, (p) => this.reportProgress(id, p)), UPLOAD_LIMIT_MS, () => new Error(`The upload timed out after ${Math.round(UPLOAD_LIMIT_MS / 60_000)} minutes`));
         if (!this.get(id)) { try { await this.d.removeStored(up.key); } catch { /* nothing points at it */ } return; }
-        this.patch(id, { uploaded: up, stage: 'record', status: 'uploading', error: undefined });
+        this.patch(id, { uploaded: up, stage: 'record', status: 'uploading', error: undefined, progress: 1 });
         j = this.get(id); if (!j) return;
       }
 
@@ -256,6 +258,16 @@ export class MediaQueue {
       this.running.delete(id);
       this.pump();
     }
+  }
+
+  /** Live progress for the screen: updated in memory and announced, never written to storage (it changes many times a second). */
+  private reportProgress(id: string, p: number): void {
+    const j = this.get(id);
+    if (!j || j.status !== 'uploading') return;
+    const next = Math.max(0, Math.min(1, p));
+    if (j.progress !== undefined && next < 1 && next - j.progress < 0.02) return;
+    this.jobs = this.jobs.map((x) => (x.id === id ? { ...x, progress: next } : x));
+    this.emit();
   }
 
   private fail(id: string, err: unknown): void {

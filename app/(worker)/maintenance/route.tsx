@@ -1,90 +1,68 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
-import { useMyMaintenanceRoute } from '@/hooks/useMaintenance';
-import { db } from '@/data/store';
+import { useDayWork } from '@/hooks/useDayWork';
 import { useT } from '@/i18n';
 import { ScreenContainer } from '@/components/layout';
 import { EmptyState } from '@/components/ui';
-import { RouteProgress } from '@/components/maintenance/RouteProgress';
-import { StopRow } from '@/components/maintenance/StopRow';
+import { RouteMap } from '@/components/maps/RouteMap';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
-const nameOf = (personId?: string) => (personId ? db.people[personId]?.firstName : undefined);
-
-/** The whole route in the owner's saved order: done stops stay in place with their finish times. */
+/**
+ * The Route tab: today's stops on one map with numbered pins (Today is the list of work, so this is the picture of the day), then each
+ * route's crew, leader and route notes. A worker on several routes sees every route's stops on the same map.
+ */
 export default function MaintenanceRouteScreen() {
   const t = useT();
   const { colors } = useTheme();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const route = useMyMaintenanceRoute();
-  const stops = route?.stops ?? [];
+  const day = useDayWork();
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const stops = day.stops.map((s, i) => ({ id: s.stop.id, number: i + 1, place: s.stop.property ?? {}, done: s.done }));
+  const placeable = stops.filter((s) => s.place && Object.keys(s.place).length > 0);
 
   return (
     <ScreenContainer scrollable padded variant="grouped">
       <View style={{ paddingTop: insets.top + spacing.md, marginBottom: spacing.lg }}>
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{route?.name || t('Route')}</Text>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>{t('Route')}</Text>
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>{dateStr}</Text>
       </View>
 
-      {!route ? (
-        <EmptyState icon="map" title={t('No route today')} description={t('When the owner puts you on a maintenance route, every stop shows up here in order.')} />
+      {day.routes.length === 0 ? (
+        <EmptyState icon="map" title={t('No route today')} description={t('When the owner puts you on a maintenance route, its stops show up here on the map.')} />
       ) : (
         <>
-          <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
-            {stops.length > 0 ? (
-              <RouteProgress stops={stops} nextStopId={route.nextStop?.id} />
-            ) : (
-              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t("This route doesn't have any stops yet.")}</Text>
-            )}
-            <View style={styles.metaRow}>
-              <Feather name="users" size={13} color={colors.textTertiary} />
-              <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]} numberOfLines={2}>
-                {route.crew.map(p => `${p.firstName} ${p.lastName}`.trim()).join(', ') || t('No crew assigned')}
-              </Text>
-            </View>
-            {route.lead && (
+          {placeable.length > 0 ? <RouteMap stops={placeable} height={320} /> : (
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t("This route doesn't have any stops yet.")}</Text>
+          )}
+          {day.routes.map((route) => (
+            <View key={route.id} style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
+              {day.routes.length > 1 ? <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.xs }]}>{route.name || t('Route')}</Text> : null}
               <View style={styles.metaRow}>
-                <Feather name="star" size={13} color={colors.textTertiary} />
-                <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]}>
-                  {t('Lead: {name}', { name: `${route.lead.firstName} ${route.lead.lastName}` })}
+                <Feather name="users" size={13} color={colors.textTertiary} />
+                <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]} numberOfLines={2}>
+                  {route.crew.map((p) => `${p.firstName} ${p.lastName}`.trim()).join(', ') || t('No crew assigned')}
                 </Text>
               </View>
-            )}
-            {route.notes ? (
-              <View style={[styles.note, { backgroundColor: colors.backgroundSecondary }]}>
-                <Feather name="file-text" size={14} color={colors.textSecondary} />
-                <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textPrimary, flex: 1 }]}>{route.notes}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          {stops.length > 0 && (
-            <>
-              <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginTop: spacing.xl, marginBottom: spacing.sm }]}>
-                {stops.length === 1 ? t('1 stop') : t('{n} stops', { n: stops.length })}
-              </Text>
-              <View style={[styles.listCard, { backgroundColor: colors.surface }, shadow.sm]}>
-                {stops.map((s, i) => (
-                  <StopRow
-                    key={s.id}
-                    stop={s}
-                    nextStopId={route.nextStop?.id}
-                    nameOf={nameOf}
-                    first={i === 0}
-                    showInstructions={s.status === 'pending' || s.status === 'arrived'}
-                    onPress={() => router.push(`/(worker)/maintenance-stop/${s.id}` as any)}
-                  />
-                ))}
-              </View>
-            </>
-          )}
+              {route.lead ? (
+                <View style={styles.metaRow}>
+                  <Feather name="star" size={13} color={colors.textTertiary} />
+                  <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textSecondary }]}>
+                    {t('Lead: {name}', { name: `${route.lead.firstName} ${route.lead.lastName}` })}
+                  </Text>
+                </View>
+              ) : null}
+              {route.notes ? (
+                <View style={[styles.note, { backgroundColor: colors.backgroundSecondary }]}>
+                  <Feather name="file-text" size={14} color={colors.textSecondary} />
+                  <Text style={[typeScale.bodySmall, styles.metaText, { color: colors.textPrimary, flex: 1 }]}>{route.notes}</Text>
+                </View>
+              ) : null}
+            </View>
+          ))}
         </>
       )}
     </ScreenContainer>
@@ -92,8 +70,7 @@ export default function MaintenanceRouteScreen() {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: radius.xl, padding: spacing.lg },
-  listCard: { borderRadius: radius.xl, overflow: 'hidden' },
+  card: { borderRadius: radius.xl, padding: spacing.lg, marginTop: spacing.lg },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   metaText: { marginLeft: spacing.xs, flexShrink: 1 },
   note: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.md, padding: spacing.sm, borderRadius: radius.sm },

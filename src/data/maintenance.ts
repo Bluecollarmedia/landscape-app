@@ -368,7 +368,10 @@ export function removeRouteCrewMember(routeId: string, personId: string) {
 export function addStop(routeId: string, input: NewStopInput): MaintenanceStop {
   const n = db.maintenance.routeById[routeId]?.stops.length ?? 0;
   const maxOrder = Math.max(-1, ...(db.maintenance.routeById[routeId]?.stops.map((s) => s.sortOrder) ?? []));
-  return insertStop(routeId, Math.max(n, maxOrder + 1), input);
+  const stop = insertStop(routeId, Math.max(n, maxOrder + 1), input);
+  // A finished route that gets another stop has open work again, so it goes back to in progress (the new stop just adds on).
+  if (db.maintenance.routeById[routeId]?.status === 'completed') updateRow('maintenance_routes', routeId, { status: 'in_progress' });
+  return stop;
 }
 
 /** Only a stop nobody has started can be removed. */

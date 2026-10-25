@@ -1,4 +1,5 @@
 import { LanguageRow } from '@/components/ui/LanguageSwitch';
+import { ClockRow } from '@/components/time/ClockRow';
 import { LegalSection } from '@/components/legal/LegalSection';
 import { useGuardedSignOut } from '@/hooks/useGuardedSignOut';
 import React, { useState } from 'react';
@@ -91,6 +92,8 @@ export default function WorkerSettingsScreen() {
           onPress={() => router.push('/(worker)/notifications' as any)}
         />
       </ListSection>
+
+      <ClockRow />
 
       <ListSection title={t('Company')}>
         <ListRow

@@ -51,5 +51,11 @@ check('14 a database without the time clock keeps the older maintenance screen',
 check('15 adding a stop to a finished route puts it back in progress', /status === 'completed'\) updateRow\('maintenance_routes', routeId, \{ status: 'in_progress' \}\)/.test(read('src/data/maintenance.ts')));
 check('16 the route tab is a map of the day\'s stops', /<RouteMap stops=/.test(read('app/(worker)/maintenance/route.tsx')) && fs.existsSync(path.join(__dirname, '../../src/components/maps/RouteMap.ios.tsx')));
 check('17 step 1 is app-only: it adds no database update file', fs.readdirSync(path.join(__dirname, '../../supabase/updates')).filter((f) => /^(09[8-9]|1\d\d)_/.test(f)).length === 0);
+// ── The next-stop card follows where the worker is (driving there / on site) ──────────────────────────
+const card2 = read('src/components/today/StopCard.tsx');
+check('18 on site, the card opens into the job: the SAME checklist, photo and finish components as the stop screen', /<StopChecklist /.test(card2) && /<StopPhotos /.test(card2) && /<FinishStopButton /.test(card2) && /const onSite = stop\.status === 'arrived'/.test(card2));
+check('19 driving there: name, address, work, task count and the way in (access notes) show; the checklist does not', /accessNotes/.test(card2) && /!onSite && tasksLine/.test(card2) && /\{onSite \? \(\s*<>/.test(card2));
+check('20 the rules are unchanged: blockers come from missingRequirements, finishing from the same onFinish, leader-only buttons', /missingRequirements\(stop\)/.test(card2) && /onFinish\(\)/.test(card2) && /leader \?/.test(card2));
+
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

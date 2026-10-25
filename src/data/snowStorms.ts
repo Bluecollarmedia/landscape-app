@@ -272,7 +272,7 @@ export const STORM_STATUS_LABEL: Record<SnowStorm['status'], string> = {
   ended: 'Ended',
 };
 
-/** A starting name for a new storm, e.g. "Jan 12 Plowing", or "Jan 12 Storm" for several services. */
+/** A starting name for a new storm, e.g. "Jan 12 Storm" (never named after one service). */
 export function defaultStormName(services: SnowService | SnowService[], now = new Date()): string {
   return defaultStormNameFor(Array.isArray(services) ? services : [services], (s) => SERVICE_LABEL[s], now);
 }

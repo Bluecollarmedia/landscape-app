@@ -22,9 +22,11 @@ export function toggleService(picked: SnowService[], s: SnowService): SnowServic
   return picked.includes(s) ? picked.filter((x) => x !== s) : [...picked, s];
 }
 
-/** A starting name for a new storm, e.g. "Jan 12 Plowing" or, with several services, "Jan 12 Storm". */
-export function defaultStormNameFor(services: SnowService[], label: (s: SnowService) => string, now = new Date()): string {
+/**
+ * A starting name for a new storm: always "Jan 12 Storm". A storm runs plowing, salting and sidewalk crews, so naming it after one service
+ * ("Jan 12 Plowing") was misleading on the dashboard. The owner can still type any name.
+ */
+export function defaultStormNameFor(_services: SnowService[], _label: (s: SnowService) => string, now = new Date()): string {
   const day = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  if (services.length === 1) return `${day} ${services[0] === 'shoveling' ? 'Sidewalks' : label(services[0])}`;
   return `${day} Storm`;
 }

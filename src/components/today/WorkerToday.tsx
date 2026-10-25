@@ -53,7 +53,7 @@ function Sheet({ header, children, bar }: { header: React.ReactNode; children: R
       </ScrollView>
       {bar ? (
         <View style={[styles.actionArea, { bottom: bottomOffset }]} pointerEvents="box-none">
-          <LinearGradient pointerEvents="none" colors={['transparent', colors.groupedBackground, colors.groupedBackground]} locations={[0, 0.35, 1]} style={styles.actionFade} />
+          <LinearGradient pointerEvents="none" colors={['transparent', colors.groupedBackground, colors.groupedBackground]} locations={[0, 0.3, 0.55]} style={styles.actionFade} />
           {bar}
         </View>
       ) : null}
@@ -180,5 +180,5 @@ const styles = StyleSheet.create({
   message: { alignItems: 'center', paddingVertical: spacing['3xl'], paddingHorizontal: spacing.lg },
   messageIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
   actionArea: { position: 'absolute', left: spacing.lg, right: spacing.lg, alignItems: 'stretch' },
-  actionFade: { position: 'absolute', left: -spacing.lg, right: -spacing.lg, top: -spacing.xl, bottom: -spacing['3xl'] },
+  actionFade: { position: 'absolute', left: -spacing.lg, right: -spacing.lg, top: -spacing['3xl'], bottom: -spacing['3xl'] },
 });

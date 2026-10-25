@@ -46,7 +46,7 @@ check('11 the row shows no timer or hours, and asks before clocking out', !/dura
 
 // ── Routes, screens, route status ───────────────────────────────────────────
 check('12 a worker on several routes sees all of them: the plural hook exists and the clock card counts every route', /export function useMyMaintenanceRoutes/.test(read('src/hooks/useMaintenance.ts')) && /useMyMaintenanceRoutes\(\)/.test(card));
-check('13 a worker with both a route and jobs gets the one combined list; maintenance-only gets the stop list', /timeOn && day\.both\) return <WorkerToday combined \/>/.test(read('app/(worker)/(tabs)/index.tsx')) && /<WorkerToday \/>/.test(read('app/(worker)/maintenance/index.tsx')));
+check('13 a worker with route stops gets the simple Today (stops only, or the one combined list when there are jobs too)', /timeOn && day\.hasStops\) return <WorkerToday combined=\{day\.both\} \/>/.test(read('app/(worker)/(tabs)/index.tsx')) && /<WorkerToday \/>/.test(read('app/(worker)/maintenance/index.tsx')));
 check('14 a database without the time clock keeps the older maintenance screen', /workday\.installed === false \? <LegacyMaintenanceToday/.test(read('app/(worker)/maintenance/index.tsx')));
 check('15 adding a stop to a finished route puts it back in progress', /status === 'completed'\) updateRow\('maintenance_routes', routeId, \{ status: 'in_progress' \}\)/.test(read('src/data/maintenance.ts')));
 check('16 the route tab is a map of the day\'s stops', /<RouteMap stops=/.test(read('app/(worker)/maintenance/route.tsx')) && fs.existsSync(path.join(__dirname, '../../src/components/maps/RouteMap.ios.tsx')));

@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
 
 /**
  * Today for a worker on project jobs.
- *  - A worker with BOTH a route and jobs today gets the one combined list.
+ *  - A worker with route stops today gets the simple Today: just the stops, or the one combined list when they also have jobs.
  *  - With the time clock installed, a worker who is not clocked in sees only a Clock In button (never the work); once a day is running
  *    the clock disappears and the existing job screen below is shown unchanged.
  */
@@ -1121,7 +1121,7 @@ export default function WorkerTodayScreen() {
   const { workday } = useWorkerContext();
   const day = useDayWork();
   const timeOn = workday.installed === true;
-  if (timeOn && day.both) return <WorkerToday combined />;
+  if (timeOn && day.hasStops) return <WorkerToday combined={day.both} />;
   const closedToday = !!workday.today?.clockOutAt;
   if (timeOn && !workday.active && day.anyWork && !(closedToday && !day.openWork)) return <ClockInScreen moreWork={closedToday} />;
   return <LandscapingToday />;

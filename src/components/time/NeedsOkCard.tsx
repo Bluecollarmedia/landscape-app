@@ -1,0 +1,99 @@
+import React, { useCallback, useState } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui';
+import { useTheme } from '@/providers/ThemeProvider';
+import { acceptAllSuggestedEnds, acceptSuggestedEnd, loadReviewList, sourceText, type ReviewDay } from '@/data/timeReview';
+import { haptics } from '@/lib/haptics';
+import { typeScale } from '@/theme/typography';
+import { spacing, radius, shadow } from '@/theme/spacing';
+
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const dayOf = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+/**
+ * "Needs your OK": days a worker never clocked out of. They count for no hours until the owner decides. Each row says when the worker
+ * probably stopped (the database's suggestion) with one tap to accept it, or "Set time" when it can't tell. Hidden when nothing is waiting.
+ */
+export function NeedsOkCard() {
+  const { colors } = useTheme();
+  const router = useRouter();
+  const [days, setDays] = useState<ReviewDay[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    const r = await loadReviewList();
+    if (r.ok) { setDays(r.data); setError(''); } else if (!r.notInstalled) setError(r.error);
+  }, []);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  if (days.length === 0 && !error) return null;
+  const withSuggestion = days.filter((d) => d.suggestedEndAt).length;
+
+  async function accept(id: string) {
+    setBusy(id);
+    setError('');
+    const r = await acceptSuggestedEnd(id);
+    setBusy(null);
+    if (!r.ok) { setError(r.error); haptics.warning(); return; }
+    haptics.success();
+    load();
+  }
+  async function acceptAll() {
+    setBusy('all');
+    setError('');
+    const r = await acceptAllSuggestedEnds();
+    setBusy(null);
+    if (!r.ok) { setError(r.error); haptics.warning(); return; }
+    if (r.data.left > 0) setError(`${r.data.left} could not be accepted. Open them and set the time.`);
+    haptics.success();
+    load();
+  }
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.warning }, shadow.sm]}>
+      <View style={styles.head}>
+        <Feather name="clock" size={18} color={colors.warning} />
+        <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Needs your OK</Text>
+        {withSuggestion > 1 ? <Button title="Accept all" size="sm" onPress={acceptAll} loading={busy === 'all'} /> : null}
+      </View>
+      <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>
+        These days closed on their own. They count as zero hours until you accept an end time.
+      </Text>
+      {days.map((d) => (
+        <View key={d.workdayId} style={[styles.row, { borderTopColor: colors.border }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{d.name} · {dayOf(d.clockInAt)}</Text>
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+              {d.suggestedEndAt
+                ? `${timeOf(d.clockInAt)} to ${timeOf(d.suggestedEndAt)} (${sourceText(d.suggestionSource)})`
+                : `Clocked in ${timeOf(d.clockInAt)}. No end time to suggest.`}
+            </Text>
+          </View>
+          {d.suggestedEndAt ? (
+            <Button title="Accept" size="sm" onPress={() => accept(d.workdayId)} loading={busy === d.workdayId} />
+          ) : null}
+          <Pressable
+            onPress={() => router.push({ pathname: '/(owner)/more/labor-day', params: { id: d.workdayId } } as never)}
+            accessibilityRole="button"
+            accessibilityLabel={`Set the end time for ${d.name}`}
+            hitSlop={8}
+            style={[styles.edit, { borderColor: colors.border }]}
+          >
+            <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{d.suggestedEndAt ? 'Edit' : 'Set time'}</Text>
+          </Pressable>
+        </View>
+      ))}
+      {error ? <Text style={[typeScale.bodySmall, { color: colors.error, marginTop: spacing.sm }]}>{error}</Text> : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: { borderRadius: radius.xl, borderWidth: 1, padding: spacing.lg, marginBottom: spacing.md },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: spacing.md, marginTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
+  edit: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1 },
+});

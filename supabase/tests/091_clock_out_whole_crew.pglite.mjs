@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import { buildFullSchema } from './helpers/fullSchema.mjs';
 
 const repo = process.argv[2];
-const { db, failures } = await buildFullSchema(repo);
+// Update 98 closes the crew by itself when the last stop is finished, so this older button is tested as it stood at update 97.
+// (How the two fit together is tested in 098_auto_close_workday.pglite.mjs.)
+const { db, failures } = await buildFullSchema(repo, { upTo: 97 });
 const check = (name, ok, detail = '') => console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + String(detail).slice(0, 300)}`);
 check('0 the full schema and all updates (including 91) load', failures.length === 0, JSON.stringify(failures));
 let again = true;

@@ -10,7 +10,7 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
 const data = read('src/data/ownerClock.ts');
 const card = read('src/components/time/OwnerClockCard.tsx');
 check('1 clock-in uses the existing time_staff_add_workday (an open day starting now); clock-out uses time_staff_edit_workday (closing it now)', /addWorkday\(personId, todayKey\(\), new Date\(\), null, reason\)/.test(data) && /editWorkday\(workdayId, null, new Date\(\), reason\)/.test(data));
-check('2 no database file was added for this: the newest update is still 097', !fs.readdirSync(path.join(__dirname, '../../supabase/updates')).some((f) => /^(09[8-9]|1\d\d)_/.test(f)));
+check('2 the owner clock itself needs no database file: it only calls functions that already exist (update 64)', !/supabase\.(rpc|from)/.test(read('src/data/ownerClock.ts')));
 check('3 a reason of at least 3 letters is required before the button works (the database requires it too)', /reason\.trim\(\)\.length < 3/.test(card) && /disabled=\{reason\.trim\(\)\.length < 3\}/.test(card));
 check('4 it asks first ("Clock out X now?") and says what is saved', /Clock out \$\{firstName\} now\?/.test(card) && /saved in the time history/.test(card));
 check('5 it shows who is on the clock right now, and hides the button when an old day is still open (that day is fixed first)', /Clocked in since/.test(card) && /Fix that day first/.test(card) && /!loading && !stale/.test(card));

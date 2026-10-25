@@ -29,6 +29,9 @@ const w2 = await mk('w2@x.test', 'Second');
 await db.query(`insert into public.company_members (company_id, person_id, role, status, worker_type) values ($1,$2,'owner','active','landscaping'),($1,$3,'worker','active','landscaping'),($1,$4,'worker','active','landscaping')`, [coA, owner.pid, w1.pid, w2.pid]);
 const proj = (await one(`insert into public.projects (company_id, name, status) values ($1,'Job','active') returning id`, [coA])).id;
 const a1 = (await one(`insert into public.assignments (company_id, project_id, person_id, scheduled_date, status) values ($1,$2,$3,$4,'scheduled') returning id`, [coA, proj, w1.pid, today])).id;
+// A second job that stays open, so finishing the first one does not close the day by itself (update 98): the owner closes it here.
+const proj2 = (await one(`insert into public.projects (company_id, name, status) values ($1,'Second job','active') returning id`, [coA])).id;
+await db.query(`insert into public.assignments (company_id, project_id, person_id, scheduled_date, status) values ($1,$2,$3,$4,'scheduled')`, [coA, proj2, w1.pid, today]);
 await db.query(`insert into public.time_settings (company_id, breaks_enabled, breaks_paid) values ($1, true, false)`, [coA]);
 
 const wds = async (pid) => (await db.query(`select * from public.time_workdays where person_id = $1 order by clock_in_at`, [pid])).rows;

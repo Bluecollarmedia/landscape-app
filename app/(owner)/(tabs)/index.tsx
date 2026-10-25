@@ -23,6 +23,7 @@ import { useCompanySetup } from '@/hooks/useCompanySetup';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { remindWorker } from '@/data/remindWorker';
 import { AdminJobCard } from '@/components/admin/AdminJobCard';
+import { NeedsOkCard } from '@/components/time/NeedsOkCard';
 import { showMessage } from '@/components/financials/ActionSheet';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
@@ -378,6 +379,9 @@ export default function OwnerDashboard() {
 
           {/* An admin who is on a job works it like a worker (confirm it, clock in and out). Nothing for the owner. */}
           <AdminJobCard />
+
+          {/* Workdays that closed on their own and wait for the owner's end time */}
+          <NeedsOkCard />
 
           {/* Needs Attention */}
           <View style={styles.section}>

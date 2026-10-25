@@ -372,7 +372,7 @@ export const ES_WORKER: Record<string, string> = {
   "You're all set. There are no stops for you today.": 'Todo listo. Hoy no tienes paradas.',
   'All done for today!': '¡Todo listo por hoy!',
   'Great work. Your work is complete.': 'Buen trabajo. Tu trabajo está completo.',
-  'Great work. Your workday ends when you clock out in Settings.': 'Buen trabajo. Tu jornada termina cuando registras tu salida en Ajustes.',
+  'Great work. Your workday closes by itself.': 'Buen trabajo. Tu jornada se cierra sola.',
   'Open job': 'Abrir trabajo',
   'OPEN JOB': 'ABRIR TRABAJO',
   '1 task': '1 tarea',

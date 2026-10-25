@@ -145,7 +145,7 @@ export function WorkerToday({ combined = false }: { combined?: boolean }) {
       ) : (
         <>
           {!openWork ? (
-            <Message icon="check-circle" title={t('All done for today!')} text={t('Great work. Your workday ends when you clock out in Settings.')} />
+            <Message icon="check-circle" title={t('All done for today!')} text={t('Great work. Your workday closes by itself.')} />
           ) : null}
           {items.map((item) => {
             const state: StopCardState = item.done ? 'done' : item.id === nextId ? 'next' : 'later';

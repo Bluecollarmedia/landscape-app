@@ -98,7 +98,7 @@ export default function TaskDetailScreen() {
         : await ImagePicker.launchImageLibraryAsync(options);
       if (!result.canceled && result.assets[0]) {
         haptics.success();
-        captureTaskPhoto(task!.id, keepPicked(result.assets[0].uri));
+        captureTaskPhoto(task!.id, await keepPicked(result.assets[0].uri));
       }
     } catch {
       if (Platform.OS === 'web') {

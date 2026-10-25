@@ -55,7 +55,10 @@ export function ReportIssueScreen() {
     }
     const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 1, allowsMultipleSelection: source === 'library', selectionLimit: 6 };
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
-    if (!result.canceled) setPhotos((cur) => [...cur, ...result.assets.map((a) => keepPicked(a.uri))].slice(0, 8));
+    if (!result.canceled) {
+      const kept = await Promise.all(result.assets.map((a) => keepPicked(a.uri)));
+      setPhotos((cur) => [...cur, ...kept].slice(0, 8));
+    }
   }
 
   async function send() {

@@ -13,7 +13,7 @@ import { db, insertRow, deleteRow } from './store';
 import { removeMedia } from '@/lib/media';
 import { getStorageInfo } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
-import { copyPickedFile } from '@/lib/keepPickedFile';
+import { keepPickedFileAsync } from '@/lib/keepPickedFile';
 import { formatBytes } from '@/types/storage';
 import type { TaskAttachment } from '@/types/project';
 
@@ -102,14 +102,14 @@ export async function pickTaskMedia(alreadyPicked: number): Promise<TaskMediaDra
       skipped.push(`A ${mediaType} is ${formatBytes(sizeBytes)}; the most one file can be is ${formatBytes(MAX_TASK_FILE_BYTES)}.`);
       continue;
     }
-    const kept = copyPickedFile(asset.uri, mediaType);
-    if (!kept) {
-      skipped.push(`A ${mediaType} couldn't be read from your phone. Pick it again.`);
+    const kept = await keepPickedFileAsync(asset.uri, mediaType);
+    if (!kept.uri) {
+      skipped.push(`A ${mediaType} couldn't be read from your phone (${kept.why}). Pick it again.`);
       continue;
     }
     drafts.push({
       key: `${Date.now()}-${drafts.length}-${asset.uri.slice(-12)}`,
-      uri: kept,
+      uri: kept.uri,
       mediaType,
       mimeType: asset.mimeType ?? undefined,
       sizeBytes,

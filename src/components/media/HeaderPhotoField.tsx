@@ -94,7 +94,7 @@ export function HeaderPhotoField({ kind, value, onChange }: HeaderPhotoFieldProp
     // No system editor: iOS only offers a square crop. Our own cropper uses the header's real shape.
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     const asset = result.canceled ? undefined : result.assets?.[0];
-    if (asset) setPicked({ uri: keepPicked(asset.uri), width: asset.width, height: asset.height });
+    if (asset) setPicked({ uri: await keepPicked(asset.uri), width: asset.width, height: asset.height });
   }
 
   function confirmRemove() {

@@ -75,7 +75,7 @@ export async function pickSnowMedia(): Promise<SnowMediaDraft[]> {
         : tr('A image is {size}; the most one file can be is {max}.', { size, max }));
       continue;
     }
-    drafts.push({ uri: keepPicked(asset.uri, mediaType), mediaType, mimeType: asset.mimeType ?? undefined, sizeBytes });
+    drafts.push({ uri: await keepPicked(asset.uri, mediaType), mediaType, mimeType: asset.mimeType ?? undefined, sizeBytes });
   }
   if (skipped.length > 0) notify(tr("Some files weren't added"), skipped.join('\n'));
   return drafts;

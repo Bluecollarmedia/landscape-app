@@ -29,7 +29,7 @@ export async function pickStopPhotos(stopId: string, source: PhotoSource): Promi
   const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
   if (result.canceled) return 0;
   let added = 0;
-  for (const a of result.assets) if (addStopPhoto(stopId, keepPicked(a.uri))) added++;
+  for (const a of result.assets) if (addStopPhoto(stopId, await keepPicked(a.uri))) added++;
   if (added) haptics.success();
   return added;
 }

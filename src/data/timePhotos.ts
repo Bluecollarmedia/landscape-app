@@ -39,7 +39,7 @@ export async function takeTimedPhoto(target: TimedPhotoTarget, phase: Phase): Pr
   }
   const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
   if (shot.canceled || !shot.assets?.[0]) return { ok: false, error: 'No photo was taken.' };
-  const uri = keepPicked(shot.assets[0].uri);
+  const uri = await keepPicked(shot.assets[0].uri);
   try {
     const companyId = db.companyId;
     if (target.kind === 'maintenance') {

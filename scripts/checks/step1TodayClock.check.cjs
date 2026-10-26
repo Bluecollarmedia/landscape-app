@@ -50,7 +50,7 @@ check('13 a worker with route stops gets the simple Today (stops only, or the on
 check('14 a database without the time clock keeps the older maintenance screen', /workday\.installed === false \? <LegacyMaintenanceToday/.test(read('app/(worker)/maintenance/index.tsx')));
 check('15 adding a stop to a finished route puts it back in progress', /status === 'completed'\) updateRow\('maintenance_routes', routeId, \{ status: 'in_progress' \}\)/.test(read('src/data/maintenance.ts')));
 check('16 the route tab is a map of the day\'s stops', /<RouteMap stops=/.test(read('app/(worker)/maintenance/route.tsx')) && fs.existsSync(path.join(__dirname, '../../src/components/maps/RouteMap.ios.tsx')));
-check('17 step 1 itself adds no database file: the only new ones are the separate step 2 files (098, 099, 100)', fs.readdirSync(path.join(__dirname, '../../supabase/updates')).filter((f) => /^(09[8-9]|1\d\d)_/.test(f)).join() === '098_auto_close_workday.sql,099_lone_worker_is_task_lead.sql,100_close_at_midnight.sql');
+check('17 step 1 itself adds no database file: the new database files all come after step 1, starting with step 2's 098', fs.readdirSync(path.join(__dirname, '../../supabase/updates')).filter((f) => /^(09[8-9]|1\d\d)_/.test(f)).join().startsWith('098_auto_close_workday.sql'));
 // ── The next-stop card follows where the worker is (driving there / on site) ──────────────────────────
 const card2 = read('src/components/today/StopCard.tsx');
 check('18 on site, the card opens into the job: the SAME checklist and photo components as the stop screen', /<StopChecklist /.test(card2) && /<StopPhotos /.test(card2) && /const onSite = stop\.status === 'arrived'/.test(card2));

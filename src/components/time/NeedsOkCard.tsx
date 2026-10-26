@@ -4,7 +4,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
-import { acceptAllSuggestedEnds, acceptSuggestedEnd, loadReviewList, sourceText, type ReviewDay } from '@/data/timeReview';
+import { acceptAllSuggestedEnds, acceptSuggestedEnd, loadReviewList, settleNoHours, sourceText, type ReviewDay } from '@/data/timeReview';
+import { confirmAction } from '@/components/financials/ActionSheet';
 import { haptics } from '@/lib/haptics';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -41,6 +42,17 @@ export function NeedsOkCard() {
     haptics.success();
     load();
   }
+  function noHours(d: ReviewDay) {
+    confirmAction(`No hours for ${d.name}?`, `${dayOf(d.clockInAt)} counts as zero hours and leaves this list. It stays in the time history.`, 'No hours', async () => {
+      setBusy(d.workdayId);
+      setError('');
+      const r = await settleNoHours(d.workdayId);
+      setBusy(null);
+      if (!r.ok) { setError(r.error); haptics.warning(); return; }
+      haptics.success();
+      load();
+    });
+  }
   async function acceptAll() {
     setBusy('all');
     setError('');
@@ -72,18 +84,23 @@ export function NeedsOkCard() {
                 : `Clocked in ${timeOf(d.clockInAt)}. No end time to suggest.`}
             </Text>
           </View>
-          {d.suggestedEndAt ? (
-            <Button title="Accept" size="sm" onPress={() => accept(d.workdayId)} loading={busy === d.workdayId} />
-          ) : null}
-          <Pressable
-            onPress={() => router.push({ pathname: '/(owner)/more/labor-day', params: { id: d.workdayId } } as never)}
-            accessibilityRole="button"
-            accessibilityLabel={`Set the end time for ${d.name}`}
-            hitSlop={8}
-            style={[styles.edit, { borderColor: colors.border }]}
-          >
-            <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{d.suggestedEndAt ? 'Edit' : 'Set time'}</Text>
-          </Pressable>
+          <View style={styles.actions}>
+            {d.suggestedEndAt ? (
+              <Button title="Accept" size="sm" onPress={() => accept(d.workdayId)} loading={busy === d.workdayId} />
+            ) : null}
+            <Pressable
+              onPress={() => router.push({ pathname: '/(owner)/more/labor-day', params: { id: d.workdayId } } as never)}
+              accessibilityRole="button"
+              accessibilityLabel={`Set the end time for ${d.name}`}
+              hitSlop={8}
+              style={[styles.edit, { borderColor: colors.border }]}
+            >
+              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{d.suggestedEndAt ? 'Edit' : 'Set time'}</Text>
+            </Pressable>
+            <Pressable onPress={() => noHours(d)} accessibilityRole="button" accessibilityLabel={`No hours for ${d.name}`} hitSlop={8} style={[styles.edit, { borderColor: colors.border }]}>
+              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>No hours</Text>
+            </Pressable>
+          </View>
         </View>
       ))}
       {error ? <Text style={[typeScale.bodySmall, { color: colors.error, marginTop: spacing.sm }]}>{error}</Text> : null}
@@ -94,6 +111,7 @@ export function NeedsOkCard() {
 const styles = StyleSheet.create({
   card: { borderRadius: radius.xl, borderWidth: 1, padding: spacing.lg, marginBottom: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: spacing.md, marginTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
+  row: { paddingTop: spacing.md, marginTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   edit: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1 },
 });

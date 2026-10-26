@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useT } from '@/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Icon, InlineNotice, LoadingSpinner, ScreenHeader } from '@/components/ui';
@@ -199,9 +199,11 @@ export function SnowHoursScreen() {
   const [loading, setLoading] = useState(true);
   const [names, setNames] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<SnowShift | null>(null);
-  const [range, setRange] = useState<RangeKey>('this_week');
+  // Opened from "X is still clocked in" on the dashboard: that worker, over 30 days (their open shift may be days old).
+  const { person } = useLocalSearchParams<{ person?: string }>();
+  const [range, setRange] = useState<RangeKey>(person ? 'last_30' : 'this_week');
   const [stormId, setStormId] = useState<string | null>(null);
-  const [personId, setPersonId] = useState<string | null>(null);
+  const [personId, setPersonId] = useState<string | null>(person ? String(person) : null);
   const [onlyReview, setOnlyReview] = useState(false);
   const [includeUntagged, setIncludeUntagged] = useState(false);
   const [openDays, setOpenDays] = useState<Record<string, boolean>>({});

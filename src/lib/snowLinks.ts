@@ -14,8 +14,9 @@ export function snowDashboardHref(target: SnowTarget): Href {
     case 'route':
     case 'visit':
       return { pathname: '/snow/owner/storm/[id]', params: { id: target.stormId } };
+    // The employee's own shifts, over the last 30 days, so an old shift they never clocked out of is on the screen when you arrive.
     case 'employee':
-      return '/snow/owner/hours';
+      return { pathname: '/snow/owner/hours', params: { person: target.personId } };
     case 'media_review':
       return '/snow/owner/review';
   }

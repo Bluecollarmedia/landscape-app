@@ -38,6 +38,8 @@ import { todayKey } from '@/lib/ids';
 import { haptics } from '@/lib/haptics';
 import type { AddressParts } from '@/lib/address';
 import { cleanDates } from '@/lib/serviceDates';
+import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
+import { formatDistance } from '@/lib/maps';
 import {
   FREQUENCIES, LEGACY_FREQUENCY_LABELS, newDraft, draftFromRule, draftToInput, spreadForDraft, toInt, type ServiceDraft,
 } from '@/lib/maintenanceServiceDraft';
@@ -81,6 +83,9 @@ export default function MaintenancePropertyEditScreen() {
     existing?.latitude != null ? { latitude: existing.latitude, longitude: existing.longitude } : {},
   );
   const [accessNotes, setAccessNotes] = useState(existing?.accessNotes ?? '');
+  // How close the crew must be to tap I'm here (0 = Anywhere). Saved with the property; an arrival outside it asks the worker to confirm.
+  const [radiusM, setRadiusM] = useState<number>(existing?.checkinRadiusM ?? 150);
+  const [pickRadius, setPickRadius] = useState(false);
   const [notes, setNotes] = useState(existing?.notes ?? '');
 
   const year = todayKey().slice(0, 4);
@@ -191,6 +196,7 @@ export default function MaintenancePropertyEditScreen() {
       zip: address.zip.trim() || undefined,
       latitude: check.latitude,
       longitude: check.longitude,
+      checkinRadiusM: radiusM,
       accessNotes: accessNotes.trim() || undefined,
       notes: notes.trim() || undefined,
     };
@@ -333,6 +339,21 @@ export default function MaintenancePropertyEditScreen() {
             />
           </View>
         </ListSection>
+
+        <ListSection title="CHECK-IN DISTANCE" footer="How close the crew has to be when they tap I'm here at this property. Choose Anywhere to turn the distance off.">
+          <ListRow icon="crosshair" title="Check-in distance" subtitle={radiusM <= 0 ? 'Anywhere (no limit)' : formatDistance(radiusM)} showChevron onPress={() => setPickRadius(true)} />
+        </ListSection>
+        <CheckInRadiusSheet
+          visible={pickRadius}
+          place={{ address: address.address, city: address.city, state: address.state, zip: address.zip, latitude: check.latitude, longitude: check.longitude }}
+          radiusMeters={radiusM}
+          onClose={() => setPickRadius(false)}
+          onSave={(meters, coords) => {
+            setRadiusM(meters);
+            setPickRadius(false);
+            void coords;
+          }}
+        />
 
         <ListSection title="ACCESS NOTES" footer="Gate codes, pets, where to park. The crew sees this at the stop.">
           <NoteField label="Access notes" placeholder="Side gate code is with the owner. Dog in back yard." value={accessNotes} onChangeText={setAccessNotes} />

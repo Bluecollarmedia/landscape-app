@@ -2173,11 +2173,11 @@ export default function ProjectDetailScreen() {
     setShowRadiusPicker((open) => (open ? open : true));
   }
 
-  function handleSetRadius(meters: number, coords: { latitude: number; longitude: number }) {
+  function handleSetRadius(meters: number, coords: { latitude: number; longitude: number } | null) {
     // This project's own setting. When the project has no saved map spot yet, save the one the sheet just resolved, so the worker's
     // check-in (and the database) measure from exactly the spot the owner saw on the map.
     updateSettings({ checkinRadiusMeters: meters });
-    if (p.latitude == null || p.longitude == null) updateProject({ latitude: coords.latitude, longitude: coords.longitude });
+    if (coords && (p.latitude == null || p.longitude == null)) updateProject({ latitude: coords.latitude, longitude: coords.longitude });
     setShowRadiusPicker(false);
   }
 
@@ -2305,7 +2305,7 @@ export default function ProjectDetailScreen() {
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginRight: spacing.xs }]}>
-                    {formatDistance(settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M)}
+                    {(settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M) <= 0 ? 'Anywhere' : formatDistance(settings.checkinRadiusMeters ?? DEFAULT_CHECKIN_RADIUS_M)}
                   </Text>
                   <Icon name="chevron-right" size={16} color={colors.textTertiary} />
                 </View>

@@ -56,6 +56,17 @@ export async function acceptSuggestedEnd(workdayId: string): Promise<Result> {
   }
 }
 
+/** The person did not work that day (update 101): it stays at zero hours, is settled, and leaves the list. */
+export async function settleNoHours(workdayId: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: false, error: 'Needs the live database.', notInstalled: true };
+  try {
+    const { error } = await supabase.rpc('time_settle_no_hours', { p_workday: workdayId });
+    return error ? failure(error, "Couldn't settle that day.") : { ok: true, data: undefined };
+  } catch (e) {
+    return failure(e as Error, "Couldn't settle that day.");
+  }
+}
+
 /** Accepts every waiting day that has a suggestion. A day that can't be accepted stays in the list. */
 export async function acceptAllSuggestedEnds(): Promise<Result<{ accepted: number; left: number }>> {
   if (!isSupabaseConfigured) return { ok: false, error: 'Needs the live database.', notInstalled: true };

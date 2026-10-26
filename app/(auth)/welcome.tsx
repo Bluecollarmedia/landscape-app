@@ -5,14 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { useCompanySlotOpen } from '@/hooks/useCompanySlot';
 import { LegalModal } from '@/components/legal/LegalModal';
 import { LanguageSwitch } from '@/components/ui/LanguageSwitch';
 import { useT } from '@/i18n';
 import type { LegalDoc } from '@/legal/legalContent';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import { brand } from '@/theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 240);
@@ -20,7 +18,6 @@ const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 240);
 export default function WelcomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const canCreateCompany = useCompanySlotOpen();
   const t = useT();
   const insets = useSafeAreaInsets();
   // The legal pages open as a pop-up over this screen, so closing one lands exactly here.
@@ -57,15 +54,6 @@ export default function WelcomeScreen() {
             <Icon name="arrow-right" size={20} color="#FFFFFF" />
           </Pressable>
 
-          {canCreateCompany && (
-            <ChoiceCard
-              icon="briefcase"
-              title={t('Create a Company')}
-              subtitle={t('Start managing your business')}
-              onPress={() => router.push('/(auth)/create-company')}
-            />
-          )}
-
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm }]}>
             {t('Joining a team, or a customer? Open the private link your employer texted you.')}
           </Text>
@@ -86,35 +74,6 @@ export default function WelcomeScreen() {
       </View>
       <LegalModal slug={reading} onClose={() => setReading(null)} />
     </View>
-  );
-}
-
-/** White rounded card with a green icon circle, used for the secondary welcome choices. */
-function ChoiceCard({ icon, title, subtitle, onPress }: {
-  icon: React.ComponentProps<typeof Icon>['name'];
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.card,
-        { backgroundColor: colors.surface, borderColor: pressed ? colors.primary : colors.border },
-        pressed && styles.pressed,
-      ]}
-      onPress={onPress}
-    >
-      <View style={[styles.iconCircle, { backgroundColor: brand.primarySurface }]}>
-        <Icon name={icon} size={20} color={colors.primary} />
-      </View>
-      <View style={styles.btnTextGroup}>
-        <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{title}</Text>
-        <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 2 }]}>{subtitle}</Text>
-      </View>
-      <Icon name="chevron-right" size={20} color={colors.textTertiary} />
-    </Pressable>
   );
 }
 
@@ -147,25 +106,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     borderRadius: radius.full,
     marginBottom: spacing.xs,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    gap: spacing.md,
-  },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnTextGroup: {
-    flex: 1,
   },
   pressed: {
     transform: [{ scale: 0.98 }],

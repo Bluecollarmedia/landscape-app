@@ -1,5 +1,5 @@
 // Run: node scripts/checks/noPlainSignup.check.cjs
-// There are exactly three ways in: Sign In, Create a Company (the business owner), and a private link (workers and customers).
+// There are two ways in: Sign In, and a private link (workers and customers). There is no Get started or Create a Company on the entry screens.
 // There is no plain "Create an account" screen that would leave someone with a login and nothing attached.
 const fs = require('fs');
 const path = require('path');
@@ -11,14 +11,14 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
 const auth = fs.readdirSync(path.join(root, 'app/(auth)')).sort().join(',');
 check('1 the sign-in group is welcome, login, create-company, forgot-password (and its layout): no plain signup screen', !fs.existsSync(path.join(root, 'app/(auth)/signup.tsx')) && auth === '_layout.tsx,create-company.tsx,forgot-password.tsx,login.tsx,welcome.tsx', auth);
 const login = read('app/(auth)/login.tsx');
-check('2 the sign-in screen no longer sends anyone to a plain "Create your account" or says "Invited by email?"', !/auth\)\/signup/.test(login) && !/Invited by email/.test(login) && /Get started/.test(login));
+check('2 the sign-in screen has no Get started button and no longer sends anyone to a plain "Create your account" or says "Invited by email?"', !/auth\)\/signup/.test(login) && !/Invited by email/.test(login) && !/Get started/.test(login));
 const files = [];
 const walk = (d) => { for (const e of fs.readdirSync(path.join(root, d), { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (/\.(ts|tsx)$/.test(e.name)) files.push(p); } };
 walk('app'); walk('src');
 const stale = files.filter((f) => /\(auth\)\/signup|Invited by your company\? Use the email|Use the email they invited/.test(fs.readFileSync(path.join(root, f), 'utf8')));
 check('3 nothing in the app points to the removed screen or says to "use the email they invited"', stale.length === 0, stale.join(', '));
 const welcome = read('app/(auth)/welcome.tsx');
-check('4 the welcome screen offers Sign In, Create a Company, and tells workers and customers to open their private link', /Sign In/.test(welcome) && /Create a Company/.test(welcome) && /Open the private link your employer texted you/.test(welcome));
+check('4 the welcome screen offers Sign In (no Create a Company) and tells workers and customers to open their private link', /Sign In/.test(welcome) && /Open the private link your employer texted you/.test(welcome));
 check('5 workers and customers still create their login from their private link page', /signUp\(/.test(read('app/invite/[token].tsx')) && /inviteToken/.test(read('app/invite/[token].tsx')));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

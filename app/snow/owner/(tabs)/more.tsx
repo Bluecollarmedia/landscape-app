@@ -13,6 +13,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Avatar, ListSection } from '@/components/ui';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { useModeSwitch } from '@/components/snow/ModeSwitchRow';
+import { usePublicWeatherRow } from '@/hooks/usePublicWeatherRow';
 import { OwnerCustomerMessages, OwnerStopAlertsToggle } from '@/components/snow/notifications/SnowNotifySettings';
 import { StopRuleToggle } from '@/components/snow/settings/StopRuleToggle';
 import { AutoShareToggle } from '@/components/snow/settings/AutoShareToggle';
@@ -40,6 +41,7 @@ export default function SnowOwnerMoreScreen() {
   const { width } = useWindowDimensions();
   const tabBarClearance = useTabBarClearance();
   const mode = useModeSwitch();
+  const weatherRow = usePublicWeatherRow();
 
   const headerHeight = width / HEADER_RATIO;
 
@@ -89,6 +91,7 @@ export default function SnowOwnerMoreScreen() {
           <Group title="You">
             <ProfileCard onPress={() => router.push('/snow/owner/edit-profile' as any)} />
             {mode.canSwitch ? <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} /> : null}
+            {weatherRow.canChange ? <Row icon="cloud" title={`${weatherRow.title}: ${weatherRow.value}`} subtitle={weatherRow.subtitle} onPress={weatherRow.confirm} /> : null}
           </Group>
 
           <Group title="Account">

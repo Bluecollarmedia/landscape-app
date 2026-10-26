@@ -6,10 +6,10 @@
  */
 
 /**
- * The Weather experience does not exist yet. While this is false the app behaves as if Weather were OFF, whatever the server says. It is
- * flipped to true only in a later phase that has been approved on its own.
+ * The Weather screens exist (Phase 2). Whether visitors actually see them is the owner's switch in Settings, which is OFF until the owner
+ * turns it on. Setting this to false would make the app behave as if Weather were OFF whatever the server says.
  */
-export const WEATHER_EXPERIENCE_BUILT = false;
+export const WEATHER_EXPERIENCE_BUILT = true;
 
 export type SignedOutDestination = '/(auth)/welcome' | '/weather';
 
@@ -18,6 +18,14 @@ export function signedOutRedirect(input: { firstSegment: string | undefined; wea
   const inAuth = input.firstSegment === '(auth)';
   if (input.weatherOn) return inAuth || input.firstSegment === 'weather' ? null : '/weather';
   return inAuth ? null : '/(auth)/welcome';
+}
+
+/**
+ * Where the app's root route (app/index.tsx) sends someone. Today that is always the login screen; the ONLY exception is a signed-out
+ * visitor while Weather is on. A signed-in person always gets the original redirect (the layout then moves them to their own area).
+ */
+export function entryRedirect(input: { isAuthenticated: boolean; weatherOn: boolean }): '/(auth)/login' | '/weather' {
+  return !input.isAuthenticated && input.weatherOn ? '/weather' : '/(auth)/login';
 }
 
 /** What the app treats as "Weather is on": the answer AND the experience actually being built. */

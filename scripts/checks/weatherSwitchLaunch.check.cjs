@@ -12,7 +12,7 @@ const root = path.join(__dirname, '../..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const load = (p) => { const m = { exports: {} }; new Function('module', 'exports', ts.transpileModule(read(p), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports); return m.exports; };
 const { decideWeatherOn, createWeatherSwitch, CACHE_MAX_AGE_MS, REQUEST_CAP_MS } = load('src/lib/weatherSwitch.ts');
-const { signedOutRedirect, effectiveWeatherOn, WEATHER_EXPERIENCE_BUILT } = load('src/lib/launchRoute.ts');
+const { signedOutRedirect, effectiveWeatherOn, entryRedirect, WEATHER_EXPERIENCE_BUILT } = load('src/lib/launchRoute.ts');
 
 let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + detail}`); };
@@ -115,6 +115,10 @@ const settle = () => new Promise((r) => setImmediate(r));
   check('23 effectiveWeatherOn: not built -> always off, built -> follows the answer', effectiveWeatherOn(false, true) === false && effectiveWeatherOn(true, true) === true && effectiveWeatherOn(true, false) === false && effectiveWeatherOn(false, false) === false);
   check('24 a late OFF while on Weather goes to welcome; a late ON while in the sign-in area stays put', signedOutRedirect({ firstSegment: 'weather', weatherOn: false }) === '/(auth)/welcome' && signedOutRedirect({ firstSegment: '(auth)', weatherOn: true }) === null);
 
+  // ── the root route (the real first stop: it sends everyone to the login screen today) ──
+  check('24b the root route: Weather OFF always gives the original login redirect, signed in or out', [true, false].every((a) => entryRedirect({ isAuthenticated: a, weatherOn: false }) === '/(auth)/login'));
+  check('24c the root route: Weather ON sends ONLY a signed-out visitor to /weather; a signed-in person still gets the original redirect', entryRedirect({ isAuthenticated: false, weatherOn: true }) === '/weather' && entryRedirect({ isAuthenticated: true, weatherOn: true }) === '/(auth)/login');
+
   // ── static checks (file text only) ──
   const sha = (s) => crypto.createHash('sha256').update(s.replace(/\r\n/g, '\n')).digest('hex');
   const layout = read('app/_layout.tsx');
@@ -133,18 +137,21 @@ const settle = () => new Promise((r) => setImmediate(r));
   };
   const changed = Object.entries(fp).filter(([f, h]) => sha(read(f)) !== h).map(([f]) => f);
   check('28 the welcome, sign-in, forgot-password, create-company screens, the auth layout and the sign-in welcome overlay are unchanged', changed.length === 0, changed.join(', '));
-  check('29 Phase 1 has no /weather screen or folder', !fs.existsSync(path.join(root, 'app/weather')));
-  check('30 the experience is marked NOT built, so even a server ON changes nothing (Phase 1 lock)', WEATHER_EXPERIENCE_BUILT === false);
+  const wfiles = fs.existsSync(path.join(root, 'app/weather')) ? fs.readdirSync(path.join(root, 'app/weather')).sort().join() : '';
+  check('29 Phase 2: the Weather area is exactly its layout and three screens (home, history, account), and no other new area exists', wfiles === '_layout.tsx,account.tsx,history.tsx,index.tsx', wfiles);
+  check('30 the Weather screens are built, and the owner\'s switch still decides: the database default is OFF', WEATHER_EXPERIENCE_BUILT === true && /enabled boolean not null default false/.test(read('supabase/updates/103_public_weather_switch.sql')));
   check('31 app.json has nothing about weather or location changes (permission text untouched)', !/weather/i.test(read('app.json')) && /Brighton Lawn uses your location to check you in when you arrive at a job site\./.test(read('app.json')));
   const walk = (d) => fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap((e) => e.isDirectory() ? (e.name === 'node_modules' ? [] : walk(path.join(d, e.name))) : [path.join(d, e.name)]);
   const callers = [...walk('app'), ...walk('src')].filter((f) => /\.(ts|tsx)$/.test(f) && /set_public_weather_enabled/.test(read(f)));
-  check('32 nothing in the app can call the owner-only switch function (no way to turn Weather on from the app)', callers.length === 0, callers.join(', '));
+  check('32 the owner-only switch function is called from exactly one place (the data file the owner\'s Settings row uses), and that row is shown only to the owner', callers.map((f) => f.replace(/\\/g, '/')).join() === 'src/data/publicWeather.ts' && /db\.role === 'owner'/.test(read('src/hooks/usePublicWeatherRow.ts')) && /weatherRow\.canChange/.test(read('app/(owner)/(tabs)/more/settings.tsx')));
   const sql = read('supabase/updates/103_public_weather_switch.sql');
   const statements = sql.replace(/--[^\n]*/g, '').split(';').map((s) => s.trim()).filter(Boolean);
   const risky = statements.filter((s) => /\b(alter|drop|grant|revoke|create\s+(or\s+replace\s+)?(trigger|policy|function|table)|insert|update|delete)\b/i.test(s) && !/public_weather/i.test(s) && !/^notify\b/i.test(s));
   check('33 the SQL touches only the new public_weather objects (nothing existing is altered, dropped, granted or revoked)', risky.length === 0, risky.map((s) => s.slice(0, 60)).join(' | '));
   check('34 the SQL revokes all direct table access and enables row security', /alter table public\.public_weather_settings enable row level security/i.test(sql) && /revoke all on public\.public_weather_settings from public, anon, authenticated/i.test(sql));
   check('35 the owner function checks the exact owner role and active membership', /m\.role = 'owner' and m\.status = 'active'/.test(sql) && !/is_staff/.test(sql));
+  const idx = read('app/index.tsx');
+  check('36b app/index.tsx still redirects to the login screen unless entryRedirect says otherwise (file text)', /<Redirect href=\{entryRedirect\(\{ isAuthenticated, weatherOn \}\)\} \/>/.test(idx) && /'\/\(auth\)\/login'/.test(read('src/lib/launchRoute.ts')));
   check('36 the app asks only the anonymous config function', /rpc\('public_weather_config'\)/.test(read('src/data/publicWeather.ts')));
 
   console.log(bad ? `\n${bad} failed` : '\nall passed');

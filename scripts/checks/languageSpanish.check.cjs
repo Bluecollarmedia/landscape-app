@@ -11,7 +11,7 @@ let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + detail}`); };
 
 const mod = (rel, fakes) => { const m = { exports: {} }; new Function('module', 'exports', 'require', ts.transpileModule(read(rel), { compilerOptions: { module: 'commonjs' } }).outputText)(m, m.exports, (n) => fakes[n]); return m.exports; };
-const parts = ['es', 'es.worker', 'es.maintenance', 'es.snow', 'es.customer'].map((n) => mod(`src/i18n/${n}.ts`, {}));
+const parts = ['es', 'es.worker', 'es.maintenance', 'es.snow', 'es.customer', 'es.weather'].map((n) => mod(`src/i18n/${n}.ts`, {}));
 const ES = Object.assign({}, ...parts.map((p) => Object.values(p)[0]).reverse());
 const i18n = mod('src/i18n/index.ts', { react: { useMemo: (f) => f(), useSyncExternalStore: () => 'en' }, '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} }, './dictionary': { DICTIONARY: ES } });
 const { translate, getLanguage } = i18n;

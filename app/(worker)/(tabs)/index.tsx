@@ -199,10 +199,13 @@ function LandscapingToday() {
         return;
       }
       haptics.success();
+      // "I'm here" is the confirmation: there is no separate Confirm Schedule step (it also clears the owner's "hasn't confirmed" alert).
+      confirmSchedule();
       return;
     }
     haptics.success();
     checkIn(result.gps, primaryAssignment?.id);
+    confirmSchedule();
   }
 
   function handleCheckOutPress() {
@@ -388,7 +391,8 @@ function LandscapingToday() {
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarClearance }}>
         <View style={[styles.hero, { height: showWorking ? HERO_HEIGHT_COMPACT : HERO_HEIGHT }]}>
-          <BrandCover uri={(primaryAssignment && getProjectImageUriById(primaryAssignment.projectId)) || getWorkerHeaderImageUri()} style={styles.heroImage} />
+          {/* The header is always the picture the owner set for workers in Settings, never a project's photo. */}
+          <BrandCover uri={getWorkerHeaderImageUri()} style={styles.heroImage} />
           <LinearGradient
             colors={['transparent', 'transparent', colors.groupedBackground]}
             locations={[0, 0.78, 1]}

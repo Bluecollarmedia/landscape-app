@@ -86,6 +86,10 @@ export function WorkdayCard({ compact = false, gate = false, preShiftTitle, preS
     if (!r.ok) say(w.onBreak ? tr("Couldn't end the break") : tr("Couldn't start the break"), r.error);
   }
 
+  // The Today screens' version shows only the Clock In button. When there is nothing to show (a running day), draw nothing, not an empty white card.
+  const gateShowsButton = !active && !noWork && (!closedToday || (moreWork && w.day?.canClockIn !== false));
+  if (gate && !gateShowsButton && !w.error) return null;
+
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }, shadow.md]}>
       {w.stale && !gate ? (

@@ -147,15 +147,6 @@ export default function LoginScreen() {
         />
       </View>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <Pressable onPress={() => router.replace('/(auth)/welcome')}>
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-            {t("Don't have an account?")}{' '}
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('Get started')}</Text>
-          </Text>
-        </Pressable>
-      </View>
     </ScreenContainer>
   );
 }
@@ -189,10 +180,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     borderRadius: radius.md,
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: spacing['3xl'],
-    paddingBottom: spacing['2xl'],
   },
 });

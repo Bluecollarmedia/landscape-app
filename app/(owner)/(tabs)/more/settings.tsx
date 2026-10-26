@@ -11,6 +11,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { DeleteAccountRow } from '@/components/account/DeleteAccountRow';
 import { DeleteCompanyRow } from '@/components/account/DeleteCompanyRow';
 import { ModeSwitchRow } from '@/components/snow/ModeSwitchRow';
+import { usePublicWeatherRow } from '@/hooks/usePublicWeatherRow';
 import { CustomerMessagePushRow } from '@/components/settings/CustomerMessagePushRow';
 import { SettingsGroup, SettingsRow, PressScale, UsageBar, tileColors } from '@/components/settings/SettingsList';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
@@ -33,6 +34,7 @@ export default function SettingsScreen() {
   const tabBarClearance = useTabBarClearance();
   const { user, signOut, switchDevRole, switchDevState, appState } = useAuth();
   const guardedSignOut = useGuardedSignOut();
+  const weatherRow = usePublicWeatherRow();
   useDb();
   const company = db.company;
   const { yard } = useCompanyYard();
@@ -158,6 +160,12 @@ export default function SettingsScreen() {
         <SettingsGroup title="Mode" footer="Snow Mode gives you and your snow crew the snow dashboard. Landscaping records stay as they are.">
           <ModeSwitchRow />
         </SettingsGroup>
+
+        {weatherRow.canChange ? (
+          <SettingsGroup title="Brighton Weather" footer="When on, anyone who opens the app without signing in sees local weather first, with a Sign In button. Off keeps the usual welcome screen.">
+            <SettingsRow icon="cloud" tint={tileColors.blue} title={weatherRow.title} subtitle={weatherRow.subtitle} value={weatherRow.value} onPress={weatherRow.confirm} />
+          </SettingsGroup>
+        ) : null}
 
         <SettingsGroup title="Quotes & Invoices">
           <SettingsRow

@@ -28,6 +28,8 @@ import { todayKey } from '@/lib/ids';
 import { hasOpenProjectWork } from '@/lib/workerAreas';
 import { useAdminWorksSnow } from '@/lib/adminSnowWork';
 import { WebDialogHost } from '@/components/ui/WebDialogHost';
+import { usePublicWeatherSwitch } from '@/hooks/usePublicWeatherSwitch';
+import { signedOutRedirect } from '@/lib/launchRoute';
 
 // On the website Alert.alert does nothing by itself; this points it at the app's own dialog (a phone keeps the system alert).
 installWebAlert();
@@ -47,6 +49,8 @@ function RootNavigator() {
   // An admin who opened their Snow route may stay in the worker Snow area (see lib/adminSnowWork).
   const adminOnSnowRoute = useAdminWorksSnow();
   const { colors } = useTheme();
+  // Is the public Weather experience on? Off unless the server (or a recent saved answer) says on. Never blocks launch.
+  const weatherOn = usePublicWeatherSwitch(!isAuthenticated);
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
   // Tell the server which language this person uses, so its push notices come in it (update 95).
@@ -72,9 +76,8 @@ function RootNavigator() {
     const currentGroup = segments[0];
 
     if (appState === 'unauthenticated') {
-      if (!inAuthGroup) {
-        router.replace('/(auth)/welcome');
-      }
+      const goTo = signedOutRedirect({ firstSegment: (segments as string[])[0], weatherOn });
+      if (goTo) router.replace(goTo as any);
       return;
     }
 
@@ -113,7 +116,7 @@ function RootNavigator() {
         router.replace(target as any);
       }
     }
-  }, [isLoading, isAuthenticated, user, appState, onboardingStep, segments, splashDone, isPublicPage, shell, shellPending, adminOnSnowRoute]);
+  }, [isLoading, isAuthenticated, user, appState, onboardingStep, segments, splashDone, isPublicPage, shell, shellPending, adminOnSnowRoute, weatherOn]);
 
   const handleSplashFinish = useCallback(() => {
     setSplashDone(true);

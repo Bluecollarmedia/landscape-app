@@ -31,8 +31,12 @@ export type CheckInVerdict =
   | { ok: true; distance: number }
   | { ok: false; reason: 'no_site' | 'bad_gps' | 'inaccurate' | 'too_far'; distance?: number; accuracy?: number; radius: number };
 
+/** A saved check-in distance of 0 means "Anywhere": the worker does not have to be at the property. */
+export const ANYWHERE_RADIUS_M = 0;
+
 export function evaluateCheckIn(input: { gps: GpsFix; site: Partial<LatLng> | null | undefined; radiusM: number }): CheckInVerdict {
   const { gps, site, radiusM } = input;
+  if (radiusM <= ANYWHERE_RADIUS_M) return { ok: true, distance: 0 };
   if (!validCoords(site)) return { ok: false, reason: 'no_site', radius: radiusM };
   if (!validCoords(gps)) return { ok: false, reason: 'bad_gps', radius: radiusM };
   const accuracy = Math.max(0, gps.accuracy ?? 0);

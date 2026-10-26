@@ -437,6 +437,8 @@ export function classifyLocation(
   radiusM: number,
 ): { status: LocationStatus; distanceM?: number } {
   if (!gps || gps.status !== 'ok') return { status: gps?.status === 'denied' ? 'denied' : 'unavailable' };
+  // "Anywhere" (distance 0): there is no zone to be outside of.
+  if (radiusM <= 0) return { status: 'verified' };
   if (target?.latitude == null || target?.longitude == null) return { status: 'no_target_location' };
   const d = Math.round(distanceM(gps.gps.latitude, gps.gps.longitude, target.latitude, target.longitude) * 10) / 10;
   if (!gps.gps.accuracy || gps.gps.accuracy > Math.max(100, radiusM)) return { status: 'low_accuracy', distanceM: d };

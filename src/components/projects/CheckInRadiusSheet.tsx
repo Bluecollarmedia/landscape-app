@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet, PanResponder, Platform, LayoutChange
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/providers/ThemeProvider';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { Switch } from '@/components/ui';
 import { RadiusMap } from '@/components/maps/RadiusMap';
 import { CHECKIN_RADIUS_STOPS_FT, feetToMeters, nearestRadiusStop, describeRadius, formatDistance, findCoords, type Place } from '@/lib/maps';
 import { validCoords, type LatLng } from '@/lib/checkInRadius';
@@ -15,8 +16,8 @@ interface CheckInRadiusSheetProps {
   place: Place;
   radiusMeters: number;
   onClose: () => void;
-  /** Called once with the chosen distance and the project's resolved coordinates. */
-  onSave: (meters: number, coords: LatLng) => void;
+  /** Called once with the chosen distance (0 = Anywhere) and the place's resolved coordinates (null when Anywhere and none were found). */
+  onSave: (meters: number, coords: LatLng | null) => void;
 }
 
 const LAST = CHECKIN_RADIUS_STOPS_FT.length - 1;
@@ -37,11 +38,13 @@ export function CheckInRadiusSheet({ visible, place, radiusMeters, onClose, onSa
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(() => nearestRadiusStop(radiusMeters));
+  // A saved distance of 0 is "Anywhere": workers can tap I'm here from any distance.
+  const [anywhere, setAnywhere] = useState(radiusMeters <= 0);
   const [trackWidth, setTrackWidth] = useState(0);
 
   // Start from the saved distance each time the sheet opens.
   useEffect(() => {
-    if (visible) setIndex(nearestRadiusStop(radiusMeters));
+    if (visible) { setIndex(nearestRadiusStop(radiusMeters)); setAnywhere(radiusMeters <= 0); }
   }, [visible, radiusMeters]);
 
   // The project's real location (saved coordinates, else its address looked up on the map). undefined = still looking,
@@ -61,12 +64,12 @@ export function CheckInRadiusSheet({ visible, place, radiusMeters, onClose, onSa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, place.latitude, place.longitude, place.address, place.city, place.state, place.zip]);
 
-  const canSave = !!coords;
+  const canSave = anywhere || !!coords;
   function save() {
-    if (!coords || savingRef.current) return;
+    if (!canSave || savingRef.current) return;
     savingRef.current = true;
     haptics.success();
-    onSave(meters, coords);
+    onSave(anywhere ? 0 : meters, coords ?? null);
   }
 
   const feet = CHECKIN_RADIUS_STOPS_FT[index];
@@ -135,13 +138,13 @@ export function CheckInRadiusSheet({ visible, place, radiusMeters, onClose, onSa
           )}
 
           <View style={styles.readout}>
-            <Text style={[styles.value, { color: colors.textPrimary }]}>{value}</Text>
-            <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, fontWeight: '700', marginLeft: spacing.xs }]}>{unit}</Text>
+            <Text style={[styles.value, { color: colors.textPrimary }]}>{anywhere ? 'Anywhere' : value}</Text>
+            {anywhere ? null : <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, fontWeight: '700', marginLeft: spacing.xs }]}>{unit}</Text>}
           </View>
-          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{describeRadius(feet)}</Text>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{anywhere ? 'No limit: workers do not have to be at the property.' : describeRadius(feet)}</Text>
 
           {/* Slider. The outer view is the touch area; positions are measured on the inner track. */}
-          <View ref={sliderRef} style={styles.sliderTouch} {...pan.panHandlers}>
+          <View ref={sliderRef} style={[styles.sliderTouch, anywhere && { opacity: 0.35 }]} pointerEvents={anywhere ? 'none' : 'auto'} {...pan.panHandlers}>
             <View
               style={[styles.track, { backgroundColor: colors.borderLight }]}
               onLayout={(e: LayoutChangeEvent) => setTrackWidth(e.nativeEvent.layout.width)}
@@ -162,9 +165,15 @@ export function CheckInRadiusSheet({ visible, place, radiusMeters, onClose, onSa
             <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{formatDistance(feetToMeters(CHECKIN_RADIUS_STOPS_FT[LAST]))}</Text>
           </View>
 
-          <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
-            Workers can only tap I'm here inside the circle.
-          </Text>
+          <View style={styles.anywhereRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, fontWeight: '600' }]}>Anywhere (no limit)</Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+                {anywhere ? 'Workers can tap I\'m here from any distance.' : 'Workers can only tap I\'m here inside the circle.'}
+              </Text>
+            </View>
+            <Switch value={anywhere} onValueChange={setAnywhere} accessibilityLabel="Anywhere, no check-in distance limit" />
+          </View>
 
           <Pressable
             onPress={save}
@@ -196,5 +205,6 @@ const styles = StyleSheet.create({
   tick: { position: 'absolute', width: 4, height: 4, borderRadius: 2 },
   thumb: { position: 'absolute', width: THUMB, height: THUMB, borderRadius: THUMB / 2, borderWidth: 3 },
   ends: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -spacing.sm },
+  anywhereRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
   save: { height: 52, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg },
 });

@@ -171,10 +171,9 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     return 'not_started';
   }, [currentJob]);
 
-  const scheduleConfirmed = useMemo(() =>
-    todayAssignments.length > 0 && todayAssignments.every(a => a.confirmationState === 'confirmed'),
-    [todayAssignments],
-  );
+  // The worker never has to confirm the schedule before starting: having a job today is enough. "I'm here" marks the jobs confirmed
+  // (see the Today screen), so the owner's "hasn't confirmed" alert still clears.
+  const scheduleConfirmed = useMemo(() => todayAssignments.length > 0, [todayAssignments]);
 
   const hasScheduleChanges = useMemo(() =>
     todayAssignments.some(a =>

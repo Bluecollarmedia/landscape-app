@@ -27,7 +27,6 @@ export default function SnowModeNoticeScreen() {
   const guardedSignOut = useGuardedSignOut();
   const insets = useSafeAreaInsets();
   useDb();
-  const company = db.company?.name;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground, paddingTop: insets.top, paddingBottom: insets.bottom + spacing.lg }]}>
@@ -39,9 +38,7 @@ export default function SnowModeNoticeScreen() {
           {t('Snow Mode is on')}
         </Text>
         <Text style={[typeScale.bodyLarge, styles.center, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-          {company
-            ? t('{company} is running snow operations right now. Your landscaping schedule comes back here on its own when the owner switches back to Landscaping Mode.', { company })
-            : t("We're running snow operations right now. Your landscaping schedule comes back here on its own when the owner switches back to Landscaping Mode.")}
+          {t('Your route shows up here when the owner puts you on one.')}
         </Text>
       </View>
       <View style={{ paddingHorizontal: spacing.lg }}>

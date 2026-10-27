@@ -80,6 +80,8 @@ export interface StormDraft {
   actualSnow: number | null;
   actualSource: string;
   final: boolean;
+  /** The picture link of the storm map, already uploaded (null for no map). Sent only when there is one, so publishing works before update 105 is run. */
+  mapUrl: string | null;
 }
 
 export async function publishStorm(d: StormDraft): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -87,6 +89,7 @@ export async function publishStorm(d: StormDraft): Promise<{ ok: true } | { ok: 
     p_outlook_id: d.outlookId, p_name: d.name, p_headline: d.headline, p_message: d.message, p_message_es: d.messageEs.trim() ? d.messageEs : null,
     p_snow_low: d.snowLow, p_snow_high: d.snowHigh, p_starts_at: d.startsAt, p_ends_at: d.endsAt, p_disclaimer: d.disclaimer,
     p_actual_snow: d.actualSnow, p_actual_source: d.actualSnow === null ? null : d.actualSource, p_final: d.final,
+    ...(d.mapUrl ? { p_map_url: d.mapUrl } : {}),
   });
   if (!r.ok) return r;
   await save(CURRENT_KEY, null);

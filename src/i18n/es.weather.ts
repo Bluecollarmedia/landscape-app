@@ -159,4 +159,5 @@ export const ES_WEATHER: Record<string, string> = {
   'Active': 'Activa',
   'Loading…': 'Cargando…',
   'Updated {h} hr ago': 'Actualizado hace {h} h',
+  'Storm map': 'Mapa de la tormenta',
 };

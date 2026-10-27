@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, DateField, Icon, Input, LoadingSpinner, Switch } from '@/components/ui';
@@ -8,6 +8,10 @@ import { StormPage } from '@/components/weather/StormPage';
 import { endStorm, fetchOwnerStorm, publishStorm, type StormDraft } from '@/data/stormOutlook';
 import { DEFAULT_DISCLAIMER, easternToIso, isoToEastern, snowRange, type StormOutlook, type StormVersion } from '@/lib/stormView';
 import { localDateKey } from '@/lib/ids';
+import { pickImage } from '@/lib/pickImage';
+import { uploadImage } from '@/lib/media';
+import { prepareImage } from '@/lib/mediaCompress';
+import { db } from '@/data/store';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { radius, spacing } from '@/theme/spacing';
@@ -87,6 +91,10 @@ export function StormOutlookEditor() {
   const [measured, setMeasured] = useState('');
   const [source, setSource] = useState('');
   const [final, setFinal] = useState(false);
+  // The storm map: the picture already on the update being followed (kept unless changed), or a new one picked on this phone (uploaded at Publish).
+  const [mapUrl, setMapUrl] = useState<string | null>(null);
+  const [pickedMap, setPickedMap] = useState<{ uri: string; width: number; height: number; mimeType?: string; size?: number } | null>(null);
+  const [mapNote, setMapNote] = useState('');
 
   const fill = useCallback((s: StormOutlook | null) => {
     setActive(s);
@@ -101,6 +109,7 @@ export function StormOutlookEditor() {
     setLow(v.snow_low === null ? '' : String(v.snow_low));
     setHigh(v.snow_high === null ? '' : String(v.snow_high));
     setDisclaimer(v.disclaimer || DEFAULT_DISCLAIMER);
+    setMapUrl(v.map_url);
     if (v.starts_at || v.ends_at) {
       setTimingOn(true);
       if (v.starts_at) { const e = isoToEastern(v.starts_at); setStartDay(e.dateKey); setStartHour(e.hour); }
@@ -128,7 +137,7 @@ export function StormOutlookEditor() {
     const actual = measuredOn ? num(measured) : null;
     const draft: StormDraft = {
       outlookId: active?.id ?? null, name: name.trim(), headline: headline.trim(), message: message.trim(), messageEs: esOn ? messageEs.trim() : '',
-      snowLow: lo, snowHigh: hi, startsAt, endsAt, disclaimer: disclaimer.trim(), actualSnow: actual, actualSource: source.trim(), final,
+      snowLow: lo, snowHigh: hi, startsAt, endsAt, disclaimer: disclaimer.trim(), actualSnow: actual, actualSource: source.trim(), final, mapUrl,
     };
     const problems: string[] = [];
     if (!draft.headline) problems.push('Write a headline.');
@@ -142,17 +151,38 @@ export function StormOutlookEditor() {
     const version: StormVersion = {
       id: 'draft', version_no: (active?.version_count ?? 0) + 1, headline: draft.headline || '…', message: draft.message || '…', message_es: draft.messageEs || null,
       snow_low: lo, snow_high: hi, starts_at: startsAt, ends_at: endsAt, disclaimer: draft.disclaimer, actual_snow: actual, actual_source: actual === null ? null : draft.actualSource || null,
-      is_final: final, published_at: new Date().toISOString(),
+      is_final: final, published_at: new Date().toISOString(), map_url: pickedMap?.uri ?? mapUrl,
     };
     return { draft, problems, version };
-  }, [active, name, headline, message, esOn, messageEs, unsure, low, high, timingOn, startDay, startHour, endDay, endHour, disclaimer, measuredOn, measured, source, final]);
+  }, [active, name, headline, message, esOn, messageEs, unsure, low, high, timingOn, startDay, startHour, endDay, endHour, disclaimer, measuredOn, measured, source, final, mapUrl, pickedMap]);
+
+  const chooseMap = async () => {
+    setMapNote('');
+    const r = await pickImage('library');
+    if (r.status === 'error') { setMapNote(r.message); return; }
+    if (r.status === 'picked') setPickedMap({ uri: r.uri, width: r.width, height: r.height, mimeType: r.mimeType, size: r.size });
+  };
+  const removeMap = () => { setPickedMap(null); setMapUrl(null); setMapNote(''); };
 
   const publish = () => {
     if (built.problems.length) { showMessage("Can't publish yet", built.problems[0]); return; }
     const what = active ? (final ? 'final update (this also ends the storm)' : 'update') : 'storm outlook';
     confirmAction('Publish to everyone?', `This ${what} will be visible to everyone who opens Brighton Weather. A published update cannot be changed afterward; you can post another update.`, 'Publish', async () => {
       setBusy(true);
-      const r = await publishStorm(built.draft);
+      let draft = built.draft;
+      if (pickedMap) {
+        // The picture goes up first; the outlook is published only once it is stored, so there is never an update pointing at a missing map.
+        try {
+          const prepared = await prepareImage({ id: 'storm-map', kind: 'image', sourceUri: pickedMap.uri, mimeType: pickedMap.mimeType, width: pickedMap.width, height: pickedMap.height, bytesIn: pickedMap.size, folder: '', target: { type: 'storm_map', payload: {} } } as unknown as Parameters<typeof prepareImage>[0]);
+          const up = await uploadImage(prepared.uri, `${db.companyId}/storm-maps`, prepared.mimeType);
+          draft = { ...draft, mapUrl: up.url };
+        } catch (e) {
+          setBusy(false);
+          showMessage("Couldn't upload the map", `${e instanceof Error ? e.message : 'Something went wrong.'} Nothing was published. Try again, or remove the map.`);
+          return;
+        }
+      }
+      const r = await publishStorm(draft);
       setBusy(false);
       if (!r.ok) { showMessage("Couldn't publish", r.message); return; }
       showMessage('Published', 'Visitors can see it now.');
@@ -256,6 +286,21 @@ export function StormOutlookEditor() {
                 </View>
               </>
             ) : null}
+
+            {label('Storm map')}
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 4 }]}>Optional. A picture of the storm, such as a snowfall map. Visitors see it under your message.</Text>
+            {pickedMap || mapUrl ? (
+              <View style={{ marginTop: spacing.sm }}>
+                <Image source={{ uri: pickedMap?.uri ?? mapUrl ?? '' }} style={{ width: '100%', aspectRatio: pickedMap ? Math.max(0.5, Math.min(2.5, pickedMap.width / Math.max(1, pickedMap.height))) : 4 / 3, borderRadius: radius.lg, backgroundColor: colors.backgroundSecondary }} resizeMode="contain" accessibilityLabel="Storm map preview" />
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+                  <Button title="Choose another" variant="secondary" icon="image" onPress={chooseMap} style={{ flex: 1 }} />
+                  <Button title="Remove" variant="secondary" icon="trash-2" onPress={removeMap} style={{ flex: 1 }} />
+                </View>
+              </View>
+            ) : (
+              <Button title="Add a storm map" variant="secondary" icon="image" onPress={chooseMap} fullWidth style={{ marginTop: spacing.sm }} />
+            )}
+            {mapNote ? <Text style={[typeScale.bodySmall, { color: '#B54708', marginTop: spacing.xs }]}>{mapNote}</Text> : null}
 
             <Area label="Disclaimer" value={disclaimer} onChange={setDisclaimer} minHeight={90} hint="Each update keeps the wording it was published with." />
             <Pressable onPress={() => setDisclaimer(DEFAULT_DISCLAIMER)} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>

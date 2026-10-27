@@ -7,6 +7,22 @@ import { Panel, WX } from '@/components/weather/WeatherUI';
 import { actualSnow, messageFor, publishedText, snowRange, versionKind, whenText, type StormOutlook, type StormVersion } from '@/lib/stormView';
 
 const HERO_RATIO = 1640 / 1170;
+
+/** The owner's storm map: shown at its own shape, full width, under the message. */
+function StormMap({ uri, label }: { uri: string; label: string }) {
+  const [ratio, setRatio] = React.useState(4 / 3);
+  return (
+    <View style={{ marginTop: 14, borderRadius: 18, overflow: 'hidden', backgroundColor: '#E6EEE0' }}>
+      <Image
+        source={{ uri }}
+        style={{ width: '100%', aspectRatio: ratio }}
+        resizeMode="contain"
+        accessibilityLabel={label}
+        onLoad={(e) => { const s = e.nativeEvent?.source; if (s?.width && s?.height) setRatio(Math.max(0.5, Math.min(2.5, s.width / s.height))); }}
+      />
+    </View>
+  );
+}
 const SNOW = '#1D5F9A';
 
 /** The label for an update: "Update 1 · Original", "Update 2", "Update 3 · Final". */
@@ -105,6 +121,8 @@ export function StormPage({ outlook, version, onBack, onSeeForecast, onSeeUpdate
             {language === 'es' && !msg.spanish ? <Text style={styles.langNote}>{t("Brighton's message is shown in English.")}</Text> : null}
           </View>
         </Panel>
+
+        {version.map_url ? <StormMap uri={version.map_url} label={t('Storm map')} /> : null}
 
         <View style={styles.disclaimer}><Text style={styles.disclaimerText}>{version.disclaimer}</Text></View>
 

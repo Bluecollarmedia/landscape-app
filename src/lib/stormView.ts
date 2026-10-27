@@ -17,6 +17,8 @@ export interface StormVersion {
   actual_source: string | null;
   is_final: boolean;
   published_at: string;
+  /** The storm map the owner attached to this update (an https picture link), or null. */
+  map_url: string | null;
 }
 export interface StormOutlook {
   id: string;
@@ -54,6 +56,7 @@ function normalizeVersion(raw: any): StormVersion | null {
     actual_source: typeof raw.actual_source === 'string' && raw.actual_source.trim() ? raw.actual_source : null,
     is_final: !!raw.is_final,
     published_at: str(raw.published_at),
+    map_url: typeof raw.map_url === 'string' && /^https:\/\//i.test(raw.map_url) ? raw.map_url : null,
   };
 }
 

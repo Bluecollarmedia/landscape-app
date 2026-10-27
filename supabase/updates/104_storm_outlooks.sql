@@ -130,6 +130,9 @@ $$;
 revoke all on function public.owner_storm_current() from public, anon;
 grant execute on function public.owner_storm_current() to authenticated;
 
+-- (If update 105 was already run, its 14-argument version of this function is removed first, so running 104 again never leaves two versions to clash.)
+drop function if exists public.publish_storm_outlook(uuid, text, text, text, text, numeric, numeric, timestamptz, timestamptz, text, numeric, text, boolean, text);
+
 -- The owner publishes: a new storm (p_outlook_id null) or a new update to the active one. p_final also ends the storm.
 create or replace function public.publish_storm_outlook(
   p_outlook_id uuid, p_name text, p_headline text, p_message text, p_message_es text,

@@ -32,7 +32,12 @@ export const TOWNS: Record<string, Town> = {
 
 export type WxIcon = 'sun' | 'moon' | 'partly' | 'cloud' | 'rain' | 'snow' | 'fog' | 'storm';
 
-export interface WxHour { time: string; tempF: number | null; popPct: number | null; icon: WxIcon }
+/** One hour. Every figure is null when NWS has none for that hour ("unavailable"), never a made-up zero. */
+export interface WxHour {
+  time: string; tempF: number | null; popPct: number | null; icon: WxIcon;
+  feelsF: number | null; windMph: number | null; windDir: string; gustMph: number | null;
+  humidityPct: number | null; dewF: number | null; precipIn: number | null; cloudPct: number | null;
+}
 export interface WxDay { date: string; highF: number | null; lowF: number | null; popPct: number | null; icon: WxIcon; text: string; snowIn: number | null }
 export interface WxAlert { id: string; event: string; severity: string; urgency: string; headline: string; description: string; instruction: string; sender: string; effective: string | null; expires: string | null }
 export interface WeatherPayload {
@@ -109,6 +114,33 @@ export function snowByLocalDay(values: Array<{ validTime: string; value: number 
   return out;
 }
 
+/**
+ * One number per whole hour from an NWS raw-grid series (blocks of one or more hours).
+ * 'level' series (temperature, wind) repeat their value in every hour of the block; 'amount' series (rain) share the block's total across its hours.
+ * `convert` maps the unit NWS used to the unit shown, or returns null for a unit we do not know (then no hour gets a number).
+ */
+export function gridPerHour(values: Array<{ validTime: string; value: number | null }> | undefined, mode: 'level' | 'amount', convert: (v: number) => number | null): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const b of values ?? []) {
+    const span = parseValidTime(b.validTime);
+    if (!span || typeof b.value !== 'number' || !Number.isFinite(b.value)) continue;
+    const v = convert(b.value);
+    if (v === null) continue;
+    const hours = (span.end - span.start) / HOUR;
+    for (let t = floorHour(span.start); t < span.end; t += HOUR) out.set(t, mode === 'amount' ? v / hours : v);
+  }
+  return out;
+}
+
+const cToF = (c: number) => (c * 9) / 5 + 32;
+const kmhToMph = (k: number) => k / 1.609344;
+/** "7 mph" or "5 to 10 mph" -> 7 / 10 (the higher figure), null when unreadable. */
+export function windMphOf(s: unknown): number | null {
+  const nums = String(s ?? '').match(/\d+(?:\.\d+)?/g);
+  return nums ? Math.max(...nums.map(Number)) : null;
+}
+const gridUnit = (grid: any, key: string): { values: any[]; uom: string } => ({ values: grid?.properties?.[key]?.values ?? [], uom: String(grid?.properties?.[key]?.uom ?? '') });
+
 const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const tempF = (p: { temperature?: unknown; temperatureUnit?: string }): number | null => {
   const t = numOrNull(p.temperature);
@@ -144,11 +176,30 @@ export function normalizeForecast(input: { townKey: string; forecast: any; hourl
   const periods: any[] = input.forecast?.properties?.periods ?? [];
   const hoursAll: any[] = input.hourly?.properties?.periods ?? [];
 
-  // Hourly: the period we are in, then the next 11.
+  // Hourly: the period we are in, then every hour NWS has after it (about seven days).
   let firstIdx = hoursAll.findIndex((p) => Date.parse(p.startTime) <= now && now < Date.parse(p.endTime));
   if (firstIdx < 0) firstIdx = hoursAll.findIndex((p) => Date.parse(p.startTime) > now);
-  const hourSlice = firstIdx < 0 ? [] : hoursAll.slice(firstIdx, firstIdx + 12);
-  const hourly: WxHour[] = hourSlice.map((p) => ({ time: p.startTime, tempF: tempF(p), popPct: popOf(p), icon: iconFor(p.shortForecast, !!p.isDaytime) }));
+  const hourSlice = firstIdx < 0 ? [] : hoursAll.slice(firstIdx);
+
+  // Feels-like, gusts and rain amount are only in the raw grid; each is matched to its hour (null when the grid has nothing for it).
+  const feelsUnit = gridUnit(input.grid, 'apparentTemperature');
+  const gustUnit = gridUnit(input.grid, 'windGust');
+  const rainUnit = gridUnit(input.grid, 'quantitativePrecipitation');
+  const cloudUnit = gridUnit(input.grid, 'skyCover');
+  const clouds = gridPerHour(cloudUnit.values, 'level', (v) => (cloudUnit.uom === 'wmoUnit:percent' ? v : null));
+  const feels = gridPerHour(feelsUnit.values, 'level', (v) => (feelsUnit.uom === 'wmoUnit:degC' ? cToF(v) : feelsUnit.uom === 'wmoUnit:degF' ? v : null));
+  const gusts = gridPerHour(gustUnit.values, 'level', (v) => (gustUnit.uom === 'wmoUnit:km_h-1' ? kmhToMph(v) : gustUnit.uom === 'wmoUnit:m_s-1' ? v * 2.236936 : null));
+  const rain = gridPerHour(rainUnit.values, 'amount', (v) => { const f = toInches(rainUnit.uom); return f === null ? null : v * f; });
+  const r1 = (n: number | undefined, digits = 0): number | null => (n === undefined ? null : Math.round(n * 10 ** digits) / 10 ** digits);
+  const hourly: WxHour[] = hourSlice.map((p) => {
+    const t = floorHour(Date.parse(p.startTime));
+    const dewC = numOrNull(p.dewpoint?.value);
+    return {
+      time: p.startTime, tempF: tempF(p), popPct: popOf(p), icon: iconFor(p.shortForecast, !!p.isDaytime),
+      feelsF: r1(feels.get(t)), windMph: windMphOf(p.windSpeed), windDir: String(p.windDirection ?? ''), gustMph: r1(gusts.get(t)),
+      humidityPct: numOrNull(p.relativeHumidity?.value), dewF: dewC === null ? null : Math.round(cToF(dewC)), precipIn: r1(rain.get(t), 2), cloudPct: r1(clouds.get(t)),
+    };
+  });
   const cur = hourSlice[0];
   const current = cur ? { tempF: tempF(cur), text: String(cur.shortForecast ?? ''), icon: iconFor(cur.shortForecast, !!cur.isDaytime), isDaytime: !!cur.isDaytime } : null;
 

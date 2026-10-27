@@ -15,7 +15,7 @@ const marker = src.indexOf('// ────────────────�
 const pure = src.slice(0, marker);
 const m = { exports: {} };
 new Function('module', 'exports', ts.transpileModule(pure, { compilerOptions: { module: 'commonjs', target: 'es2020' } }).outputText)(m, m.exports);
-const { TOWNS, iconFor, parseValidTime, localDate, snowByLocalDay, normalizeAlerts, normalizeForecast } = m.exports;
+const { TOWNS, iconFor, parseValidTime, localDate, snowByLocalDay, normalizeAlerts, normalizeForecast, gridPerHour, windMphOf } = m.exports;
 
 let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  - ' + detail}`); };
@@ -61,7 +61,7 @@ const alertsNJ = fixture('alerts-nj'); const alertsZone = fixture('alerts-zone-e
 const out = normalizeForecast({ townKey: 'lakewood', forecast, hourly, grid, alerts: alertsZone, now: NOW });
 check('12 REAL: the answer names the town and the source', out.town === 'lakewood' && out.townName === 'Lakewood' && out.source === 'National Weather Service' && out.fetchedAt === NOW);
 check('13 REAL: "now" is the hour we are in (4 PM), with a real temperature and the agency\'s own words', out.current && typeof out.current.tempF === 'number' && out.current.text === hourly.properties.periods[0].shortForecast && out.hourly[0].time === hourly.properties.periods[0].startTime, JSON.stringify(out.current));
-check('14 REAL: 12 hours, in order', out.hourly.length === 12 && out.hourly.every((h, i) => i === 0 || Date.parse(h.time) > Date.parse(out.hourly[i - 1].time)));
+check('14 REAL: every hour NWS gave from now on (the whole fixture), in order', out.hourly.length === hourly.properties.periods.length - 0 + 0 && out.hourly.length >= 20 && out.hourly.every((h, i) => i === 0 || Date.parse(h.time) > Date.parse(out.hourly[i - 1].time)));
 check('15 REAL: up to 7 distinct days, today first', out.daily.length >= 5 && out.daily.length <= 7 && new Set(out.daily.map((d) => d.date)).size === out.daily.length && out.daily[0].date === '2026-10-26', JSON.stringify(out.daily.map((d) => d.date)));
 check('16 REAL: highs and lows come from the day and night periods', out.daily[1].highF === forecast.properties.periods.find((p, i) => p.isDaytime && localDate(Date.parse(p.startTime), NY) === out.daily[1].date).temperature && typeof out.daily[1].lowF === 'number');
 check('17 REAL: the header high/low is today\'s', out.today.highF === out.daily[0].highF && out.today.lowF === out.daily[0].lowF);
@@ -88,6 +88,19 @@ const noGrid = normalizeForecast({ townKey: 'lakewood', forecast, hourly, grid: 
 check('26 forecast without the raw grid: every snowfall figure is "unavailable" (null)', noGrid.daily.length > 0 && noGrid.daily.every((d) => d.snowIn === null));
 const celsius = normalizeForecast({ townKey: 'lakewood', forecast: { properties: { periods: [] } }, hourly: { properties: { periods: [{ startTime: '2026-10-26T16:00:00-04:00', endTime: '2026-10-26T17:00:00-04:00', isDaytime: true, temperature: 20, temperatureUnit: 'C', shortForecast: 'Sunny' }] } }, grid: undefined, alerts: undefined, now: NOW });
 check('27 a temperature given in Celsius is converted (20 C = 68 F)', celsius.current.tempF === 68);
+
+// ── Phase 2b: the full hourly list and the extra figures ──
+const first = out.hourly[0]; const rawFirst = hourly.properties.periods[0];
+check('40 REAL: each hour carries wind, humidity and dew point exactly as NWS gave them (dew point in F)', first.windMph === windMphOf(rawFirst.windSpeed) && first.windDir === rawFirst.windDirection && first.humidityPct === rawFirst.relativeHumidity.value && first.dewF === Math.round(rawFirst.dewpoint.value * 9 / 5 + 32), JSON.stringify(first));
+check('41 REAL: the fixture grid has no feels-like, gust or cloud series, so those are null (unavailable), never 0', out.hourly.every((h) => h.feelsF === null && h.gustMph === null && h.cloudPct === null));
+check('42 wind text: "7 mph" -> 7, "5 to 10 mph" -> 10, junk -> null', windMphOf('7 mph') === 7 && windMphOf('5 to 10 mph') === 10 && windMphOf('') === null && windMphOf(undefined) === null);
+const syn = (v) => ({ properties: { apparentTemperature: { uom: 'wmoUnit:degC', values: [{ validTime: '2026-10-26T20:00:00+00:00/PT2H', value: 10 }] }, windGust: { uom: 'wmoUnit:km_h-1', values: [{ validTime: '2026-10-26T20:00:00+00:00/PT2H', value: 16.09344 }] }, quantitativePrecipitation: { uom: 'wmoUnit:mm', values: [{ validTime: '2026-10-26T20:00:00+00:00/PT2H', value: 5.08 }] }, skyCover: { uom: 'wmoUnit:percent', values: [{ validTime: '2026-10-26T20:00:00+00:00/PT3H', value: 40 }] }, ...v } });
+const sOut = normalizeForecast({ townKey: 'lakewood', forecast, hourly, grid: syn(), alerts: undefined, now: NOW });
+const h0 = sOut.hourly[0]; const h2 = sOut.hourly[2];
+check('43 SYNTHETIC grid blocks: feels-like 10 C = 50 F, a 16.09 km/h gust = 10 mph, 5.08 mm over 2 hours = 0.1 in an hour, cloud 40% (block covers 3 hours)', h0.feelsF === 50 && h0.gustMph === 10 && h0.precipIn === 0.1 && h0.cloudPct === 40 && sOut.hourly[1].cloudPct === 40 && sOut.hourly[1].precipIn === null && h2.precipIn === null && h2.feelsF === null, JSON.stringify([h0, h2]));
+check('44 an unknown unit gives no number (null), never a guess', normalizeForecast({ townKey: 'lakewood', forecast, hourly, grid: syn({ windGust: { uom: 'wmoUnit:furlong', values: [{ validTime: '2026-10-26T20:00:00+00:00/PT1H', value: 5 }] } }), alerts: undefined, now: NOW }).hourly[0].gustMph === null);
+const gph = gridPerHour([{ validTime: '2026-10-26T20:00:00+00:00/PT2H', value: 4 }, { validTime: '2026-10-26T22:00:00+00:00/PT1H', value: null }], 'amount', (v) => v);
+check('45 a real 0 stays 0, a null block gives no hour', gridPerHour([{ validTime: '2026-10-26T20:00:00+00:00/PT1H', value: 0 }], 'level', (v) => v).get(Date.parse('2026-10-26T20:00:00Z')) === 0 && gph.get(Date.parse('2026-10-26T20:00:00Z')) === 2 && !gph.has(Date.parse('2026-10-26T22:00:00Z')));
 
 // ── the edge wrapper (file text only: it is not run here) ──
 const wrap = src.slice(marker);

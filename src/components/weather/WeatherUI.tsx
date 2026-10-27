@@ -31,7 +31,7 @@ export function Panel({ children, style, bg }: { children?: React.ReactNode; sty
 let SymbolView: any = null;
 try { SymbolView = require('expo-symbols').SymbolView; } catch { /* no symbols on this platform: the drawn pictures are used */ }
 
-/** Apple's own weather symbols (SF Symbols, the set the iPhone Weather app draws from), in their multicolor form. iPhone only. */
+/** Apple's own weather symbols (SF Symbols, the set the iPhone Weather app draws from). iPhone only. */
 const SYMBOLS: Record<WxIcon | 'sunrise' | 'sunset', string> = {
   sun: 'sun.max.fill',
   moon: 'moon.stars.fill',
@@ -43,6 +43,20 @@ const SYMBOLS: Record<WxIcon | 'sunrise' | 'sunset', string> = {
   storm: 'cloud.bolt.rain.fill',
   sunrise: 'sunrise.fill',
   sunset: 'sunset.fill',
+};
+
+/** The colours for each symbol's layers (cloud, then sun / rain / bolt): Apple's own shapes, in colours that stay visible on the white cards. */
+const SYMBOL_COLORS: Record<WxIcon | 'sunrise' | 'sunset', string[]> = {
+  sun: ['#F5A623'],
+  moon: ['#8CA0D3', '#F0B84A'],
+  partly: ['#9FB1C7', '#F5A623'],
+  cloud: ['#9FB1C7'],
+  rain: ['#9FB1C7', '#3B8FE0'],
+  snow: ['#9FB1C7', '#5AA9F0'],
+  fog: ['#9FB1C7', '#B3C2D6'],
+  storm: ['#8496AE', '#F5B82E', '#3B8FE0'],
+  sunrise: ['#F5A623', '#E8602C'],
+  sunset: ['#F0545F', '#E8602C'],
 };
 
 /** The fallback weather pictures: soft, flat drawings (assets/images/wx), used where Apple's symbols are not available (web, Android). */
@@ -64,7 +78,8 @@ export function WxPicture({ icon, size = 24 }: { icon: WxIcon | 'sunrise' | 'sun
     return (
       <SymbolView
         name={SYMBOLS[icon] ?? SYMBOLS.cloud}
-        type="multicolor"
+        type="palette"
+        colors={SYMBOL_COLORS[icon] ?? SYMBOL_COLORS.cloud}
         size={size}
         resizeMode="scaleAspectFit"
         style={{ width: size, height: size }}

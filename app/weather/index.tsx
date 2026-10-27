@@ -42,24 +42,21 @@ const DAY_W = 34;
 const MORE_W = 66;
 const STRIP_DAYS = 5;
 
-/** What the hourly strip shows: first the next 24 hours, then (after the arrow) five days of hours. A day label sits at every midnight. */
-type StripRow = { kind: 'hour'; key: string; h: WxHour; isNow: boolean } | { kind: 'day'; key: string; label: string } | { kind: 'more'; key: string };
-function buildStrip(hours: WxHour[], expanded: boolean, locale: string): StripRow[] {
+/** What the hourly strip shows: first the next 24 hours, then (after the arrow) five days of hours. */
+type StripRow = { kind: 'hour'; key: string; h: WxHour; isNow: boolean } | { kind: 'more'; key: string };
+function buildStrip(hours: WxHour[], expanded: boolean): StripRow[] {
   if (!hours.length) return [];
   const dates: string[] = [];
   for (const h of hours) { const d = localDay(h.time); if (!dates.includes(d)) dates.push(d); }
   const allowed = new Set(dates.slice(0, STRIP_DAYS));
   const shown = expanded ? hours.filter((h) => allowed.has(localDay(h.time))) : hours.slice(0, 24);
   const rows: StripRow[] = [];
-  shown.forEach((h, i) => {
-    const d = localDay(h.time);
-    if (i > 0 && d !== localDay(shown[i - 1].time)) rows.push({ kind: 'day', key: `d-${d}`, label: weekdayShort(d, locale).replace('.', '').toUpperCase() });
-    rows.push({ kind: 'hour', key: h.time, h, isNow: i === 0 });
-  });
+  shown.forEach((h, i) => { rows.push({ kind: 'hour', key: h.time, h, isNow: i === 0 }); });
   if (!expanded && hours.length > shown.length) rows.push({ kind: 'more', key: 'more' });
   return rows;
 }
-const rowWidth = (r: StripRow) => (r.kind === 'hour' ? HOUR_W : r.kind === 'day' ? DAY_W : MORE_W);
+const rowWidth = (r: StripRow) => (r.kind === 'hour' ? HOUR_W : MORE_W);
+const STRIP_PAD = DAY_W + 10;   // room at the left for the pinned day label
 
 const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress, label }: { h: WxHour; isNow: boolean; metric: HourMetric; locale: string; now: string; onPress: (h: WxHour) => void; label: string }) {
   const value =
@@ -127,11 +124,12 @@ export default function WeatherHome() {
   const [arcW, setArcW] = useState(0);
   const [moreDays, setMoreDays] = useState(false);
   const stripRef = useRef<FlatList<StripRow>>(null);
+  const [stripDate, setStripDate] = useState<string | null>(null);
   const { view, refresh, busy } = useWeather(town);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => { readTown().then(setTown); }, []);
-  useEffect(() => { setMoreDays(false); }, [town]);
+  useEffect(() => { setMoreDays(false); setStripDate(null); }, [town]);
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(id); }, []);
 
   const data = view.data;
@@ -177,14 +175,23 @@ export default function WeatherHome() {
   const feelsDiff = first && first.feelsF !== null && first.tempF !== null ? Math.round(first.feelsF - first.tempF) : null;
   const metricOf = (m: MetricKey): DetailsStart => ({ date: today, metric: m });
 
-  const stripRows = useMemo(() => buildStrip(hours, moreDays, locale), [hours, moreDays, locale]);
+  const stripRows = useMemo(() => buildStrip(hours, moreDays), [hours, moreDays]);
   const stripOffsets = useMemo(() => { const o: number[] = []; let x = 0; for (const r of stripRows) { o.push(x); x += rowWidth(r); } return o; }, [stripRows]);
+  const stripHours = useMemo(() => stripRows.filter((r): r is Extract<StripRow, { kind: 'hour' }> => r.kind === 'hour'), [stripRows]);
+  const pinnedDate = stripDate ?? (stripHours[0] ? localDay(stripHours[0].h.time) : '');
+  const pinnedLabel = pinnedDate ? weekdayShort(pinnedDate, locale).replace('.', '').toUpperCase() : '';
+  const onStripScroll = useCallback((e: { nativeEvent: { contentOffset: { x: number } } }) => {
+    if (!stripHours.length) return;
+    const i = Math.min(stripHours.length - 1, Math.max(0, Math.floor(e.nativeEvent.contentOffset.x / HOUR_W)));
+    const d = localDay(stripHours[i].h.time);
+    setStripDate((prev) => (prev === d ? prev : d));
+  }, [stripHours]);
   // The arrow loads everything at once (five days), then glides on to where the first new day begins.
   const showMoreDays = useCallback(() => {
     const at = stripRows.findIndex((r) => r.kind === 'more');
     setMoreDays(true);
     haptics.light();
-    setTimeout(() => { if (at >= 0) stripRef.current?.scrollToIndex({ index: at, animated: true, viewPosition: 0 }); }, 80);
+    setTimeout(() => { if (at >= 0) stripRef.current?.scrollToIndex({ index: at, animated: true, viewPosition: 0, viewOffset: STRIP_PAD }); }, 80);
   }, [stripRows]);
   const ARC_DOTS = 34;
   const arcR = Math.max(0, Math.min(150, (arcW - 30) / 2));
@@ -284,32 +291,38 @@ export default function WeatherHome() {
               <Pressable onPress={() => open({ date: today, metric: hourMetric === 'temp' ? 'temp' : hourMetric === 'feels' ? 'feels' : hourMetric === 'pop' ? 'pop' : 'wind' })} accessibilityRole="button" accessibilityLabel={`${t('Hourly Forecast')}. ${t('Open details')}`}>
                 <CardHead icon="clock-outline" title={t('Hourly Forecast')} tappable />
               </Pressable>
-              <FlatList
-                ref={stripRef}
-                horizontal
-                data={stripRows}
-                keyExtractor={(r) => r.key}
-                showsHorizontalScrollIndicator={false}
-                initialNumToRender={14}
-                windowSize={9}
-                getItemLayout={(_d, i) => ({ length: stripRows[i] ? rowWidth(stripRows[i]) : HOUR_W, offset: stripOffsets[i] ?? 0, index: i })}
-                style={{ marginHorizontal: -6, marginTop: 6 }}
-                renderItem={({ item }) =>
-                  item.kind === 'hour' ? (
-                    <HourItem h={item.h} isNow={item.isNow} metric={hourMetric} locale={locale} now={t('Now')} onPress={openHour} label={`${hourLabel(item.h.time, locale)}. ${t('Open details')}`} />
-                  ) : item.kind === 'day' ? (
-                    <View style={styles.dayCol} accessible accessibilityLabel={item.label}>
-                      {item.label.split('').map((c, k) => <Text key={k} style={styles.dayColText}>{c}</Text>)}
-                    </View>
-                  ) : (
-                    <View style={styles.moreWrap}>
-                      <Pressable onPress={showMoreDays} accessibilityRole="button" accessibilityLabel={t('Show the next days')} style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.7 }]}>
-                        <MaterialCommunityIcons name="chevron-right" size={28} color={ON_DARK} />
-                      </Pressable>
-                    </View>
-                  )
-                }
-              />
+              <View style={{ marginTop: 6 }}>
+                <FlatList
+                  ref={stripRef}
+                  horizontal
+                  data={stripRows}
+                  keyExtractor={(r) => r.key}
+                  showsHorizontalScrollIndicator={false}
+                  initialNumToRender={14}
+                  windowSize={9}
+                  onScroll={onStripScroll}
+                  scrollEventThrottle={16}
+                  contentContainerStyle={{ paddingLeft: STRIP_PAD }}
+                  getItemLayout={(_d, i) => ({ length: stripRows[i] ? rowWidth(stripRows[i]) : HOUR_W, offset: stripOffsets[i] ?? 0, index: i })}
+                  style={{ marginRight: -6 }}
+                  renderItem={({ item }) =>
+                    item.kind === 'hour' ? (
+                      <HourItem h={item.h} isNow={item.isNow} metric={hourMetric} locale={locale} now={t('Now')} onPress={openHour} label={`${hourLabel(item.h.time, locale)}. ${t('Open details')}`} />
+                    ) : (
+                      <View style={styles.moreWrap}>
+                        <Pressable onPress={showMoreDays} accessibilityRole="button" accessibilityLabel={t('Show the next days')} style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.7 }]}>
+                          <MaterialCommunityIcons name="chevron-right" size={28} color={ON_DARK} />
+                        </Pressable>
+                      </View>
+                    )
+                  }
+                />
+                {pinnedLabel ? (
+                  <View style={styles.dayCol} pointerEvents="none" accessible accessibilityLabel={pinnedLabel}>
+                    {pinnedLabel.split('').map((c, k) => <Text key={k} style={styles.dayColText}>{c}</Text>)}
+                  </View>
+                ) : null}
+              </View>
               <View style={styles.pills}>
                 {HOUR_METRICS.map((m) => {
                   const on = m.key === hourMetric;
@@ -601,7 +614,7 @@ const styles = StyleSheet.create({
   alertSub: { color: SOFT, fontSize: 12.5, marginTop: 1 },
   alertView: { color: INK, fontSize: 13.5, fontWeight: '700', textDecorationLine: 'underline' },
   hour: { width: HOUR_W, alignItems: 'center', gap: 5, paddingVertical: 8, borderRadius: 14 },
-  dayCol: { width: DAY_W, marginVertical: 8, marginHorizontal: 2, borderRadius: 12, backgroundColor: WX.leafTint, alignItems: 'center', justifyContent: 'center' },
+  dayCol: { position: 'absolute', left: 0, top: 8, bottom: 8, width: DAY_W, borderRadius: 12, backgroundColor: WX.leafTint, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   dayColText: { color: WX.deep, fontSize: 12, fontWeight: '800', lineHeight: 16 },
   moreWrap: { width: MORE_W, alignItems: 'center', justifyContent: 'center' },
   moreBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: WX.deep, alignItems: 'center', justifyContent: 'center', shadowColor: WX.deep, shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 3 },

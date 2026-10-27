@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { LegalModal } from '@/components/legal/LegalModal';
 import { LanguageSwitch } from '@/components/ui/LanguageSwitch';
+import { BackToWeather } from '@/components/weather/BackToWeather';
 import { useT } from '@/i18n';
 import type { LegalDoc } from '@/legal/legalContent';
 import { typeScale } from '@/theme/typography';
@@ -27,7 +28,7 @@ export default function WelcomeScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.content, { paddingTop: insets.top + spacing.lg }]}>
         {/* English | Español, before anyone signs in or up. English is the default. */}
-        <View style={{ alignItems: 'flex-end', marginBottom: spacing['2xl'] }}><LanguageSwitch /></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing['2xl'] }}><BackToWeather /><LanguageSwitch /></View>
         <View style={styles.logoSection}>
           <Image
             source={require('../../assets/images/logo-full.png')}

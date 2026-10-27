@@ -4,8 +4,7 @@
  * see-through panels. Used only by the Weather screens.
  */
 import React from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image, StyleSheet, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import type { WxIcon } from '@/lib/weatherView';
 
 /** The brand greens come from the logo file (deep #0B4736, fresh #53A246); the rest are tints and neutrals chosen to sit with them. */
@@ -29,19 +28,21 @@ export function Panel({ children, style, bg }: { children?: React.ReactNode; sty
   return <View style={[styles.panel, bg ? { backgroundColor: bg } : null, style]}>{children}</View>;
 }
 
-const ICONS: Record<WxIcon, { name: React.ComponentProps<typeof MaterialCommunityIcons>['name']; color: string }> = {
-  sun: { name: 'weather-sunny', color: '#F0A21A' },
-  moon: { name: 'weather-night', color: '#7C8FB8' },
-  partly: { name: 'weather-partly-cloudy', color: '#D9A441' },
-  cloud: { name: 'weather-cloudy', color: '#8FA0B3' },
-  rain: { name: 'weather-rainy', color: '#4B8FD0' },
-  snow: { name: 'weather-snowy-heavy', color: '#6FA8D8' },
-  fog: { name: 'weather-fog', color: '#9AA7B5' },
-  storm: { name: 'weather-lightning-rainy', color: '#D9A441' },
+/** The weather pictures: soft, flat drawings (assets/images/wx), one per kind of weather, plus sunrise and sunset. */
+const PICTURES: Record<WxIcon | 'sunrise' | 'sunset', ImageSourcePropType> = {
+  sun: require('../../../assets/images/wx/sun.png'),
+  moon: require('../../../assets/images/wx/moon.png'),
+  partly: require('../../../assets/images/wx/partly.png'),
+  cloud: require('../../../assets/images/wx/cloud.png'),
+  rain: require('../../../assets/images/wx/rain.png'),
+  snow: require('../../../assets/images/wx/snow.png'),
+  fog: require('../../../assets/images/wx/fog.png'),
+  storm: require('../../../assets/images/wx/storm.png'),
+  sunrise: require('../../../assets/images/wx/sunrise.png'),
+  sunset: require('../../../assets/images/wx/sunset.png'),
 };
-export function WxPicture({ icon, size = 24 }: { icon: WxIcon; size?: number }) {
-  const i = ICONS[icon] ?? ICONS.cloud;
-  return <MaterialCommunityIcons name={i.name} size={size} color={i.color} />;
+export function WxPicture({ icon, size = 24 }: { icon: WxIcon | 'sunrise' | 'sunset'; size?: number }) {
+  return <Image source={PICTURES[icon] ?? PICTURES.cloud} style={{ width: size, height: size }} resizeMode="contain" accessible={false} />;
 }
 
 /** The page behind every Weather screen: the soft off-white the hero artwork dissolves into. */

@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +15,8 @@ import {
 } from '@/lib/weatherView';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { Panel, WX, WxPicture } from '@/components/weather/WeatherUI';
+import { ScrubArea } from '@/components/weather/ScrubArea';
+import { haptics } from '@/lib/haptics';
 import { WeatherDetails, type DetailsStart, type MetricKey } from '@/components/weather/WeatherDetails';
 
 const ON_DARK = '#FFFFFF';
@@ -44,30 +46,45 @@ const HourItem = memo(function HourItem({ h, i, tag, metric, locale, now, onPres
     <Pressable onPress={() => onPress(h)} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.hour, pressed && { backgroundColor: WX.leafTint }]}>
       <Text style={styles.hourTag}>{tag}</Text>
       <Text style={styles.hourText}>{i === 0 ? now : hourLabel(h.time, locale)}</Text>
-      <WxPicture icon={h.icon} size={26} />
+      <WxPicture icon={h.icon} size={30} />
       <Text style={[styles.hourValue, metric === 'pop' && { color: WX.rain }]}>{value}</Text>
       {metric === 'wind' ? <Text style={styles.hourSub}>{h.windDir}</Text> : typeof h.popPct === 'number' && h.popPct >= 20 && metric !== 'pop' ? <Text style={[styles.hourSub, { color: WX.rain }]}>{h.popPct}%</Text> : <Text style={styles.hourSub}> </Text>}
     </Pressable>
   );
 });
 
-/** A small row of bars for the next 24 hours (wind, rain chance). Unavailable hours are left empty, never drawn as zero. */
-function MiniBars({ values, max, color }: { values: Array<number | null>; max: number; color: string }) {
+/**
+ * A small row of bars for the next 24 hours (wind, rain chance). Slide a finger along it to read any hour: the bar you touch darkens and a line
+ * below says what it is. Hours with no figure are left empty, never drawn as zero.
+ */
+function MiniBars({ values, max, color, describe, caption }: { values: Array<number | null>; max: number; color: string; describe: (i: number) => string; caption: string }) {
+  const [w, setW] = useState(0);
+  const [sel, setSel] = useState<number | null>(null);
+  const last = useRef(-1);
+  const onPick = useCallback((i: number) => { if (i !== last.current) { last.current = i; haptics.select(); } setSel(i); }, []);
+  const onEnd = useCallback(() => { last.current = -1; setSel(null); }, []);
   return (
-    <View style={styles.miniBars} accessible={false}>
-      {values.map((v, i) => (
-        <View key={i} style={styles.miniCol}>
-          {v === null ? <View style={[styles.miniBar, { height: 2, backgroundColor: '#DDE7D8' }]} /> : <View style={[styles.miniBar, { height: Math.max(3, (Math.min(v, max) / max) * 44), backgroundColor: color }]} />}
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      <ScrubArea width={w} count={values.length} onPick={onPick} onEnd={onEnd}>
+        <View style={styles.miniBars} accessible={false}>
+          {values.map((v, i) => (
+            <View key={i} style={styles.miniCol}>
+              {v === null
+                ? <View style={[styles.miniBar, { height: 2, backgroundColor: '#DDE7D8' }]} />
+                : <View style={[styles.miniBar, { height: Math.max(3, (Math.min(v, max) / max) * 44), backgroundColor: color, opacity: sel === null || sel === i ? 1 : 0.35 }]} />}
+            </View>
+          ))}
         </View>
-      ))}
+      </ScrubArea>
+      <Text style={[styles.axisNote, sel !== null && { color: INK, fontWeight: '700' }]}>{sel !== null ? describe(sel) : caption}</Text>
     </View>
   );
 }
 
-function CardHead({ icon, title, tappable }: { icon: Icon; title: string; tappable?: boolean }) {
+function CardHead({ icon, title, tappable, picture }: { icon?: Icon; title: string; tappable?: boolean; picture?: 'sunrise' | 'sunset' }) {
   return (
     <View style={styles.cardHead}>
-      <MaterialCommunityIcons name={icon} size={16} color={SOFT} />
+      {picture ? <WxPicture icon={picture} size={24} /> : <MaterialCommunityIcons name={icon as Icon} size={16} color={SOFT} />}
       <Text style={styles.cardTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{title}</Text>
       {tappable ? <MaterialCommunityIcons name="chevron-right" size={20} color={SOFT} style={{ marginLeft: 'auto' }} /> : null}
     </View>
@@ -175,7 +192,7 @@ export default function WeatherHome() {
           {data?.current ? (
             <View>
               <View style={styles.heroRow}>
-                <WxPicture icon={data.current.icon} size={54} />
+                <WxPicture icon={data.current.icon} size={72} />
                 <Text style={styles.temp}>{degrees(data.current.tempF)}</Text>
               </View>
               <Text style={styles.cond}>{data.current.text}</Text>
@@ -274,7 +291,7 @@ export default function WeatherHome() {
                       <Text style={[styles.daySnow, { color: s.color }]} numberOfLines={2}>{s.text}</Text>
                     </View>
                     <View style={styles.dayIcon}>
-                      <WxPicture icon={d.icon} size={22} />
+                      <WxPicture icon={d.icon} size={28} />
                       {typeof d.popPct === 'number' && d.popPct >= 10 ? <Text style={styles.dayPop}>{d.popPct}%</Text> : null}
                     </View>
                     <Text style={styles.dayLow}>{degrees(d.lowF)}</Text>
@@ -306,8 +323,13 @@ export default function WeatherHome() {
                     {windWord(first.windMph) ? t(windWord(first.windMph) as string) : ''}
                     {gustMax.length ? `${windWord(first.windMph) ? '. ' : ''}${t('Gusts up to {n} mph in the next 24 hours', { n: Math.round(Math.max(...gustMax)) })}` : ''}
                   </Text>
-                  <MiniBars values={next24.map((h) => h.windMph)} max={Math.max(15, ...next24.map((h) => h.windMph ?? 0))} color={WX.leaf} />
-                  <Text style={styles.axisNote}>{t('Next 24 hours')}</Text>
+                  <MiniBars
+                    values={next24.map((h) => h.windMph)}
+                    max={Math.max(15, ...next24.map((h) => h.windMph ?? 0))}
+                    color={WX.leaf}
+                    caption={t('Slide your finger across to read any hour')}
+                    describe={(i) => `${hourLabel(next24[i].time, locale)} · ${next24[i].windMph === null ? t('Unavailable') : `${Math.round(next24[i].windMph as number)} mph ${next24[i].windDir}`}`}
+                  />
                 </View>
               </Panel>
             </Pressable>
@@ -337,8 +359,13 @@ export default function WeatherHome() {
                   <CardHead icon="weather-pouring" title={t('Rain')} tappable />
                   <Text style={styles.big}>{rainKnown.length ? `${rainKnown.reduce((a, b) => a + b, 0).toFixed(2)} in` : t('Unavailable')}</Text>
                   <Text style={styles.cardBody}>{rainKnown.length ? t('expected in the next 24 hours.') : ''} {summary}</Text>
-                  <MiniBars values={next24.map((h) => h.popPct)} max={100} color="#6AA9DE" />
-                  <Text style={styles.axisNote}>{t('Chance of rain, next 24 hours')}</Text>
+                  <MiniBars
+                    values={next24.map((h) => h.popPct)}
+                    max={100}
+                    color="#6AA9DE"
+                    caption={t('Chance of rain, next 24 hours. Slide your finger across to read any hour.')}
+                    describe={(i) => `${hourLabel(next24[i].time, locale)} · ${next24[i].popPct === null ? t('Unavailable') : `${next24[i].popPct}% ${t('chance of rain')}`}`}
+                  />
                 </View>
               </Panel>
             </Pressable>
@@ -369,7 +396,7 @@ export default function WeatherHome() {
         {data && sun ? (
           <Panel style={styles.gap}>
             <View style={styles.pad} onLayout={(e) => setArcW(e.nativeEvent.layout.width)}>
-              <CardHead icon="weather-sunset" title={t('Sun')} />
+              <CardHead picture="sunset" title={t('Sun')} />
               {arcW > 0 ? (
                 <View style={{ height: arcR + 26, marginTop: 8 }} accessible accessibilityLabel={t('Sunrise {a}, sunset {b}', { a: clock(sun.rise, locale), b: clock(sun.set, locale) })}>
                   {Array.from({ length: ARC_DOTS + 1 }, (_, k) => {
@@ -382,7 +409,7 @@ export default function WeatherHome() {
                   })}
                   {sunProgress >= 0 && sunProgress <= 1 ? (() => {
                     const ang = Math.PI * (1 - sunProgress);
-                    return <MaterialCommunityIcons name="white-balance-sunny" size={26} color="#E8A21E" style={{ position: 'absolute', left: arcW / 2 - 16 + arcR * Math.cos(ang) + 8 - 13, top: arcR - arcR * Math.sin(ang) + 6 - 11 }} />;
+                    return <View style={{ position: 'absolute', left: arcW / 2 - 16 + arcR * Math.cos(ang) + 8 - 16, top: arcR - arcR * Math.sin(ang) + 6 - 14 }}><WxPicture icon="sun" size={32} /></View>;
                   })() : null}
                   <View style={styles.arcMid}>
                     <Text style={styles.arcMain}>{t('{h} hr {m} min of daylight', { h: Math.floor(daylightMin / 60), m: daylightMin % 60 })}</Text>
@@ -390,8 +417,8 @@ export default function WeatherHome() {
                 </View>
               ) : null}
               <View style={styles.sunRow}>
-                <View><Text style={styles.sunTime}>{clock(sun.rise, locale)}</Text><Text style={styles.sunLabel}>{t('Sunrise')}</Text></View>
-                <View style={{ alignItems: 'flex-end' }}><Text style={styles.sunTime}>{clock(sun.set, locale)}</Text><Text style={styles.sunLabel}>{t('Sunset')}</Text></View>
+                <View style={styles.sunCol}><WxPicture icon="sunrise" size={40} /><View><Text style={styles.sunTime}>{clock(sun.rise, locale)}</Text><Text style={styles.sunLabel}>{t('Sunrise')}</Text></View></View>
+                <View style={[styles.sunCol, { flexDirection: 'row-reverse' }]}><WxPicture icon="sunset" size={40} /><View style={{ alignItems: 'flex-end' }}><Text style={styles.sunTime}>{clock(sun.set, locale)}</Text><Text style={styles.sunLabel}>{t('Sunset')}</Text></View></View>
               </View>
             </View>
           </Panel>
@@ -443,7 +470,7 @@ export default function WeatherHome() {
         <Animated.View style={[styles.mini, { top: insets.top + 6 }, miniStyle]} pointerEvents="none">
           <Panel style={{ borderRadius: 99 }}>
             <View style={styles.miniRow}>
-              <WxPicture icon={data.current.icon} size={18} />
+              <WxPicture icon={data.current.icon} size={22} />
               <Text style={styles.miniText}>{name} · {degrees(data.current.tempF)} · {data.current.text}</Text>
             </View>
           </Panel>
@@ -557,6 +584,7 @@ const styles = StyleSheet.create({
   two: { flexDirection: 'row', gap: 14 },
   arcMid: { position: 'absolute', left: 0, right: 0, top: '42%', alignItems: 'center' },
   arcMain: { color: INK, fontSize: 14, fontWeight: '600' },
+  sunCol: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sunRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   sunTime: { color: INK, fontSize: 22, fontWeight: '700' },
   sunLabel: { color: SOFT, fontSize: 13, marginTop: 1 },

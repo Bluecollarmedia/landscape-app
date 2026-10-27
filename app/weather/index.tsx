@@ -514,10 +514,6 @@ export default function WeatherHome() {
         {data ? (
           <View style={styles.footWrap}>
             <Text style={styles.foot}>
-              {t('Forecast data: National Weather Service')}
-              {'\n'}
-              {t('Weather icons: Meteocons')}
-              {'\n'}
               {ageMinutes(data.fetchedAt, now) < 1 ? t('Updated just now') : t('Updated {n} min ago', { n: ageMinutes(data.fetchedAt, now) })}
             </Text>
             <Pressable onPress={refresh} accessibilityRole="button" accessibilityLabel={t('Refresh')} style={({ pressed }) => [styles.refreshBtn, pressed && { opacity: 0.7 }]}>

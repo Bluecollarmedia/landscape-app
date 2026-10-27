@@ -24,7 +24,6 @@ export const ES_WEATHER: Record<string, string> = {
   'Now': 'Ahora',
   '7 Day Forecast': 'Pronóstico de 7 días',
   'Today': 'Hoy',
-  'Forecast data: National Weather Service': 'Datos del pronóstico: Servicio Meteorológico Nacional',
   'Updated just now': 'Actualizado hace un momento',
   'Updated {n} min ago': 'Actualizado hace {n} min',
   'Past storm updates from Brighton.': 'Avisos de tormentas anteriores de Brighton.',
@@ -105,5 +104,4 @@ export const ES_WEATHER: Record<string, string> = {
   'chance of rain': 'de probabilidad de lluvia',
   'Back to weather': 'Volver al clima',
   'Show the next days': 'Ver los próximos días',
-  'Weather icons: Meteocons': 'Íconos del clima: Meteocons',
 };

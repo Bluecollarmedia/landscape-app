@@ -216,7 +216,7 @@ export default function WeatherHome() {
             <Image source={require('../../assets/images/logo-leaf.png')} style={styles.leaf} />
             <View>
               <Text style={styles.brandName}>BRIGHTON</Text>
-              <Text style={styles.brandSub}>LAWN · LANDSCAPE</Text>
+              <Text style={styles.brandSub}>FORECAST</Text>
             </View>
           </View>
           <Pressable onPress={() => router.push('/(auth)/welcome' as any)} accessibilityRole="button" accessibilityLabel={t('Sign In')} style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.8 }]}>
@@ -603,7 +603,7 @@ const styles = StyleSheet.create({
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   leaf: { width: 34, height: 34, tintColor: WX.leaf },
   brandName: { color: INK, fontSize: 16, fontWeight: '600', letterSpacing: 2.6 },
-  brandSub: { color: SOFT, fontSize: 7.5, letterSpacing: 2.2, marginTop: 3 },
+  brandSub: { color: SOFT, fontSize: 10, fontWeight: '600', letterSpacing: 5.6, marginTop: 2 },
   signIn: { borderRadius: 99, backgroundColor: WX.deep, shadowColor: WX.deep, shadowOpacity: 0.28, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   signInRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 44, paddingHorizontal: 17 },
   signInText: { color: ON_DARK, fontSize: 14, fontWeight: '600' },

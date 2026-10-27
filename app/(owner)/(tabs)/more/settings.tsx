@@ -146,6 +146,13 @@ export default function SettingsScreen() {
             subtitle={yard ? formatAddress(yard) : 'Not set yet'}
             onPress={() => router.push('/(owner)/more/yard-location' as any)}
           />
+          <SettingsRow
+            icon="bell"
+            tint={tileColors.orange}
+            title="Yard & clock-in alerts"
+            subtitle="Get an email when someone clocks in away from the yard"
+            onPress={() => router.push('/(owner)/more/yard-alerts' as any)}
+          />
           {!db.demo && (
             <SettingsRow
               icon="check-square"

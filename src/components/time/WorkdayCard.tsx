@@ -30,7 +30,7 @@ const dayAndTime = (iso: string) => `${new Date(iso).toLocaleDateString('en-US',
  * else (w.active is only ever a current, non-stale session), so hiding it never changes whether the worker is clocked in. The only
  * clock-out is the small row in Settings.
  */
-export function WorkdayCard({ compact = false, gate = false, preShiftTitle, preShiftText }: { compact?: boolean; gate?: boolean; preShiftTitle?: string; preShiftText?: string } = {}) {
+export function WorkdayCard({ compact = false, gate = false, portal = false, preShiftTitle, preShiftText }: { compact?: boolean; gate?: boolean; /** The Clock tab: big Clock Out, and a clear Clock back in after clocking out. */ portal?: boolean; preShiftTitle?: string; preShiftText?: string } = {}) {
   const { colors } = useTheme();
   const { workday: w, todayAssignments } = useWorkerContext();
   const myRoutes = useMyMaintenanceRoutes();
@@ -182,9 +182,9 @@ export function WorkdayCard({ compact = false, gate = false, preShiftTitle, preS
                 <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{w.onBreak ? 'End Break' : 'Start Break'}</Text>
               </Pressable>
             ) : null}
-            <Pressable onPress={onClockOut} disabled={w.busy} style={[styles.secondary, { borderColor: colors.border, opacity: w.busy ? 0.5 : 1 }]} accessibilityRole="button">
-              <Feather name="log-out" size={15} color={colors.textPrimary} />
-              <Text style={[typeScale.labelSmall, { color: colors.textPrimary }]}>{t('Clock Out')}</Text>
+            <Pressable onPress={onClockOut} disabled={w.busy} style={[styles.secondary, portal ? { height: 56, backgroundColor: colors.error, borderColor: colors.error } : { borderColor: colors.border }, { opacity: w.busy ? 0.5 : 1 }]} accessibilityRole="button">
+              <Feather name="log-out" size={portal ? 18 : 15} color={portal ? '#FFFFFF' : colors.textPrimary} />
+              <Text style={[portal ? typeScale.labelLarge : typeScale.labelSmall, { color: portal ? '#FFFFFF' : colors.textPrimary }]}>{t('Clock Out')}</Text>
             </Pressable>
           </View>
           {current && !w.onBreak ? (
@@ -204,7 +204,14 @@ export function WorkdayCard({ compact = false, gate = false, preShiftTitle, preS
               </Text>
             </View>
           </View>
-          {w.day?.canClockIn !== false && moreWork ? (
+          {portal && w.day?.canClockIn !== false ? (
+            <>
+              <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>{t('Clocked out by mistake? Clock back in and your day keeps going.')}</Text>
+              <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} accessibilityRole="button" style={[styles.primary, { backgroundColor: colors.primary, opacity: w.busy || loadingTrucks ? 0.6 : 1 }]}>
+                {w.busy || loadingTrucks ? <ActivityIndicator color="#FFFFFF" /> : <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('Clock back in')}</Text>}
+              </Pressable>
+            </>
+          ) : w.day?.canClockIn !== false && moreWork ? (
             <Pressable onPress={onClockIn} disabled={w.busy || loadingTrucks} accessibilityRole="button" style={[styles.secondary, { backgroundColor: colors.primaryDark, borderColor: colors.primaryDark, marginTop: spacing.sm, alignItems: 'center' }]}>
               <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('You have more work today. Clock back in')}</Text>
             </Pressable>

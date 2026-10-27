@@ -116,7 +116,7 @@ export default function YardLocationScreen() {
             </View>
           </View>
           <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>
-            Workers can tap this on their Today screen for directions to the yard. It isn&apos;t used for jobsites or check-in.
+            Workers can tap this on their Today screen for directions to the yard. It is also the spot clock-ins are checked against when you turn on Yard & clock-in alerts in Settings.
           </Text>
         </Card>
 

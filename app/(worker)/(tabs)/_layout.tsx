@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { sizing } from '@/theme/spacing';
+import { useOpenOnClock } from '@/hooks/useOpenOnClock';
 
 let NativeTabs: any = null;
 try {
@@ -26,6 +27,14 @@ function WorkerNativeTabs() {
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="sun" />}
         />
         <NativeTabs.Trigger.Label>{t('Today')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="clock">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'clock', selected: 'clock.fill' }}
+          src={<NativeTabs.Trigger.VectorIcon family={Feather} name="clock" />}
+        />
+        <NativeTabs.Trigger.Label>{t('Clock')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="jobs">
@@ -88,6 +97,15 @@ function WorkerJSTabs() {
         }}
       />
       <Tabs.Screen
+        name="clock"
+        options={{
+          title: t('Clock'),
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="clock" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="jobs"
         options={{
           title: t('Jobs'),
@@ -119,6 +137,7 @@ function WorkerJSTabs() {
 }
 
 export default function WorkerTabsLayout() {
+  useOpenOnClock();
   const useNative = NativeTabs != null && Platform.OS !== 'web';
 
   return useNative ? <WorkerNativeTabs /> : <WorkerJSTabs />;

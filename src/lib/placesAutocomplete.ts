@@ -7,6 +7,7 @@
  */
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import appJson from '../../app.json';
 import { config } from '@/lib/config';
 import type { AddressParts } from '@/lib/address';
 
@@ -14,6 +15,13 @@ export interface Suggestion { placeId: string; main: string; secondary: string }
 export interface PickedPlace extends AddressParts { latitude?: number; longitude?: number }
 
 export const placesEnabled = config.googlePlacesKey.length > 0;
+
+/** Why the last lookup failed ("" when it worked), so the address screen can say so instead of silently showing nothing. */
+let lastProblem = '';
+export const lastPlacesProblem = () => lastProblem;
+
+/** This app's bundle id. The key is restricted to the iPhone app, so Google must be told which app is asking: it is read from the running app, and if that is not available, from the app's own config file. */
+const BUNDLE_ID = Constants.expoConfig?.ios?.bundleIdentifier ?? Constants.manifest2?.extra?.expoClient?.ios?.bundleIdentifier ?? (appJson as { expo?: { ios?: { bundleIdentifier?: string } } }).expo?.ios?.bundleIdentifier;
 
 const BASE = 'https://places.googleapis.com/v1';
 
@@ -26,8 +34,7 @@ export function newSessionToken(): string {
 function headers(extra: Record<string, string> = {}): Record<string, string> {
   const h: Record<string, string> = { 'Content-Type': 'application/json', 'X-Goog-Api-Key': config.googlePlacesKey, ...extra };
   // A key restricted to the iPhone app is only accepted when the request says which app it is.
-  const bundle = Constants.expoConfig?.ios?.bundleIdentifier;
-  if (Platform.OS === 'ios' && bundle) h['X-Ios-Bundle-Identifier'] = bundle;
+  if (Platform.OS === 'ios' && BUNDLE_ID) h['X-Ios-Bundle-Identifier'] = BUNDLE_ID;
   return h;
 }
 
@@ -77,9 +84,16 @@ export async function fetchSuggestions(input: string, sessionToken: string, sign
         includedPrimaryTypes: ['street_address', 'premise', 'subpremise'],
       }),
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      let why = `error ${res.status}`;
+      try { why = ((await res.json()) as { error?: { message?: string } })?.error?.message ?? why; } catch { /* keep the status */ }
+      lastProblem = why;
+      return [];
+    }
+    lastProblem = '';
     return parseSuggestions(await res.json());
-  } catch {
+  } catch (e) {
+    lastProblem = e instanceof Error ? e.message : 'no connection';
     return [];
   }
 }

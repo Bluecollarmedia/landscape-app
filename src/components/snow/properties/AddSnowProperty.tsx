@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Keyboard } from 'react-native';
 import { Button, Icon, Input } from '@/components/ui';
 import { CustomerPicker } from '@/components/customers/CustomerPicker';
+import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useCustomers } from '@/hooks/useCustomers';
@@ -25,6 +26,8 @@ export function AddSnowProperty({ onCancel, onDone, snowPropertyIds = [] }: { on
   const { allCustomers } = useCustomers();
   const [customerId, setCustomerId] = useState<string | undefined>();
   const [newMode, setNewMode] = useState(false);
+  // A customer added right here: their private invite link is made for them below, so it is never lost.
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const shared = useCustomerProperties(customerId);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -94,13 +97,19 @@ export function AddSnowProperty({ onCancel, onDone, snowPropertyIds = [] }: { on
         <View style={[styles.picked, { backgroundColor: colors.primarySurface }]}>
           <Icon name="user" size={18} color={colors.primary} />
           <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1, fontWeight: '600' }]}>{`${customer.person.firstName} ${customer.person.lastName}`.trim()}</Text>
-          <Button title="Change" size="sm" variant="ghost" onPress={() => { setCustomerId(undefined); setNewMode(false); }} />
+          <Button title="Change" size="sm" variant="ghost" onPress={() => { setCustomerId(undefined); setNewMode(false); setJustAddedId(null); }} />
         </View>
       ) : (
         <>
-          <CustomerPicker onPick={(id) => { setCustomerId(id); setNewMode(false); }} />
+          <CustomerPicker onPick={(id, isNew) => { setCustomerId(id); setNewMode(false); setJustAddedId(isNew ? id : null); }} />
         </>
       )}
+
+      {customer && justAddedId === customer.person.id ? (
+        <View style={{ marginTop: spacing.md }}>
+          <CustomerInviteCard personId={customer.person.id} firstName={customer.person.firstName} phone={customer.person.phone ?? undefined} autoMake />
+        </View>
+      ) : null}
 
       {customer ? (
         <>

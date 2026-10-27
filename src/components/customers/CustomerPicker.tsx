@@ -13,8 +13,8 @@ import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 
 export function CustomerPicker({ onPick, checkedId, disabled }: {
-  /** An existing customer was tapped, or a new one was just added. */
-  onPick: (personId: string) => void;
+  /** An existing customer was tapped, or a new one was just added (`isNew`). */
+  onPick: (personId: string, isNew?: boolean) => void;
   /** Shows a check on this customer (the one already linked). */
   checkedId?: string;
   disabled?: boolean;

@@ -9,11 +9,12 @@ import { Icon } from './Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import { fetchPlace, fetchSuggestions, newSessionToken, placesEnabled, type PickedPlace, type Suggestion } from '@/lib/placesAutocomplete';
+import { fetchPlace, fetchSuggestions, lastPlacesProblem, newSessionToken, placesEnabled, type PickedPlace, type Suggestion } from '@/lib/placesAutocomplete';
 
 export function StreetSuggestions({ text, onPick }: { text: string; onPick: (place: PickedPlace) => void }) {
   const { colors } = useTheme();
   const [rows, setRows] = useState<Suggestion[]>([]);
+  const [problem, setProblem] = useState('');
   const token = useRef(newSessionToken());
   // After a pick the field text changes by itself; do not immediately suggest again for it.
   const picked = useRef<string | null>(null);
@@ -26,11 +27,14 @@ export function StreetSuggestions({ text, onPick }: { text: string; onPick: (pla
     // Wait for a pause in typing, so a few letters are one lookup, not five.
     const t = setTimeout(async () => {
       const found = await fetchSuggestions(text, token.current, ctl.signal);
-      if (!ctl.signal.aborted) setRows(found);
+      if (!ctl.signal.aborted) { setRows(found); setProblem(found.length ? '' : lastPlacesProblem()); }
     }, 300);
     return () => { clearTimeout(t); ctl.abort(); };
   }, [text]);
 
+  if (placesEnabled && rows.length === 0 && problem) {
+    return <Text style={[typeScale.caption, { color: colors.warning, marginTop: -spacing.sm, marginBottom: spacing.sm }]}>{`Address suggestions are not working right now (${problem}). You can still type the address.`}</Text>;
+  }
   if (!placesEnabled || rows.length === 0) return null;
 
   async function choose(s: Suggestion) {

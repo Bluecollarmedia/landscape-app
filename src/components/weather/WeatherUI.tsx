@@ -4,7 +4,7 @@
  * see-through panels. Used only by the Weather screens.
  */
 import React from 'react';
-import { Image, StyleSheet, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, Platform, StyleSheet, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import type { WxIcon } from '@/lib/weatherView';
 
 /** The brand greens come from the logo file (deep #0B4736, fresh #53A246); the rest are tints and neutrals chosen to sit with them. */
@@ -28,7 +28,24 @@ export function Panel({ children, style, bg }: { children?: React.ReactNode; sty
   return <View style={[styles.panel, bg ? { backgroundColor: bg } : null, style]}>{children}</View>;
 }
 
-/** The weather pictures: soft, flat drawings (assets/images/wx), one per kind of weather, plus sunrise and sunset. */
+let SymbolView: any = null;
+try { SymbolView = require('expo-symbols').SymbolView; } catch { /* no symbols on this platform: the drawn pictures are used */ }
+
+/** Apple's own weather symbols (SF Symbols, the set the iPhone Weather app draws from), in their multicolor form. iPhone only. */
+const SYMBOLS: Record<WxIcon | 'sunrise' | 'sunset', string> = {
+  sun: 'sun.max.fill',
+  moon: 'moon.stars.fill',
+  partly: 'cloud.sun.fill',
+  cloud: 'cloud.fill',
+  rain: 'cloud.rain.fill',
+  snow: 'cloud.snow.fill',
+  fog: 'cloud.fog.fill',
+  storm: 'cloud.bolt.rain.fill',
+  sunrise: 'sunrise.fill',
+  sunset: 'sunset.fill',
+};
+
+/** The fallback weather pictures: soft, flat drawings (assets/images/wx), used where Apple's symbols are not available (web, Android). */
 const PICTURES: Record<WxIcon | 'sunrise' | 'sunset', ImageSourcePropType> = {
   sun: require('../../../assets/images/wx/sun.png'),
   moon: require('../../../assets/images/wx/moon.png'),
@@ -42,7 +59,21 @@ const PICTURES: Record<WxIcon | 'sunrise' | 'sunset', ImageSourcePropType> = {
   sunset: require('../../../assets/images/wx/sunset.png'),
 };
 export function WxPicture({ icon, size = 24 }: { icon: WxIcon | 'sunrise' | 'sunset'; size?: number }) {
-  return <Image source={PICTURES[icon] ?? PICTURES.cloud} style={{ width: size, height: size }} resizeMode="contain" accessible={false} />;
+  const drawn = <Image source={PICTURES[icon] ?? PICTURES.cloud} style={{ width: size, height: size }} resizeMode="contain" accessible={false} />;
+  if (Platform.OS === 'ios' && SymbolView) {
+    return (
+      <SymbolView
+        name={SYMBOLS[icon] ?? SYMBOLS.cloud}
+        type="multicolor"
+        size={size}
+        resizeMode="scaleAspectFit"
+        style={{ width: size, height: size }}
+        fallback={drawn}
+        accessible={false}
+      />
+    );
+  }
+  return drawn;
 }
 
 /** The page behind every Weather screen: the soft off-white the hero artwork dissolves into. */

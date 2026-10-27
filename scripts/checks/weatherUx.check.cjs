@@ -98,5 +98,9 @@ check('43 the Sun card shows the sunset picture in its header and the sunrise an
 check('44 the hourly strip starts with the next 24 hours and ends in one labelled arrow button (48 points); tapping it loads five days of hours at once and glides on to the first new day', /buildStrip\(hours, moreDays, locale\)/.test(home) && /hours\.slice\(0, 24\)/.test(home) && /STRIP_DAYS = 5/.test(home) && /accessibilityLabel=\{t\('Show the next days'\)\}/.test(home) && /moreBtn: \{ width: 48, height: 48/.test(home) && /scrollToIndex/.test(home));
 check('45 a day label (WED, THU...) stands in the strip at every midnight, so the day is always clear while scrolling', /kind: 'day'/.test(home) && /dayCol:/.test(home) && /toUpperCase\(\)/.test(home));
 
+// ── Apple's own weather symbols ──
+check('46 on the iPhone the weather pictures are Apple\'s own multicolor weather symbols (SF Symbols: sun.max.fill, cloud.rain.fill, sunrise.fill, sunset.fill...), with the drawn pictures only as a fallback elsewhere', /SymbolView/.test(ui2) && /type="multicolor"/.test(ui2) && ['sun.max.fill', 'moon.stars.fill', 'cloud.sun.fill', 'cloud.fill', 'cloud.rain.fill', 'cloud.snow.fill', 'cloud.fog.fill', 'cloud.bolt.rain.fill', 'sunrise.fill', 'sunset.fill'].every((n) => ui2.includes("'" + n + "'")) && /Platform\.OS === 'ios'/.test(ui2) && /fallback=\{drawn\}/.test(ui2));
+check('47 no Apple artwork is copied into the app: the symbols come from the phone itself, and the fallback pictures are our own drawings', !fs.readdirSync(path.join(root, 'assets/images/wx')).some((f) => /apple|sf-?symbol/i.test(f)) && /drawn in code|soft, flat drawings/.test(ui2));
+
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

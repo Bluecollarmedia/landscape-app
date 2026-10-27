@@ -64,7 +64,7 @@ const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress
   return (
     <Pressable onPress={() => onPress(h)} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.hour, pressed && { backgroundColor: WX.leafTint }]}>
       <Text style={styles.hourText}>{isNow ? now : hourLabel(h.time, locale)}</Text>
-      <WxPicture icon={h.icon} size={30} />
+      <WxPicture icon={h.icon} size={40} />
       <Text style={[styles.hourValue, metric === 'pop' && { color: WX.rain }]}>{value}</Text>
       {metric === 'wind' ? <Text style={styles.hourSub}>{h.windDir}</Text> : typeof h.popPct === 'number' && h.popPct >= 20 && metric !== 'pop' ? <Text style={[styles.hourSub, { color: WX.rain }]}>{h.popPct}%</Text> : <Text style={styles.hourSub}> </Text>}
     </Pressable>
@@ -231,7 +231,7 @@ export default function WeatherHome() {
           {data?.current ? (
             <View>
               <View style={styles.heroRow}>
-                <WxPicture icon={data.current.icon} size={72} />
+                <WxPicture icon={data.current.icon} size={84} />
                 <Text style={styles.temp}>{degrees(data.current.tempF)}</Text>
               </View>
               <Text style={styles.cond}>{data.current.text}</Text>
@@ -351,7 +351,7 @@ export default function WeatherHome() {
                       <Text style={[styles.daySnow, { color: s.color }]} numberOfLines={2}>{s.text}</Text>
                     </View>
                     <View style={styles.dayIcon}>
-                      <WxPicture icon={d.icon} size={28} />
+                      <WxPicture icon={d.icon} size={36} />
                       {typeof d.popPct === 'number' && d.popPct >= 10 ? <Text style={styles.dayPop}>{d.popPct}%</Text> : null}
                     </View>
                     <Text style={styles.dayLow}>{degrees(d.lowF)}</Text>
@@ -469,7 +469,7 @@ export default function WeatherHome() {
                   })}
                   {sunProgress >= 0 && sunProgress <= 1 ? (() => {
                     const ang = Math.PI * (1 - sunProgress);
-                    return <View style={{ position: 'absolute', left: arcW / 2 - 16 + arcR * Math.cos(ang) + 8 - 16, top: arcR - arcR * Math.sin(ang) + 6 - 14 }}><WxPicture icon="sun" size={32} /></View>;
+                    return <View style={{ position: 'absolute', left: arcW / 2 - 16 + arcR * Math.cos(ang) + 8 - 16, top: arcR - arcR * Math.sin(ang) + 6 - 14 }}><WxPicture icon="sun" size={32} bare /></View>;
                   })() : null}
                   <View style={styles.arcMid}>
                     <Text style={styles.arcMain}>{t('{h} hr {m} min of daylight', { h: Math.floor(daylightMin / 60), m: daylightMin % 60 })}</Text>
@@ -516,6 +516,8 @@ export default function WeatherHome() {
             <Text style={styles.foot}>
               {t('Forecast data: National Weather Service')}
               {'\n'}
+              {t('Weather icons: Meteocons')}
+              {'\n'}
               {ageMinutes(data.fetchedAt, now) < 1 ? t('Updated just now') : t('Updated {n} min ago', { n: ageMinutes(data.fetchedAt, now) })}
             </Text>
             <Pressable onPress={refresh} accessibilityRole="button" accessibilityLabel={t('Refresh')} style={({ pressed }) => [styles.refreshBtn, pressed && { opacity: 0.7 }]}>
@@ -530,7 +532,7 @@ export default function WeatherHome() {
         <Animated.View style={[styles.mini, { top: insets.top + 6 }, miniStyle]} pointerEvents="none">
           <Panel style={{ borderRadius: 99 }}>
             <View style={styles.miniRow}>
-              <WxPicture icon={data.current.icon} size={22} />
+              <WxPicture icon={data.current.icon} size={28} />
               <Text style={styles.miniText}>{name} · {degrees(data.current.tempF)} · {data.current.text}</Text>
             </View>
           </Panel>

@@ -4,7 +4,7 @@
  * the order is saved in one database call (update 025). Working layout in
  * the existing app style; no approved mockup yet.
  */
-import { crewAfterLeadChange, crewChoices, nextCrew, routeTeam, type TeamMember } from '@/lib/snowCrew';
+import { crewChoices, nextCrew, routeTeamMulti, toggleLead, type TeamMember } from '@/lib/snowCrew';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,7 +14,7 @@ import { confirmAction, showMessage } from '@/components/financials/ActionSheet'
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
 import {
-  addStops, cancelRoute, loadLeadLoad, loadLeadsForServices, grantSnowAccessForRoute, loadRoute, loadRouteCrew, loadSnowCrewPool, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, stopNeedsPhotos, updateRoute, updateStop,
+  addStops, cancelRoute, loadRouteExtraLeadIds, setRouteLeads, loadLeadLoad, loadLeadsForServices, grantSnowAccessForRoute, loadRoute, loadRouteCrew, loadSnowCrewPool, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, stopNeedsPhotos, updateRoute, updateStop,
   type RouteCrewMember, type RouteStop,
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
@@ -57,6 +57,8 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
   const [dragging, setDragging] = useState(false);
   const [leadLoad, setLeadLoad] = useState<Record<string, string[]>>({});
   const [crew, setCrew] = useState<RouteCrewMember[]>([]);
+  // The route's other crew leads (the first lead is route.leadPersonId); together they are the leads, any number.
+  const [extraLeadIds, setExtraLeadIds] = useState<string[]>([]);
   const [pickCrew, setPickCrew] = useState(false);
   // The property whose notes and photo setting are being edited.
   const [detailStop, setDetailStop] = useState<RouteStop[] | null>(null);
@@ -80,6 +82,8 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
     ]);
     const c = await loadRouteCrew(r.data.id);
     if (c.ok) setCrew(c.data);
+    const xl = await loadRouteExtraLeadIds(r.data.id);
+    if (xl.ok) setExtraLeadIds(xl.data);
     const everyone = await loadSnowCrewPool();
     if (everyone.ok) setPool(everyone.data);
     if (l.ok) setLeads(l.data);
@@ -135,28 +139,22 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
     reload();
   }
 
-  /** Makes one of the team the lead. The database takes them off the crew list; the old lead stays on the route as crew. */
+  /** Taps one of the team: a lead is taken off the leads, anyone else becomes a lead too. Any number can lead. The database takes new leads off the crew. */
   async function chooseLead(personId: string) {
     if (!route) return;
     setBusy(true);
-    const old = route.leadPersonId;
-    const res = await updateRoute(route.id, { leadPersonId: personId });
-    if (res.ok && old && old !== personId) {
-      const again = await setRouteCrew(route.id, crewAfterLeadChange(crew.map((c) => c.personId), old, personId));
-      if (!again.ok) showMessage("Couldn't keep the old lead on the crew", again.error);
-    }
+    const res = await setRouteLeads(route.id, toggleLead(leadIds, personId));
     setBusy(false);
-    setPickLead(false);
     if (!res.ok) showMessage("Couldn't save", res.error);
     reload();
   }
 
-  /** Takes one person off the route: a crew member leaves the crew; the lead leaves the route (nobody leads it until one is chosen). */
+  /** Takes one person off the route: a crew member leaves the crew; a lead stops leading (and leaves the route). */
   async function removeMember(m: TeamMember) {
     if (!route) return;
     if (!m.lead) return changeCrew(m.personId, false);
     setBusy(true);
-    const res = await updateRoute(route.id, { leadPersonId: null });
+    const res = await setRouteLeads(route.id, leadIds.filter((id) => id !== m.personId));
     setBusy(false);
     if (!res.ok) showMessage("Couldn't remove them", res.error);
     reload();
@@ -261,8 +259,10 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
 
   const editable = !route.cancelled && route.stormStatus !== 'ended';
   const leadName = leads.find((l) => l.personId === route.leadPersonId)?.name;
-  const team = routeTeam(route.leadPersonId, leadName, crew);
-  const crewPeople = crewChoices(pool.length ? pool : leads, route.leadPersonId, crew.map((c) => c.personId));
+  const leadIds = [route.leadPersonId, ...extraLeadIds].filter((id): id is string => !!id);
+  const nameOf = (id: string) => leads.find((l) => l.personId === id)?.name ?? pool.find((l) => l.personId === id)?.name;
+  const team = routeTeamMulti(leadIds, nameOf, crew);
+  const crewPeople = crewChoices(pool.length ? pool : leads, route.leadPersonId, [...crew.map((c) => c.personId), ...extraLeadIds]);
   const onSnowTeam = new Set(leads.map((l) => l.personId));
   // A property can be on a route more than once (repeat passes), so every
   // eligible property stays pickable; we just show how many visits it has.
@@ -360,40 +360,49 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
         <SetupCard
           n={2}
           icon="user"
-          title="Crew Lead"
-          sub="Select a crew lead for this route."
-          pill={team.length ? `${team.length} available` : undefined}
+          title="Crew Leads"
+          sub="Select one or more crew leads for this route."
+          pill={leadIds.length ? `${leadIds.length} ${leadIds.length === 1 ? 'lead' : 'leads'}` : team.length ? `${team.length} available` : undefined}
           onPress={editable && team.length > 0 ? () => setPickLead(!pickLead) : undefined}
           open={pickLead}
         >
           {team.length === 0 ? (
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>Add crew members first.</Text>
           ) : (
-            <Pressable
-              onPress={() => editable && setPickLead(!pickLead)}
-              style={[styles.leadRow, { backgroundColor: colors.primarySurface }]}
-              accessibilityRole="button"
-              accessibilityLabel="Select crew lead"
-            >
-              {route.leadPersonId ? (
-                <Avatar firstName={(leadName ?? 'Crew').split(' ')[0]} lastName={(leadName ?? '').split(' ').slice(1).join(' ')} size={44} />
-              ) : (
-                <View style={[styles.leadEmpty, { borderColor: colors.border }]}><Icon name="user" size={20} color={colors.textTertiary} /></View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={[typeScale.bodyLarge, { color: route.leadPersonId ? colors.textPrimary : colors.textTertiary, fontWeight: '700' }]} numberOfLines={1}>
-                  {route.leadPersonId ? (leadName ?? 'Crew lead') : 'Select crew lead'}
-                </Text>
-                {route.leadPersonId ? <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew Lead</Text> : null}
-                {route.leadPersonId && leadLoad[route.leadPersonId] ? (
-                  <Text style={[typeScale.caption, { color: colors.warning }]}>Also leads {leadLoad[route.leadPersonId].join(', ')}. That's allowed; check the timing.</Text>
-                ) : null}
-              </View>
-              {editable ? <Icon name={pickLead ? 'chevron-up' : 'chevron-right'} size={18} color={colors.textTertiary} /> : null}
-            </Pressable>
+            <View style={{ gap: spacing.sm }}>
+              {(leadIds.length ? leadIds : [null]).map((leadId, i) => {
+                const nm = leadId ? nameOf(leadId) ?? 'Crew lead' : undefined;
+                return (
+                  <Pressable
+                    key={leadId ?? 'none'}
+                    onPress={() => editable && setPickLead(!pickLead)}
+                    style={[styles.leadRow, { backgroundColor: colors.primarySurface }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={leadId ? `Crew lead ${nm}` : 'Select crew leads'}
+                  >
+                    {leadId ? (
+                      <Avatar firstName={(nm ?? 'Crew').split(' ')[0]} lastName={(nm ?? '').split(' ').slice(1).join(' ')} size={44} />
+                    ) : (
+                      <View style={[styles.leadEmpty, { borderColor: colors.border }]}><Icon name="user" size={20} color={colors.textTertiary} /></View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typeScale.bodyLarge, { color: leadId ? colors.textPrimary : colors.textTertiary, fontWeight: '700' }]} numberOfLines={1}>
+                        {leadId ? nm : 'Select crew leads'}
+                      </Text>
+                      {leadId ? <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Crew Lead</Text> : null}
+                      {leadId && leadLoad[leadId] ? (
+                        <Text style={[typeScale.caption, { color: colors.warning }]}>Also leads {leadLoad[leadId].join(', ')}. That's allowed; check the timing.</Text>
+                      ) : null}
+                    </View>
+                    {editable && i === 0 ? <Icon name={pickLead ? 'chevron-up' : 'chevron-right'} size={18} color={colors.textTertiary} /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
           )}
           {pickLead ? (
             <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.md }]}>
+              <Text style={[typeScale.caption, { color: colors.textTertiary, paddingHorizontal: spacing.md, paddingTop: spacing.sm }]}>Tap a name to add or remove a crew lead. Any number can lead.</Text>
               {team.map((m, i) => (
                 <Pressable key={m.personId} style={[styles.row, i > 0 && sep]} onPress={() => chooseLead(m.personId)} accessibilityRole="button">
                   <View style={{ flex: 1 }}>

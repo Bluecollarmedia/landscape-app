@@ -1,6 +1,6 @@
 /**
- * Crew on a Snow route (update 41). A route has one lead and can also have crew
- * members. Crew can view the route; only the lead can act on it. Pure helpers.
+ * Crew on a Snow route (update 41). A route has one or more leads (update 110) and can also have crew
+ * members. Crew can view the route; only a lead can act on it. Pure helpers.
  */
 
 export type RouteRole = 'lead' | 'crew';
@@ -41,6 +41,24 @@ export function routeTeam(leadPersonId: string | undefined, leadName: string | u
   if (leadPersonId) out.push({ personId: leadPersonId, name: leadName || 'Crew lead', lead: true });
   for (const c of crew) if (c.personId !== leadPersonId) out.push({ personId: c.personId, name: c.name, lead: false });
   return out;
+}
+
+/** Everyone working the route with SEVERAL leads: the leads first (in order), then the crew. `nameOf` finds a person's name. */
+export function routeTeamMulti(leadIds: string[], nameOf: (id: string) => string | undefined, crew: PersonChoice[]): TeamMember[] {
+  const out: TeamMember[] = [];
+  const seen = new Set<string>();
+  for (const id of leadIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ personId: id, name: nameOf(id) || 'Crew lead', lead: true });
+  }
+  for (const c of crew) if (!seen.has(c.personId)) { seen.add(c.personId); out.push({ personId: c.personId, name: c.name, lead: false }); }
+  return out;
+}
+
+/** The leads after tapping one person: a lead is taken off, anyone else is added (the leads are a list, any length). */
+export function toggleLead(leadIds: string[], personId: string): string[] {
+  return leadIds.includes(personId) ? leadIds.filter((id) => id !== personId) : [...leadIds, personId];
 }
 
 /** The crew list after `newLead` becomes the lead: the old lead stays on the route as crew, the new lead leaves the crew list. */

@@ -12,4 +12,6 @@ check('the map goes to the company media folder (the owner may upload there)', /
 check('visitors see the map on the storm page, and only an https link counts', /version\.map_url \?/.test(page) && /\^https:/.test(read('src/lib/stormView.ts')));
 check('the map link is sent only when there is one (publishing still works before update 105)', /\.\.\.\(d\.mapUrl \? \{ p_map_url: d\.mapUrl \} : \{\}\)/.test(read('src/data/stormOutlook.ts')));
 check('update 105 only adds a column and replaces the one publish function (no clash)', /add column if not exists map_url/.test(sql) && /drop function if exists public\.publish_storm_outlook/.test(sql) && !/drop table|truncate/i.test(sql));
+check('the map shows on the home card, first on the outlook page, and opens full screen with pinch zoom', read('src/components/weather/StormCard.tsx').includes('onOpenCard') && read('src/components/weather/StormPage.tsx').indexOf('<StormMap') < read('src/components/weather/StormPage.tsx').indexOf('styles.message') && /maximumZoomScale/.test(read('src/components/weather/StormMapView.tsx')));
+check('the editor offers the map near the top (right after the message), not at the bottom', ed.indexOf("label('Storm map')") < ed.indexOf("label('Snowfall you expect')"));
 process.exit(bad ? 1 : 0);

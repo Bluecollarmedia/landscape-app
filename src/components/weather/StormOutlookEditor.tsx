@@ -238,6 +238,21 @@ export function StormOutlookEditor() {
             </View>
             {esOn ? <Area label="Mensaje en español" value={messageEs} onChange={setMessageEs} hint="People using the app in Spanish see this. Without it they see your English message." /> : null}
 
+            {label('Storm map')}
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 4 }]}>Optional. Post a picture, such as a screenshot of the map with the snow amounts for each town. Visitors see it first, and can zoom in. Without one, they see just your words.</Text>
+            {pickedMap || mapUrl ? (
+              <View style={{ marginTop: spacing.sm }}>
+                <Image source={{ uri: pickedMap?.uri ?? mapUrl ?? '' }} style={{ width: '100%', aspectRatio: pickedMap ? Math.max(0.5, Math.min(2.5, pickedMap.width / Math.max(1, pickedMap.height))) : 4 / 3, borderRadius: radius.lg, backgroundColor: colors.backgroundSecondary }} resizeMode="contain" accessibilityLabel="Storm map preview" />
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+                  <Button title="Choose another" variant="secondary" icon="image" onPress={chooseMap} style={{ flex: 1 }} />
+                  <Button title="Remove" variant="secondary" icon="trash-2" onPress={removeMap} style={{ flex: 1 }} />
+                </View>
+              </View>
+            ) : (
+              <Button title="Add a storm map" variant="secondary" icon="image" onPress={chooseMap} fullWidth style={{ marginTop: spacing.sm }} />
+            )}
+            {mapNote ? <Text style={[typeScale.bodySmall, { color: '#B54708', marginTop: spacing.xs }]}>{mapNote}</Text> : null}
+
             {label('Snowfall you expect')}
             <View style={styles.switchRow}>
               <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, flex: 1 }]}>I’m not sure yet</Text>
@@ -286,21 +301,6 @@ export function StormOutlookEditor() {
                 </View>
               </>
             ) : null}
-
-            {label('Storm map')}
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 4 }]}>Optional. A picture of the storm, such as a snowfall map. Visitors see it under your message.</Text>
-            {pickedMap || mapUrl ? (
-              <View style={{ marginTop: spacing.sm }}>
-                <Image source={{ uri: pickedMap?.uri ?? mapUrl ?? '' }} style={{ width: '100%', aspectRatio: pickedMap ? Math.max(0.5, Math.min(2.5, pickedMap.width / Math.max(1, pickedMap.height))) : 4 / 3, borderRadius: radius.lg, backgroundColor: colors.backgroundSecondary }} resizeMode="contain" accessibilityLabel="Storm map preview" />
-                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
-                  <Button title="Choose another" variant="secondary" icon="image" onPress={chooseMap} style={{ flex: 1 }} />
-                  <Button title="Remove" variant="secondary" icon="trash-2" onPress={removeMap} style={{ flex: 1 }} />
-                </View>
-              </View>
-            ) : (
-              <Button title="Add a storm map" variant="secondary" icon="image" onPress={chooseMap} fullWidth style={{ marginTop: spacing.sm }} />
-            )}
-            {mapNote ? <Text style={[typeScale.bodySmall, { color: '#B54708', marginTop: spacing.xs }]}>{mapNote}</Text> : null}
 
             <Area label="Disclaimer" value={disclaimer} onChange={setDisclaimer} minHeight={90} hint="Each update keeps the wording it was published with." />
             <Pressable onPress={() => setDisclaimer(DEFAULT_DISCLAIMER)} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>

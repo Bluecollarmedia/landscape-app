@@ -6,7 +6,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { DEFAULT_TOWN, isTownKey, type TownKey } from '@/lib/weatherTowns';
+import { DEFAULT_TOWN, isTownKey, townCoords, type TownKey } from '@/lib/weatherTowns';
 import { completePayload, type WeatherPayload } from '@/lib/weatherView';
 
 const TOWN_KEY = 'weather.town.v1';
@@ -29,7 +29,7 @@ export async function loadWeather(town: TownKey): Promise<WeatherResult> {
     }
     const body = data as { ok?: boolean; stale?: boolean; data?: WeatherPayload } | null;
     if (!body?.ok || !body.data) return { ok: false, reason: 'unavailable' };
-    return { ok: true, data: completePayload(body.data), stale: !!body.stale };
+    return { ok: true, data: completePayload(body.data, townCoords(town)), stale: !!body.stale };
   } catch {
     return { ok: false, reason: 'unavailable' };
   }
@@ -40,7 +40,7 @@ export async function readLastWeather(town: TownKey): Promise<WeatherPayload | n
     const raw = await AsyncStorage.getItem(cacheKey(town));
     if (!raw) return null;
     const v = JSON.parse(raw) as WeatherPayload;
-    return v && v.town === town && typeof v.fetchedAt === 'number' ? completePayload(v) : null;
+    return v && v.town === town && typeof v.fetchedAt === 'number' ? completePayload(v, townCoords(town)) : null;
   } catch {
     return null;
   }

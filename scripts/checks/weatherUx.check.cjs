@@ -46,7 +46,7 @@ check('13 the app\'s town points are exactly the data function\'s points (so sun
 // ── the screens follow the rules (file text) ──
 const home = read('app/weather/index.tsx'); const det = read('src/components/weather/WeatherDetails.tsx'); const ui = read('src/components/weather/WeatherUI.tsx'); const bar = read('src/components/weather/FloatingTabBar.tsx');
 const screens = home + det + ui + bar;
-check('14 no UV index and no pressure anywhere (NWS does not provide them, so they are not shown or invented)', !/uv ?index|\buvIndex\b|barometer|pressure/i.test(screens));
+check('14 no pressure and no air quality anywhere (the National Weather Service does not provide them, so they are not shown or invented); UV is shown only as a labelled estimate', !/barometer|pressure|air quality|airQuality/i.test(screens) && /An estimate worked out from the sun/.test(home));
 check('15 the details screen opens on the day and hour that was tapped, and has a visible Back button with a label (a swipe is only a shortcut)', /presentationStyle="pageSheet"/.test(det) && /accessibilityLabel=\{t\('Close details'\)\}/.test(det) && /t\('Back'\)/.test(det));
 const scrub = read('src/components/weather/ScrubArea.tsx');
 check('16 the chart can be slid across (live, with a tick at each hour), tapped, or stepped with two labelled arrow buttons (sliding is never the only way)', /<ScrubArea/.test(det) && /GestureHandlerRootView/.test(det) && /haptics\.select\(\)/.test(det) && /accessibilityLabel=\{t\('Previous hour'\)\}/.test(det) && /accessibilityLabel=\{t\('Next hour'\)\}/.test(det));
@@ -64,7 +64,7 @@ check('25 the Weather screens still never talk to a weather provider themselves'
 const old = { town: 'lakewood', townName: 'Lakewood', fetchedAt: 1, updatedAt: null, current: null, today: { highF: 1, lowF: 1 }, hourly: [{ time: '2026-10-26T17:00:00-04:00', tempF: 65, popPct: 0, icon: 'sun' }], daily: [], alerts: [], source: 'x' };
 const done = V.completePayload(old).hourly[0];
 check('26 an older answer (no wind, humidity, feels-like...) is completed with null (unavailable), never undefined or NaN, and keeps what it had', done.feelsF === null && done.windMph === null && done.humidityPct === null && done.cloudPct === null && done.windDir === '' && done.tempF === 65 && done.popPct === 0);
-check('27 the app completes every answer, fresh or saved on the phone, before showing it', /completePayload\(body\.data\)/.test(read('src/data/weather.ts')) && /completePayload\(v\)/.test(read('src/data/weather.ts')));
+check('27 the app completes every answer, fresh or saved on the phone, before showing it', /completePayload\(body\.data/.test(read('src/data/weather.ts')) && /completePayload\(v/.test(read('src/data/weather.ts')));
 
 // ── Phase 2c: the light design (white air, the logo's leaf green, the real leaf in the corner) ──
 const ui2 = read('src/components/weather/WeatherUI.tsx');
@@ -102,6 +102,25 @@ check('45 the day label (WED, THU...) is pinned at the left of the hourly strip 
 // ── Apple's own weather symbols ──
 check('46 the pictures are Meteocons (MIT licence), drawn still, each on a round colour (sky blue by day, deep blue at night, slate for storms) so the pale clouds show on white; the licence notice is kept with the picture files, and no credit line is shown on screen', /Meteocons by Bas Milius \(MIT licence\)/.test(ui2) && /CHIP_NIGHT/.test(ui2) && /CHIP_STORM/.test(ui2) && /borderRadius: size \/ 2/.test(ui2) && !/SymbolView/.test(ui2) && fs.existsSync(path.join(root, 'assets/images/wx/NOTICE.txt')) && !/Weather icons: Meteocons|Forecast data: National Weather Service/.test(home + det));
 check('47 the sun on the Sun card arc is drawn bare (no circle behind it), and the sunrise and sunset pictures have no circle', /icon="sun" size=\{32\} bare/.test(home) && /icon === 'sunrise' \|\| icon === 'sunset'/.test(ui2));
+
+// ── UV index (an estimate: the sun's real height plus the forecast cloud cover) ──
+const lkc = towns.townCoords('lakewood');
+const noonOct = Date.parse('2026-10-26T17:00:00Z'); // 1 PM Eastern, near the sun's highest point that day
+const uvClear = V.uvIndexAt(noonOct, lkc.lat, lkc.lon, 0);
+check('48 UV at midday in late October is moderate (about 3 to 4 when clear: the EPA lists 4 for Lakewood on Oct 26 2026)', uvClear >= 3 && uvClear <= 4, String(uvClear));
+const uvJune = V.uvIndexAt(Date.parse('2026-06-21T16:30:00Z'), lkc.lat, lkc.lon, 0);
+check('49 UV at midday near the longest day is very high (8 to 11)', uvJune >= 8 && uvJune <= 11, String(uvJune));
+check('50 UV is 0 at night, and heavy cloud lowers it (clear > half cloud > overcast)', V.uvIndexAt(Date.parse('2026-10-27T03:00:00Z'), lkc.lat, lkc.lon, 0) === 0 && V.uvIndexAt(Date.parse('2026-06-21T16:30:00Z'), lkc.lat, lkc.lon, 100) < V.uvIndexAt(Date.parse('2026-06-21T16:30:00Z'), lkc.lat, lkc.lon, 50) && V.uvIndexAt(Date.parse('2026-06-21T16:30:00Z'), lkc.lat, lkc.lon, 50) <= uvJune, '');
+check('51 an unreadable time gives null, never a made-up number; unknown cloud counts as clear sky (the most cautious figure)', V.uvIndexAt(NaN, lkc.lat, lkc.lon, 0) === null && V.uvIndexAt(noonOct, lkc.lat, lkc.lon, null) === uvClear);
+check('52 the solar height is right: about 73 degrees at solar noon on the longest day, about 37 on Oct 26, below 0 at midnight', Math.abs(V.solarElevation(Date.parse('2026-06-21T16:40:00Z'), lkc.lat, lkc.lon) - 73.4) < 1.5 && Math.abs(V.solarElevation(Date.parse('2026-10-26T16:50:00Z'), lkc.lat, lkc.lon) - 37.4) < 1.5 && V.solarElevation(Date.parse('2026-10-27T05:00:00Z'), lkc.lat, lkc.lon) < 0);
+check('53 the UV bands follow the World Health Organization: 0-2 Low, 3-5 Moderate, 6-7 High, 8-10 Very high, 11+ Extreme', [[0, 'Low'], [2, 'Low'], [3, 'Moderate'], [5, 'Moderate'], [6, 'High'], [7, 'High'], [8, 'Very high'], [10, 'Very high'], [11, 'Extreme'], [13, 'Extreme']].every(([n, w]) => V.uvLevel(n) === w));
+const withUv = V.completePayload({ town: 'lakewood', townName: 'Lakewood', fetchedAt: 1, updatedAt: null, current: null, today: { highF: 1, lowF: 1 }, hourly: [{ time: '2026-10-26T13:00:00-04:00', tempF: 60, popPct: 0, icon: 'sun', cloudPct: 0 }], daily: [], alerts: [], source: 'x' }, lkc);
+check('54 every answer gets its UV estimate in the app (fresh or saved), and without a place it stays null', withUv.hourly[0].uvIndex === uvClear && V.completePayload({ town: 'x', townName: 'x', fetchedAt: 1, updatedAt: null, current: null, today: { highF: 1, lowF: 1 }, hourly: [{ time: '2026-10-26T13:00:00-04:00', tempF: 1, popPct: 0, icon: 'sun' }], daily: [], alerts: [], source: 'x' }).hourly[0].uvIndex === null && /completePayload\(body\.data, townCoords\(town\)\)/.test(read('src/data/weather.ts')));
+check('55 UV is a main option everywhere: a UV button on the hourly strip, a UV index card (number, level, advice, scale, 24-hour bars), the hero line, and a tile and chart in the details sheet', /key: 'uv', label: 'UV'/.test(home) && /<CardHead icon="white-balance-sunny" title=\{t\('UV index'\)\}/.test(home) && /UV index \{n\}/.test(home) && /key: 'uv', label: 'UV index'/.test(det) && /uvColor/.test(det));
+
+// ── days that have passed are not listed ──
+const oldDays = V.completePayload({ town: 'lakewood', townName: 'Lakewood', fetchedAt: 1, updatedAt: null, current: null, today: { highF: 1, lowF: 1 }, hourly: [], daily: [{ date: '2020-01-01', highF: null, lowF: 40, popPct: 0, icon: 'sun', text: 'x', snowIn: 0 }, { date: '2999-01-01', highF: 50, lowF: 40, popPct: 0, icon: 'sun', text: 'x', snowIn: 0 }], alerts: [], source: 'x' });
+check('56 a day that has already passed (the overnight hours after midnight still belong to yesterday\'s forecast) is dropped from the day lists, and later days stay', oldDays.daily.length === 1 && oldDays.daily[0].date === '2999-01-01');
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

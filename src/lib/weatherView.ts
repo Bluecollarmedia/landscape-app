@@ -7,6 +7,8 @@ export interface WxHour {
   time: string; tempF: number | null; popPct: number | null; icon: WxIcon;
   feelsF: number | null; windMph: number | null; windDir: string; gustMph: number | null;
   humidityPct: number | null; dewF: number | null; precipIn: number | null; cloudPct: number | null;
+  /** The UV index estimate for the hour (worked out in the app: see uvIndexAt). */
+  uvIndex: number | null;
 }
 export interface WxDay { date: string; highF: number | null; lowF: number | null; popPct: number | null; icon: WxIcon; text: string; snowIn: number | null }
 export interface WxAlert { id: string; event: string; severity: string; urgency: string; headline: string; description: string; instruction: string; sender: string; effective: string | null; expires: string | null }
@@ -164,7 +166,7 @@ export function nextMoons(ms: number): Array<{ name: 'New Moon' | 'First Quarter
  * An answer from the weather function with every hourly figure present. An older version of the function (before it sent feels-like, wind,
  * humidity and so on) leaves them out; they become null ("unavailable") instead of undefined, so the screens never show NaN.
  */
-export function completePayload(p: WeatherPayload): WeatherPayload {
+export function completePayload(p: WeatherPayload, at?: { lat: number; lon: number }): WeatherPayload {
   const n = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
   return {
     ...p,
@@ -172,8 +174,72 @@ export function completePayload(p: WeatherPayload): WeatherPayload {
       time: h.time, tempF: n(h.tempF), popPct: n(h.popPct), icon: h.icon,
       feelsF: n(h.feelsF), windMph: n(h.windMph), windDir: typeof h.windDir === 'string' ? h.windDir : '', gustMph: n(h.gustMph),
       humidityPct: n(h.humidityPct), dewF: n(h.dewF), precipIn: n(h.precipIn), cloudPct: n(h.cloudPct),
+      uvIndex: at ? uvIndexAt(Date.parse(h.time), at.lat, at.lon, n(h.cloudPct)) : null,
     })),
-    daily: p.daily ?? [],
+    // Days that have already passed (the overnight hours after midnight belong to yesterday's forecast) are not shown.
+    daily: (p.daily ?? []).filter((d) => d.date >= todayInTowns(Date.now())),
     alerts: p.alerts ?? [],
   };
+}
+
+// ───────────── UV index (an estimate) ─────────────
+// The National Weather Service publishes no UV index, so the app works one out: the sun's real height in the sky for that place and hour
+// (exact astronomy), the usual clear-sky UV for that height, then reduced by the forecast cloud cover. It is an estimate, and is labelled as one.
+
+/** The sun's height above the horizon in degrees (negative at night) for a moment and place (NOAA solar position formulas). */
+export function solarElevation(ms: number, lat: number, lon: number): number {
+  const jd = ms / 86_400_000 + 2440587.5;
+  const T = (jd - 2451545.0) / 36525;
+  const L0 = norm(280.46646 + T * (36000.76983 + T * 0.0003032), 360);
+  const M = norm(357.52911 + T * (35999.05029 - 0.0001537 * T), 360);
+  const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
+  const C = (1.914602 - T * (0.004817 + 0.000014 * T)) * Math.sin(rad(M)) + (0.019993 - 0.000101 * T) * Math.sin(rad(2 * M)) + 0.000289 * Math.sin(rad(3 * M));
+  const omega = 125.04 - 1934.136 * T;
+  const lambda = L0 + C - 0.00569 - 0.00478 * Math.sin(rad(omega));
+  const eps = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60 + 0.00256 * Math.cos(rad(omega));
+  const decl = Math.asin(Math.sin(rad(eps)) * Math.sin(rad(lambda)));
+  const y = Math.tan(rad(eps) / 2) ** 2;
+  const eot = 4 * deg(y * Math.sin(rad(2 * L0)) - 2 * e * Math.sin(rad(M)) + 4 * e * y * Math.sin(rad(M)) * Math.cos(rad(2 * L0)) - 0.5 * y * y * Math.sin(rad(4 * L0)) - 1.25 * e * e * Math.sin(rad(2 * M)));
+  const d = new Date(ms);
+  const utcMin = d.getUTCHours() * 60 + d.getUTCMinutes() + d.getUTCSeconds() / 60;
+  const solarTime = norm(utcMin + eot + 4 * lon, 1440);
+  const ha = solarTime / 4 - 180;
+  return deg(Math.asin(Math.sin(rad(lat)) * Math.sin(decl) + Math.cos(rad(lat)) * Math.cos(decl) * Math.cos(rad(ha))));
+}
+
+/** The UV index for an hour: clear-sky value for the sun's height, times a cloud factor. 0 at night; whole numbers; null when the time is unreadable. */
+export function uvIndexAt(ms: number, lat: number, lon: number, cloudPct: number | null): number | null {
+  if (!Number.isFinite(ms)) return null;
+  const elev = solarElevation(ms + 1_800_000, lat, lon);   // the middle of the hour
+  if (elev <= 0) return 0;
+  const mu0 = Math.sin(rad(elev));
+  const clear = 12.5 * Math.pow(mu0, 2.42) * Math.pow(300 / 320, 1.23) * 0.95;   // typical ozone and air for New Jersey
+  const c = cloudPct === null || !Number.isFinite(cloudPct) ? 0 : Math.min(1, Math.max(0, cloudPct / 100));
+  const cloud = 1 - 0.75 * Math.pow(c, 3.4);
+  return Math.round(clear * cloud);
+}
+
+export type UvLevel = 'Low' | 'Moderate' | 'High' | 'Very high' | 'Extreme';
+/** The World Health Organization's UV bands. */
+export function uvLevel(uv: number): UvLevel {
+  if (uv <= 2) return 'Low';
+  if (uv <= 5) return 'Moderate';
+  if (uv <= 7) return 'High';
+  if (uv <= 10) return 'Very high';
+  return 'Extreme';
+}
+export function uvColor(uv: number | null): string {
+  if (uv === null) return '#9FB3A6';
+  if (uv <= 2) return '#3E9E52';
+  if (uv <= 5) return '#C99A0C';
+  if (uv <= 7) return '#E27B1E';
+  if (uv <= 10) return '#D8452F';
+  return '#8E3FBF';
+}
+export function uvAdvice(level: UvLevel): string {
+  return level === 'Low' ? 'No sun protection needed for most people.'
+    : level === 'Moderate' ? 'Wear sunscreen and sunglasses if you are out for a while.'
+    : level === 'High' ? 'Cover up, wear sunscreen, and take breaks in the shade.'
+    : level === 'Very high' ? 'Extra care: sunscreen, hat, and shade around midday.'
+    : 'Avoid the sun in the middle of the day.';
 }

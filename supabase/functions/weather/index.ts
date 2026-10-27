@@ -224,7 +224,8 @@ export function normalizeForecast(input: { townKey: string; forecast: any; hourl
     if (p.isDaytime) rec.day = p; else rec.night = p;
     byDate.set(d, rec);
   }
-  const daily: WxDay[] = [...byDate.entries()].slice(0, 7).map(([date, r]) => {
+  const todayLocal = localDate(now, tz);
+  const daily: WxDay[] = [...byDate.entries()].filter(([date]) => date >= todayLocal).slice(0, 7).map(([date, r]) => {
     const lead = r.day ?? r.night;
     const pops = [r.day, r.night].map((p) => (p ? popOf(p) : null)).filter((v): v is number => v !== null);
     return {

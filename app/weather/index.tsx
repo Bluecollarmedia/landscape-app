@@ -56,7 +56,7 @@ function buildStrip(hours: WxHour[], expanded: boolean): StripRow[] {
   return rows;
 }
 const rowWidth = (r: StripRow) => (r.kind === 'hour' ? HOUR_W : MORE_W);
-const STRIP_PAD = DAY_W + 10;   // room at the left for the pinned day label
+const STRIP_PAD = DAY_W + 10;   // the width the pinned day label covers at the left
 
 const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress, label }: { h: WxHour; isNow: boolean; metric: HourMetric; locale: string; now: string; onPress: (h: WxHour) => void; label: string }) {
   const value =
@@ -178,11 +178,14 @@ export default function WeatherHome() {
   const stripRows = useMemo(() => buildStrip(hours, moreDays), [hours, moreDays]);
   const stripOffsets = useMemo(() => { const o: number[] = []; let x = 0; for (const r of stripRows) { o.push(x); x += rowWidth(r); } return o; }, [stripRows]);
   const stripHours = useMemo(() => stripRows.filter((r): r is Extract<StripRow, { kind: 'hour' }> => r.kind === 'hour'), [stripRows]);
-  const pinnedDate = stripDate ?? (stripHours[0] ? localDay(stripHours[0].h.time) : '');
+  const firstDate = stripHours[0] ? localDay(stripHours[0].h.time) : '';
+  const pinnedDate = stripDate ?? firstDate;
+  // Today's own hours carry no label. The label appears once the strip reaches the next day, and goes away again when you come back to today.
+  const showPinned = !!pinnedDate && pinnedDate !== firstDate;
   const pinnedLabel = pinnedDate ? weekdayShort(pinnedDate, locale).replace('.', '').toUpperCase() : '';
   const onStripScroll = useCallback((e: { nativeEvent: { contentOffset: { x: number } } }) => {
     if (!stripHours.length) return;
-    const i = Math.min(stripHours.length - 1, Math.max(0, Math.floor(e.nativeEvent.contentOffset.x / HOUR_W)));
+    const i = Math.min(stripHours.length - 1, Math.max(0, Math.floor((e.nativeEvent.contentOffset.x + STRIP_PAD) / HOUR_W)));
     const d = localDay(stripHours[i].h.time);
     setStripDate((prev) => (prev === d ? prev : d));
   }, [stripHours]);
@@ -302,7 +305,6 @@ export default function WeatherHome() {
                   windowSize={9}
                   onScroll={onStripScroll}
                   scrollEventThrottle={16}
-                  contentContainerStyle={{ paddingLeft: STRIP_PAD }}
                   getItemLayout={(_d, i) => ({ length: stripRows[i] ? rowWidth(stripRows[i]) : HOUR_W, offset: stripOffsets[i] ?? 0, index: i })}
                   style={{ marginRight: -6 }}
                   renderItem={({ item }) =>
@@ -317,7 +319,7 @@ export default function WeatherHome() {
                     )
                   }
                 />
-                {pinnedLabel ? (
+                {showPinned && pinnedLabel ? (
                   <View style={styles.dayCol} pointerEvents="none" accessible accessibilityLabel={pinnedLabel}>
                     {pinnedLabel.split('').map((c, k) => <Text key={k} style={styles.dayColText}>{c}</Text>)}
                   </View>

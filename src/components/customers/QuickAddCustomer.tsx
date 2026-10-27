@@ -12,7 +12,7 @@ import { properName } from '@/lib/names';
  * "Add a new customer" right inside a form (a new property or project), so the owner never has to leave it to make one.
  * The new customer is created like one from More → Customers and handed back so the form can pick them straight away.
  */
-export function QuickAddCustomer({ onAdded }: { onAdded: (personId: string) => void }) {
+export function QuickAddCustomer({ onAdded }: { onAdded: (personId: string, isNew?: boolean) => void }) {
   const { colors } = useTheme();
   const { addCustomer } = useCustomers();
   const [open, setOpen] = useState(false);
@@ -38,7 +38,7 @@ export function QuickAddCustomer({ onAdded }: { onAdded: (personId: string) => v
       const id = await addCustomer({ firstName: properName(firstName), lastName: properName(lastName), email: mail, phone });
       Keyboard.dismiss();
       reset();
-      onAdded(id);
+      onAdded(id, true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The customer couldn't be added.");
     } finally {

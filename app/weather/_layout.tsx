@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { weatherSwitch } from '@/data/publicWeather';
 import { WX, WeatherBackground } from '@/components/weather/WeatherUI';
 import { FloatingTabBar } from '@/components/weather/FloatingTabBar';
+import { WEATHER_ON_THIS_DEVICE } from '@/lib/weatherPlatform';
 
 /**
  * The public Brighton Weather area: one light page behind three screens (Weather, Storm History, Account) and its own floating tab bar.
@@ -17,6 +18,8 @@ export default function WeatherLayout() {
     const id = setInterval(() => { void weatherSwitch.refresh(); }, 60_000);
     return () => clearInterval(id);
   }, []);
+  // The website has no public weather: anyone who types a weather address there goes to the normal entry.
+  if (!WEATHER_ON_THIS_DEVICE) return <Redirect href="/" />;
   return (
     <View style={{ flex: 1, backgroundColor: WX.page }}>
       <WeatherBackground />

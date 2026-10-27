@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { weatherSwitch } from '@/data/publicWeather';
-import { WEATHER_EXPERIENCE_BUILT, effectiveWeatherOn } from '@/lib/launchRoute';
+import { effectiveWeatherOn } from '@/lib/launchRoute';
+import { WEATHER_ON_THIS_DEVICE } from '@/lib/weatherPlatform';
 
 /**
  * Is the public Weather experience on? Asks once at launch (without ever holding launch up: the answer is read from what the phone
@@ -17,7 +18,7 @@ export function usePublicWeatherSwitch(signedOut: boolean): boolean {
 
   useEffect(() => {
     const update = () => {
-      const next = effectiveWeatherOn(WEATHER_EXPERIENCE_BUILT, weatherSwitch.getEnabled());
+      const next = effectiveWeatherOn(WEATHER_ON_THIS_DEVICE, weatherSwitch.getEnabled());
       if (next !== last.current) { last.current = next; setOn(next); }
     };
     const off = weatherSwitch.subscribe(update);

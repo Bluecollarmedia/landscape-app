@@ -12,10 +12,11 @@
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { weatherSwitch } from '@/data/publicWeather';
-import { WEATHER_EXPERIENCE_BUILT, effectiveWeatherOn, entryRedirect } from '@/lib/launchRoute';
+import { effectiveWeatherOn, entryRedirect } from '@/lib/launchRoute';
+import { WEATHER_ON_THIS_DEVICE } from '@/lib/weatherPlatform';
 
 export default function AppIndex() {
   const { isAuthenticated } = useAuth();
-  const weatherOn = effectiveWeatherOn(WEATHER_EXPERIENCE_BUILT, weatherSwitch.getEnabled());
+  const weatherOn = effectiveWeatherOn(WEATHER_ON_THIS_DEVICE, weatherSwitch.getEnabled());
   return <Redirect href={entryRedirect({ isAuthenticated, weatherOn })} />;
 }

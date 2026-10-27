@@ -11,6 +11,9 @@
  * Swipe down on a sheet to close it (a phone only). The drag follows the finger; a long enough pull, or a quick flick, closes it, otherwise
  * it springs back. Scrolling a long list inside the sheet is left to the list.
  *
+ * A sheet that holds a scrolling page can pass `scrollOffset` (the page's scroll position, updated on the UI thread). The swipe then starts the
+ * moment a finger moves down while the page is at the top, however slightly, and `closeDistance` / `closeVelocity` can be made smaller.
+ *
  * One sheet at a time: a sheet that opens while another is still sliding away waits for it to finish. Two native modals presenting and
  * dismissing at once leave iOS stuck with an invisible layer that swallows every touch (the app looked frozen).
  */
@@ -18,12 +21,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 
 interface BottomSheetModalProps {
   visible: boolean;
   onRequestClose: () => void;
   children: React.ReactElement<{ style?: any }>;
+  scrollOffset?: SharedValue<number>;
+  closeDistance?: number;
+  closeVelocity?: number;
 }
 
 const IN_MS = 300;
@@ -39,12 +45,14 @@ const closing = new Set<symbol>();
 const waiting = new Set<() => void>();
 const notify = () => { for (const w of Array.from(waiting)) w(); };
 
-export function BottomSheetModal({ visible, onRequestClose, children }: BottomSheetModalProps) {
+export function BottomSheetModal({ visible, onRequestClose, children, scrollOffset, closeDistance = CLOSE_DISTANCE, closeVelocity = CLOSE_VELOCITY }: BottomSheetModalProps) {
   const { height } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
   const progress = useSharedValue(0);
   const drag = useSharedValue(0);
   const id = useRef(Symbol('sheet')).current;
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,14 +105,28 @@ export function BottomSheetModal({ visible, onRequestClose, children }: BottomSh
   const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value * Math.max(0, 1 - drag.value / (height * 0.8)) }));
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - progress.value) * height + drag.value }] }));
 
-  const pan = Gesture.Pan()
-    .enabled(Platform.OS !== 'web')
-    .activeOffsetY(14)
-    .failOffsetY(-14)
-    .failOffsetX([-28, 28])
+  const base = Gesture.Pan().enabled(Platform.OS !== 'web');
+  const pan = (scrollOffset
+    ? base
+      .manualActivation(true)
+      .onTouchesDown((e) => { const t = e.changedTouches[0]; if (t) { startX.value = t.absoluteX; startY.value = t.absoluteY; } })
+      .onTouchesMove((e, state) => {
+        const t = e.changedTouches[0];
+        if (!t) return;
+        const dy = t.absoluteY - startY.value;
+        const dx = Math.abs(t.absoluteX - startX.value);
+        if (dy < -6 || (dx > 8 && dx > Math.abs(dy))) { state.fail(); return; }
+        // Takes over the instant the finger moves down while the page is at the top.
+        if (dy > 4 && scrollOffset.value <= 1) state.activate();
+      })
+    : base
+      .activeOffsetY(14)
+      .failOffsetY(-14)
+      .failOffsetX([-28, 28])
+  )
     .onUpdate((e) => { drag.value = Math.max(0, e.translationY); })
     .onEnd((e) => {
-      if (drag.value > CLOSE_DISTANCE || e.velocityY > CLOSE_VELOCITY) runOnJS(onRequestClose)();
+      if (drag.value > closeDistance || e.velocityY > closeVelocity) runOnJS(onRequestClose)();
       else drag.value = withSpring(0, { damping: 22, stiffness: 260 });
     });
 

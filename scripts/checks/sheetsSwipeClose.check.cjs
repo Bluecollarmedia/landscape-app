@@ -13,7 +13,7 @@ const doc = read('app/(owner)/document-edit.tsx');
 const layout = read('app/(owner)/_layout.tsx');
 
 check('1 the shared bottom sheet has a downward pan that follows the finger', /Gesture\.Pan\(\)/.test(sheet) && /activeOffsetY\(14\)/.test(sheet) && /drag\.value = Math\.max\(0, e\.translationY\)/.test(sheet));
-check('2 a long pull or a quick flick closes it; otherwise it springs back', /drag\.value > CLOSE_DISTANCE \|\| e\.velocityY > CLOSE_VELOCITY\) runOnJS\(onRequestClose\)\(\)/.test(sheet) && /withSpring\(0/.test(sheet));
+check('2 a long pull or a quick flick closes it; otherwise it springs back', /drag\.value > closeDistance \|\| e\.velocityY > closeVelocity\) runOnJS\(onRequestClose\)\(\)/.test(sheet) && /withSpring\(0/.test(sheet));
 check('3 sideways and upward drags are not taken, and it is off on the website (text selection)', /failOffsetX\(\[-28, 28\]\)/.test(sheet) && /failOffsetY\(-14\)/.test(sheet) && /enabled\(Platform\.OS !== 'web'\)/.test(sheet));
 check('4 the gesture works inside the modal (its own gesture root)', /<GestureHandlerRootView style=\{styles\.fill\}>/.test(sheet) && /<GestureDetector gesture=\{pan\}>/.test(sheet));
 check('5 the dimmed backdrop fades as the sheet is pulled', /1 - drag\.value \/ \(height \* 0\.8\)/.test(sheet));

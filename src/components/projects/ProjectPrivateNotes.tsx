@@ -28,9 +28,16 @@ function confirm(title: string, message: string, action: string, run: () => void
   Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: run }]);
 }
 
-interface Props { projectId: string; projectName: string; address?: string }
+interface Props {
+  projectId: string;
+  projectName: string;
+  address?: string;
+  /** The project's own internal notes (the Overview's Internal Notes). Shown here too so all of the owner's notes are in one place. */
+  internalNotes?: string;
+  onEditInternalNotes?: () => void;
+}
 
-export function ProjectPrivateNotes({ projectId, projectName, address }: Props) {
+export function ProjectPrivateNotes({ projectId, projectName, address, internalNotes, onEditInternalNotes }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const isOwner = useIsProjectOwner();
@@ -107,6 +114,17 @@ export function ProjectPrivateNotes({ projectId, projectName, address }: Props) 
           Only you can see My Notes. Not your workers, admins or the customer. They stay with this project after the quote is approved.
         </Text>
       </View>
+
+      {internalNotes?.trim() ? (
+        <Card title="Project Notes (Overview)" style={{ marginTop: 0 }}>
+          <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>{internalNotes}</Text>
+          {onEditInternalNotes ? (
+            <Pressable onPress={onEditInternalNotes} style={{ minHeight: 44, justifyContent: 'center' }} accessibilityRole="button">
+              <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Edit on the Overview</Text>
+            </Pressable>
+          ) : null}
+        </Card>
+      ) : null}
 
       <Card title="My Notes" style={{ marginTop: 0 }}>
         <TextInput

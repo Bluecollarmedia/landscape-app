@@ -321,10 +321,10 @@ function LandscapingToday() {
           <Feather name="check" size={40} color="#FFFFFF" />
         </View>
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.xl }]}>
-          {t('Checked Out')}
+          {t('Project Complete')}
         </Text>
-        <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-          {t('Great work today!')}
+        <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center', paddingHorizontal: spacing.lg }]}>
+          {t('Great work! Clock out for the day on the Clock tab when you are done.')}
         </Text>
 
         <View style={[styles.card, styles.summaryCard, { backgroundColor: colors.surface }, shadow.md]}>
@@ -737,18 +737,18 @@ function LandscapingToday() {
 
               <Pressable onPress={handleCheckOutPress}>
                 <LinearGradient
-                  colors={['#E1615D', '#C4453F']}
+                  colors={['#4A8B3F', '#2D5A43']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[styles.card, styles.leavingCard, { borderRadius: 28 }]}
                 >
-                  <Feather name="log-out" size={22} color="#FFFFFF" />
-                  <View style={{ marginLeft: spacing.md }}>
+                  <Feather name="check-circle" size={22} color="#FFFFFF" />
+                  <View style={{ marginLeft: spacing.md, flex: 1 }}>
                     <Text style={[typeScale.headingSmall, { color: '#FFFFFF', fontWeight: '700' }]}>
-                      {t("I'M LEAVING")}
+                      {t('COMPLETE PROJECT')}
                     </Text>
                     <Text style={[typeScale.bodySmall, { color: 'rgba(255,255,255,0.85)' }]}>
-                      {t("Check out when you're done")}
+                      {t('Finish this job. You clock out for the day on the Clock tab.')}
                     </Text>
                   </View>
                 </LinearGradient>
@@ -769,14 +769,14 @@ function LandscapingToday() {
           onPress={() => setShowCheckoutConfirm(false)}
         >
           <Pressable style={[styles.modalCard, { backgroundColor: colors.surface }]} onPress={() => {}}>
-            <View style={[styles.modalIcon, { backgroundColor: colors.errorLight }]}>
-              <Feather name="log-out" size={24} color={colors.error} />
+            <View style={[styles.modalIcon, { backgroundColor: colors.primarySurface }]}>
+              <Feather name="check-circle" size={24} color={colors.primary} />
             </View>
             <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: spacing.lg, textAlign: 'center' }]}>
-              {t("You're done for today?")}
+              {t('Complete this project?')}
             </Text>
             <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }]}>
-              {t('This checks you out from {name} and ends your work session.', { name: primaryAssignment?.project?.name ?? t('this job') })}
+              {t('This marks {name} finished. You stay clocked in until you clock out for the day on the Clock tab.', { name: primaryAssignment?.project?.name ?? t('this job') })}
             </Text>
 
             <View style={styles.modalActions}>
@@ -788,12 +788,12 @@ function LandscapingToday() {
               </Pressable>
               <Pressable style={styles.modalButton} onPress={confirmCheckOut}>
                 <LinearGradient
-                  colors={['#E1615D', '#C4453F']}
+                  colors={['#4A8B3F', '#2D5A43']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.modalButtonFill}
                 >
-                  <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('Check Out')}</Text>
+                  <Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>{t('Complete project')}</Text>
                 </LinearGradient>
               </Pressable>
             </View>

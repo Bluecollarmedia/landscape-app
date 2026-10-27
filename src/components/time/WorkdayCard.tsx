@@ -77,8 +77,11 @@ export function WorkdayCard({ compact = false, gate = false, portal = false, pre
   function onClockOut() {
     haptics.select();
     const total = durationText(todayNetMs);
+    const message = current
+      ? tr('Clocking out also ends your time at {place}. Your total for today is {total}.', { place: current.label ?? tr('the property you are at'), total })
+      : tr('Your total for today is {total}.', { total });
     const go = async () => { const r = await w.clockOut(); if (r.ok) haptics.success(); else say(tr("Can't clock out yet"), r.error); };
-    Alert.alert(tr('Clock out?'), tr('Your total for today is {total}.', { total }), [{ text: tr('Not yet'), style: 'cancel' }, { text: tr('Clock Out'), style: 'destructive', onPress: go }]);
+    Alert.alert(tr('Clock out?'), message, [{ text: tr('Not yet'), style: 'cancel' }, { text: tr('Clock Out'), style: 'destructive', onPress: go }]);
   }
   async function onBreak() {
     haptics.select();
@@ -188,7 +191,7 @@ export function WorkdayCard({ compact = false, gate = false, portal = false, pre
             </Pressable>
           </View>
           {current && !w.onBreak ? (
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>{t('Complete the property you are at before clocking out.')}</Text>
+            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>{t('Clocking out for the day also ends your time at the property you are at.')}</Text>
           ) : null}
         </>
       ) : null}

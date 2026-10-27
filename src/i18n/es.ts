@@ -166,6 +166,7 @@ export const ES: Record<string, string> = {
   'Your route': 'Tu ruta',
   'Open my route': 'Abrir mi ruta',
   'Clock': 'Reloj',
+  'Your route shows up here when the owner puts you on one.': 'Tu ruta aparece aquí cuando el dueño te asigne una.',
   'Needs its own photo': 'Necesita su propia foto',
   'Photo saving. This task ticks when it is saved.': 'Guardando la foto. Esta tarea se marca cuando se guarde.',
   'Each task needs its own photo before it can be completed.': 'Cada tarea necesita su propia foto antes de completarse.',

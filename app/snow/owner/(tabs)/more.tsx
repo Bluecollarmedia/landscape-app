@@ -92,6 +92,7 @@ export default function SnowOwnerMoreScreen() {
             <ProfileCard onPress={() => router.push('/snow/owner/edit-profile' as any)} />
             {mode.canSwitch ? <Row icon={mode.icon} title={mode.title} subtitle={mode.subtitle} onPress={mode.confirm} /> : null}
             {weatherRow.canChange ? <Row icon="cloud" title={`${weatherRow.title}: ${weatherRow.value}`} subtitle={weatherRow.subtitle} onPress={weatherRow.confirm} /> : null}
+            {weatherRow.canChange ? <Row icon="cloud-snow" title="Storm outlook" subtitle="Write a storm update for everyone to read" onPress={() => router.push('/snow/owner/storm-outlook' as any)} /> : null}
           </Group>
 
           <Group title="Account">

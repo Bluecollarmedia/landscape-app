@@ -229,11 +229,12 @@ export function uvLevel(uv: number): UvLevel {
   return 'Extreme';
 }
 export function uvColor(uv: number | null): string {
-  if (uv === null) return '#9FB3A6';
-  if (uv <= 2) return '#3E9E52';
-  if (uv <= 5) return '#C99A0C';
-  if (uv <= 7) return '#E27B1E';
-  if (uv <= 10) return '#D8452F';
+  // Darker than a traffic light on purpose, so the number stays readable as text on white.
+  if (uv === null) return '#6F8B80';
+  if (uv <= 2) return '#2E8B45';
+  if (uv <= 5) return '#9C7500';
+  if (uv <= 7) return '#C2620F';
+  if (uv <= 10) return '#C2381F';
   return '#8E3FBF';
 }
 export function uvAdvice(level: UvLevel): string {

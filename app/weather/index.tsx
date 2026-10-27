@@ -58,7 +58,7 @@ function buildStrip(hours: WxHour[], expanded: boolean): StripRow[] {
 const rowWidth = (r: StripRow) => (r.kind === 'hour' ? HOUR_W : MORE_W);
 const STRIP_PAD = DAY_W + 10;   // the width the pinned day label covers at the left
 
-const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress, label, uvWord }: { h: WxHour; isNow: boolean; metric: HourMetric; locale: string; now: string; onPress: (h: WxHour) => void; label: string; uvWord: string }) {
+const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress, label }: { h: WxHour; isNow: boolean; metric: HourMetric; locale: string; now: string; onPress: (h: WxHour) => void; label: string }) {
   const value =
     metric === 'temp' ? degrees(h.tempF) : metric === 'feels' ? degrees(h.feelsF) : metric === 'uv' ? orDash(h.uvIndex) : metric === 'pop' ? orDash(h.popPct, '%') : h.windMph === null ? '–' : `${Math.round(h.windMph)}`;
   return (
@@ -66,7 +66,7 @@ const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress
       <Text style={styles.hourText}>{isNow ? now : hourLabel(h.time, locale)}</Text>
       <WxPicture icon={h.icon} size={40} />
       <Text style={[styles.hourValue, metric === 'pop' && { color: WX.rain }, metric === 'uv' && { color: uvColor(h.uvIndex) }]}>{value}</Text>
-      {metric === 'uv' ? <Text style={[styles.hourSub, { color: uvColor(h.uvIndex) }]}>{h.uvIndex !== null && h.uvIndex > 0 ? uvWord : ' '}</Text> : metric === 'wind' ? <Text style={styles.hourSub}>{h.windDir}</Text> : typeof h.popPct === 'number' && h.popPct >= 20 && metric !== 'pop' ? <Text style={[styles.hourSub, { color: WX.rain }]}>{h.popPct}%</Text> : <Text style={styles.hourSub}> </Text>}
+      {metric === 'uv' ? <View style={[styles.uvBar, { backgroundColor: h.uvIndex !== null && h.uvIndex > 0 ? uvColor(h.uvIndex) : 'transparent' }]} /> : metric === 'wind' ? <Text style={styles.hourSub}>{h.windDir}</Text> : typeof h.popPct === 'number' && h.popPct >= 20 && metric !== 'pop' ? <Text style={[styles.hourSub, { color: WX.rain }]}>{h.popPct}%</Text> : <Text style={styles.hourSub}> </Text>}
     </Pressable>
   );
 });
@@ -313,7 +313,7 @@ export default function WeatherHome() {
                   style={{ marginRight: -6 }}
                   renderItem={({ item }) =>
                     item.kind === 'hour' ? (
-                      <HourItem h={item.h} isNow={item.isNow} metric={hourMetric} locale={locale} now={t('Now')} onPress={openHour} label={`${hourLabel(item.h.time, locale)}. ${t('Open details')}`} uvWord={item.h.uvIndex === null ? '' : t(uvLevel(item.h.uvIndex))} />
+                      <HourItem h={item.h} isNow={item.isNow} metric={hourMetric} locale={locale} now={t('Now')} onPress={openHour} label={`${hourLabel(item.h.time, locale)}${hourMetric === 'uv' && item.h.uvIndex !== null ? `. ${t('UV index {n}', { n: item.h.uvIndex })}, ${t(uvLevel(item.h.uvIndex))}` : ''}. ${t('Open details')}`} />
                     ) : (
                       <View style={styles.moreWrap}>
                         <Pressable onPress={showMoreDays} accessibilityRole="button" accessibilityLabel={t('Show the next days')} style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.7 }]}>
@@ -676,6 +676,7 @@ const styles = StyleSheet.create({
   miniCol: { flex: 1, justifyContent: 'flex-end' },
   miniBar: { borderRadius: 2, width: '100%' },
   axisNote: { color: FAINT, fontSize: 11.5, marginTop: 6 },
+  uvBar: { width: 26, height: 5, borderRadius: 3, marginTop: 4 },
   uvTrack: { height: 10, borderRadius: 5, overflow: 'hidden', marginTop: 14 },
   humTrack: { height: 10, borderRadius: 5, overflow: 'hidden', marginTop: 14 },
   humDot: { position: 'absolute', top: -2, width: 14, height: 14, borderRadius: 7, marginLeft: -7, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: WX.deep },

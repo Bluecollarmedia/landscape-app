@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, DateField, Icon, Input, LoadingSpinner, Switch } from '@/components/ui';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { StormPage } from '@/components/weather/StormPage';
-import { endStorm, fetchOwnerStorm, publishStorm, type StormDraft } from '@/data/stormOutlook';
+import { deleteStorm, deleteStormUpdate, endStorm, fetchOwnerStorm, fetchOwnerStormHistory, publishStorm, type StormDraft } from '@/data/stormOutlook';
 import { DEFAULT_DISCLAIMER, easternToIso, isoToEastern, snowRange, type StormOutlook, type StormVersion } from '@/lib/stormView';
 import { localDateKey } from '@/lib/ids';
 import { pickImage } from '@/lib/pickImage';
@@ -95,6 +95,8 @@ export function StormOutlookEditor() {
   const [mapUrl, setMapUrl] = useState<string | null>(null);
   const [pickedMap, setPickedMap] = useState<{ uri: string; width: number; height: number; mimeType?: string; size?: number } | null>(null);
   const [mapNote, setMapNote] = useState('');
+  // Everything that has been published (for deleting a mistake).
+  const [posted, setPosted] = useState<StormOutlook[]>([]);
 
   const fill = useCallback((s: StormOutlook | null) => {
     setActive(s);
@@ -125,8 +127,53 @@ export function StormOutlookEditor() {
       fill(r.storm);
       setState('ready');
     });
+    fetchOwnerStormHistory().then((r) => { if (alive && r.ok) setPosted(r.storms); });
     return () => { alive = false; };
   }, [fill]);
+
+  /** After a delete: what is published now, for the form and for the list. */
+  const reload = useCallback(async () => {
+    const [cur, all] = await Promise.all([fetchOwnerStorm(), fetchOwnerStormHistory()]);
+    if (cur.ok) {
+      if (!cur.storm) { setActive(null); setMapUrl(null); setPickedMap(null); }
+      else fill(cur.storm);
+    }
+    if (all.ok) setPosted(all.storms);
+  }, [fill]);
+
+  const removeUpdate = (storm: StormOutlook, v: StormVersion) => {
+    const only = storm.version_count <= 1;
+    confirmAction(
+      only ? 'Delete this storm?' : `Delete update ${v.version_no}?`,
+      only
+        ? 'This is the only update, so the whole storm is deleted. It disappears for everyone, including Storm History. This cannot be undone.'
+        : `Update ${v.version_no} disappears for everyone, including Storm History${storm.latest?.id === v.id ? ', and the update before it becomes the current one' : ''}. This cannot be undone.`,
+      'Delete',
+      async () => {
+        setBusy(true);
+        const r = await deleteStormUpdate(v.id);
+        if (!r.ok) { setBusy(false); showMessage("Couldn't delete", r.message); return; }
+        await reload();
+        setBusy(false);
+      },
+      true,
+    );
+  };
+  const removeStorm = (storm: StormOutlook) => {
+    confirmAction(
+      'Delete the whole storm?',
+      `“${storm.name || storm.latest?.headline || 'This storm'}” and all of its updates disappear for everyone, including Storm History. This cannot be undone.`,
+      'Delete storm',
+      async () => {
+        setBusy(true);
+        const r = await deleteStorm(storm.id);
+        if (!r.ok) { setBusy(false); showMessage("Couldn't delete", r.message); return; }
+        await reload();
+        setBusy(false);
+      },
+      true,
+    );
+  };
 
   /** The draft as the storm page shows it (for Preview) and as it is saved (for Publish). */
   const built = useMemo(() => {
@@ -307,6 +354,32 @@ export function StormOutlookEditor() {
               <Text style={[typeScale.bodyMedium, { color: colors.primary, fontWeight: '700', textDecorationLine: 'underline' }]}>Reset to the standard wording</Text>
             </Pressable>
 
+            {posted.length ? (
+              <View style={{ marginTop: spacing.xl }}>
+                {label('Posted storms')}
+                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 4 }]}>Published something by mistake? Delete it here. It disappears for everyone, Storm History included.</Text>
+                {posted.map((s) => (
+                  <View key={s.id} style={[styles.postedCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                    <Text style={[typeScale.bodyMedium, { color: colors.textPrimary, fontWeight: '700' }]} numberOfLines={2}>{s.name || s.latest?.headline || 'Storm outlook'}</Text>
+                    <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>{s.status === 'active' ? 'Published now' : 'Ended'} · {s.version_count} {s.version_count === 1 ? 'update' : 'updates'}</Text>
+                    {s.versions.map((v) => (
+                      <View key={v.id} style={styles.postedRow}>
+                        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, flex: 1 }]} numberOfLines={2}>Update {v.version_no}{v.is_final ? ' · Final' : ''}{v.map_url ? ' · picture' : ''} — {v.headline}</Text>
+                        <Pressable onPress={() => removeUpdate(s, v)} disabled={busy} accessibilityRole="button" accessibilityLabel={`Delete update ${v.version_no}`} hitSlop={6} style={styles.deleteBtn}>
+                          <Text style={styles.deleteText}>Delete</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                    {s.version_count > 1 ? (
+                      <Pressable onPress={() => removeStorm(s)} disabled={busy} accessibilityRole="button" accessibilityLabel="Delete the whole storm" style={[styles.deleteBtn, { alignSelf: 'flex-start', marginTop: spacing.xs }]}>
+                        <Text style={styles.deleteText}>Delete the whole storm</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
             {built.problems.length ? <Text style={[typeScale.bodySmall, { color: '#B54708', marginTop: spacing.md }]}>{built.problems[0]}</Text> : null}
             <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.md }]}>
               {snowRange(built.version) ? `Visitors will see “${snowRange(built.version)}”.` : 'Visitors will see “Unavailable” for snowfall.'}
@@ -342,5 +415,9 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, marginTop: spacing.xs },
   area: { borderWidth: 1.5, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingTop: spacing.sm + 2, paddingBottom: spacing.sm, fontSize: 16, lineHeight: 22 },
   hourChip: { minHeight: 44, minWidth: 62, paddingHorizontal: 12, borderRadius: 99, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  postedCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.sm },
+  postedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  deleteBtn: { minHeight: 44, minWidth: 64, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E5B4B0', alignItems: 'center', justifyContent: 'center' },
+  deleteText: { color: '#B42318', fontWeight: '700', fontSize: 14 },
   previewBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, backgroundColor: '#F7FAF4' },
 });

@@ -53,6 +53,10 @@ create table if not exists public.storm_outlook_versions (
 -- A published update is permanent: nobody (not even the database owner's own functions) can change or delete one.
 create or replace function public.storm_versions_are_permanent() returns trigger language plpgsql as $$
 begin
+  -- Only the owner's delete functions (update 106) may delete, and only while they are running.
+  if tg_op = 'DELETE' and coalesce(current_setting('app.storm_owner_delete', true), '') = '1' then
+    return old;
+  end if;
   raise exception 'A published storm update cannot be changed or deleted.';
 end;
 $$;

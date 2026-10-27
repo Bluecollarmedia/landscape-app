@@ -32,7 +32,7 @@ const stop = read('app/(worker)/maintenance-stop/[id].tsx');
 const data = read('src/data/maintenance.ts');
 const hist = read('app/(owner)/(tabs)/maintenance/history/[id].tsx');
 const card = read('src/components/time/WorkdayCard.tsx');
-check('9 not scheduled: "You\'re not scheduled today" and no Clock In until a route exists', /You're not scheduled today/.test(today) && /!route && !workday\.active/.test(today));
+check('9 the maintenance dashboard has no Clock In card and no "not scheduled" gate: clocking is manual, on the Clock tab', !/You're not scheduled today/.test(today) && !/preShiftTitle=\{t\('Ready to start your day'\)\}/.test(today));
 check('10 before clock-in the route is hidden and the pre-shift card explains what clocking in does', /showRoute = !!route && \(!timeOn \|\| clockedIn\)/.test(today) && /unlocks today's route/.test(today));
 check('11 after clock-in a compact "On the clock" status replaces the big card, with no floating action button', /On the clock/.test(card) && /if \(cardMode\) \{\s*action = null;/.test(today));
 check('12 I\'M HERE and FINISH STOP sit on the property card and only for the leader; others see the status text', /styles\.cardAction/.test(today) && /leader \? \(/.test(today) && /crewStopMessage/.test(today) && /leader && stop\.status === 'pending'/.test(stop));

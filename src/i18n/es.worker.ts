@@ -47,7 +47,7 @@ export const ES_WORKER: Record<string, string> = {
   'Starts in {n} minutes': 'Empieza en {n} minutos',
   'Starts in 1 minute': 'Empieza en 1 minuto',
   'Starting now': 'Empieza ahora',
-  'Clock in for the day first. The Clock In button is at the top.': 'Primero registra tu entrada del día. El botón Registrar entrada está arriba.',
+  'Clock in first on the Clock tab.': 'Primero registra tu entrada del día. El botón Registrar entrada está arriba.',
   'START PROPERTY': 'INICIAR PROPIEDAD',
   "I'M HERE": 'YA LLEGUÉ',
   'Start your time at this property': 'Empieza tu tiempo en esta propiedad',

@@ -197,23 +197,7 @@ function LegacyMaintenanceToday() {
           {projectWork ? (
             <OtherWorkCard icon="briefcase" title={t('You also have project work')} subtitle={t('Tap to see your jobs.')} onPress={() => router.push('/(worker)/(tabs)' as any)} />
           ) : null}
-          {timeOn ? (
-            !route && !workday.active ? (
-              <View style={[styles.notScheduled, { backgroundColor: colors.backgroundSecondary }]}>
-                <Feather name="calendar" size={22} color={colors.textSecondary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{t("You're not scheduled today")}</Text>
-                  <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t('Clock In appears when the owner puts you on a route for the day.')}</Text>
-                </View>
-              </View>
-            ) : (
-              <WorkdayCard
-                compact={clockedIn}
-                preShiftTitle={t('Ready to start your day')}
-                preShiftText={preShiftText}
-              />
-            )
-          ) : (
+          {timeOn ? null : (
             <YardStartCard
               dayStart={dayStart}
               yard={yard}

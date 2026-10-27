@@ -108,7 +108,7 @@ export const ES_MAINTENANCE: Record<string, string> = {
   'RECORDING…': 'REGISTRANDO…',
   'Finish {name} first. Stops are worked in order.': 'Termina {name} primero. Las paradas se hacen en orden.',
   'stop {n}': 'la parada {n}',
-  'Clock in for the day first. The Clock In button is on the Today screen.': 'Primero registra tu entrada del día. El botón Registrar entrada está en la pantalla Hoy.',
+  'Clock in first on the Clock tab.': 'Primero registra tu entrada del día. El botón Registrar entrada está en la pantalla Hoy.',
   'NEXT: {name}': 'SIGUIENTE: {name}',
   'STOP {n}': 'PARADA {n}',
   'BACK TO ROUTE': 'VOLVER A LA RUTA',

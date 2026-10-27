@@ -166,6 +166,7 @@ export const ES: Record<string, string> = {
   'Your route': 'Tu ruta',
   'Open my route': 'Abrir mi ruta',
   'Clock': 'Reloj',
+  'Clock in first on the Clock tab.': 'Primero marca tu entrada en la pestaña Reloj.',
   'COMPLETE PROJECT': 'COMPLETAR PROYECTO',
   'Finish this job. You clock out for the day on the Clock tab.': 'Termina este trabajo. Marcas tu salida del día en la pestaña Reloj.',
   'Complete this project?': '¿Completar este proyecto?',

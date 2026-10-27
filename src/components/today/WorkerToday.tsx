@@ -108,24 +108,7 @@ export function WorkerToday({ combined = false }: { combined?: boolean }) {
   const active = !!w.active;
   const closedToday = !active && !!w.today?.clockOutAt;
 
-  // Not clocked in: only a way to clock in (when there is something to do), never the route.
-  if (!active) {
-    if (!anyWork) {
-      return (
-        <Sheet header={<TodayHeader title={t('Today')} />}>
-          <Message icon="calendar" title={t('No route today')} text={t("You're all set. There are no stops for you today.")} />
-        </Sheet>
-      );
-    }
-    if (closedToday && !openWork) {
-      return (
-        <Sheet header={<TodayHeader title={t('Today')} />}>
-          <Message icon="check-circle" title={t('All done for today!')} text={t('Great work. Your work is complete.')} />
-        </Sheet>
-      );
-    }
-    return <ClockInScreen moreWork={closedToday} />;
-  }
+  // Whether or not the worker is clocked in, they see their route. Clocking in and out is manual, on the Clock tab.
 
   const nextItem = items.find((i) => !i.done);
   const nextId = nextItem?.id;

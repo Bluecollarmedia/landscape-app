@@ -278,6 +278,24 @@ export async function loadRouteCrew(routeId: string): Promise<Result<RouteCrewMe
   return ok(ids.map((id) => ({ personId: id, name: names.get(id) ?? 'Unnamed' })));
 }
 
+const NEEDS_UPDATE_110 = 'More than one crew lead needs database update 110, which has not been installed yet.';
+
+/** The route's other crew leads (beyond its first lead), oldest first. Empty before database update 110. */
+export async function loadRouteExtraLeadIds(routeId: string): Promise<Result<string[]>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data, error } = await supabase.from('snow_route_extra_leads').select('person_id, created_at').eq('route_id', routeId).order('created_at');
+  if (error) return OLD_DATABASE.test(error.message) ? ok([]) : fail(message(error, 'Couldn\'t load the crew leads.'));
+  return ok((data ?? []).map((r) => r.person_id as string));
+}
+
+/** Makes this exactly the route's crew leads, any number (owner/admin). The first stays first if still listed. Repeating it changes nothing. */
+export async function setRouteLeads(routeId: string, personIds: string[]): Promise<Result<string[]>> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { data, error } = await supabase.rpc('snow_set_route_leads', { p_route_id: routeId, p_person_ids: personIds });
+  if (error) return fail(OLD_DATABASE.test(error.message) ? NEEDS_UPDATE_110 : message(error, 'Couldn\'t change the crew leads.'));
+  return ok(((data as { leads?: string[] } | null)?.leads ?? []) as string[]);
+}
+
 /** Makes this exactly the route's crew (owner/admin). Repeating it changes nothing. */
 export async function setRouteCrew(routeId: string, personIds: string[]): Promise<Result<string[]>> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);

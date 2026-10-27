@@ -5,7 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ScrubArea } from '@/components/weather/ScrubArea';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage, useT } from '@/i18n';
-import { hoursOnDate, hourLabel, orDash, tempColor, uvColor, weekdayShort, todayInTowns, type WeatherPayload, type WxHour } from '@/lib/weatherView';
+import { hoursOnDate, hourLabel, orDash, tempColor, uvColor, viewTz, weekdayShort, todayInTowns, type WeatherPayload, type WxHour } from '@/lib/weatherView';
 import { Panel, WX, WeatherBackground, WxPicture } from '@/components/weather/WeatherUI';
 
 export type MetricKey = 'temp' | 'feels' | 'uv' | 'pop' | 'rain' | 'wind' | 'gust' | 'humidity' | 'dew' | 'cloud';
@@ -31,7 +31,7 @@ const ON_DARK = '#FFFFFF';
 const AXIS_W = 40;
 const CHART_H = 190;
 
-const hourOf = (iso: string): number => Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/New_York' }).format(new Date(iso)));
+const hourOf = (iso: string): number => Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: viewTz() }).format(new Date(iso)));
 const dayTitle = (date: string, locale: string): string => new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
 
 export interface DetailsStart { date: string; time?: string; metric?: MetricKey }

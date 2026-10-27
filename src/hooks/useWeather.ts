@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { loadWeather, readLastWeather, saveLastWeather } from '@/data/weather';
 import { weatherSwitch } from '@/data/publicWeather';
-import type { TownKey } from '@/lib/weatherTowns';
+import type { Place } from '@/lib/weatherTowns';
 import type { WeatherPayload } from '@/lib/weatherView';
 
 export type WeatherView =
@@ -14,19 +14,19 @@ export type WeatherView =
 
 const REFRESH_MS = 10 * 60_000;
 
-/** The forecast for a town: the saved one at once, a fresh one right after, and a new one every 10 minutes and whenever the app comes back. */
-export function useWeather(town: TownKey): { view: WeatherView; refresh: () => void; busy: boolean } {
+/** The forecast for a place: the saved one at once, a fresh one right after, and a new one every 10 minutes and whenever the app comes back. */
+export function useWeather(place: Place): { view: WeatherView; refresh: () => void; busy: boolean } {
   const [view, setView] = useState<WeatherView>({ status: 'loading', data: null });
   const [busy, setBusy] = useState(false);
-  const current = useRef<TownKey>(town);
-  current.current = town;
+  const current = useRef<Place>(place);
+  current.current = place;
   const have = useRef<WeatherPayload | null>(null);
 
   const refresh = useCallback(async () => {
     const asked = current.current;
     setBusy(true);
     const r = await loadWeather(asked);
-    if (asked !== current.current) return;
+    if (asked.key !== current.current.key) return;
     setBusy(false);
     if (r.ok) {
       have.current = r.data;
@@ -46,7 +46,7 @@ export function useWeather(town: TownKey): { view: WeatherView; refresh: () => v
     let alive = true;
     have.current = null;
     setView({ status: 'loading', data: null });
-    readLastWeather(town).then((saved) => {
+    readLastWeather(place).then((saved) => {
       if (!alive || !saved || have.current) return;
       have.current = saved;
       setView({ status: 'stale', data: saved });
@@ -55,7 +55,7 @@ export function useWeather(town: TownKey): { view: WeatherView; refresh: () => v
     const timer = setInterval(() => { void refresh(); }, REFRESH_MS);
     const sub = AppState.addEventListener('change', (s) => { if (s === 'active') void refresh(); });
     return () => { alive = false; clearInterval(timer); sub.remove(); };
-  }, [town, refresh]);
+  }, [place.key, refresh]);
 
   return { view, refresh: () => { void refresh(); }, busy };
 }

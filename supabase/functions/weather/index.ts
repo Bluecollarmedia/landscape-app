@@ -3,7 +3,8 @@
  *
  * The app never talks to NWS itself. It asks this function for a town, and the function:
  *   1. refuses unless the owner's public Weather switch is ON (public_weather_config, update 103), so nothing is served while Weather is off;
- *   2. only answers for the eight supported towns (fixed list below, each point from the US Census and checked against NWS);
+ *   2. answers for the eight towns near Brighton (fixed list below, each point from the US Census and checked against NWS) and for any other US point
+ *      (its forecast grid is looked up from NWS /points, which also says the place's time zone);
  *   3. reads NWS (forecast, hourly, raw grid for snowfall, active alerts), converts it, and keeps the answer for 10 minutes;
  *   4. if NWS is unreachable, hands back the last good answer marked stale, or says it is unavailable.
  * NWS needs no key; it asks for a User-Agent that says who is calling. Set the secret NWS_CONTACT to an email to add it (optional).
@@ -41,6 +42,8 @@ export interface WxHour {
 export interface WxDay { date: string; highF: number | null; lowF: number | null; popPct: number | null; icon: WxIcon; text: string; snowIn: number | null }
 export interface WxAlert { id: string; event: string; severity: string; urgency: string; headline: string; description: string; instruction: string; sender: string; effective: string | null; expires: string | null }
 export interface WeatherPayload {
+  /** The place's own time zone. */
+  tz: string;
   town: string;
   townName: string;
   fetchedAt: number;
@@ -179,8 +182,8 @@ export function normalizeAlerts(alerts: any, now: number): WxAlert[] {
 }
 
 /** NWS forecast + hourly + raw grid + alerts -> the small answer the app shows. */
-export function normalizeForecast(input: { townKey: string; forecast: any; hourly: any; grid: any; alerts: any; now: number }): WeatherPayload {
-  const town = TOWNS[input.townKey];
+export function normalizeForecast(input: { townKey: string; town?: Town; displayName?: string; forecast: any; hourly: any; grid: any; alerts: any; now: number }): WeatherPayload {
+  const town = input.town ?? TOWNS[input.townKey];
   const tz = town?.tz ?? 'America/New_York';
   const now = input.now;
   const periods: any[] = input.forecast?.properties?.periods ?? [];
@@ -247,7 +250,8 @@ export function normalizeForecast(input: { townKey: string; forecast: any; hourl
 
   return {
     town: input.townKey,
-    townName: town?.name ?? input.townKey,
+    townName: input.displayName || town?.name || input.townKey,
+    tz,
     fetchedAt: now,
     updatedAt: input.forecast?.properties?.generatedAt ?? input.forecast?.properties?.updateTime ?? null,
     current,
@@ -283,6 +287,32 @@ const NWS_TIMEOUT_MS = 8000;
 
 // Best-effort memory of recent answers (a warm instance keeps it; a cold one starts empty).
 const memory = new Map<string, { at: number; payload: WeatherPayload }>();
+const MEMORY_MAX = 300;
+
+// A point's forecast grid never changes, so it is remembered for a day.
+const resolved = new Map<string, { at: number; town: Town | null }>();
+const RESOLVE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** The forecast grid, zone and time zone NWS gives for a point (4 decimals). null when NWS has no forecast for it (outside the US). */
+async function resolvePoint(lat: number, lon: number, name: string): Promise<Town | null> {
+  const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  const hit = resolved.get(key);
+  if (hit && Date.now() - hit.at < RESOLVE_TTL_MS) return hit.town ? { ...hit.town, name } : null;
+  let town: Town | null = null;
+  try {
+    const p = (await nws(`/points/${key}`))?.properties;
+    const zone = String(p?.forecastZone ?? '').split('/').pop() ?? '';
+    if (p?.gridId && Number.isFinite(p.gridX) && Number.isFinite(p.gridY) && zone && p.timeZone) {
+      town = { name, lat, lon, office: String(p.gridId), gridX: Number(p.gridX), gridY: Number(p.gridY), zone, tz: String(p.timeZone) };
+    }
+  } catch { town = null; }
+  if (resolved.size > MEMORY_MAX) resolved.delete(resolved.keys().next().value as string);
+  resolved.set(key, { at: Date.now(), town });
+  return town ? { ...town } : null;
+}
+
+/** A place name from a person: letters, numbers and a few marks only, at most 60 characters. */
+const cleanName = (v: unknown): string => String(v ?? '').replace(/[^\p{L}\p{N} .,'’-]/gu, '').trim().slice(0, 60);
 
 async function nws(path: string): Promise<any> {
   const ctl = new AbortController();
@@ -311,10 +341,24 @@ serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json(405, { error: 'method' });
 
+  let body: { town?: unknown; lat?: unknown; lon?: unknown; name?: unknown } | null = null;
+  try { body = (await req.json()) as typeof body; } catch { /* handled below */ }
   let townKey = '';
-  try { townKey = String(((await req.json()) as { town?: unknown })?.town ?? ''); } catch { /* handled below */ }
-  const town = TOWNS[townKey];
-  if (!town) return json(400, { error: 'town' });
+  let town: Town | undefined;
+  let displayName = '';
+  if (typeof body?.town === 'string' && TOWNS[body.town]) {
+    townKey = body.town;
+    town = TOWNS[townKey];
+  } else if (body && Number.isFinite(Number(body.lat)) && Number.isFinite(Number(body.lon)) && body.lat !== null && body.lon !== null) {
+    // Any other US point: rounded to three decimals (about 100 metres), inside the United States and its territories.
+    const lat = Math.round(Number(body.lat) * 1000) / 1000;
+    const lon = Math.round(Number(body.lon) * 1000) / 1000;
+    if (lat < 17 || lat > 72 || lon < -180 || lon > -60) return json(400, { error: 'place' });
+    townKey = `p:${lat.toFixed(3)},${lon.toFixed(3)}`;
+    displayName = cleanName(body.name);
+  } else {
+    return json(400, { error: 'town' });
+  }
 
   // Nothing is served while the owner has Weather switched off (or when the switch cannot be read).
   const on = await weatherIsOn();
@@ -324,12 +368,20 @@ serve(async (req: Request) => {
   const cached = memory.get(townKey);
   if (cached && Date.now() - cached.at < TTL_MS) return json(200, { ok: true, stale: false, data: cached.payload });
 
+  if (!town) {
+    const [la, lo] = townKey.slice(2).split(',').map(Number);
+    const found = await resolvePoint(la, lo, displayName || 'This place');
+    if (!found) return json(404, { error: 'place' });
+    town = found;
+  }
+
   try {
     const grid = `/gridpoints/${town.office}/${town.gridX},${town.gridY}`;
     const [forecast, hourly, gridData, alerts] = await Promise.all([
       nws(`${grid}/forecast`), nws(`${grid}/forecast/hourly`), nws(grid), nws(`/alerts/active?zone=${town.zone}`),
     ]);
-    const payload = normalizeForecast({ townKey, forecast, hourly, grid: gridData, alerts, now: Date.now() });
+    const payload = normalizeForecast({ townKey, town, displayName, forecast, hourly, grid: gridData, alerts, now: Date.now() });
+    if (memory.size > MEMORY_MAX) memory.delete(memory.keys().next().value as string);
     memory.set(townKey, { at: Date.now(), payload });
     return json(200, { ok: true, stale: false, data: payload });
   } catch {

@@ -7,13 +7,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useLanguage, useT } from '@/i18n';
 import { useWeather } from '@/hooks/useWeather';
-import { readTown, saveTown } from '@/data/weather';
-import { DEFAULT_TOWN, WEATHER_TOWNS, townCoords, townName, type TownKey } from '@/lib/weatherTowns';
+import { readPlace, savePlace } from '@/data/weather';
+import { DEFAULT_PLACE, type Place } from '@/lib/weatherTowns';
 import {
-  ageMinutes, barSpan, degrees, dewWord, firstWetHour, hoursOnDate, hourLabel, localDay, moonPhase, nextMoons, orDash, snowKind, sunTimes, tempColor, timeLabel, todayInTowns, uvAdvice, uvColor, uvLevel, weekdayShort, windWord,
+  ageMinutes, barSpan, setViewTz, viewTz, degrees, dewWord, firstWetHour, hoursOnDate, hourLabel, localDay, moonPhase, nextMoons, orDash, snowKind, sunTimes, tempColor, timeLabel, todayInTowns, uvAdvice, uvColor, uvLevel, weekdayShort, windWord,
   type MoonName, type WxAlert, type WxDay, type WxHour,
 } from '@/lib/weatherView';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { PlacePicker } from '@/components/weather/PlacePicker';
 import { Panel, WX, WxPicture } from '@/components/weather/WeatherUI';
 import { ScrubArea } from '@/components/weather/ScrubArea';
 import { WeatherDetails, type DetailsStart, type MetricKey } from '@/components/weather/WeatherDetails';
@@ -25,8 +26,8 @@ const FAINT = WX.faint;
 const HERO_RATIO = 1640 / 1170;
 type Icon = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-const clock = (ms: number, locale: string) => new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(new Date(ms));
-const shortDate = (ms: number, locale: string) => new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).format(new Date(ms));
+const clock = (ms: number, locale: string) => new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: viewTz() }).format(new Date(ms));
+const shortDate = (ms: number, locale: string) => new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: viewTz() }).format(new Date(ms));
 const MOON_ICON: Record<MoonName, Icon> = {
   'New Moon': 'moon-new', 'Waxing Crescent': 'moon-waxing-crescent', 'First Quarter': 'moon-first-quarter', 'Waxing Gibbous': 'moon-waxing-gibbous',
   'Full Moon': 'moon-full', 'Waning Gibbous': 'moon-waning-gibbous', 'Last Quarter': 'moon-last-quarter', 'Waning Crescent': 'moon-waning-crescent',
@@ -114,7 +115,7 @@ export default function WeatherHome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
-  const [town, setTown] = useState<TownKey>(DEFAULT_TOWN);
+  const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
   const [pickTown, setPickTown] = useState(false);
   const [openAlert, setOpenAlert] = useState<WxAlert | null>(null);
   const [hourMetric, setHourMetric] = useState<HourMetric>('temp');
@@ -123,15 +124,16 @@ export default function WeatherHome() {
   const [moreDays, setMoreDays] = useState(false);
   const stripRef = useRef<FlatList<StripRow>>(null);
   const [stripDate, setStripDate] = useState<string | null>(null);
-  const { view, refresh, busy } = useWeather(town);
+  const { view, refresh, busy } = useWeather(place);
   const [now, setNow] = useState(Date.now());
 
-  useEffect(() => { readTown().then(setTown); }, []);
-  useEffect(() => { setMoreDays(false); setStripDate(null); }, [town]);
+  useEffect(() => { readPlace().then(setPlace); }, []);
+  useEffect(() => { setMoreDays(false); setStripDate(null); }, [place.key]);
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(id); }, []);
 
   const data = view.data;
-  const name = townName(town);
+  setViewTz(data?.tz);
+  const name = place.name;
   const today = todayInTowns(now);
   const stale = view.status === 'stale' && !busy;
 
@@ -169,7 +171,7 @@ export default function WeatherHome() {
   const uvPeak = uvToday.reduce<WxHour | null>((best, h) => ((h.uvIndex ?? 0) > ((best?.uvIndex) ?? -1) ? h : best), null);
   const gustMax = next24.map((h) => h.gustMph).filter((v): v is number => v !== null);
   const rainKnown = next24.map((h) => h.precipIn).filter((v): v is number => v !== null);
-  const sun = data ? sunTimes(today, townCoords(town).lat, townCoords(town).lon) : null;
+  const sun = data ? sunTimes(today, place.lat, place.lon) : null;
   const moon = moonPhase(now);
   const sunProgress = sun ? (now - sun.rise) / (sun.set - sun.rise) : 0;
   const daylightMin = sun ? Math.round((sun.set - sun.rise) / 60_000) : 0;
@@ -228,7 +230,7 @@ export default function WeatherHome() {
         <Animated.View style={[heroStyle, { minHeight: 290 }]}>
           <Pressable onPress={() => setPickTown(true)} style={({ pressed }) => [styles.townRow, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={t('Choose your town')}>
             <MaterialCommunityIcons name="map-marker-outline" size={17} color={INK} />
-            <Text style={styles.townText}>{name}, New Jersey</Text>
+            <Text style={styles.townText}>{place.state ? `${name}, ${place.state}` : name}</Text>
             <MaterialCommunityIcons name="chevron-down" size={18} color={INK} />
           </Pressable>
           {data?.current ? (
@@ -570,27 +572,7 @@ export default function WeatherHome() {
 
       <WeatherDetails visible={!!details} data={data} start={details} onClose={() => setDetails(null)} />
 
-      <BottomSheetModal visible={pickTown} onRequestClose={() => setPickTown(false)}>
-        <View style={{ flex: 1 }}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPickTown(false)} accessibilityLabel={t('Close')} />
-          <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
-            <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
-              <View style={styles.grip} />
-              <View style={styles.sheetHead}>
-                <Text style={styles.sheetTitle}>{t('Choose your town')}</Text>
-                <Pressable onPress={() => setPickTown(false)} hitSlop={10}><Text style={styles.sheetCancel}>{t('Cancel')}</Text></Pressable>
-              </View>
-              <Text style={styles.sheetNote}>{t('Weather is shown for the town you pick. No location access is needed.')}</Text>
-              {WEATHER_TOWNS.map((x) => (
-                <Pressable key={x.key} onPress={() => { setTown(x.key); void saveTown(x.key); setPickTown(false); }} style={styles.townItem} accessibilityRole="button">
-                  <Text style={styles.townItemText}>{x.name}</Text>
-                  {x.key === town ? <MaterialCommunityIcons name="check" size={20} color="#1F4D36" /> : null}
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        </View>
-      </BottomSheetModal>
+      <PlacePicker visible={pickTown} current={place} onClose={() => setPickTown(false)} onPick={(p) => { setPlace(p); void savePlace(p); setPickTown(false); }} />
 
       <BottomSheetModal visible={!!openAlert} onRequestClose={() => setOpenAlert(null)}>
         <View style={{ flex: 1 }}>

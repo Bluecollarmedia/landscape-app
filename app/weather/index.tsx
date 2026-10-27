@@ -38,14 +38,35 @@ const HOUR_METRICS: { key: HourMetric; label: string }[] = [
   { key: 'temp', label: 'Temp' }, { key: 'feels', label: 'Feels like' }, { key: 'pop', label: 'Rain' }, { key: 'wind', label: 'Wind' },
 ];
 const HOUR_W = 58;
+const DAY_W = 34;
+const MORE_W = 66;
+const STRIP_DAYS = 5;
 
-const HourItem = memo(function HourItem({ h, i, tag, metric, locale, now, onPress, label }: { h: WxHour; i: number; tag: string; metric: HourMetric; locale: string; now: string; onPress: (h: WxHour) => void; label: string }) {
+/** What the hourly strip shows: first the next 24 hours, then (after the arrow) five days of hours. A day label sits at every midnight. */
+type StripRow = { kind: 'hour'; key: string; h: WxHour; isNow: boolean } | { kind: 'day'; key: string; label: string } | { kind: 'more'; key: string };
+function buildStrip(hours: WxHour[], expanded: boolean, locale: string): StripRow[] {
+  if (!hours.length) return [];
+  const dates: string[] = [];
+  for (const h of hours) { const d = localDay(h.time); if (!dates.includes(d)) dates.push(d); }
+  const allowed = new Set(dates.slice(0, STRIP_DAYS));
+  const shown = expanded ? hours.filter((h) => allowed.has(localDay(h.time))) : hours.slice(0, 24);
+  const rows: StripRow[] = [];
+  shown.forEach((h, i) => {
+    const d = localDay(h.time);
+    if (i > 0 && d !== localDay(shown[i - 1].time)) rows.push({ kind: 'day', key: `d-${d}`, label: weekdayShort(d, locale).replace('.', '').toUpperCase() });
+    rows.push({ kind: 'hour', key: h.time, h, isNow: i === 0 });
+  });
+  if (!expanded && hours.length > shown.length) rows.push({ kind: 'more', key: 'more' });
+  return rows;
+}
+const rowWidth = (r: StripRow) => (r.kind === 'hour' ? HOUR_W : r.kind === 'day' ? DAY_W : MORE_W);
+
+const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress, label }: { h: WxHour; isNow: boolean; metric: HourMetric; locale: string; now: string; onPress: (h: WxHour) => void; label: string }) {
   const value =
     metric === 'temp' ? degrees(h.tempF) : metric === 'feels' ? degrees(h.feelsF) : metric === 'pop' ? orDash(h.popPct, '%') : h.windMph === null ? '–' : `${Math.round(h.windMph)}`;
   return (
     <Pressable onPress={() => onPress(h)} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.hour, pressed && { backgroundColor: WX.leafTint }]}>
-      <Text style={styles.hourTag}>{tag}</Text>
-      <Text style={styles.hourText}>{i === 0 ? now : hourLabel(h.time, locale)}</Text>
+      <Text style={styles.hourText}>{isNow ? now : hourLabel(h.time, locale)}</Text>
       <WxPicture icon={h.icon} size={30} />
       <Text style={[styles.hourValue, metric === 'pop' && { color: WX.rain }]}>{value}</Text>
       {metric === 'wind' ? <Text style={styles.hourSub}>{h.windDir}</Text> : typeof h.popPct === 'number' && h.popPct >= 20 && metric !== 'pop' ? <Text style={[styles.hourSub, { color: WX.rain }]}>{h.popPct}%</Text> : <Text style={styles.hourSub}> </Text>}
@@ -104,10 +125,13 @@ export default function WeatherHome() {
   const [hourMetric, setHourMetric] = useState<HourMetric>('temp');
   const [details, setDetails] = useState<DetailsStart | null>(null);
   const [arcW, setArcW] = useState(0);
+  const [moreDays, setMoreDays] = useState(false);
+  const stripRef = useRef<FlatList<StripRow>>(null);
   const { view, refresh, busy } = useWeather(town);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => { readTown().then(setTown); }, []);
+  useEffect(() => { setMoreDays(false); }, [town]);
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(id); }, []);
 
   const data = view.data;
@@ -153,7 +177,15 @@ export default function WeatherHome() {
   const feelsDiff = first && first.feelsF !== null && first.tempF !== null ? Math.round(first.feelsF - first.tempF) : null;
   const metricOf = (m: MetricKey): DetailsStart => ({ date: today, metric: m });
 
-  const dateTag = (i: number) => (i === 0 || localDay(hours[i].time) !== localDay(hours[i - 1].time) ? (i === 0 ? t('Today') : weekdayShort(localDay(hours[i].time), locale)) : '');
+  const stripRows = useMemo(() => buildStrip(hours, moreDays, locale), [hours, moreDays, locale]);
+  const stripOffsets = useMemo(() => { const o: number[] = []; let x = 0; for (const r of stripRows) { o.push(x); x += rowWidth(r); } return o; }, [stripRows]);
+  // The arrow loads everything at once (five days), then glides on to where the first new day begins.
+  const showMoreDays = useCallback(() => {
+    const at = stripRows.findIndex((r) => r.kind === 'more');
+    setMoreDays(true);
+    haptics.light();
+    setTimeout(() => { if (at >= 0) stripRef.current?.scrollToIndex({ index: at, animated: true, viewPosition: 0 }); }, 80);
+  }, [stripRows]);
   const ARC_DOTS = 34;
   const arcR = Math.max(0, Math.min(150, (arcW - 30) / 2));
 
@@ -253,15 +285,30 @@ export default function WeatherHome() {
                 <CardHead icon="clock-outline" title={t('Hourly Forecast')} tappable />
               </Pressable>
               <FlatList
+                ref={stripRef}
                 horizontal
-                data={hours}
-                keyExtractor={(h) => h.time}
+                data={stripRows}
+                keyExtractor={(r) => r.key}
                 showsHorizontalScrollIndicator={false}
-                initialNumToRender={12}
-                windowSize={7}
-                getItemLayout={(_d, i) => ({ length: HOUR_W, offset: HOUR_W * i, index: i })}
+                initialNumToRender={14}
+                windowSize={9}
+                getItemLayout={(_d, i) => ({ length: stripRows[i] ? rowWidth(stripRows[i]) : HOUR_W, offset: stripOffsets[i] ?? 0, index: i })}
                 style={{ marginHorizontal: -6, marginTop: 6 }}
-                renderItem={({ item, index }) => <HourItem h={item} i={index} tag={dateTag(index)} metric={hourMetric} locale={locale} now={t('Now')} onPress={openHour} label={`${hourLabel(item.time, locale)}. ${t('Open details')}`} />}
+                renderItem={({ item }) =>
+                  item.kind === 'hour' ? (
+                    <HourItem h={item.h} isNow={item.isNow} metric={hourMetric} locale={locale} now={t('Now')} onPress={openHour} label={`${hourLabel(item.h.time, locale)}. ${t('Open details')}`} />
+                  ) : item.kind === 'day' ? (
+                    <View style={styles.dayCol} accessible accessibilityLabel={item.label}>
+                      {item.label.split('').map((c, k) => <Text key={k} style={styles.dayColText}>{c}</Text>)}
+                    </View>
+                  ) : (
+                    <View style={styles.moreWrap}>
+                      <Pressable onPress={showMoreDays} accessibilityRole="button" accessibilityLabel={t('Show the next days')} style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.7 }]}>
+                        <MaterialCommunityIcons name="chevron-right" size={28} color={ON_DARK} />
+                      </Pressable>
+                    </View>
+                  )
+                }
               />
               <View style={styles.pills}>
                 {HOUR_METRICS.map((m) => {
@@ -554,7 +601,10 @@ const styles = StyleSheet.create({
   alertSub: { color: SOFT, fontSize: 12.5, marginTop: 1 },
   alertView: { color: INK, fontSize: 13.5, fontWeight: '700', textDecorationLine: 'underline' },
   hour: { width: HOUR_W, alignItems: 'center', gap: 5, paddingVertical: 8, borderRadius: 14 },
-  hourTag: { color: WX.amber, fontSize: 11, fontWeight: '800', height: 14 },
+  dayCol: { width: DAY_W, marginVertical: 8, marginHorizontal: 2, borderRadius: 12, backgroundColor: WX.leafTint, alignItems: 'center', justifyContent: 'center' },
+  dayColText: { color: WX.deep, fontSize: 12, fontWeight: '800', lineHeight: 16 },
+  moreWrap: { width: MORE_W, alignItems: 'center', justifyContent: 'center' },
+  moreBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: WX.deep, alignItems: 'center', justifyContent: 'center', shadowColor: WX.deep, shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   hourText: { color: SOFT, fontSize: 12 },
   hourValue: { color: INK, fontSize: 16, fontWeight: '700' },
   hourSub: { color: SOFT, fontSize: 11, height: 14 },

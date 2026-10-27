@@ -5,6 +5,7 @@ import { netMs, grossMs, type TimeBreak } from '@/lib/timeCalc';
 import { isCurrent, needsAnswer, WORKDAY_STALE_HOURS } from '@/lib/clockSession';
 import { getCurrentGps } from '@/lib/location';
 import { reportClockInLocation } from '@/data/yard';
+import { refresh as refreshStore } from '@/data/store';
 import {
   onTimeChanged, clockIn as apiClockIn, clockOut as apiClockOut, completeVisit as apiCompleteVisit, endBreak as apiEndBreak, loadMyDay, loadTruckOptions,
   startBreak as apiStartBreak, startVisit as apiStartVisit, claimStaleEnd as apiClaimStale,
@@ -123,7 +124,12 @@ export function useMyWorkday(enabled: boolean): Workday {
     if (r.ok) void reportClockInLocation(r.data, where);
     return r;
   }), [act, doApply]);
-  const clockOut = useCallback(() => act(() => apiClockOut().then(doApply)), [act, doApply]);
+  // Clocking out for the day also ends any project the worker is still on (the database does it), so the jobs are reloaded to show that.
+  const clockOut = useCallback(() => act(async () => {
+    const r = await apiClockOut().then(doApply);
+    if (r.ok) await refreshStore('assignments', 'check_ins', 'check_outs', 'work_sessions');
+    return r;
+  }), [act, doApply]);
   const startBreak = useCallback(() => act(() => apiStartBreak().then(doApply)), [act, doApply]);
   const endBreak = useCallback(() => act(() => apiEndBreak().then(doApply)), [act, doApply]);
   const claimStale = useCallback((workdayId: string, stoppedAtIso: string | null, note?: string) => act(() => apiClaimStale(workdayId, stoppedAtIso, note).then(doApply)), [act, doApply]);

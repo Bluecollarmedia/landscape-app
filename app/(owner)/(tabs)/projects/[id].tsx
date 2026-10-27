@@ -23,7 +23,7 @@ import { refresh as refreshStore } from '@/data/store';
 import { openDirections, formatDistance, DEFAULT_CHECKIN_RADIUS_M } from '@/lib/maps';
 import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
 import { ProjectPrivateNotes } from '@/components/projects/ProjectPrivateNotes';
-import { useIsProjectOwner } from '@/data/ownerProjectNotes';
+import { useIsProjectOwner, useOwnerNotes } from '@/data/ownerProjectNotes';
 import { MessageThread } from '@/components/messages/MessageThread';
 import { db, rowsOf } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
@@ -249,6 +249,8 @@ export default function ProjectDetailScreen() {
   const { project, updateProject, tasks, addTask, updateTask, team, addTeamMember, removeTeamMember, settings, updateSettings, history, updates, postUpdate, requests, respondToRequest, editRequestResponse, reopenRequest, deleteRequest, photos, addPhoto, updatePhoto, deletePhoto, photoStats, taskStats } = useProject(id);
   const { user } = useAuth();
   const isProjectOwner = useIsProjectOwner();
+  // The owner's private My Notes (also written while quoting): shown on the Overview next to the Internal Notes so every note is in one view.
+  const myNotes = useOwnerNotes(id);
   const schedule = useSchedule();
   const customerAccess = useCustomerAccess();
   const { workers: companyWorkers } = useWorkers();
@@ -518,9 +520,24 @@ export default function ProjectDetailScreen() {
               </View>
             ) : (
               <Text style={[typeScale.bodyLarge, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-                {p.notes || 'No internal notes yet.'}
+                {p.notes || (isProjectOwner && myNotes.length ? '' : 'No internal notes yet.')}
               </Text>
             )}
+            {isProjectOwner && !editingNotes && myNotes.length ? (
+              <View style={{ marginTop: spacing.md }}>
+                <Text style={[typeScale.overline, { color: colors.textTertiary }]}>MY NOTES · {myNotes.length}</Text>
+                {myNotes.slice(0, 3).map((n) => (
+                  <Text key={n.id} style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: spacing.xs }]} numberOfLines={4}>{n.body}</Text>
+                ))}
+                <Pressable
+                  onPress={() => { setActiveSection('more'); setMoreSubSection('notes'); }}
+                  style={{ minHeight: 44, justifyContent: 'center' }}
+                  accessibilityRole="button"
+                >
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{myNotes.length > 3 ? `See all ${myNotes.length} in My Notes` : 'Open My Notes'}</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
 
           {canComplete && (
@@ -1191,7 +1208,13 @@ export default function ProjectDetailScreen() {
         {moreSubSection === 'materials' && <ProjectMaterials projectId={p.id} />}
         {moreSubSection === 'notes' && isProjectOwner && (
           <View style={styles.sectionContent}>
-            <ProjectPrivateNotes projectId={p.id} projectName={p.name} address={[p.address, p.city].filter(Boolean).join(', ') || undefined} />
+            <ProjectPrivateNotes
+              projectId={p.id}
+              projectName={p.name}
+              address={[p.address, p.city].filter(Boolean).join(', ') || undefined}
+              internalNotes={p.notes}
+              onEditInternalNotes={() => { setMoreSubSection(null); setActiveSection('overview'); setNotesDraft(p.notes ?? ''); setEditingNotes(true); }}
+            />
           </View>
         )}
         {moreSubSection === 'people' && renderPeople()}

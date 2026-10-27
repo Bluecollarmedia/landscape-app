@@ -6,7 +6,10 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { useAuth } from './AuthProvider';
-import { db, useDb, insertRow, updateRow, upsertRow, findRow, refresh as refreshStore } from '@/data/store';
+import { db, useDb, insertRow, updateRow, upsertRow, findRow, refresh as refreshStore, type TableName } from '@/data/store';
+
+/** What a check-in or finish changes on the database side: the job's status and its check-in / check-out and session records. */
+export const JOB_TABLES: TableName[] = ['assignments', 'check_ins', 'check_outs', 'work_sessions'];
 import { useMyWorkday, type Workday } from '@/hooks/useMyWorkday';
 import { addProjectPhoto, logProjectHistory, notifyStaff } from '@/data/actions';
 import { todayKey, localDateTime } from '@/lib/ids';
@@ -332,7 +335,8 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     const g = gps ? { lat: gps.latitude, lng: gps.longitude, accuracy: gps.accuracy, raw: gps as unknown as Record<string, unknown> } : {};
     const r = await workday.startVisit('assignment', job.id, g);
     if (!r.ok) return { ok: false, error: r.error };
-    await refreshStore();
+    // The database already marked the job checked in; reload the jobs now so the screen moves on at once (an empty refresh reloaded nothing).
+    await refreshStore(...JOB_TABLES);
     afterCheckIn(job, resuming);
     return { ok: true };
   }, [resolveCheckInJob, workday, afterCheckIn]);
@@ -368,7 +372,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
     const g = gps ? { lat: gps.latitude, lng: gps.longitude, accuracy: gps.accuracy, raw: gps as unknown as Record<string, unknown> } : {};
     const r = await workday.completeVisit(cur.visitId, undefined, g);
     if (!r.ok) return { ok: false, error: r.error };
-    await refreshStore();
+    await refreshStore(...JOB_TABLES);
     const projectName = job.project?.name ?? 'job site';
     logActivity({ assignmentId: job.id, projectId: job.projectId, activityType: 'checked_out', description: `Checked out from ${projectName}` });
     notifyStaff('worker_checked_out', 'Worker checked out', `${workerName} checked out from ${projectName}.`, { type: 'assignment', id: job.id }, undefined, workerId);

@@ -16,7 +16,6 @@ import {
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { Panel, WX, WxPicture } from '@/components/weather/WeatherUI';
 import { ScrubArea } from '@/components/weather/ScrubArea';
-import { haptics } from '@/lib/haptics';
 import { WeatherDetails, type DetailsStart, type MetricKey } from '@/components/weather/WeatherDetails';
 
 const ON_DARK = '#FFFFFF';
@@ -78,12 +77,11 @@ const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress
 function MiniBars({ values, max, color, describe, caption }: { values: Array<number | null>; max: number; color: string; describe: (i: number) => string; caption: string }) {
   const [w, setW] = useState(0);
   const [sel, setSel] = useState<number | null>(null);
-  const last = useRef(-1);
-  const onPick = useCallback((i: number) => { if (i !== last.current) { last.current = i; haptics.select(); } setSel(i); }, []);
-  const onEnd = useCallback(() => { last.current = -1; setSel(null); }, []);
+  const onPick = useCallback((i: number) => { setSel(i); }, []);
+  const onEnd = useCallback(() => { setSel(null); }, []);
   return (
     <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
-      <ScrubArea width={w} count={values.length} onPick={onPick} onEnd={onEnd}>
+      <ScrubArea width={w} count={values.length} onPick={onPick} onEnd={onEnd} tap={false}>
         <View style={styles.miniBars} accessible={false}>
           {values.map((v, i) => (
             <View key={i} style={styles.miniCol}>
@@ -196,7 +194,6 @@ export default function WeatherHome() {
   const showMoreDays = useCallback(() => {
     const at = stripRows.findIndex((r) => r.kind === 'more');
     setMoreDays(true);
-    haptics.light();
     setTimeout(() => { if (at >= 0) stripRef.current?.scrollToIndex({ index: at, animated: true, viewPosition: 0, viewOffset: STRIP_PAD }); }, 80);
   }, [stripRows]);
   const ARC_DOTS = 34;

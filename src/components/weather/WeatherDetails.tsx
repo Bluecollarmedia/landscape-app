@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { haptics } from '@/lib/haptics';
 import { ScrubArea } from '@/components/weather/ScrubArea';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage, useT } from '@/i18n';
@@ -84,14 +83,9 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
   const xAt = (i: number) => (hours.length <= 1 ? plotW / 2 : (i / (hours.length - 1)) * plotW);
   const yAt = (v: number) => CHART_H - ((v - lo) / (hi - lo || 1)) * CHART_H;
 
-  // Sliding a finger across the chart picks the hour under it, live, with a light tick as it crosses each hour. A tap does the same, and the
-  // arrows below do it too, so sliding is only ever a shortcut.
-  const lastPick = useRef(-1);
-  const pickHour = useCallback((i: number) => {
-    if (i !== lastPick.current) { lastPick.current = i; haptics.select(); }
-    setIdx(i);
-  }, []);
-  const endScrub = useCallback(() => { lastPick.current = -1; }, []);
+  // Sliding a finger across the chart picks the hour under it, live. A tap does the same, and the arrows below do it too, so sliding is only ever
+  // a shortcut. No vibration, and nothing happens at touch-down, so swiping the sheet down is never held up.
+  const pickHour = useCallback((i: number) => { setIdx(i); }, []);
 
   const stat = (() => {
     if (!known.length) return t('Unavailable');
@@ -203,7 +197,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
                         {sel ? <View style={{ position: 'absolute', left: xAt(idx) - 1, top: 0, width: 2, height: CHART_H, backgroundColor: WX.deep }} /> : null}
                         {sel && selVal !== null && !bars ? <View style={{ position: 'absolute', left: xAt(idx) - 7, top: yAt(selVal) - 7, width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: metric.key === 'temp' ? tempColor(selVal) : WX.rain }} /> : null}
                       </View>
-                      <ScrubArea width={plotW} count={hours.length} onPick={pickHour} onEnd={endScrub} style={{ position: 'absolute', left: 0, top: 0, width: plotW, height: CHART_H }} />
+                      <ScrubArea width={plotW} count={hours.length} onPick={pickHour} style={{ position: 'absolute', left: 0, top: 0, width: plotW, height: CHART_H }} />
                       {grid.map((g, k) => <Text key={k} style={[styles.axisY, { top: yAt(g) - 8 }]}>{metric.fmt(g, undefined).replace(/ mph.*/, '')}</Text>)}
                       {axisLabels.map(({ h, i }) => <Text key={h.time} style={[styles.axisX, { left: Math.max(0, Math.min(plotW - 40, xAt(i) - 20)), top: CHART_H + 6 }]}>{hourLabel(h.time, locale)}</Text>)}
                     </View>

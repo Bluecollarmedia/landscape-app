@@ -14,6 +14,8 @@ export interface WxDay { date: string; highF: number | null; lowF: number | null
 export interface WxAlert { id: string; event: string; severity: string; urgency: string; headline: string; description: string; instruction: string; sender: string; effective: string | null; expires: string | null }
 export interface WeatherPayload {
   town: string; townName: string; fetchedAt: number; updatedAt: string | null;
+  /** The place's own time zone (every time and day on screen follows it). Missing from older answers: Eastern. */
+  tz?: string;
   current: { tempF: number | null; text: string; icon: WxIcon; isDaytime: boolean } | null;
   today: { highF: number | null; lowF: number | null };
   hourly: WxHour[]; daily: WxDay[]; alerts: WxAlert[]; source: string;
@@ -34,19 +36,26 @@ export const ageMinutes = (fetchedAt: number, now: number): number => Math.max(0
 export const degrees = (f: number | null | undefined): string => (typeof f === 'number' && Number.isFinite(f) ? `${Math.round(f)}°` : '–');
 
 const NY = 'America/New_York';
+let VIEW_TZ = NY;
+/** Sets the time zone of the place on screen: every day and hour label, and "today", follow it. */
+export function setViewTz(tz?: string | null): void {
+  try { if (tz) { new Intl.DateTimeFormat('en-US', { timeZone: tz }); VIEW_TZ = tz; return; } } catch { /* not a time zone we know */ }
+  VIEW_TZ = NY;
+}
+export const viewTz = (): string => VIEW_TZ;
 /** "Tue" / "mar" for a calendar date like 2026-10-27 (the weekday of that date, not shifted by the phone's time zone). */
 export function weekdayShort(date: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
 }
 /** "4 PM" in the towns' time (Eastern), whatever time zone the phone is in. */
 export function hourLabel(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { hour: 'numeric', timeZone: NY }).format(new Date(iso));
+  return new Intl.DateTimeFormat(locale, { hour: 'numeric', timeZone: VIEW_TZ }).format(new Date(iso));
 }
 export function timeLabel(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: NY }).format(new Date(iso));
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: VIEW_TZ }).format(new Date(iso));
 }
 /** Today's date in the towns' time as YYYY-MM-DD. */
-export const todayInTowns = (now: number): string => new Intl.DateTimeFormat('en-CA', { timeZone: NY, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
+export const todayInTowns = (now: number, tz: string = VIEW_TZ): string => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
 
 // ───────────── helpers for the home and details screens ─────────────
 
@@ -177,7 +186,8 @@ export function completePayload(p: WeatherPayload, at?: { lat: number; lon: numb
       uvIndex: at ? uvIndexAt(Date.parse(h.time), at.lat, at.lon, n(h.cloudPct)) : null,
     })),
     // Days that have already passed (the overnight hours after midnight belong to yesterday's forecast) are not shown.
-    daily: (p.daily ?? []).filter((d) => d.date >= todayInTowns(Date.now())),
+    tz: p.tz ?? NY,
+    daily: (p.daily ?? []).filter((d) => d.date >= todayInTowns(Date.now(), p.tz ?? NY)),
     alerts: p.alerts ?? [],
   };
 }

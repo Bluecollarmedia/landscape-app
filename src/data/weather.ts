@@ -1,46 +1,52 @@
 /**
- * Brighton Weather data, as the app reads it: one call to the `weather` function (supabase/functions/weather) for the chosen town, and the
- * last good answer kept on the phone so a dropped connection still shows something (with its age).
+ * Brighton Weather data, as the app reads it: one call to the `weather` function (supabase/functions/weather) for the chosen place, and the
+ * last good answer kept on the phone so a dropped connection still shows something (with its age). The chosen place and the last few picked
+ * are kept on the phone too.
  *
  * The function refuses while the owner's public Weather switch is off (403 "disabled"); that is passed up so the app can leave Weather.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { DEFAULT_TOWN, isTownKey, townCoords, type TownKey } from '@/lib/weatherTowns';
+import { DEFAULT_PLACE, WEATHER_TOWNS, asPlace, isBuiltInKey, type Place } from '@/lib/weatherTowns';
 import { completePayload, type WeatherPayload } from '@/lib/weatherView';
 
-const TOWN_KEY = 'weather.town.v1';
-const cacheKey = (town: string) => `weather.last.${town}.v1`;
+const PLACE_KEY = 'weather.place.v1';
+const OLD_TOWN_KEY = 'weather.town.v1';
+const RECENT_KEY = 'weather.recent.v1';
+const cacheKey = (key: string) => `weather.last.${key}.v1`;
 const REQUEST_LIMIT_MS = 12_000;
+const RECENT_MAX = 5;
 
 export type WeatherResult =
   | { ok: true; data: WeatherPayload; stale: boolean }
   | { ok: false; reason: 'disabled' | 'unavailable' };
 
-export async function loadWeather(town: TownKey): Promise<WeatherResult> {
+export async function loadWeather(place: Place): Promise<WeatherResult> {
   if (!isSupabaseConfigured) return { ok: false, reason: 'unavailable' };
   try {
-    const call = supabase.functions.invoke('weather', { body: { town } });
+    // The eight towns near Brighton are asked for by name (their forecast grid is already known); any other place by its point.
+    const body = isBuiltInKey(place.key) ? { town: place.key } : { lat: place.lat, lon: place.lon, name: place.name, state: place.state };
+    const call = supabase.functions.invoke('weather', { body });
     const stop = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timed out.')), REQUEST_LIMIT_MS));
     const { data, error } = await Promise.race([Promise.resolve(call), stop]);
     if (error) {
       const status = (error as { context?: { status?: number } }).context?.status;
       return { ok: false, reason: status === 403 ? 'disabled' : 'unavailable' };
     }
-    const body = data as { ok?: boolean; stale?: boolean; data?: WeatherPayload } | null;
-    if (!body?.ok || !body.data) return { ok: false, reason: 'unavailable' };
-    return { ok: true, data: completePayload(body.data, townCoords(town)), stale: !!body.stale };
+    const answer = data as { ok?: boolean; stale?: boolean; data?: WeatherPayload } | null;
+    if (!answer?.ok || !answer.data) return { ok: false, reason: 'unavailable' };
+    return { ok: true, data: completePayload({ ...answer.data, town: place.key, townName: place.name }, place), stale: !!answer.stale };
   } catch {
     return { ok: false, reason: 'unavailable' };
   }
 }
 
-export async function readLastWeather(town: TownKey): Promise<WeatherPayload | null> {
+export async function readLastWeather(place: Place): Promise<WeatherPayload | null> {
   try {
-    const raw = await AsyncStorage.getItem(cacheKey(town));
+    const raw = await AsyncStorage.getItem(cacheKey(place.key));
     if (!raw) return null;
     const v = JSON.parse(raw) as WeatherPayload;
-    return v && v.town === town && typeof v.fetchedAt === 'number' ? completePayload(v, townCoords(town)) : null;
+    return v && v.town === place.key && typeof v.fetchedAt === 'number' ? completePayload(v, place) : null;
   } catch {
     return null;
   }
@@ -49,14 +55,35 @@ export async function saveLastWeather(data: WeatherPayload): Promise<void> {
   try { await AsyncStorage.setItem(cacheKey(data.town), JSON.stringify(data)); } catch { /* the phone's storage is best effort */ }
 }
 
-export async function readTown(): Promise<TownKey> {
+/** The place last chosen (Lakewood the first time, or when nothing usable is saved). An older save that held one of the eight towns' names still works. */
+export async function readPlace(): Promise<Place> {
   try {
-    const v = await AsyncStorage.getItem(TOWN_KEY);
-    return isTownKey(v) ? v : DEFAULT_TOWN;
+    const raw = await AsyncStorage.getItem(PLACE_KEY);
+    const saved = raw ? asPlace(JSON.parse(raw)) : null;
+    if (saved) return saved;
+    const old = await AsyncStorage.getItem(OLD_TOWN_KEY);
+    const t = WEATHER_TOWNS.find((x) => x.key === old);
+    return t ? { ...t } : DEFAULT_PLACE;
   } catch {
-    return DEFAULT_TOWN;
+    return DEFAULT_PLACE;
   }
 }
-export async function saveTown(town: TownKey): Promise<void> {
-  try { await AsyncStorage.setItem(TOWN_KEY, town); } catch { /* best effort */ }
+export async function savePlace(place: Place): Promise<void> {
+  try { await AsyncStorage.setItem(PLACE_KEY, JSON.stringify(place)); } catch { /* best effort */ }
+}
+
+/** The last few places picked, newest first. */
+export async function readRecents(): Promise<Place[]> {
+  try {
+    const raw = await AsyncStorage.getItem(RECENT_KEY);
+    const list = raw ? (JSON.parse(raw) as unknown[]) : [];
+    return list.map(asPlace).filter((p): p is Place => !!p).slice(0, RECENT_MAX);
+  } catch {
+    return [];
+  }
+}
+export async function pushRecent(place: Place): Promise<Place[]> {
+  const next = [place, ...(await readRecents()).filter((p) => p.key !== place.key)].slice(0, RECENT_MAX);
+  try { await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* best effort */ }
+  return next;
 }

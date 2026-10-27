@@ -119,4 +119,10 @@ export const ES_WEATHER: Record<string, string> = {
   'Avoid the sun in the middle of the day.': 'Evita el sol a mediodía.',
   'Peak today: {n} around {time}.': 'Máximo hoy: {n} alrededor de las {time}.',
   'An estimate worked out from the sun\'s position and the forecast cloud cover.': 'Es un cálculo estimado a partir de la posición del sol y la nubosidad prevista.',
+  'Choose your place': 'Elige un lugar',
+  'Search any US town or city': 'Busca cualquier ciudad o pueblo de EE. UU.',
+  'No match. Try the town name and state, like Toms River NJ.': 'Sin resultados. Prueba el nombre y el estado, como Toms River NJ.',
+  'Recent': 'Recientes',
+  'Near Brighton': 'Cerca de Brighton',
+  'Weather is shown for the place you pick. No location access is needed.': 'El clima se muestra para el lugar que elijas. No se necesita acceso a tu ubicación.',
 };

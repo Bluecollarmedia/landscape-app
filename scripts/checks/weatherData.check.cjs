@@ -107,15 +107,23 @@ const AFTER_MIDNIGHT = Date.parse('2026-10-27T05:00:00Z'); // 1 AM Eastern on th
 const late = normalizeForecast({ townKey: 'lakewood', forecast, hourly, grid, alerts: alertsZone, now: AFTER_MIDNIGHT });
 check('46 REAL: at 1 AM the day list starts with today (the 27th), not with the 26th whose forecast is already over', late.daily.length > 0 && late.daily[0].date === '2026-10-27' && late.daily.every((d) => d.date >= '2026-10-27'), JSON.stringify(late.daily.map((d) => d.date)));
 
+// ── any US place: the function, the answer's time zone and the search list ──
+const chicago = { name: 'Chicago', lat: 41.85, lon: -87.65, office: 'LOT', gridX: 75, gridY: 72, zone: 'ILZ013', tz: 'America/Chicago' };
+const chi = normalizeForecast({ townKey: 'p:41.850,-87.650', town: chicago, displayName: 'Chicago', forecast, hourly, grid, alerts: undefined, now: NOW });
+check('47 a place that is not one of the eight is shown by the name it was asked for, with its own time zone in the answer; the eight keep theirs', chi.townName === 'Chicago' && chi.tz === 'America/Chicago' && out.tz === 'America/New_York' && chi.town === 'p:41.850,-87.650', JSON.stringify([chi.townName, chi.tz]));
+check('48 the function only ever takes a name from a person as plain text (letters, numbers and a few marks, 60 characters)', /cleanName = \(v: unknown\): string => String\(v \?\? ''\)\.replace\(\/\[\^\\p\{L\}\\p\{N\} \.,'’-\]\/gu, ''\)\.trim\(\)\.slice\(0, 60\)/.test(src));
+check('49 a place\'s forecast grid is remembered for a day, and the answer caches are capped, so a flood of different places cannot grow memory without limit', /RESOLVE_TTL_MS = 24 \* 60 \* 60 \* 1000/.test(src) && /MEMORY_MAX = 300/.test(src) && /memory\.size > MEMORY_MAX/.test(src) && /resolved\.size > MEMORY_MAX/.test(src));
+
 // ── the edge wrapper (file text only: it is not run here) ──
 const wrap = src.slice(marker);
-check('28 the wrapper checks the owner\'s Weather switch BEFORE any request to NWS, and answers 403 when it is off', wrap.indexOf('weatherIsOn()') > -1 && wrap.indexOf('weatherIsOn()', wrap.indexOf('serve(')) < wrap.indexOf('nws(`${grid}', wrap.indexOf('serve(')) && /json\(403, \{ error: 'disabled' \}\)/.test(wrap));
+check('28 the wrapper checks the owner\'s Weather switch BEFORE any request to NWS (including looking a point up), and answers 403 when it is off', wrap.indexOf('weatherIsOn()', wrap.indexOf('serve(')) > -1 && wrap.indexOf('weatherIsOn()', wrap.indexOf('serve(')) < wrap.indexOf('resolvePoint(la, lo', wrap.indexOf('serve(')) && wrap.indexOf('weatherIsOn()', wrap.indexOf('serve(')) < wrap.indexOf('nws(`${grid}', wrap.indexOf('serve(')) && /if \(!on\) return json\(403/.test(wrap));
 check('29 if the switch cannot be read it serves nothing (503), never data', /if \(on === null\) return json\(503/.test(wrap));
-check('30 it only answers for the fixed towns, identifies itself to NWS, and falls back to the last good answer marked stale', /if \(!town\) return json\(400/.test(wrap) && /User-Agent/.test(wrap) && /stale: true/.test(wrap));
+check('30 it answers for the eight known towns and for any US point (rounded, inside US bounds, looked up from NWS /points), refuses anything else with 400, identifies itself to NWS, and falls back to the last good answer marked stale', /return json\(400, \{ error: 'town' \}\)/.test(wrap) && /return json\(400, \{ error: 'place' \}\)/.test(wrap) && /return json\(404, \{ error: 'place' \}\)/.test(wrap) && /\/points\//.test(wrap) && /User-Agent/.test(wrap) && /stale: true/.test(wrap));
 check('31 it is one self-contained file (no relative imports)', !/from '\.{1,2}\//.test(src));
 
 // ── the app side (file text only) ──
-const appTowns = [...read('src/lib/weatherTowns.ts').matchAll(/key: '([a-z-]+)', name: '([^']+)'/g)].map((x) => [x[1], x[2]]);
+const townsBlock = (() => { const t = read('src/lib/weatherTowns.ts'); return t.slice(t.indexOf('export const WEATHER_TOWNS'), t.indexOf('] as const')); })();
+const appTowns = [...townsBlock.matchAll(/key: '([a-z-]+)', name: '([^']+)'/g)].map((x) => [x[1], x[2]]);
 check('32 the app\'s town list is the same eight towns, with the same keys and names, as the data function', JSON.stringify(appTowns.map((x) => x[0])) === JSON.stringify(keys) && appTowns.every(([k, n]) => TOWNS[k].name === n), JSON.stringify(appTowns));
 const walk = (d) => fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
 const weatherFiles = [...walk('app/weather'), 'src/data/weather.ts', 'src/hooks/useWeather.ts', ...walk('src/components/weather')].filter((f) => /\.(ts|tsx)$/.test(f));

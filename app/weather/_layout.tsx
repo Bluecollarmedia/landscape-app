@@ -1,12 +1,14 @@
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
-import { Slot } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { weatherSwitch } from '@/data/publicWeather';
 import { WX, WeatherBackground } from '@/components/weather/WeatherUI';
 import { FloatingTabBar } from '@/components/weather/FloatingTabBar';
 
 /**
  * The public Brighton Weather area: one light page behind three screens (Weather, Storm History, Account) and its own floating tab bar.
+ * The screens are tabs that stay alive once opened, so switching is instant and each keeps its place (scroll position, the hourly strip, the open storm).
+ * The storm outlook page is a fourth, hidden tab: it has no button in the bar and is opened from the home card or the history.
  * While it is open the app re-asks the owner's switch every 60 seconds; if Weather has been switched off, the app's launch routing
  * moves the visitor to the welcome screen.
  */
@@ -18,8 +20,16 @@ export default function WeatherLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: WX.page }}>
       <WeatherBackground />
-      <Slot />
-      <FloatingTabBar />
+      <Tabs
+        backBehavior="history"
+        tabBar={() => <FloatingTabBar />}
+        screenOptions={{ headerShown: false, lazy: true, sceneStyle: { backgroundColor: 'transparent' } }}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="history" />
+        <Tabs.Screen name="account" />
+        <Tabs.Screen name="outlook" options={{ href: null }} />
+      </Tabs>
     </View>
   );
 }

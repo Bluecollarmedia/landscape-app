@@ -24,8 +24,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LOGO_WIDTH = Math.min(SCREEN_WIDTH * 0.6, 280);
 
 const FADE_IN = 500;
-const HOLD = 600;
-const FADE_OUT = 400;
+// The logo still fades in and out; it just stays up for less time before the app appears (was 600 ms hold and 400 ms fade out: 1.5 s in all).
+const HOLD = 200;
+const FADE_OUT = 300;
 
 interface SplashScreenProps {
   onFinish: () => void;

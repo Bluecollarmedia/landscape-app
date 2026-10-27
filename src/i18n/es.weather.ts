@@ -158,4 +158,5 @@ export const ES_WEATHER: Record<string, string> = {
   'Every storm outlook Brighton has posted. Nothing is ever overwritten.': 'Todos los pronósticos de tormenta que Brighton ha publicado. Nada se sobrescribe.',
   'Active': 'Activa',
   'Loading…': 'Cargando…',
+  'Updated {h} hr ago': 'Actualizado hace {h} h',
 };

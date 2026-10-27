@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -34,6 +34,127 @@ const CHART_H = 190;
 const hourOf = (iso: string): number => Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: viewTz() }).format(new Date(iso)));
 const dayTitle = (date: string, locale: string): string => new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
 
+/** Everything the chart needs, worked out once for a day, a figure and a width. Sliding a finger changes only the cursor, never this. */
+interface Chart {
+  keys: string[];
+  values: Array<number | null>;
+  known: number[];
+  bars: boolean;
+  plotW: number;
+  barW: number;
+  xs: number[];
+  ys: Array<number | null>;
+  grid: Array<{ y: number; label: string }>;
+  axis: Array<{ key: string; left: number; label: string }>;
+  stat: string;
+  yRange: [number, number];
+}
+
+function buildChart(hours: WxHour[], metric: Metric, plotW: number, locale: string, t: (k: string, p?: Record<string, string | number>) => string): Chart {
+  const values = hours.map((h) => metric.get(h));
+  const known = values.filter((v): v is number => v !== null);
+  const bars = metric.kind === 'bars';
+  let lo = 0; let hi = 1;
+  if (known.length) {
+    if (bars) { lo = 0; hi = metric.max ?? Math.max(0.1, Math.max(...known)); }
+    else {
+      lo = Math.floor(Math.min(...known) - 1); hi = Math.ceil(Math.max(...known) + 1);
+      if (hi - lo < 6) { const mid = (hi + lo) / 2; lo = Math.floor(mid - 3); hi = Math.ceil(mid + 3); }
+    }
+  }
+  const xAt = (i: number) => (hours.length <= 1 ? plotW / 2 : (i / (hours.length - 1)) * plotW);
+  const yAt = (v: number) => CHART_H - ((v - lo) / (hi - lo || 1)) * CHART_H;
+  let stat: string;
+  if (!known.length) stat = t('Unavailable');
+  else if (metric.key === 'rain') stat = t('{n} in for the day', { n: known.reduce((a, b) => a + b, 0).toFixed(2) });
+  else {
+    const hiV = Math.max(...known); const loV = Math.min(...known);
+    const hiH = hours[values.indexOf(hiV)]; const loH = hours[values.indexOf(loV)];
+    stat = bars
+      ? t('Highest {v} around {time}', { v: metric.fmt(hiV, hiH), time: hourLabel(hiH.time, locale) })
+      : t('High {high} at {hi} · Low {low} at {lo}', { high: metric.fmt(hiV, hiH), hi: hourLabel(hiH.time, locale), low: metric.fmt(loV, loH), lo: hourLabel(loH.time, locale) });
+  }
+  return {
+    keys: hours.map((h) => h.time),
+    values, known, bars, plotW,
+    barW: Math.max(3, plotW / Math.max(1, hours.length) - 2),
+    xs: hours.map((_, i) => xAt(i)),
+    ys: values.map((v) => (v === null ? null : yAt(v))),
+    grid: [0, 1, 2, 3].map((k) => { const g = lo + ((hi - lo) * k) / 3; return { y: yAt(g), label: metric.fmt(g, undefined).replace(/ mph.*/, '') }; }),
+    axis: hours.map((h, i) => ({ h, i })).filter(({ h }) => [0, 6, 12, 18].includes(hourOf(h.time))).map(({ h, i }) => ({ key: h.time, left: Math.max(0, Math.min(plotW - 40, xAt(i) - 20)), label: hourLabel(h.time, locale) })),
+    stat,
+    yRange: [lo, hi],
+  };
+}
+
+/** The lines, dots, bars and grid. Memoised on the chart object, so a finger sliding across the chart never rebuilds them. */
+const ChartMarks = memo(function ChartMarks({ chart, metricKey }: { chart: Chart; metricKey: MetricKey }) {
+  const { xs, ys, values, keys, bars, barW } = chart;
+  const nodes: React.ReactNode[] = [];
+  chart.grid.forEach((g, k) => nodes.push(<View key={`g${k}`} style={{ position: 'absolute', left: 0, right: 0, top: g.y - 0.5, height: StyleSheet.hairlineWidth, backgroundColor: WX.line }} />));
+  if (bars) {
+    keys.forEach((key, i) => {
+      const y = ys[i]; if (y === null) return;
+      const top = Math.min(CHART_H - 2, y);
+      nodes.push(<View key={`b${key}`} style={{ position: 'absolute', left: xs[i] - barW / 2, width: barW, top, height: CHART_H - top, borderRadius: 3, backgroundColor: metricKey === 'uv' ? uvColor(values[i]) : '#8EC3F0', opacity: 0.85 }} />);
+    });
+  } else {
+    for (let i = 0; i < keys.length - 1; i++) {
+      const ya = ys[i]; const yb = ys[i + 1]; const b = values[i + 1];
+      if (ya === null || yb === null) continue;
+      const x1 = xs[i]; const x2 = xs[i + 1];
+      const len = Math.hypot(x2 - x1, yb - ya);
+      nodes.push(<View key={`s${i}`} style={{ position: 'absolute', left: (x1 + x2) / 2 - len / 2, top: (ya + yb) / 2 - 1.5, width: len, height: 3, borderRadius: 2, backgroundColor: metricKey === 'temp' ? tempColor(b) : WX.rain, transform: [{ rotate: `${Math.atan2(yb - ya, x2 - x1)}rad` }] }} />);
+    }
+    keys.forEach((key, i) => {
+      const y = ys[i]; const v = values[i]; if (y === null || v === null) return;
+      nodes.push(<View key={`d${key}`} style={{ position: 'absolute', left: xs[i] - 3, top: y - 3, width: 6, height: 6, borderRadius: 3, backgroundColor: metricKey === 'temp' ? tempColor(v) : WX.rain, borderWidth: 1.5, borderColor: '#FFFFFF' }} />);
+    });
+  }
+  return <>{nodes}</>;
+});
+
+/** The moving part: the vertical line, the big dot (or the highlighted bar) at the chosen hour. A few views, so it is cheap to redraw on every move. */
+function Cursor({ chart, idx, metricKey }: { chart: Chart; idx: number; metricKey: MetricKey }) {
+  const x = chart.xs[idx]; const y = chart.ys[idx]; const v = chart.values[idx];
+  if (x === undefined) return null;
+  return (
+    <>
+      {chart.bars && y !== null ? <View style={{ position: 'absolute', left: x - chart.barW / 2, width: chart.barW, top: Math.min(CHART_H - 2, y), height: CHART_H - Math.min(CHART_H - 2, y), borderRadius: 3, backgroundColor: WX.deep }} /> : null}
+      <View style={{ position: 'absolute', left: x - 1, top: 0, width: 2, height: CHART_H, backgroundColor: WX.deep }} />
+      {!chart.bars && y !== null && v !== null ? <View style={{ position: 'absolute', left: x - 7, top: y - 7, width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: metricKey === 'temp' ? tempColor(v) : WX.rain }} /> : null}
+    </>
+  );
+}
+
+/** One "choose what to see" tile. Memoised: it redraws only when its own text or state changes. */
+const MetricTile = memo(function MetricTile({ metric, on, valueText, off, label, a11y, onPress }: { metric: Metric; on: boolean; valueText: string; off: boolean; label: string; a11y: string; onPress: (k: MetricKey) => void }) {
+  return (
+    <Pressable onPress={() => onPress(metric.key)} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={a11y} style={({ pressed }) => [styles.tile, on && styles.tileOn, pressed && { opacity: 0.75 }]}>
+      <View style={styles.tileHead}>
+        <MaterialCommunityIcons name={metric.icon} size={16} color={on ? ON_DARK : SOFT} />
+        <Text style={[styles.tileLabel, on && { color: ON_DARK }]} numberOfLines={1}>{label}</Text>
+      </View>
+      <Text style={[styles.tileValue, on && { color: ON_DARK }, off && styles.tileOff, off && on && { color: '#D7E8DD' }]} numberOfLines={1}>{valueText}</Text>
+    </Pressable>
+  );
+});
+
+const DayChip = memo(function DayChip({ date, label, a11y, on, empty, onSelect }: { date: string; label: string; a11y: string; on: boolean; empty: boolean; onSelect: (date: string) => void }) {
+  return (
+    <Pressable
+      disabled={empty}
+      onPress={() => onSelect(date)}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on, disabled: empty }}
+      accessibilityLabel={a11y}
+      style={({ pressed }) => [styles.day, on && styles.dayOn, empty && { opacity: 0.4 }, pressed && { opacity: 0.7 }]}
+    >
+      <Text style={[styles.dayText, on && { fontWeight: '700', color: ON_DARK }]}>{label}</Text>
+    </Pressable>
+  );
+});
+
 export interface DetailsStart { date: string; time?: string; metric?: MetricKey }
 
 /**
@@ -66,52 +187,50 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
   }, [visible, data, start]);
 
   const selected: WxHour | undefined = hours[Math.min(idx, hours.length - 1)];
-  const values = hours.map((h) => metric.get(h));
-  const known = values.filter((v): v is number => v !== null);
-
-  // Chart scale.
   const plotW = Math.max(0, width - AXIS_W);
-  const bars = metric.kind === 'bars';
-  let lo = 0; let hi = 1;
-  if (known.length) {
-    if (bars) { lo = 0; hi = metric.max ?? Math.max(0.1, Math.max(...known)); }
-    else {
-      lo = Math.floor(Math.min(...known) - 1); hi = Math.ceil(Math.max(...known) + 1);
-      if (hi - lo < 6) { const mid = (hi + lo) / 2; lo = Math.floor(mid - 3); hi = Math.ceil(mid + 3); }
-    }
-  }
-  const xAt = (i: number) => (hours.length <= 1 ? plotW / 2 : (i / (hours.length - 1)) * plotW);
-  const yAt = (v: number) => CHART_H - ((v - lo) / (hi - lo || 1)) * CHART_H;
+  const chart = useMemo(() => buildChart(hours, metric, plotW, locale, t), [hours, metric, plotW, locale, t]);
+  const bars = chart.bars;
 
   // Sliding a finger across the chart picks the hour under it, live. A tap does the same, and the arrows below do it too, so sliding is only ever
   // a shortcut. No vibration, and nothing happens at touch-down, so swiping the sheet down is never held up.
   const pickHour = useCallback((i: number) => { setIdx(i); }, []);
-
-  const stat = (() => {
-    if (!known.length) return t('Unavailable');
-    if (metric.key === 'rain') return t('{n} in for the day', { n: known.reduce((a, b) => a + b, 0).toFixed(2) });
-    const hiV = Math.max(...known); const loV = Math.min(...known);
-    const hiH = hours[values.indexOf(hiV)]; const loH = hours[values.indexOf(loV)];
-    if (bars) return t('Highest {v} around {time}', { v: metric.fmt(hiV, hiH), time: hourLabel(hiH.time, locale) });
-    return t('High {high} at {hi} · Low {low} at {lo}', { high: metric.fmt(hiV, hiH), hi: hourLabel(hiH.time, locale), low: metric.fmt(loV, loH), lo: hourLabel(loH.time, locale) });
-  })();
-
-  const axisLabels = hours.map((h, i) => ({ h, i })).filter(({ h }) => [0, 6, 12, 18].includes(hourOf(h.time)));
-  const grid = [0, 1, 2, 3].map((k) => lo + ((hi - lo) * k) / 3);
-
-  const segs: React.ReactNode[] = [];
-  if (!bars) {
-    for (let i = 0; i < hours.length - 1; i++) {
-      const a = values[i]; const b = values[i + 1];
-      if (a === null || b === null) continue;
-      const x1 = xAt(i); const y1 = yAt(a); const x2 = xAt(i + 1); const y2 = yAt(b);
-      const len = Math.hypot(x2 - x1, y2 - y1);
-      segs.push(<View key={`s${i}`} style={{ position: 'absolute', left: (x1 + x2) / 2 - len / 2, top: (y1 + y2) / 2 - 1.5, width: len, height: 3, borderRadius: 2, backgroundColor: metric.key === 'temp' ? tempColor(b) : WX.rain, transform: [{ rotate: `${Math.atan2(y2 - y1, x2 - x1)}rad` }] }} />);
-    }
-  }
+  const chooseDay = useCallback((d: string) => {
+    setDate(d);
+    const hs = data ? hoursOnDate(data.hourly, d) : [];
+    setIdx(d === todayInTowns(Date.now()) ? 0 : Math.max(0, hs.findIndex((h) => hourOf(h.time) >= 12)));
+  }, [data]);
+  // The tiles follow the finger one step behind (React may skip their redraw while the finger is still moving), so the cursor and the readout never wait for them.
+  const tileIdx = useDeferredValue(idx);
+  const tileSel: WxHour | undefined = hours[Math.min(tileIdx, hours.length - 1)];
+  const header = useMemo(() => (
+    <View style={styles.head}>
+      <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('Close details')} style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]} hitSlop={6}>
+        <View style={styles.backGlass}>
+          <View style={styles.backRow}>
+            <MaterialCommunityIcons name="chevron-left" size={22} color={INK} />
+            <Text style={styles.backText}>{t('Back')}</Text>
+          </View>
+        </View>
+      </Pressable>
+      <View style={styles.headTitle} pointerEvents="none">
+        <Text style={styles.title}>{t('Details')}</Text>
+        <Text style={styles.subtitle}>{data?.townName}</Text>
+      </View>
+    </View>
+  ), [onClose, t, data?.townName]);
+  const dayRow = useMemo(() => (
+    <View style={styles.days}>
+      {days.map((d) => {
+        const empty = !data || hoursOnDate(data.hourly, d.date).length === 0;
+        return <DayChip key={d.date} date={d.date} label={weekdayShort(d.date, locale)} a11y={dayTitle(d.date, locale)} on={d.date === date} empty={empty} onSelect={chooseDay} />;
+      })}
+    </View>
+  ), [days, data, date, locale, chooseDay]);
+  const setMetric = useCallback((k: MetricKey) => setMetricKey(k), []);
 
   const sel = selected;
   const selVal = sel ? metric.get(sel) : null;
+  const stat = chart.stat;
   const go = (d: number) => setIdx((i) => Math.max(0, Math.min(hours.length - 1, i + d)));
   const hasHours = hours.length > 0;
 
@@ -120,40 +239,9 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: WX.page }}>
         <WeatherBackground />
         <ScrollView contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
-          <View style={styles.head}>
-            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('Close details')} style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]} hitSlop={6}>
-              <View style={styles.backGlass}>
-                <View style={styles.backRow}>
-                  <MaterialCommunityIcons name="chevron-left" size={22} color={INK} />
-                  <Text style={styles.backText}>{t('Back')}</Text>
-                </View>
-              </View>
-            </Pressable>
-            <View style={styles.headTitle} pointerEvents="none">
-              <Text style={styles.title}>{t('Details')}</Text>
-              <Text style={styles.subtitle}>{data?.townName}</Text>
-            </View>
-          </View>
+          {header}
 
-          <View style={styles.days}>
-            {days.map((d) => {
-              const on = d.date === date;
-              const empty = !data || hoursOnDate(data.hourly, d.date).length === 0;
-              return (
-                <Pressable
-                  key={d.date}
-                  disabled={empty}
-                  onPress={() => { setDate(d.date); const hs = data ? hoursOnDate(data.hourly, d.date) : []; setIdx(d.date === todayInTowns(Date.now()) ? 0 : Math.max(0, hs.findIndex((h) => hourOf(h.time) >= 12))); }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on, disabled: empty }}
-                  accessibilityLabel={dayTitle(d.date, locale)}
-                  style={({ pressed }) => [styles.day, on && styles.dayOn, empty && { opacity: 0.4 }, pressed && { opacity: 0.7 }]}
-                >
-                  <Text style={[styles.dayText, on && { fontWeight: '700', color: ON_DARK }]}>{weekdayShort(d.date, locale)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {dayRow}
 
           <Panel style={{ marginTop: 14 }}>
             <View style={styles.pad}>
@@ -183,23 +271,12 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
                   {width > 0 ? (
                     <View style={{ height: CHART_H + 26 }}>
                       <View style={{ height: CHART_H, width: plotW }} accessible={false}>
-                        {grid.map((g, k) => <View key={k} style={{ position: 'absolute', left: 0, right: 0, top: yAt(g) - 0.5, height: StyleSheet.hairlineWidth, backgroundColor: WX.line }} />)}
-                        {bars ? hours.map((h, i) => {
-                          const v = values[i]; if (v === null) return null;
-                          const bw = Math.max(3, plotW / hours.length - 2);
-                          const top = Math.min(CHART_H - 2, yAt(v));
-                          return <View key={h.time} style={{ position: 'absolute', left: xAt(i) - bw / 2, width: bw, top, height: CHART_H - top, borderRadius: 3, backgroundColor: i === idx ? WX.deep : metric.key === 'uv' ? uvColor(v) : '#8EC3F0', opacity: i === idx ? 1 : 0.85 }} />;
-                        }) : segs}
-                        {!bars ? hours.map((h, i) => {
-                          const v = values[i]; if (v === null || i === idx) return null;
-                          return <View key={h.time} style={{ position: 'absolute', left: xAt(i) - 3, top: yAt(v) - 3, width: 6, height: 6, borderRadius: 3, backgroundColor: metric.key === 'temp' ? tempColor(v) : WX.rain, borderWidth: 1.5, borderColor: '#FFFFFF' }} />;
-                        }) : null}
-                        {sel ? <View style={{ position: 'absolute', left: xAt(idx) - 1, top: 0, width: 2, height: CHART_H, backgroundColor: WX.deep }} /> : null}
-                        {sel && selVal !== null && !bars ? <View style={{ position: 'absolute', left: xAt(idx) - 7, top: yAt(selVal) - 7, width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: metric.key === 'temp' ? tempColor(selVal) : WX.rain }} /> : null}
+                        <ChartMarks chart={chart} metricKey={metricKey} />
+                        {sel ? <Cursor chart={chart} idx={Math.min(idx, hours.length - 1)} metricKey={metricKey} /> : null}
                       </View>
                       <ScrubArea width={plotW} count={hours.length} onPick={pickHour} style={{ position: 'absolute', left: 0, top: 0, width: plotW, height: CHART_H }} />
-                      {grid.map((g, k) => <Text key={k} style={[styles.axisY, { top: yAt(g) - 8 }]}>{metric.fmt(g, undefined).replace(/ mph.*/, '')}</Text>)}
-                      {axisLabels.map(({ h, i }) => <Text key={h.time} style={[styles.axisX, { left: Math.max(0, Math.min(plotW - 40, xAt(i) - 20)), top: CHART_H + 6 }]}>{hourLabel(h.time, locale)}</Text>)}
+                      {chart.grid.map((g, k) => <Text key={k} style={[styles.axisY, { top: g.y - 8 }]}>{g.label}</Text>)}
+                      {chart.axis.map((a) => <Text key={a.key} style={[styles.axisX, { left: a.left, top: CHART_H + 6 }]}>{a.label}</Text>)}
                     </View>
                   ) : null}
                 </View>
@@ -211,24 +288,9 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
           <Text style={styles.section}>{t('Choose what to see')}</Text>
           <View style={styles.grid}>
             {METRICS.map((m) => {
-              const on = m.key === metricKey;
-              const v = sel ? m.get(sel) : null;
-              return (
-                <Pressable
-                  key={m.key}
-                  onPress={() => setMetricKey(m.key)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  accessibilityLabel={`${t(m.label)}, ${v === null ? t('Unavailable') : m.fmt(v, sel)}`}
-                  style={({ pressed }) => [styles.tile, on && styles.tileOn, pressed && { opacity: 0.75 }]}
-                >
-                  <View style={styles.tileHead}>
-                    <MaterialCommunityIcons name={m.icon} size={16} color={on ? ON_DARK : SOFT} />
-                    <Text style={[styles.tileLabel, on && { color: ON_DARK }]} numberOfLines={1}>{t(m.label)}</Text>
-                  </View>
-                  <Text style={[styles.tileValue, on && { color: ON_DARK }, v === null && styles.tileOff, v === null && on && { color: '#D7E8DD' }]} numberOfLines={1}>{v === null ? t('Unavailable') : m.fmt(v, sel)}</Text>
-                </Pressable>
-              );
+              const v = tileSel ? m.get(tileSel) : null;
+              const text = v === null ? t('Unavailable') : m.fmt(v, tileSel);
+              return <MetricTile key={m.key} metric={m} on={m.key === metricKey} valueText={text} off={v === null} label={t(m.label)} a11y={`${t(m.label)}, ${text}`} onPress={setMetric} />;
             })}
           </View>
         </ScrollView>

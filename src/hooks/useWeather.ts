@@ -13,6 +13,8 @@ export type WeatherView =
   | { status: 'unavailable'; data: null };
 
 const REFRESH_MS = 10 * 60_000;
+/** A foreground or launch refresh is skipped when the app asked less than this long ago (iOS can announce "active" right after launch). */
+const MIN_GAP_MS = 2 * 60_000;
 
 /** The forecast for a place: the saved one at once, a fresh one right after, and a new one every 10 minutes and whenever the app comes back. */
 export function useWeather(place: Place): { view: WeatherView; refresh: () => void; busy: boolean } {
@@ -21,9 +23,12 @@ export function useWeather(place: Place): { view: WeatherView; refresh: () => vo
   const current = useRef<Place>(place);
   current.current = place;
   const have = useRef<WeatherPayload | null>(null);
+  const lastAsk = useRef<{ key: string; at: number }>({ key: '', at: 0 });
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     const asked = current.current;
+    if (!force && lastAsk.current.key === asked.key && Date.now() - lastAsk.current.at < MIN_GAP_MS) return;
+    lastAsk.current = { key: asked.key, at: Date.now() };
     setBusy(true);
     const r = await loadWeather(asked);
     if (asked.key !== current.current.key) return;
@@ -57,5 +62,5 @@ export function useWeather(place: Place): { view: WeatherView; refresh: () => vo
     return () => { alive = false; clearInterval(timer); sub.remove(); };
   }, [place.key, refresh]);
 
-  return { view, refresh: () => { void refresh(); }, busy };
+  return { view, refresh: () => { void refresh(true); }, busy };
 }

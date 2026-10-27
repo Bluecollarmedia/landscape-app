@@ -29,7 +29,7 @@ export function FloatingTabBar() {
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
               accessibilityLabel={t(tab.label)}
-              onPress={() => { if (pathname !== tab.path && pathname !== `${tab.path}/`) router.replace(tab.path as any); }}
+              onPress={() => { if (pathname !== tab.path && pathname !== `${tab.path}/`) router.navigate(tab.path as any); }}
               style={({ pressed }) => [styles.item, on && styles.itemOn, pressed && !on && { backgroundColor: WX.leafTint }]}
             >
               <MaterialCommunityIcons name={tab.icon} size={23} color={on ? WX.deep : WX.soft} />

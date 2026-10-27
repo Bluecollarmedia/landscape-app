@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { normalizeStorm, normalizeStorms, type StormOutlook } from '@/lib/stormView';
+import { shareInFlight } from '@/lib/sharedRequest';
 
 const CURRENT_KEY = 'weather.storm.current.v1';
 const HISTORY_KEY = 'weather.storm.history.v1';
@@ -28,7 +29,10 @@ const save = async (key: string, v: unknown) => { try { await AsyncStorage.setIt
 const read = async (key: string): Promise<unknown> => { try { const r = await AsyncStorage.getItem(key); return r ? JSON.parse(r) : null; } catch { return null; } };
 
 /** The storm that is active right now, or null. Falls back to the last one saved on the phone when it cannot be asked. */
-export async function fetchCurrentStorm(): Promise<{ storm: StormOutlook | null; fresh: boolean }> {
+export function fetchCurrentStorm(): Promise<{ storm: StormOutlook | null; fresh: boolean }> {
+  return shareInFlight('storm.current', fetchCurrentStormNow);
+}
+async function fetchCurrentStormNow(): Promise<{ storm: StormOutlook | null; fresh: boolean }> {
   const r = await rpc('public_storm_current');
   if (r.ok) {
     const storm = normalizeStorm(r.data);
@@ -39,7 +43,10 @@ export async function fetchCurrentStorm(): Promise<{ storm: StormOutlook | null;
 }
 export async function readSavedStorm(): Promise<StormOutlook | null> { return normalizeStorm(await read(CURRENT_KEY)); }
 
-export async function fetchStormHistory(): Promise<{ storms: StormOutlook[]; fresh: boolean }> {
+export function fetchStormHistory(): Promise<{ storms: StormOutlook[]; fresh: boolean }> {
+  return shareInFlight('storm.history', fetchStormHistoryNow);
+}
+async function fetchStormHistoryNow(): Promise<{ storms: StormOutlook[]; fresh: boolean }> {
   const r = await rpc('public_storm_history');
   if (r.ok) {
     const storms = normalizeStorms(r.data);

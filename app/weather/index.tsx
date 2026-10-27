@@ -35,6 +35,38 @@ const MOON_ICON: Record<MoonName, Icon> = {
   'Full Moon': 'moon-full', 'Waning Gibbous': 'moon-waning-gibbous', 'Last Quarter': 'moon-last-quarter', 'Waning Crescent': 'moon-waning-crescent',
 };
 
+/** The current time, refreshed every `ms`. */
+function useNow(ms: number): number {
+  const [n, setN] = useState(() => Date.now());
+  useEffect(() => { const id = setInterval(() => setN(Date.now()), ms); return () => clearInterval(id); }, [ms]);
+  return n;
+}
+/** Today's date in the place's time zone. It only changes (and so only re-renders the screen) at midnight, or when the place's zone changes. */
+function useToday(tz?: string): string {
+  const [d, setD] = useState(() => todayInTowns(Date.now(), tz));
+  useEffect(() => {
+    const tick = () => setD(todayInTowns(Date.now(), tz));
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, [tz]);
+  return d;
+}
+/** "N minutes ago" text with its own timer, so the minute ticking over redraws only this text and not the whole screen. */
+function Age({ fetchedAt, render }: { fetchedAt: number; render: (minutes: number) => string }) {
+  const now = useNow(30_000);
+  return <>{render(ageMinutes(fetchedAt, now))}</>;
+}
+
+/** Under the summary: how old the forecast on screen is, once it is more than 30 minutes old (a saved forecast shown while offline, for example). */
+function OldDataLine({ fetchedAt }: { fetchedAt: number }) {
+  const t = useT();
+  const now = useNow(60_000);
+  const n = ageMinutes(fetchedAt, now);
+  if (n < 30) return null;
+  return <Text style={styles.old}>{n < 120 ? t('Updated {n} min ago', { n }) : t('Updated {h} hr ago', { h: Math.floor(n / 60) })}</Text>;
+}
+
 type HourMetric = 'temp' | 'feels' | 'uv' | 'pop' | 'wind';
 const HOUR_METRICS: { key: HourMetric; label: string }[] = [
   { key: 'temp', label: 'Temp' }, { key: 'feels', label: 'Feels like' }, { key: 'uv', label: 'UV' }, { key: 'pop', label: 'Rain' }, { key: 'wind', label: 'Wind' },
@@ -128,16 +160,15 @@ export default function WeatherHome() {
   const [stripDate, setStripDate] = useState<string | null>(null);
   const { view, refresh, busy } = useWeather(place);
   const { storm } = useCurrentStorm();
-  const [now, setNow] = useState(Date.now());
 
   useEffect(() => { readPlace().then(setPlace); }, []);
   useEffect(() => { setMoreDays(false); setStripDate(null); }, [place.key]);
-  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(id); }, []);
 
   const data = view.data;
   setViewTz(data?.tz);
   const name = place.name;
-  const today = todayInTowns(now);
+  const now = useNow(5 * 60_000);   // the sun arc and the moon only need a coarse clock
+  const today = useToday(data?.tz);
   const stale = view.status === 'stale' && !busy;
 
 
@@ -247,6 +278,7 @@ export default function WeatherHome() {
               {uvNow !== null && uvNow > 0 ? <Text style={styles.hl}>{t('UV index {n}', { n: uvNow })} · {t(uvLevel(uvNow))}</Text> : null}
               <Text style={styles.hl}>{t('H: {high}  L: {low}', { high: degrees(data.today.highF), low: degrees(data.today.lowF) })}</Text>
               <Text style={styles.summary}>{summary}</Text>
+              <OldDataLine fetchedAt={data.fetchedAt} />
             </View>
           ) : view.status === 'loading' ? (
             <Text style={styles.cond}>{t('Loading the forecast…')}</Text>
@@ -264,7 +296,7 @@ export default function WeatherHome() {
         {stale && data ? (
           <Panel style={styles.gap}>
             <View style={styles.pad}>
-              <Text style={styles.cardTitle}>{t('Last forecast, {n} minutes ago', { n: ageMinutes(data.fetchedAt, now) })}</Text>
+              <Text style={styles.cardTitle}><Age fetchedAt={data.fetchedAt} render={(n) => t('Last forecast, {n} minutes ago', { n })} /></Text>
               <Text style={styles.cardBody}>{t("We couldn't reach the National Weather Service. This is the last forecast we have for {town}, so it may be out of date.", { town: name })}</Text>
               <Pressable onPress={refresh} style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]} accessibilityRole="button"><Text style={styles.retryText}>{t('Try again')}</Text></Pressable>
             </View>
@@ -558,7 +590,7 @@ export default function WeatherHome() {
         {data ? (
           <View style={styles.footWrap}>
             <Text style={styles.foot}>
-              {ageMinutes(data.fetchedAt, now) < 1 ? t('Updated just now') : t('Updated {n} min ago', { n: ageMinutes(data.fetchedAt, now) })}
+              <Age fetchedAt={data.fetchedAt} render={(n) => (n < 1 ? t('Updated just now') : t('Updated {n} min ago', { n }))} />
             </Text>
             <Pressable onPress={refresh} accessibilityRole="button" accessibilityLabel={t('Refresh')} style={({ pressed }) => [styles.refreshBtn, pressed && { opacity: 0.7 }]}>
               <MaterialCommunityIcons name="refresh" size={18} color={INK} />
@@ -622,6 +654,7 @@ const styles = StyleSheet.create({
   temp: { color: INK, fontSize: 92, fontWeight: '200', letterSpacing: -4, lineHeight: 100 },
   cond: { color: INK, fontSize: 20, marginTop: 2 },
   hl: { color: SOFT, fontSize: 14, marginTop: 3 },
+  old: { color: SOFT, fontSize: 12.5, marginTop: 4 },
   summary: { color: INK, fontSize: 15, fontWeight: '600', marginTop: 12, lineHeight: 21 },
   bigMsg: { color: INK, fontSize: 24, fontWeight: '500', marginTop: 12 },
   gap: { marginTop: 14 },

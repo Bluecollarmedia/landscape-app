@@ -270,7 +270,7 @@ export default function MaintenanceStopScreen() {
           <InlineNotice icon="lock" tone="neutral" text={t('Finish {name} first. Stops are worked in order.', { name: blockedBy.property?.name ?? t('stop {n}', { n: blockedBy.number }) })} />
         )}
         {leader && stop.status === 'pending' && !blockedBy && !clockedIn && (
-          <InlineNotice icon="clock" tone="neutral" text={t('Clock in for the day first. The Clock In button is on the Today screen.')} />
+          <InlineNotice icon="clock" tone="neutral" text={t('Clock in first on the Clock tab.')} />
         )}
         {leader && stop.status === 'arrived' && (
           <FinishStopButton stopId={stop.id} missing={missing} uploading={uploadingPhotoCount(stop)} onPress={handleFinish} />

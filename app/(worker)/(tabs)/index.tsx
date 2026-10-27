@@ -1,5 +1,5 @@
 import { WorkdayCard } from '@/components/time/WorkdayCard';
-import { WorkerToday, ClockInScreen } from '@/components/today/WorkerToday';
+import { WorkerToday } from '@/components/today/WorkerToday';
 import { useDayWork } from '@/hooks/useDayWork';
 import { OtherWorkCard } from '@/components/worker/OtherWorkCard';
 import { useWorkerLanding } from '@/hooks/useWorkerLanding';
@@ -574,7 +574,7 @@ function LandscapingToday() {
               )}
 
               {needsClockIn ? (
-                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, textAlign: 'center' }]}>{t('Clock in for the day first. The Clock In button is at the top.')}</Text>
+                <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, textAlign: 'center' }]}>{t('Clock in first on the Clock tab.')}</Text>
               ) : (
               <Pressable onPress={handleCheckIn}>
                 <LinearGradient
@@ -1129,7 +1129,5 @@ export default function WorkerTodayScreen() {
   // thing on the list is a job and the worker is clocked in, that screen is the one to show. Route stops keep the new Today.
   if (timeOn && day.hasStops && workday.active && day.next?.kind === 'job') return <LandscapingToday />;
   if (timeOn && day.hasStops) return <WorkerToday combined={day.both} />;
-  const closedToday = !!workday.today?.clockOutAt;
-  if (timeOn && !workday.active && day.anyWork && !(closedToday && !day.openWork)) return <ClockInScreen moreWork={closedToday} />;
   return <LandscapingToday />;
 }

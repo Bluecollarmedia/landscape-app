@@ -36,7 +36,7 @@ const card = read('src/components/time/WorkdayCard.tsx');
 check('5 the card has a gate version that shows only Clock In: no stale card, no timer, no Clock Out, no closed summary', /gate = false/.test(card) && /w\.stale && !gate/.test(card) && /active && compact && !gate/.test(card) && /active && !compact && !gate/.test(card) && /closedToday && !gate/.test(card));
 check('6 the gate shows Clock In again when work remains after a closed session, and still never when there is no work', /!active && !noWork && \(!closedToday \|\| \(gate && moreWork/.test(card));
 const today = read('src/components/today/WorkerToday.tsx');
-check('7 not clocked in: a Clock In screen (or a calm empty state), never the route', /if \(!active\) \{[\s\S]*return <ClockInScreen/.test(today) && today.indexOf('if (!active)') < today.indexOf('const nextId'));
+check('7 not clocked in: the worker still sees their route (no Clock In screen replaces it); clocking is manual on the Clock tab', !/return <ClockInScreen/.test(today) && !/if \(!active\) \{/.test(today));
 check('8 "clocked in" is only a current session (the one shared definition); a stale or flagged one never counts', /w\.active/.test(today) && /isCurrent\(asSession\(d\)/.test(read('src/hooks/useMyWorkday.ts')));
 check('9 no timer, total or Clock Out on Today after clock-in', !/w\.clockOut\(|Clock Out|netMsAt|durationText|clockText|Workday total/.test(today.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')));
 const settings = read('app/(worker)/(tabs)/settings.tsx');

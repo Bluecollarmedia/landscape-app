@@ -92,7 +92,9 @@ export function SnowTimeClockScreen() {
   const [clockError, setClockError] = useState<string | null>(null);
   // Not on a running storm route: no Clock In button (an open shift always keeps its Clock Out).
   useEffect(() => { canClockIn().then(setAllowed); }, [shifts.length, open?.id]);
-  const blocked = !open && !allowed;
+  // Clocking in is manual and always possible: not on a route, no storm dispatched, no job started: the worker can still clock in and out here.
+  void allowed;
+  const blocked = false;
   const week = shifts.reduce((sum, s) => sum + shiftHours(s), 0);
 
   async function toggle() {

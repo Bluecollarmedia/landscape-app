@@ -50,12 +50,15 @@ export function WorkdayCard({ compact = false, gate = false, portal = false, pre
   // A running day that began before today (an overnight job) is labelled with its day. A day open for much longer is never "running": it is `w.stale`.
   const fromEarlier = !!w.active && new Date(w.active.clockInAt).toDateString() !== new Date(nowMs).toDateString();
 
+  // The dashboards never pop up a Clock In: clocking in and out is manual, on the Clock tab (the card there is `portal`).
+  if (gate) return null;
   if (w.installed !== true) return null;
   const active = w.active;
   const closedToday = !active ? w.today : undefined;
   const current = w.day?.current;
   // No route or job today: no Clock In button at all (the database refuses a clock-in too).
-  const noWork = !active && w.day?.canClockIn === false;
+  // Clocking in is always possible, with or without work scheduled (the database no longer refuses it).
+  const noWork = false;
   // Clocked out for the day, but work was added afterwards (a new job today, or route stops still open): offer to clock back in right away.
   const moreWork = todayAssignments.some((a) => a.status !== 'completed' && a.status !== 'cancelled') || myRoutes.some((r) => r.stops.some((st) => st.status === 'pending' || st.status === 'arrived'));
 

@@ -5,7 +5,6 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { sizing } from '@/theme/spacing';
-import { useOpenOnClock } from '@/hooks/useOpenOnClock';
 
 let NativeTabs: any = null;
 try {
@@ -137,7 +136,6 @@ function WorkerJSTabs() {
 }
 
 export default function WorkerTabsLayout() {
-  useOpenOnClock();
   const useNative = NativeTabs != null && Platform.OS !== 'web';
 
   return useNative ? <WorkerNativeTabs /> : <WorkerJSTabs />;

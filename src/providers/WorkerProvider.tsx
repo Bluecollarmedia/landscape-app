@@ -330,7 +330,7 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
   const checkInTimed = useCallback(async (gps: GPSCoordinates | null, assignmentId?: string): Promise<{ ok: true } | { ok: false; error: string }> => {
     const job = resolveCheckInJob(assignmentId);
     if (!job) return { ok: false, error: 'There is no job to check in to.' };
-    if (!workday.active) return { ok: false, error: 'Clock in for the day first. The Clock In button is at the top of Today.' };
+    if (!workday.active) return { ok: false, error: 'Clock in first on the Clock tab.' };
     const resuming = job.status === 'completed';
     const g = gps ? { lat: gps.latitude, lng: gps.longitude, accuracy: gps.accuracy, raw: gps as unknown as Record<string, unknown> } : {};
     const r = await workday.startVisit('assignment', job.id, g);

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { InteractionManager, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
@@ -29,9 +29,18 @@ export function PlacePicker({ visible, current, onClose, onPick }: { visible: bo
   const [query, setQuery] = useState('');
   const [recents, setRecents] = useState<Place[]>([]);
 
-  useEffect(() => { if (visible) { setQuery(''); void readRecents().then(setRecents); } }, [visible]);
-  const results = useMemo(() => (visible && query.trim().length >= 2 ? searchPlaces(allPlaces(), query, DEFAULT_PLACE, 8) : []), [visible, query]);
-  const searching = query.trim().length >= 2;
+  useEffect(() => {
+    if (!visible) return;
+    setQuery('');
+    void readRecents().then(setRecents);
+    // Build the town list while the sheet slides up, so the first letter typed never waits for it.
+    const warm = InteractionManager.runAfterInteractions(() => { allPlaces(); });
+    return () => warm.cancel();
+  }, [visible]);
+  // The list follows what is typed one step behind, so typing itself is never held up by a search.
+  const typed = useDeferredValue(query);
+  const results = useMemo(() => (visible && typed.trim().length >= 2 ? searchPlaces(allPlaces(), typed, DEFAULT_PLACE, 8) : []), [visible, typed]);
+  const searching = typed.trim().length >= 2;
 
   const choose = (p: Place) => { void pushRecent(p); onPick(p); };
   const row = (p: Place, key: string) => (

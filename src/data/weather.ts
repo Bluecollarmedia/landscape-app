@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { DEFAULT_PLACE, WEATHER_TOWNS, asPlace, isBuiltInKey, type Place } from '@/lib/weatherTowns';
 import { completePayload, type WeatherPayload } from '@/lib/weatherView';
+import { shareInFlight } from '@/lib/sharedRequest';
 
 const PLACE_KEY = 'weather.place.v1';
 const OLD_TOWN_KEY = 'weather.town.v1';
@@ -16,12 +17,20 @@ const RECENT_KEY = 'weather.recent.v1';
 const cacheKey = (key: string) => `weather.last.${key}.v1`;
 const REQUEST_LIMIT_MS = 12_000;
 const RECENT_MAX = 5;
+/** How many places keep a saved forecast on the phone (the most recently saved ones); older ones are removed so the cache never grows. */
+export const FORECAST_CACHE_MAX = 12;
+const INDEX_KEY = 'weather.last.index.v1';
 
 export type WeatherResult =
   | { ok: true; data: WeatherPayload; stale: boolean }
   | { ok: false; reason: 'disabled' | 'unavailable' };
 
-export async function loadWeather(place: Place): Promise<WeatherResult> {
+/** One request per place at a time: a second ask while the first is on its way shares its answer. */
+export function loadWeather(place: Place): Promise<WeatherResult> {
+  return shareInFlight(`weather:${place.key}`, () => loadWeatherNow(place));
+}
+
+async function loadWeatherNow(place: Place): Promise<WeatherResult> {
   if (!isSupabaseConfigured) return { ok: false, reason: 'unavailable' };
   try {
     // The eight towns near Brighton are asked for by name (their forecast grid is already known); any other place by its point.
@@ -52,7 +61,15 @@ export async function readLastWeather(place: Place): Promise<WeatherPayload | nu
   }
 }
 export async function saveLastWeather(data: WeatherPayload): Promise<void> {
-  try { await AsyncStorage.setItem(cacheKey(data.town), JSON.stringify(data)); } catch { /* the phone's storage is best effort */ }
+  try {
+    await AsyncStorage.setItem(cacheKey(data.town), JSON.stringify(data));
+    const raw = await AsyncStorage.getItem(INDEX_KEY);
+    const known: string[] = raw ? (JSON.parse(raw) as string[]).filter((k) => typeof k === 'string') : [];
+    const next = [data.town, ...known.filter((k) => k !== data.town)];
+    const drop = next.slice(FORECAST_CACHE_MAX);
+    await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(next.slice(0, FORECAST_CACHE_MAX)));
+    for (const k of drop) await AsyncStorage.removeItem(cacheKey(k));
+  } catch { /* the phone's storage is best effort */ }
 }
 
 /** The place last chosen (Lakewood the first time, or when nothing usable is saved). An older save that held one of the eight towns' names still works. */

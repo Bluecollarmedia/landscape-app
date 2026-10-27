@@ -8,12 +8,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { createWeatherSwitch, type CachedAnswer } from '@/lib/weatherSwitch';
+import { shareInFlight } from '@/lib/sharedRequest';
 
 const KEY = 'publicWeather.v1';
 /** The decision never waits for this (it waits at most REQUEST_CAP_MS); this only stops a request that never finishes. */
 const HARD_STOP_MS = 15_000;
 
-async function fetchAnswer(): Promise<boolean> {
+/** One question at a time: callers that ask while one is on its way share its answer (launch, foreground and the 60-second check can overlap). */
+function fetchAnswer(): Promise<boolean> {
+  return shareInFlight('weather.switch', fetchAnswerNow);
+}
+async function fetchAnswerNow(): Promise<boolean> {
   if (!isSupabaseConfigured) throw new Error('No backend configured.');
   const work = Promise.resolve(supabase.rpc('public_weather_config'));
   const stop = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timed out.')), HARD_STOP_MS));

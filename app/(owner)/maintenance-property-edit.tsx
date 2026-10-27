@@ -11,6 +11,7 @@
  * Saved services are never deleted, only turned off, so visits keep their history.
  */
 
+import { PhotoRuleEditor } from '@/components/maintenance/PhotoRuleEditor';
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, Platform, ScrollView } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -533,10 +534,13 @@ function ServiceEditor({ draft: d, onChange, onRemove, seasonStart, seasonEnd }:
           : '"Last done" covers work before it was tracked here.'}
       </Text>
 
-      <View style={styles.switchRow}>
-        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>Completion photos required</Text>
-        <Switch value={d.requiresPhotos} onValueChange={(v) => onChange({ requiresPhotos: v })} accessibilityLabel="Completion photos required" />
-      </View>
+      <PhotoRuleEditor
+        label="Completion photos required"
+        on={d.requiresPhotos}
+        count={d.minPhotos}
+        onChange={(on, count) => onChange({ requiresPhotos: on, minPhotos: count })}
+        hint="When on, the crew takes one photo for each task before ticking it, and at least this many photos in all."
+      />
       <NoteField label="Checklist" placeholder={'Checklist for every visit, one per line\nBlow off driveway and walks'} value={d.checklist} onChangeText={(t) => onChange({ checklist: t })} />
       <NoteField label="Instructions" placeholder="Standing instructions for this service" value={d.instructions} onChangeText={(t) => onChange({ instructions: t })} />
 

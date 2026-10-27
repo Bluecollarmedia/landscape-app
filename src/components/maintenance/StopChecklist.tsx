@@ -1,13 +1,14 @@
 /**
  * The checklist for one maintenance visit. Any crew member can tick an item;
  * the tick is shared with the whole crew and records who ticked it.
+ * When the stop needs photos, EVERY task needs its own photo: pressing a task asks for one, and the task ticks when that photo is saved.
  */
 
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Icon, PressableScale } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
-import { db } from '@/data/store';
+import { db, rowsOf, useDb } from '@/data/store';
 import { setTaskDone } from '@/data/maintenance';
 import { askForTaskPhoto } from '@/lib/stopPhotoPicker';
 import { typeScale } from '@/theme/typography';
@@ -30,15 +31,26 @@ interface Props {
 export function StopChecklist({ tasks, locked, stopId, requiresPhotos, photoCount, onError }: Props) {
   const t = useT();
   const { colors } = useTheme();
+  useDb();
   const [saving, setSaving] = useState<string | null>(null);
   const sorted = tasks.slice().sort((a, b) => a.sortOrder - b.sortOrder);
+  // Which tasks already have their own photo (saved, or still on its way up).
+  const withPhoto = new Set((rowsOf('maintenance_photos') as unknown as { stopId: string; taskId?: string }[]).filter((p) => p.stopId === stopId && p.taskId).map((p) => p.taskId as string));
 
   async function toggle(task: MaintenanceStopTask) {
     if (locked || saving) return;
     haptics.light();
-    if (!task.completedAt && photoCount === 0) {
+    if (!task.completedAt && requiresPhotos) {
+      // One photo per task. Without its own photo the task is not ticked: the photo is asked for, and the task ticks when it is saved.
+      if (!withPhoto.has(task.id)) {
+        setSaving(task.id);
+        await askForTaskPhoto(stopId, true, task.id);
+        setSaving(null);
+        return;
+      }
+    } else if (!task.completedAt && photoCount === 0) {
       setSaving(task.id);
-      const go = await askForTaskPhoto(stopId, requiresPhotos);
+      const go = await askForTaskPhoto(stopId, false);
       setSaving(null);
       if (!go) return;
     }
@@ -80,6 +92,10 @@ export function StopChecklist({ tasks, locked, stopId, requiresPhotos, photoCoun
               {done ? (
                 <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
                   {by ? `${by.firstName} · ` : ''}{clockTime(task.completedAt!)}
+                </Text>
+              ) : requiresPhotos ? (
+                <Text style={[typeScale.caption, { color: withPhoto.has(task.id) ? colors.warning : colors.textTertiary, marginTop: 2 }]}>
+                  {withPhoto.has(task.id) ? t('Photo saving. This task ticks when it is saved.') : t('Needs its own photo')}{!task.isRequired ? ` · ${t('Optional')}` : ''}
                 </Text>
               ) : !task.isRequired ? (
                 <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>{t('Optional')}</Text>

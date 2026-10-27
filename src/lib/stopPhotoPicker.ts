@@ -12,7 +12,7 @@ import { tr } from '@/i18n';
 export type PhotoSource = 'camera' | 'library';
 
 /** Opens the camera or library and adds what was picked to the stop. Resolves to how many photos were added (0 = cancelled or no permission). */
-export async function pickStopPhotos(stopId: string, source: PhotoSource): Promise<number> {
+export async function pickStopPhotos(stopId: string, source: PhotoSource, task?: { id: string; tickWhenSaved?: boolean }): Promise<number> {
   if (Platform.OS !== 'web') {
     const permission = source === 'camera'
       ? await ImagePicker.requestCameraPermissionsAsync()
@@ -29,7 +29,7 @@ export async function pickStopPhotos(stopId: string, source: PhotoSource): Promi
   const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
   if (result.canceled) return 0;
   let added = 0;
-  for (const a of result.assets) if (addStopPhoto(stopId, await keepPicked(a.uri))) added++;
+  for (const a of result.assets) if (addStopPhoto(stopId, await keepPicked(a.uri), undefined, task?.id, task?.tickWhenSaved)) added++;
   if (added) haptics.success();
   return added;
 }
@@ -40,8 +40,8 @@ export async function pickStopPhotos(stopId: string, source: PhotoSource): Promi
  *  - optional: a worker can add one or skip, and the task is ticked either way.
  * Resolves true when the task should now be ticked.
  */
-export function askForTaskPhoto(stopId: string, required: boolean): Promise<boolean> {
-  const add = async (source: PhotoSource) => (await pickStopPhotos(stopId, source)) > 0;
+export function askForTaskPhoto(stopId: string, required: boolean, taskId?: string): Promise<boolean> {
+  const add = async (source: PhotoSource) => (await pickStopPhotos(stopId, source, taskId ? { id: taskId, tickWhenSaved: required } : undefined)) > 0;
   if (Platform.OS === 'web') return required ? add('library') : Promise.resolve(true);
   return new Promise((resolve) => {
     const buttons = [
@@ -53,7 +53,7 @@ export function askForTaskPhoto(stopId: string, required: boolean): Promise<bool
     ];
     Alert.alert(
       required ? tr('Please add a photo first') : tr('Add a photo?'),
-      required ? tr('This property needs a photo before this task can be completed.') : tr('A photo of the finished work is a good idea. You can skip it.'),
+      required ? tr('Each task needs its own photo before it can be completed.') : tr('A photo of the finished work is a good idea. You can skip it.'),
       buttons,
       { cancelable: false },
     );

@@ -29,6 +29,7 @@ export interface ServiceDraft {
   priorCompletedCount: string;
   lastCompletedOn?: string;
   requiresPhotos: boolean;
+  minPhotos: number;
   /** One checklist item per line. */
   checklist: string;
   instructions: string;
@@ -89,6 +90,7 @@ export function newDraft(type: string, seasonStart?: string, seasonEnd?: string)
     seasonQuantity: '',
     priorCompletedCount: '',
     requiresPhotos: false,
+    minPhotos: 1,
     checklist: '',
     instructions: '',
     isActive: true,
@@ -116,6 +118,7 @@ export function draftFromRule(r: MaintenanceServiceRule): ServiceDraft {
     priorCompletedCount: r.priorCompletedCount ? String(r.priorCompletedCount) : '',
     lastCompletedOn: r.lastCompletedOn,
     requiresPhotos: r.requiresPhotos,
+    minPhotos: r.minPhotos ?? 1,
     checklist: r.defaultChecklist.join('\n'),
     instructions: r.instructions ?? '',
     isActive: r.isActive,
@@ -148,6 +151,7 @@ export function draftToInput(d: ServiceDraft, sortOrder: number): ServiceRuleInp
     priorCompletedCount: toInt(d.priorCompletedCount) ?? 0,
     lastCompletedOn: d.lastCompletedOn,
     requiresPhotos: d.requiresPhotos,
+    minPhotos: Math.max(1, Math.min(20, d.minPhotos || 1)),
     defaultChecklist: d.checklist.split('\n').map((s) => s.trim()).filter(Boolean),
     instructions: d.instructions.trim() || undefined,
     isActive: d.isActive,

@@ -32,6 +32,7 @@ import {
   addCompletionMedia, arriveAtStop, finishStop, loadMyRoutes, loadRoute, SNOW_COMPLETION_TARGET, STOP_STATUS_LABEL,
   type MyRoute, type RouteDetail, type RouteStop,
   stopNeedsPhotos,
+  stopMinMedia,
 } from '@/data/snowRoutes';
 import { STOP_TONE } from './RouteEditScreen';
 import { LeadSkipPanel } from './SkipRequests';
@@ -122,7 +123,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
   const addedCount = (current?.mediaCount ?? 0) + uploading.length;
   // Photos for stops already completed (or any other stop) keep uploading in the background; they stay visible here so they can be retried or removed.
   const elsewhere = snowUploadState(mediaJobs, SNOW_COMPLETION_TARGET, (p) => !current || p.visitId !== current.id);
-  const needMedia = route && current && stopNeedsPhotos(current, route) ? Math.max(0, route.minMedia - addedCount) : 0;
+  const needMedia = route && current && stopNeedsPhotos(current, route) ? Math.max(0, stopMinMedia(current, route) - addedCount) : 0;
 
   /** Starts every visit at this property that has not been started, in order. Stops at the first problem. */
   async function arriveGroup(g: RouteStop[]): Promise<{ ok: boolean; error?: string }> {

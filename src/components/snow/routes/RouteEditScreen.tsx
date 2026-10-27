@@ -5,6 +5,7 @@
  * the existing app style; no approved mockup yet.
  */
 import { crewChoices, nextCrew, routeTeamMulti, toggleLead, type TeamMember } from '@/lib/snowCrew';
+import { PhotoRuleEditor } from '@/components/maintenance/PhotoRuleEditor';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,7 +15,7 @@ import { confirmAction, showMessage } from '@/components/financials/ActionSheet'
 import { useTheme } from '@/providers/ThemeProvider';
 import { loadEligibleProperties, SERVICE_LABEL, type EligibleProperty } from '@/data/snowStorms';
 import {
-  addStops, cancelRoute, loadRouteExtraLeadIds, setRouteLeads, loadLeadLoad, loadLeadsForServices, grantSnowAccessForRoute, loadRoute, loadRouteCrew, loadSnowCrewPool, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, stopNeedsPhotos, updateRoute, updateStop,
+  addStops, cancelRoute, stopMinMedia, loadRouteExtraLeadIds, setRouteLeads, loadLeadLoad, loadLeadsForServices, grantSnowAccessForRoute, loadRoute, loadRouteCrew, loadSnowCrewPool, loadSnowLeads, orderWithNext, removeStop, reorderStops, saveRouteAsTemplate, setRouteCrew, stopNeedsPhotos, updateRoute, updateStop,
   type RouteCrewMember, type RouteStop,
   STOP_STATUS_LABEL, type RouteDetail, type SnowLead,
 } from '@/data/snowRoutes';
@@ -64,6 +65,7 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
   const [detailStop, setDetailStop] = useState<RouteStop[] | null>(null);
   const [stopNote, setStopNote] = useState('');
   const [stopPhotos, setStopPhotos] = useState(false);
+  const [stopCount, setStopCount] = useState(1);
   const [renaming, setRenaming] = useState(false);
   const [renameText, setRenameText] = useState('');
 
@@ -231,6 +233,7 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
     setDetailStop(group);
     setStopNote(group[0].ownerNote ?? '');
     setStopPhotos(route ? stopNeedsPhotos(group[0], route) : false);
+    setStopCount(route ? stopMinMedia(group[0], route) : 1);
   }
 
   async function saveStop() {
@@ -244,6 +247,7 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
       // The crew adds one set of photos for the whole stop, on its first visit, so only that visit can require photos.
       const wantPhotos = i === 0 ? stopPhotos : false;
       if (wantPhotos !== stopNeedsPhotos(v, route)) patch.photosRequired = wantPhotos;
+      if (wantPhotos && stopCount !== stopMinMedia(v, route)) patch.minMedia = stopCount;
       if (!Object.keys(patch).length) continue;
       const res = await updateStop(v.id, patch);
       if (!res.ok) { failure = res.error; break; }
@@ -418,6 +422,26 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
           ) : null}
         </SetupCard>
 
+        {editable ? (
+          <View style={[styles.group, { borderColor: colors.borderLight, marginBottom: spacing.md, paddingVertical: spacing.xs }]}>
+            <PhotoRuleEditor
+              label="Photos required at every stop"
+              on={route.mediaRequired}
+              count={route.minMedia}
+              onChange={async (on, n) => {
+                setBusy(true);
+                const res = await updateRoute(route.id, { mediaRequired: on, minMedia: n });
+                // The whole route is set: every stop follows it again (a property can still be changed on its own afterwards).
+                if (res.ok) for (const v of route.stops) if (v.photosRequired !== undefined || v.minMedia !== undefined) await updateStop(v.id, { photosRequired: null, ...(v.minMedia !== undefined ? { minMedia: null } : {}) });
+                setBusy(false);
+                if (!res.ok) showMessage("Couldn't save", res.error);
+                reload();
+              }}
+              hint="Applies to the whole route, every property. Tap a property below to change just that one."
+            />
+          </View>
+        ) : null}
+
         <SetupCard
           n={3}
           icon="map-pin"
@@ -551,12 +575,14 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
             <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
               <Text style={[typeScale.headingSmall, { color: colors.textPrimary }]}>{detailStop?.[0].propertyName}</Text>
               {detailStop?.[0].propertyAddress ? <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{detailStop[0].propertyAddress}</Text> : null}
-              <View style={[styles.inline, { marginTop: spacing.lg }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]}>Photos required here</Text>
-                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>The crew must add a photo before finishing this property.</Text>
-                </View>
-                <Switch value={stopPhotos} disabled={!editable || busy || (!!detailStop && isGroupClosed(detailStop))} onValueChange={setStopPhotos} accessibilityLabel="Photos required at this property" />
+              <View style={{ marginTop: spacing.lg }}>
+                <PhotoRuleEditor
+                  label="Photos required here"
+                  on={stopPhotos}
+                  count={stopCount}
+                  onChange={(on, n) => { setStopPhotos(on); setStopCount(n); }}
+                  hint="Just this property. The crew must add this many photos before finishing it."
+                />
               </View>
               <Input label="Notes for this property" value={stopNote} onChangeText={setStopNote} editable={editable} multiline numberOfLines={4} placeholder="Gate code, where to pile snow, what to watch for" containerStyle={{ marginTop: spacing.lg }} />
               <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>

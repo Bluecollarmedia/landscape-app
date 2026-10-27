@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
 import { Button, Icon, LoadingSpinner } from '@/components/ui';
+import { PhotoCountStepper } from '@/components/maintenance/PhotoRuleEditor';
 import { CustomerPicker } from '@/components/customers/CustomerPicker';
 import { CustomerInviteCard } from '@/components/invites/CustomerInviteCard';
 import { TaskMediaStrip, TaskMediaViewer } from '@/components/tasks/TaskMedia';
@@ -30,7 +31,7 @@ import { db, useDb } from '@/data/store';
 import { useSnowPropertyDetails } from '@/hooks/useSnowPropertyDetails';
 import {
   addContact, addReferenceMedia, addService, referenceAsOf, retireReferenceMedia, saveInstructions,
-  setServiceActive, updateContact, type ContactInput, type SnowPropertyDetails,
+  setServiceActive, setServicePhotoRule, updateContact, type ContactInput, type SnowPropertyDetails,
 } from '@/data/snowProperties';
 import {
   SNOW_SERVICES, SNOW_SERVICE_ICONS, SNOW_SERVICE_LABELS,
@@ -248,9 +249,53 @@ function ServiceCard({ companyId, propertyId, service, details, mediaUrls, onCha
           Stopped{row.deactivatedAt ? ` ${formatDate(row.deactivatedAt)}` : ''}. Its instructions and media are kept.
         </Text>
       )}
+      {row?.isActive && <ServicePhotoRule ps={row} label={label} onChanged={onChanged} />}
       {row?.isActive && (
         <ServiceReferenceEditor companyId={companyId} ps={row} details={details} mediaUrls={mediaUrls} onChanged={onChanged} />
       )}
+    </View>
+  );
+}
+
+/**
+ * Photos for this service at this property: follow the route, required (with how many), or none. New stops for this property start from it;
+ * the owner can still change one stop, or a whole route, on the route screen.
+ */
+function ServicePhotoRule({ ps, label, onChanged }: { ps: SnowPropertyService; label: string; onChanged: () => void }) {
+  const { colors } = useTheme();
+  const [mode, setMode] = useState<'route' | 'on' | 'off'>(ps.photosRequired === true ? 'on' : ps.photosRequired === false ? 'off' : 'route');
+  const [count, setCount] = useState(ps.photoCount ?? 1);
+  const [saving, setSaving] = useState(false);
+  async function save(nextMode: 'route' | 'on' | 'off', nextCount: number) {
+    setMode(nextMode);
+    setCount(nextCount);
+    setSaving(true);
+    const res = await setServicePhotoRule(ps.id, { photosRequired: nextMode === 'route' ? null : nextMode === 'on', photoCount: nextMode === 'on' ? nextCount : null });
+    setSaving(false);
+    if (!res.ok) return notify('Not Saved', res.error);
+    onChanged();
+  }
+  const chips: { key: 'route' | 'on' | 'off'; text: string }[] = [
+    { key: 'route', text: 'Follow the route' }, { key: 'on', text: 'Photos required' }, { key: 'off', text: 'No photos' },
+  ];
+  return (
+    <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
+      <Text style={[typeScale.labelLarge, { color: colors.textPrimary }]}>{`Photos for ${label.toLowerCase()} here`}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+        {chips.map((c) => {
+          const on = mode === c.key;
+          return (
+            <Pressable key={c.key} onPress={() => save(c.key, count)} disabled={saving} accessibilityRole="button" accessibilityState={{ selected: on }}
+              style={{ minHeight: 40, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? colors.primary : colors.backgroundSecondary, borderColor: on ? colors.primary : colors.border }}>
+              <Text style={[typeScale.bodySmall, { color: on ? '#FFFFFF' : colors.textPrimary, fontWeight: '700' }]}>{c.text}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {mode === 'on' ? <PhotoCountStepper count={count} onChange={(n) => save('on', n)} /> : null}
+      <Text style={[typeScale.caption, { color: colors.textTertiary }]}>
+        {mode === 'route' ? 'Each route decides.' : mode === 'on' ? 'New stops here start with this many photos required.' : 'New stops here start with no photos required.'}
+      </Text>
     </View>
   );
 }

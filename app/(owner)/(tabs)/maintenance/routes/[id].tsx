@@ -13,7 +13,8 @@ import { useMaintenance, useMaintenanceRoute } from '@/hooks/useMaintenance';
 import { db, useDb } from '@/data/store';
 import { useWorkdaysOn } from '@/hooks/useClockedInToday';
 import { PrivatePhoto } from '@/components/media/PrivatePhoto';
-import { correctAttendance, locationLabel, setRouteLead, setStopPhotoShared } from '@/data/maintenance';
+import { correctAttendance, locationLabel, setRouteLead, setRoutePhotoRule, setStopPhotoShared, updateStop } from '@/data/maintenance';
+import { PhotoRuleEditor } from '@/components/maintenance/PhotoRuleEditor';
 import {
   buildRouteReview, correctStopTime, describeEvent, formatTime,
   type AttendanceReview, type RecordedTime, type StopReview, type StopTimeKind,
@@ -194,6 +195,30 @@ export default function RouteDetailScreen() {
             />
           ))}
         </View>
+
+        {/* Photos: one rule for the whole route, or each stop on its own below */}
+        {route.status !== 'cancelled' && route.stops.some((s) => s.status === 'pending' || s.status === 'arrived') ? (() => {
+          const open = route.stops.filter((s) => s.status === 'pending' || s.status === 'arrived');
+          const allOn = open.every((s) => s.requiresPhotos);
+          const allOff = open.every((s) => !s.requiresPhotos);
+          const counts = new Set(open.filter((s) => s.requiresPhotos).map((s) => s.minPhotos));
+          const same = (allOn || allOff) && counts.size <= 1;
+          const count = counts.size === 1 ? [...counts][0] : 1;
+          return (
+            <>
+              <SectionTitle>PHOTOS FOR THE WHOLE ROUTE</SectionTitle>
+              <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm, { paddingVertical: spacing.xs, marginBottom: spacing.md }]}>
+                <PhotoRuleEditor
+                  label="Photos required at every stop"
+                  on={allOn}
+                  count={count}
+                  onChange={(on, n) => setRoutePhotoRule(route.id, on, n)}
+                  hint={same ? 'This sets every stop that is not finished. You can still change one stop below. With photos on, the crew takes one photo for each task.' : 'Your stops have different photo settings. Changing this sets all of them the same. Or change one stop below.'}
+                />
+              </View>
+            </>
+          );
+        })() : null}
 
         {/* Stops */}
         <SectionTitle>{`STOPS IN ROUTE ORDER (${total})`}</SectionTitle>
@@ -494,6 +519,19 @@ function StopCard({ review, canFix, onFix, onOpenProperty }: {
           )}
         </View>
       )}
+
+      {stop.status === 'pending' || stop.status === 'arrived' ? (
+        <>
+          <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
+          <PhotoRuleEditor
+            label="Photos required here"
+            on={stop.requiresPhotos}
+            count={stop.minPhotos}
+            onChange={(on, n) => updateStop(stop.id, { requiresPhotos: on, minPhotos: n })}
+            hint="Just this property. With photos on, the crew takes one photo for each task."
+          />
+        </>
+      ) : null}
 
       {canFix && stop.status !== 'skipped' && (
         <View style={styles.actions}>

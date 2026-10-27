@@ -228,6 +228,15 @@ export async function setServiceActive(propertyServiceId: string, active: boolea
   return error ? fail(message(error, 'Couldn\'t change the service.')) : ok(undefined);
 }
 
+/** The photo rule for one service at a property (update 112): required (with how many), not required, or null to follow the route. */
+export async function setServicePhotoRule(propertyServiceId: string, rule: { photosRequired: boolean | null; photoCount: number | null }): Promise<Result> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const { error } = await supabase.from('snow_property_services')
+    .update({ photos_required: rule.photosRequired, photo_count: rule.photosRequired ? rule.photoCount : null }).eq('id', propertyServiceId);
+  if (error) return fail(/photos_required|photo_count/i.test(error.message) ? 'Photo rules for a service need database update 112, which has not been installed yet.' : message(error, 'Couldn\'t save the photo rule.'));
+  return ok(undefined);
+}
+
 // ── Instructions ────────────────────────────────────────────────────────────
 
 /**

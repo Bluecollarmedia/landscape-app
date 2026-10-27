@@ -2,7 +2,7 @@
  * Plain helpers for showing a weather answer (pure: no React, no network). The answer's shape is defined by the weather function
  * (supabase/functions/weather/index.ts); the types are repeated here so the app does not import server code.
  */
-export type WxIcon = 'sun' | 'moon' | 'partly' | 'cloud' | 'rain' | 'snow' | 'fog' | 'storm';
+export type WxIcon = 'sun' | 'moon' | 'partly' | 'partlynight' | 'cloud' | 'drizzle' | 'rain' | 'heavyrain' | 'storm' | 'snow' | 'heavysnow' | 'sleet' | 'hail' | 'fog' | 'haze' | 'smoke' | 'dust' | 'wind';
 export interface WxHour {
   time: string; tempF: number | null; popPct: number | null; icon: WxIcon;
   feelsF: number | null; windMph: number | null; windDir: string; gustMph: number | null;
@@ -79,7 +79,7 @@ export function dewWord(dewF: number | null): 'Dry' | 'Comfortable' | 'A little 
 /** The first hour in the next 24 where rain or snow is likely (40% or more), or null. */
 export function firstWetHour(hours: WxHour[]): { index: number; time: string; snow: boolean } | null {
   const i = hours.slice(0, 24).findIndex((h) => typeof h.popPct === 'number' && h.popPct >= 40);
-  return i < 0 ? null : { index: i, time: hours[i].time, snow: hours[i].icon === 'snow' };
+  return i < 0 ? null : { index: i, time: hours[i].time, snow: hours[i].icon === 'snow' || hours[i].icon === 'heavysnow' || hours[i].icon === 'sleet' };
 }
 
 /** Where a day's low and high sit (0..1) inside the week's range, for the temperature bar. null when a figure is missing. */

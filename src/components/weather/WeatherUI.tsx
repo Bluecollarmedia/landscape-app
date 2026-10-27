@@ -4,7 +4,7 @@
  * see-through panels. Used only by the Weather screens.
  */
 import React from 'react';
-import { Image, Platform, StyleSheet, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, StyleSheet, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import type { WxIcon } from '@/lib/weatherView';
 
 /** The brand greens come from the logo file (deep #0B4736, fresh #53A246); the rest are tints and neutrals chosen to sit with them. */
@@ -28,67 +28,48 @@ export function Panel({ children, style, bg }: { children?: React.ReactNode; sty
   return <View style={[styles.panel, bg ? { backgroundColor: bg } : null, style]}>{children}</View>;
 }
 
-let SymbolView: any = null;
-try { SymbolView = require('expo-symbols').SymbolView; } catch { /* no symbols on this platform: the drawn pictures are used */ }
-
-/** Apple's own weather symbols (SF Symbols, the set the iPhone Weather app draws from). iPhone only. */
-const SYMBOLS: Record<WxIcon | 'sunrise' | 'sunset', string> = {
-  sun: 'sun.max.fill',
-  moon: 'moon.stars.fill',
-  partly: 'cloud.sun.fill',
-  cloud: 'cloud.fill',
-  rain: 'cloud.rain.fill',
-  snow: 'cloud.snow.fill',
-  fog: 'cloud.fog.fill',
-  storm: 'cloud.bolt.rain.fill',
-  sunrise: 'sunrise.fill',
-  sunset: 'sunset.fill',
-};
-
-/** The colours for each symbol's layers (cloud, then sun / rain / bolt): Apple's own shapes, in colours that stay visible on the white cards. */
-const SYMBOL_COLORS: Record<WxIcon | 'sunrise' | 'sunset', string[]> = {
-  sun: ['#F5A623'],
-  moon: ['#8CA0D3', '#F0B84A'],
-  partly: ['#9FB1C7', '#F5A623'],
-  cloud: ['#9FB1C7'],
-  rain: ['#9FB1C7', '#3B8FE0'],
-  snow: ['#9FB1C7', '#5AA9F0'],
-  fog: ['#9FB1C7', '#B3C2D6'],
-  storm: ['#8496AE', '#F5B82E', '#3B8FE0'],
-  sunrise: ['#F5A623', '#E8602C'],
-  sunset: ['#F0545F', '#E8602C'],
-};
-
-/** The fallback weather pictures: soft, flat drawings (assets/images/wx), used where Apple's symbols are not available (web, Android). */
-const PICTURES: Record<WxIcon | 'sunrise' | 'sunset', ImageSourcePropType> = {
+type Pic = WxIcon | 'sunrise' | 'sunset';
+/** The weather pictures are Meteocons by Bas Milius (MIT licence), drawn still: assets/images/wx. Sunrise and sunset are our own drawings. */
+const PICTURES: Record<Pic, ImageSourcePropType> = {
   sun: require('../../../assets/images/wx/sun.png'),
   moon: require('../../../assets/images/wx/moon.png'),
   partly: require('../../../assets/images/wx/partly.png'),
+  partlynight: require('../../../assets/images/wx/partlynight.png'),
   cloud: require('../../../assets/images/wx/cloud.png'),
+  drizzle: require('../../../assets/images/wx/drizzle.png'),
   rain: require('../../../assets/images/wx/rain.png'),
-  snow: require('../../../assets/images/wx/snow.png'),
-  fog: require('../../../assets/images/wx/fog.png'),
+  heavyrain: require('../../../assets/images/wx/heavyrain.png'),
   storm: require('../../../assets/images/wx/storm.png'),
+  snow: require('../../../assets/images/wx/snow.png'),
+  heavysnow: require('../../../assets/images/wx/heavysnow.png'),
+  sleet: require('../../../assets/images/wx/sleet.png'),
+  hail: require('../../../assets/images/wx/hail.png'),
+  fog: require('../../../assets/images/wx/fog.png'),
+  haze: require('../../../assets/images/wx/haze.png'),
+  smoke: require('../../../assets/images/wx/smoke.png'),
+  dust: require('../../../assets/images/wx/dust.png'),
+  wind: require('../../../assets/images/wx/wind.png'),
   sunrise: require('../../../assets/images/wx/sunrise.png'),
   sunset: require('../../../assets/images/wx/sunset.png'),
 };
-export function WxPicture({ icon, size = 24 }: { icon: WxIcon | 'sunrise' | 'sunset'; size?: number }) {
-  const drawn = <Image source={PICTURES[icon] ?? PICTURES.cloud} style={{ width: size, height: size }} resizeMode="contain" accessible={false} />;
-  if (Platform.OS === 'ios' && SymbolView) {
-    return (
-      <SymbolView
-        name={SYMBOLS[icon] ?? SYMBOLS.cloud}
-        type="palette"
-        colors={SYMBOL_COLORS[icon] ?? SYMBOL_COLORS.cloud}
-        size={size}
-        resizeMode="scaleAspectFit"
-        style={{ width: size, height: size }}
-        fallback={drawn}
-        accessible={false}
-      />
-    );
+
+/** The Meteocons clouds are pale, so each picture sits on a round colour: sky blue by day, deep blue at night, slate for storms. */
+const CHIP_DAY = '#A9C9EA';
+const CHIP_NIGHT = '#27375F';
+const CHIP_STORM = '#8EA3C4';
+const CHIP: Partial<Record<WxIcon, string>> = { moon: CHIP_NIGHT, partlynight: CHIP_NIGHT, storm: CHIP_STORM, heavyrain: CHIP_STORM, hail: CHIP_STORM, heavysnow: CHIP_STORM, sleet: CHIP_STORM, smoke: '#B8BEC6', dust: '#D6C7A6' };
+
+export function WxPicture({ icon, size = 24, bare = false }: { icon: Pic; size?: number; bare?: boolean }) {
+  const source = PICTURES[icon] ?? PICTURES.cloud;
+  if (bare || icon === 'sunrise' || icon === 'sunset') {
+    return <Image source={source} style={{ width: size, height: size }} resizeMode="contain" accessible={false} />;
   }
-  return drawn;
+  const inner = Math.round(size * 0.92);
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: CHIP[icon as WxIcon] ?? CHIP_DAY, alignItems: 'center', justifyContent: 'center' }}>
+      <Image source={source} style={{ width: inner, height: inner }} resizeMode="contain" accessible={false} />
+    </View>
+  );
 }
 
 /** The page behind every Weather screen: the soft off-white the hero artwork dissolves into. */

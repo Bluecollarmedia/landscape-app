@@ -30,7 +30,7 @@ export const TOWNS: Record<string, Town> = {
   'point-pleasant': { name: 'Point Pleasant', lat: 40.0777, lon: -74.0699, office: 'PHI', gridX: 87, gridY: 90, zone: 'NJZ026', tz: 'America/New_York' },
 };
 
-export type WxIcon = 'sun' | 'moon' | 'partly' | 'cloud' | 'rain' | 'snow' | 'fog' | 'storm';
+export type WxIcon = 'sun' | 'moon' | 'partly' | 'partlynight' | 'cloud' | 'drizzle' | 'rain' | 'heavyrain' | 'storm' | 'snow' | 'heavysnow' | 'sleet' | 'hail' | 'fog' | 'haze' | 'smoke' | 'dust' | 'wind';
 
 /** One hour. Every figure is null when NWS has none for that hour ("unavailable"), never a made-up zero. */
 export interface WxHour {
@@ -53,14 +53,24 @@ export interface WeatherPayload {
   source: string;
 }
 
-/** One word for the picture, from NWS's own short text (never from anything invented). */
+/** One word for the picture, from NWS's own short text (never from anything invented). The kinds follow the list in Apple's "Learn the weather icons" article. */
 export function iconFor(shortForecast: string, isDaytime: boolean): WxIcon {
   const t = (shortForecast || '').toLowerCase();
   if (/thunder|t-storm/.test(t)) return 'storm';
-  if (/snow|blizzard|flurr|sleet|wintry|freezing/.test(t)) return 'snow';
-  if (/rain|shower|drizzle/.test(t)) return 'rain';
-  if (/fog|haze|mist|smoke/.test(t)) return 'fog';
-  if (/partly|mostly sunny|mostly clear/.test(t)) return isDaytime ? 'partly' : 'moon';
+  if (/blizzard|heavy snow/.test(t)) return 'heavysnow';
+  if (/sleet|freezing rain|wintry|ice pellet|rain and snow|snow and rain/.test(t)) return 'sleet';
+  if (/hail/.test(t)) return 'hail';
+  if (/snow|flurr/.test(t)) return 'snow';
+  if (/drizzle/.test(t)) return 'drizzle';
+  if (/heavy rain|downpour/.test(t)) return 'heavyrain';
+  if (/rain|shower/.test(t)) return 'rain';
+  if (/smoke/.test(t)) return 'smoke';
+  if (/dust|sand/.test(t)) return 'dust';
+  if (/fog|mist/.test(t)) return 'fog';
+  if (/haze/.test(t)) return 'haze';
+  if (/^(windy|breezy|blustery|gusty)$/.test(t.trim())) return 'wind';
+  if (/mostly clear/.test(t)) return isDaytime ? 'partly' : 'moon';
+  if (/partly|mostly sunny/.test(t)) return isDaytime ? 'partly' : 'partlynight';
   if (/cloud|overcast/.test(t)) return 'cloud';
   if (/sunny|clear|fair/.test(t)) return isDaytime ? 'sun' : 'moon';
   return 'cloud';

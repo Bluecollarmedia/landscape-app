@@ -105,4 +105,5 @@ export const ES_WEATHER: Record<string, string> = {
   'chance of rain': 'de probabilidad de lluvia',
   'Back to weather': 'Volver al clima',
   'Show the next days': 'Ver los próximos días',
+  'Weather icons: Meteocons': 'Íconos del clima: Meteocons',
 };

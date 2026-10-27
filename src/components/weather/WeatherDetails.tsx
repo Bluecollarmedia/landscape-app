@@ -167,7 +167,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
 
               {hasHours && sel ? (
                 <View style={styles.readout} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${t(metric.label)}, ${metric.fmt(selVal, sel)}, ${hourLabel(sel.time, locale)}`}>
-                  <WxPicture icon={sel.icon} size={36} />
+                  <WxPicture icon={sel.icon} size={46} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.readValue}>{selVal === null ? t('Unavailable') : metric.fmt(selVal, sel)}</Text>
                     <Text style={styles.readTime}>{hourLabel(sel.time, locale)} · {dayTitle(date, locale)}</Text>

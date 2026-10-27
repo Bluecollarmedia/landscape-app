@@ -1,7 +1,8 @@
 import React, { memo, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ScrubArea } from '@/components/weather/ScrubArea';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage, useT } from '@/i18n';
@@ -166,6 +167,8 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
   const { language } = useLanguage();
   const locale = language === 'es' ? 'es' : 'en-US';
   const insets = useSafeAreaInsets();
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => { scrollY.value = e.contentOffset.y; });
   const [date, setDate] = useState('');
   const [idx, setIdx] = useState(0);
   const [metricKey, setMetricKey] = useState<MetricKey>('temp');
@@ -235,10 +238,11 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
   const hasHours = hours.length > 0;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: WX.page }}>
+    <BottomSheetModal visible={visible} onRequestClose={onClose} scrollOffset={scrollY} closeDistance={36} closeVelocity={450}>
+      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, marginTop: insets.top + 8, backgroundColor: WX.page, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' }}>
         <WeatherBackground />
-        <ScrollView contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} bounces={false} contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
           {header}
 
           {dayRow}
@@ -293,9 +297,10 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
               return <MetricTile key={m.key} metric={m} on={m.key === metricKey} valueText={text} off={v === null} label={t(m.label)} a11y={`${t(m.label)}, ${text}`} onPress={setMetric} />;
             })}
           </View>
-        </ScrollView>
-      </GestureHandlerRootView>
-    </Modal>
+        </Animated.ScrollView>
+      </View>
+      </View>
+    </BottomSheetModal>
   );
 }
 

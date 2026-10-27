@@ -6,16 +6,17 @@ import { haptics } from '@/lib/haptics';
 import { ScrubArea } from '@/components/weather/ScrubArea';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage, useT } from '@/i18n';
-import { hoursOnDate, hourLabel, orDash, tempColor, weekdayShort, todayInTowns, type WeatherPayload, type WxHour } from '@/lib/weatherView';
+import { hoursOnDate, hourLabel, orDash, tempColor, uvColor, weekdayShort, todayInTowns, type WeatherPayload, type WxHour } from '@/lib/weatherView';
 import { Panel, WX, WeatherBackground, WxPicture } from '@/components/weather/WeatherUI';
 
-export type MetricKey = 'temp' | 'feels' | 'pop' | 'rain' | 'wind' | 'gust' | 'humidity' | 'dew' | 'cloud';
+export type MetricKey = 'temp' | 'feels' | 'uv' | 'pop' | 'rain' | 'wind' | 'gust' | 'humidity' | 'dew' | 'cloud';
 type Icon = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 interface Metric { key: MetricKey; label: string; icon: Icon; kind: 'line' | 'bars'; get: (h: WxHour) => number | null; fmt: (v: number | null, h?: WxHour) => string; max?: number }
 
 const METRICS: Metric[] = [
   { key: 'temp', label: 'Temperature', icon: 'thermometer', kind: 'line', get: (h) => h.tempF, fmt: (v) => orDash(v, '°') },
   { key: 'feels', label: 'Feels like', icon: 'thermometer-lines', kind: 'line', get: (h) => h.feelsF, fmt: (v) => orDash(v, '°') },
+  { key: 'uv', label: 'UV index', icon: 'white-balance-sunny', kind: 'bars', max: 11, get: (h) => h.uvIndex, fmt: (v) => orDash(v) },
   { key: 'pop', label: 'Rain chance', icon: 'weather-pouring', kind: 'bars', max: 100, get: (h) => h.popPct, fmt: (v) => orDash(v, '%') },
   { key: 'rain', label: 'Rain amount', icon: 'water-outline', kind: 'bars', get: (h) => h.precipIn, fmt: (v) => orDash(v, ' in', 2) },
   { key: 'wind', label: 'Wind', icon: 'weather-windy', kind: 'line', get: (h) => h.windMph, fmt: (v, h) => (v === null ? '–' : `${Math.round(v)} mph ${h?.windDir ?? ''}`.trim()) },
@@ -193,7 +194,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
                           const v = values[i]; if (v === null) return null;
                           const bw = Math.max(3, plotW / hours.length - 2);
                           const top = Math.min(CHART_H - 2, yAt(v));
-                          return <View key={h.time} style={{ position: 'absolute', left: xAt(i) - bw / 2, width: bw, top, height: CHART_H - top, borderRadius: 3, backgroundColor: i === idx ? WX.deep : '#8EC3F0', opacity: i === idx ? 1 : 0.85 }} />;
+                          return <View key={h.time} style={{ position: 'absolute', left: xAt(i) - bw / 2, width: bw, top, height: CHART_H - top, borderRadius: 3, backgroundColor: i === idx ? WX.deep : metric.key === 'uv' ? uvColor(v) : '#8EC3F0', opacity: i === idx ? 1 : 0.85 }} />;
                         }) : segs}
                         {!bars ? hours.map((h, i) => {
                           const v = values[i]; if (v === null || i === idx) return null;

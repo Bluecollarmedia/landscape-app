@@ -10,7 +10,7 @@ import { useWeather } from '@/hooks/useWeather';
 import { readTown, saveTown } from '@/data/weather';
 import { DEFAULT_TOWN, WEATHER_TOWNS, townCoords, townName, type TownKey } from '@/lib/weatherTowns';
 import {
-  ageMinutes, barSpan, degrees, dewWord, firstWetHour, hourLabel, localDay, moonPhase, nextMoons, orDash, snowKind, sunTimes, tempColor, timeLabel, todayInTowns, weekdayShort, windWord,
+  ageMinutes, barSpan, degrees, dewWord, firstWetHour, hoursOnDate, hourLabel, localDay, moonPhase, nextMoons, orDash, snowKind, sunTimes, tempColor, timeLabel, todayInTowns, uvAdvice, uvColor, uvLevel, weekdayShort, windWord,
   type MoonName, type WxAlert, type WxDay, type WxHour,
 } from '@/lib/weatherView';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
@@ -33,9 +33,9 @@ const MOON_ICON: Record<MoonName, Icon> = {
   'Full Moon': 'moon-full', 'Waning Gibbous': 'moon-waning-gibbous', 'Last Quarter': 'moon-last-quarter', 'Waning Crescent': 'moon-waning-crescent',
 };
 
-type HourMetric = 'temp' | 'feels' | 'pop' | 'wind';
+type HourMetric = 'temp' | 'feels' | 'uv' | 'pop' | 'wind';
 const HOUR_METRICS: { key: HourMetric; label: string }[] = [
-  { key: 'temp', label: 'Temp' }, { key: 'feels', label: 'Feels like' }, { key: 'pop', label: 'Rain' }, { key: 'wind', label: 'Wind' },
+  { key: 'temp', label: 'Temp' }, { key: 'feels', label: 'Feels like' }, { key: 'uv', label: 'UV' }, { key: 'pop', label: 'Rain' }, { key: 'wind', label: 'Wind' },
 ];
 const HOUR_W = 58;
 const DAY_W = 34;
@@ -58,15 +58,15 @@ function buildStrip(hours: WxHour[], expanded: boolean): StripRow[] {
 const rowWidth = (r: StripRow) => (r.kind === 'hour' ? HOUR_W : MORE_W);
 const STRIP_PAD = DAY_W + 10;   // the width the pinned day label covers at the left
 
-const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress, label }: { h: WxHour; isNow: boolean; metric: HourMetric; locale: string; now: string; onPress: (h: WxHour) => void; label: string }) {
+const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress, label, uvWord }: { h: WxHour; isNow: boolean; metric: HourMetric; locale: string; now: string; onPress: (h: WxHour) => void; label: string; uvWord: string }) {
   const value =
-    metric === 'temp' ? degrees(h.tempF) : metric === 'feels' ? degrees(h.feelsF) : metric === 'pop' ? orDash(h.popPct, '%') : h.windMph === null ? '–' : `${Math.round(h.windMph)}`;
+    metric === 'temp' ? degrees(h.tempF) : metric === 'feels' ? degrees(h.feelsF) : metric === 'uv' ? orDash(h.uvIndex) : metric === 'pop' ? orDash(h.popPct, '%') : h.windMph === null ? '–' : `${Math.round(h.windMph)}`;
   return (
     <Pressable onPress={() => onPress(h)} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [styles.hour, pressed && { backgroundColor: WX.leafTint }]}>
       <Text style={styles.hourText}>{isNow ? now : hourLabel(h.time, locale)}</Text>
       <WxPicture icon={h.icon} size={40} />
-      <Text style={[styles.hourValue, metric === 'pop' && { color: WX.rain }]}>{value}</Text>
-      {metric === 'wind' ? <Text style={styles.hourSub}>{h.windDir}</Text> : typeof h.popPct === 'number' && h.popPct >= 20 && metric !== 'pop' ? <Text style={[styles.hourSub, { color: WX.rain }]}>{h.popPct}%</Text> : <Text style={styles.hourSub}> </Text>}
+      <Text style={[styles.hourValue, metric === 'pop' && { color: WX.rain }, metric === 'uv' && { color: uvColor(h.uvIndex) }]}>{value}</Text>
+      {metric === 'uv' ? <Text style={[styles.hourSub, { color: uvColor(h.uvIndex) }]}>{h.uvIndex !== null && h.uvIndex > 0 ? uvWord : ' '}</Text> : metric === 'wind' ? <Text style={styles.hourSub}>{h.windDir}</Text> : typeof h.popPct === 'number' && h.popPct >= 20 && metric !== 'pop' ? <Text style={[styles.hourSub, { color: WX.rain }]}>{h.popPct}%</Text> : <Text style={styles.hourSub}> </Text>}
     </Pressable>
   );
 });
@@ -147,16 +147,16 @@ export default function WeatherHome() {
   }));
   const miniStyle = useAnimatedStyle(() => ({ opacity: interpolate(y.value, [150, 230], [0, 1], Extrapolation.CLAMP) }));
 
-  function snowText(d: WxDay): { text: string; color: string } {
+  // Snow is only mentioned on a day when snow is actually expected (a trace or more). A day with none, or with no figure, says nothing about it.
+  function snowText(d: WxDay): { text: string; color: string } | null {
     const k = snowKind(d.snowIn);
-    if (k === 'unavailable') return { text: t('Snow: unavailable'), color: FAINT };
-    if (k === 'none') return { text: t('Snow: none'), color: SOFT };
     if (k === 'trace') return { text: t('Snow: trace'), color: WX.rain };
-    return { text: t('Snow: {n} in', { n: d.snowIn as number }), color: WX.rain };
+    if (k === 'amount') return { text: t('Snow: {n} in', { n: d.snowIn as number }), color: WX.rain };
+    return null;
   }
 
   const open = useCallback((s: DetailsStart) => setDetails(s), []);
-  const openHour = useCallback((h: WxHour) => open({ date: localDay(h.time), time: h.time, metric: hourMetric === 'temp' ? 'temp' : hourMetric === 'feels' ? 'feels' : hourMetric === 'pop' ? 'pop' : 'wind' }), [open, hourMetric]);
+  const openHour = useCallback((h: WxHour) => open({ date: localDay(h.time), time: h.time, metric: hourMetric }), [open, hourMetric]);
 
   const hours = data?.hourly ?? [];
   const first = hours[0];
@@ -166,6 +166,9 @@ export default function WeatherHome() {
     ? (wet.index === 0 ? t(wet.snow ? 'Snow likely now.' : 'Rain likely now.') : t(wet.snow ? 'Snow likely around {time}.' : 'Rain likely around {time}.', { time: hourLabel(wet.time, locale) }))
     : t('No rain expected in the next 24 hours.');
   const dewNow = first?.dewF ?? null;
+  const uvNow = first?.uvIndex ?? null;
+  const uvToday = hoursOnDate(hours, today);
+  const uvPeak = uvToday.reduce<WxHour | null>((best, h) => ((h.uvIndex ?? 0) > ((best?.uvIndex) ?? -1) ? h : best), null);
   const gustMax = next24.map((h) => h.gustMph).filter((v): v is number => v !== null);
   const rainKnown = next24.map((h) => h.precipIn).filter((v): v is number => v !== null);
   const sun = data ? sunTimes(today, townCoords(town).lat, townCoords(town).lon) : null;
@@ -239,6 +242,7 @@ export default function WeatherHome() {
               </View>
               <Text style={styles.cond}>{data.current.text}</Text>
               {first && first.feelsF !== null ? <Text style={styles.hl}>{t('Feels like {n}', { n: degrees(first.feelsF) })}</Text> : null}
+              {uvNow !== null && uvNow > 0 ? <Text style={styles.hl}>{t('UV index {n}', { n: uvNow })} · {t(uvLevel(uvNow))}</Text> : null}
               <Text style={styles.hl}>{t('H: {high}  L: {low}', { high: degrees(data.today.highF), low: degrees(data.today.lowF) })}</Text>
               <Text style={styles.summary}>{summary}</Text>
             </View>
@@ -291,7 +295,7 @@ export default function WeatherHome() {
         {data && hours.length > 0 ? (
           <Panel style={styles.gap}>
             <View style={styles.pad}>
-              <Pressable onPress={() => open({ date: today, metric: hourMetric === 'temp' ? 'temp' : hourMetric === 'feels' ? 'feels' : hourMetric === 'pop' ? 'pop' : 'wind' })} accessibilityRole="button" accessibilityLabel={`${t('Hourly Forecast')}. ${t('Open details')}`}>
+              <Pressable onPress={() => open({ date: today, metric: hourMetric })} accessibilityRole="button" accessibilityLabel={`${t('Hourly Forecast')}. ${t('Open details')}`}>
                 <CardHead icon="clock-outline" title={t('Hourly Forecast')} tappable />
               </Pressable>
               <View style={{ marginTop: 6 }}>
@@ -309,7 +313,7 @@ export default function WeatherHome() {
                   style={{ marginRight: -6 }}
                   renderItem={({ item }) =>
                     item.kind === 'hour' ? (
-                      <HourItem h={item.h} isNow={item.isNow} metric={hourMetric} locale={locale} now={t('Now')} onPress={openHour} label={`${hourLabel(item.h.time, locale)}. ${t('Open details')}`} />
+                      <HourItem h={item.h} isNow={item.isNow} metric={hourMetric} locale={locale} now={t('Now')} onPress={openHour} label={`${hourLabel(item.h.time, locale)}. ${t('Open details')}`} uvWord={item.h.uvIndex === null ? '' : t(uvLevel(item.h.uvIndex))} />
                     ) : (
                       <View style={styles.moreWrap}>
                         <Pressable onPress={showMoreDays} accessibilityRole="button" accessibilityLabel={t('Show the next days')} style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.7 }]}>
@@ -350,7 +354,7 @@ export default function WeatherHome() {
                   <Pressable key={d.date} onPress={() => open({ date: d.date })} accessibilityRole="button" accessibilityLabel={`${d.date === today ? t('Today') : weekdayShort(d.date, locale)}, ${d.text}. ${t('Open details')}`} style={({ pressed }) => [styles.day, i > 0 && styles.dayLine, pressed && { backgroundColor: WX.leafTint }]}>
                     <View style={{ width: 70 }}>
                       <Text style={styles.dayName}>{d.date === today ? t('Today') : weekdayShort(d.date, locale)}</Text>
-                      <Text style={[styles.daySnow, { color: s.color }]} numberOfLines={2}>{s.text}</Text>
+                      {s ? <Text style={[styles.daySnow, { color: s.color }]} numberOfLines={2}>{s.text}</Text> : null}
                     </View>
                     <View style={styles.dayIcon}>
                       <WxPicture icon={d.icon} size={36} />
@@ -373,6 +377,36 @@ export default function WeatherHome() {
 
         {data && first ? (
           <>
+            <Pressable onPress={() => open(metricOf('uv'))} accessibilityRole="button" accessibilityLabel={`${t('UV index')}. ${t('Open details')}`} style={({ pressed }) => [styles.gap, pressed && { opacity: 0.8 }]}>
+              <Panel>
+                <View style={styles.pad}>
+                  <CardHead icon="white-balance-sunny" title={t('UV index')} tappable />
+                  <View style={styles.bigRow}>
+                    <Text style={styles.big}>{uvNow === null ? t('Unavailable') : `${uvNow}`}</Text>
+                    {uvNow !== null ? <Text style={[styles.bigSub, { color: uvColor(uvNow) }]}>{t(uvLevel(uvNow))}</Text> : null}
+                  </View>
+                  <Text style={styles.cardBody}>
+                    {uvNow === null ? '' : t(uvAdvice(uvLevel(uvNow)))}
+                    {uvPeak && (uvPeak.uvIndex ?? 0) > 0 ? ` ${t('Peak today: {n} around {time}.', { n: uvPeak.uvIndex as number, time: hourLabel(uvPeak.time, locale) })}` : ''}
+                  </Text>
+                  {uvNow !== null ? (
+                    <View style={styles.uvTrack}>
+                      <LinearGradient colors={['#3E9E52', '#E8C23A', '#F08A24', '#E0503A', '#8E3FBF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                      <View style={[styles.humDot, { left: `${Math.max(2, Math.min(98, (Math.min(uvNow, 11) / 11) * 100))}%` }]} />
+                    </View>
+                  ) : null}
+                  <MiniBars
+                    values={next24.map((h) => h.uvIndex)}
+                    max={11}
+                    color="#F0A21A"
+                    caption={t('Slide your finger across to read any hour')}
+                    describe={(i) => `${hourLabel(next24[i].time, locale)} · ${t('UV index {n}', { n: next24[i].uvIndex ?? 0 })} · ${t(uvLevel(next24[i].uvIndex ?? 0))}`}
+                  />
+                  <Text style={styles.axisNote}>{t("An estimate worked out from the sun's position and the forecast cloud cover.")}</Text>
+                </View>
+              </Panel>
+            </Pressable>
+
             <Pressable onPress={() => open(metricOf('wind'))} accessibilityRole="button" accessibilityLabel={`${t('Wind')}. ${t('Open details')}`} style={({ pressed }) => [styles.gap, pressed && { opacity: 0.8 }]}>
               <Panel>
                 <View style={styles.pad}>
@@ -642,6 +676,7 @@ const styles = StyleSheet.create({
   miniCol: { flex: 1, justifyContent: 'flex-end' },
   miniBar: { borderRadius: 2, width: '100%' },
   axisNote: { color: FAINT, fontSize: 11.5, marginTop: 6 },
+  uvTrack: { height: 10, borderRadius: 5, overflow: 'hidden', marginTop: 14 },
   humTrack: { height: 10, borderRadius: 5, overflow: 'hidden', marginTop: 14 },
   humDot: { position: 'absolute', top: -2, width: 14, height: 14, borderRadius: 7, marginLeft: -7, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: WX.deep },
   two: { flexDirection: 'row', gap: 14 },

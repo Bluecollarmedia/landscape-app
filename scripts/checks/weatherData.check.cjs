@@ -102,6 +102,11 @@ check('44 an unknown unit gives no number (null), never a guess', normalizeForec
 const gph = gridPerHour([{ validTime: '2026-10-26T20:00:00+00:00/PT2H', value: 4 }, { validTime: '2026-10-26T22:00:00+00:00/PT1H', value: null }], 'amount', (v) => v);
 check('45 a real 0 stays 0, a null block gives no hour', gridPerHour([{ validTime: '2026-10-26T20:00:00+00:00/PT1H', value: 0 }], 'level', (v) => v).get(Date.parse('2026-10-26T20:00:00Z')) === 0 && gph.get(Date.parse('2026-10-26T20:00:00Z')) === 2 && !gph.has(Date.parse('2026-10-26T22:00:00Z')));
 
+// ── after midnight, yesterday's evening is not a day to list ──
+const AFTER_MIDNIGHT = Date.parse('2026-10-27T05:00:00Z'); // 1 AM Eastern on the 27th
+const late = normalizeForecast({ townKey: 'lakewood', forecast, hourly, grid, alerts: alertsZone, now: AFTER_MIDNIGHT });
+check('46 REAL: at 1 AM the day list starts with today (the 27th), not with the 26th whose forecast is already over', late.daily.length > 0 && late.daily[0].date === '2026-10-27' && late.daily.every((d) => d.date >= '2026-10-27'), JSON.stringify(late.daily.map((d) => d.date)));
+
 // ── the edge wrapper (file text only: it is not run here) ──
 const wrap = src.slice(marker);
 check('28 the wrapper checks the owner\'s Weather switch BEFORE any request to NWS, and answers 403 when it is off', wrap.indexOf('weatherIsOn()') > -1 && wrap.indexOf('weatherIsOn()', wrap.indexOf('serve(')) < wrap.indexOf('nws(`${grid}', wrap.indexOf('serve(')) && /json\(403, \{ error: 'disabled' \}\)/.test(wrap));
@@ -116,7 +121,7 @@ const walk = (d) => fs.readdirSync(path.join(root, d), { withFileTypes: true }).
 const weatherFiles = [...walk('app/weather'), 'src/data/weather.ts', 'src/hooks/useWeather.ts', ...walk('src/components/weather')].filter((f) => /\.(ts|tsx)$/.test(f));
 check('33 the Weather screens never talk to NWS or any weather provider themselves: only the data function', weatherFiles.every((f) => !/api\.weather\.gov|weatherapi|open-meteo|visualcrossing|weatherkit/i.test(read(f))) && /functions\.invoke\('weather'/.test(read('src/data/weather.ts')));
 check('34 no device-location permission is requested anywhere in the Weather screens', weatherFiles.every((f) => !/expo-location|requestForegroundPermissions|geolocation/i.test(read(f))));
-check('35 a missing snowfall figure is worded as "unavailable", and the screen keeps "none" for a real zero only', /snowKind\(d\.snowIn\)/.test(read('app/weather/index.tsx')) && /k === 'unavailable'\) return \{ text: t\('Snow: unavailable'\)/.test(read('app/weather/index.tsx')) && /k === 'none'\) return \{ text: t\('Snow: none'\)/.test(read('app/weather/index.tsx')));
+check('35 snow is only mentioned on a day when snow is expected (a trace or more); a day with none, or with no figure, says nothing about snow, and a missing figure is never turned into 0', /if \(k === 'trace'\) return/.test(read('app/weather/index.tsx')) && /if \(k === 'amount'\) return/.test(read('app/weather/index.tsx')) && !/Snow: unavailable|Snow: none/.test(read('app/weather/index.tsx')) && /return null;/.test(read('app/weather/index.tsx')));
 check('36 the Sign In buttons open the app\'s existing welcome screen (nothing is redrawn)', (read('app/weather/index.tsx').match(/router\.push\('\/\(auth\)\/welcome' as any\)/g) ?? []).length === 1 && /router\.push\('\/\(auth\)\/welcome' as any\)/.test(read('app/weather/account.tsx')));
 check('37 the Weather area re-asks the owner\'s switch every 60 seconds while it is open', /setInterval\(\(\) => \{ void weatherSwitch\.refresh\(\); \}, 60_000\)/.test(read('app/weather/_layout.tsx')));
 check('38 a refusal from the data function ("disabled") makes the app re-ask the switch at once', /reason === 'disabled'/.test(read('src/hooks/useWeather.ts')) && /weatherSwitch\.refresh\(\)/.test(read('src/hooks/useWeather.ts')));

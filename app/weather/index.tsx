@@ -10,7 +10,6 @@ import { useWeather } from '@/hooks/useWeather';
 import { useCurrentStorm } from '@/hooks/useStorm';
 import { StormCard } from '@/components/weather/StormCard';
 import { readPlace, savePlace } from '@/data/weather';
-import { syncWidgets } from '@/data/widgetSync';
 import { DEFAULT_PLACE, type Place } from '@/lib/weatherTowns';
 import {
   ageMinutes, barSpan, setViewTz, viewTz, degrees, dewWord, firstWetHour, hoursOnDate, hourLabel, localDay, moonPhase, nextMoons, orDash, snowKind, sunTimes, tempColor, timeLabel, todayInTowns, uvAdvice, uvColor, uvLevel, weekdayShort, windWord,
@@ -171,8 +170,6 @@ export default function WeatherHome() {
   const now = useNow(5 * 60_000);   // the sun arc and the moon only need a coarse clock
   const today = useToday(data?.tz);
   const stale = view.status === 'stale' && !busy;
-  // The home screen and lock screen widgets follow whatever forecast and storm outlook are on screen.
-  useEffect(() => { void syncWidgets(data, storm); }, [data, storm]);
 
 
   // Hero fades and drifts slowly as the cards slide up over it.

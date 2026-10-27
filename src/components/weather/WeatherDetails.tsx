@@ -236,7 +236,6 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
               );
             })}
           </View>
-          <Text style={styles.source}>{t('Forecast data: National Weather Service')}</Text>
         </ScrollView>
       </GestureHandlerRootView>
     </Modal>
@@ -275,5 +274,4 @@ const styles = StyleSheet.create({
   tileLabel: { color: SOFT, fontSize: 12, fontWeight: '700', flexShrink: 1 },
   tileValue: { color: INK, fontSize: 21, fontWeight: '700', marginTop: 6 },
   tileOff: { fontSize: 14, fontWeight: '500', color: WX.faint },
-  source: { color: WX.faint, fontSize: 11, textAlign: 'center', marginTop: 20 },
 });

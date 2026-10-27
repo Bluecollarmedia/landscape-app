@@ -160,4 +160,6 @@ export const ES_WEATHER: Record<string, string> = {
   'Loading…': 'Cargando…',
   'Updated {h} hr ago': 'Actualizado hace {h} h',
   'Storm map': 'Mapa de la tormenta',
+  'Tap to zoom': 'Toca para ampliar',
+  'Open full screen': 'Abrir en pantalla completa',
 };

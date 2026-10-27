@@ -5,6 +5,7 @@ import { useT } from '@/i18n';
 import { Panel, WX } from '@/components/weather/WeatherUI';
 import { snowRange, type StormOutlook } from '@/lib/stormView';
 import { useVersionLabel } from '@/components/weather/StormPage';
+import { StormMap } from '@/components/weather/StormMapView';
 
 /** The card on the Weather home while a storm outlook is published. It is the same saved update the outlook page shows. */
 export function StormCard({ storm, onPress }: { storm: StormOutlook; onPress: () => void }) {
@@ -26,6 +27,7 @@ export function StormCard({ storm, onPress }: { storm: StormOutlook; onPress: ()
           </View>
           <MaterialCommunityIcons name="chevron-right" size={24} color={WX.faint} />
         </View>
+        {v.map_url ? <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}><StormMap uri={v.map_url} label={t('Storm map')} onOpenCard /></View> : null}
       </Panel>
     </Pressable>
   );

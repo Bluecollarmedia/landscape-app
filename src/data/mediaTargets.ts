@@ -35,6 +35,10 @@ export async function completeMediaTarget(job: MediaJob, uploaded: { url: string
   if (job.target.type !== 'project_photo' && (job.bytesOut ?? job.bytesIn)) fileFields.sizeBytes = job.bytesOut ?? job.bytesIn;
   const res = await confirmDeferredRow(table, job.id, fileFields, { ...baseRow(job), ...fileFields });
   if (!res.ok) throw new Error(res.error);
+  if (job.target.type === 'maintenance_photo') {
+    // A worker who pressed a task that needs its own photo: the task ticks as soon as that photo is saved. Never lets a failure here undo the photo.
+    try { await (require('./maintenance') as typeof import('./maintenance')).afterStopPhotoSaved(job.id, job.target.payload.taskId as string | undefined); } catch { /* the worker can tick it by hand */ }
+  }
 }
 
 /** After an app restart: show the pending item again with its local file (nothing is saved yet). */

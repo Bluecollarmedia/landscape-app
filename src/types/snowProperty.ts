@@ -29,6 +29,10 @@ export interface SnowPropertyService {
   service: SnowService;
   isActive: boolean;
   deactivatedAt?: string;
+  /** Photos for this service at this property: true / false, or empty to follow the route (update 112). */
+  photosRequired?: boolean | null;
+  /** How many photos when required, or empty to follow the route's number (update 112). */
+  photoCount?: number | null;
   createdAt: string;
   updatedAt: string;
 }

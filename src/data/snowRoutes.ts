@@ -45,6 +45,8 @@ export interface RouteStop {
   ownerNote?: string;
   /** Photos required at this property: true / false, or undefined to follow the route's rule (update 60). */
   photosRequired?: boolean;
+  /** How many photos this stop needs, or undefined to follow the route's number (update 112). */
+  minMedia?: number;
 }
 
 export interface RouteDetail {
@@ -82,11 +84,14 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
   if (error) return fail(message(error, 'Couldn\'t load the route.'));
   if (!r) return fail('This route isn\'t available.');
   const visitCols = 'id, property_id, position, status, service, property_name, property_address, arrived_at, completed_at, completion_note';
-  const [first, media] = await Promise.all([
-    supabase.from('snow_visits').select(`${visitCols}, owner_note, photos_required`).eq('route_id', routeId).order('position'),
+  const [withCount, media] = await Promise.all([
+    supabase.from('snow_visits').select(`${visitCols}, owner_note, photos_required, min_media`).eq('route_id', routeId).order('position'),
     supabase.from('snow_completion_media').select('id, visit_id, kind, file_key').eq('route_id', routeId),
   ]);
-  // A database without update 60 has no note / photo columns yet: load the stops without them rather than failing.
+  // A database without update 112 has no per-stop photo count yet: load the stops without it. Without update 60, without the notes and photo columns too.
+  const first = withCount.error && /min_media/i.test(withCount.error.message)
+    ? await supabase.from('snow_visits').select(`${visitCols}, owner_note, photos_required`).eq('route_id', routeId).order('position')
+    : withCount;
   const visits = first.error && /owner_note|photos_required/i.test(first.error.message)
     ? await supabase.from('snow_visits').select(visitCols).eq('route_id', routeId).order('position')
     : first;
@@ -129,6 +134,7 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
       photos: photosOf(v.id),
       ownerNote: (v as { owner_note?: string | null }).owner_note?.trim() || undefined,
       photosRequired: typeof (v as { photos_required?: boolean | null }).photos_required === 'boolean' ? (v as unknown as { photos_required: boolean }).photos_required : undefined,
+      minMedia: typeof (v as { min_media?: number | null }).min_media === 'number' ? (v as unknown as { min_media: number }).min_media : undefined,
     })),
   });
 }
@@ -137,15 +143,22 @@ export async function loadRoute(routeId: string): Promise<Result<RouteDetail>> {
 export const stopNeedsPhotos = (stop: Pick<RouteStop, 'photosRequired'>, route: Pick<RouteDetail, 'mediaRequired'>): boolean =>
   stop.photosRequired ?? route.mediaRequired;
 
+/** How many photos this stop needs: its own number, else the route's. */
+export const stopMinMedia = (stop: Pick<RouteStop, 'minMedia'>, route: Pick<RouteDetail, 'minMedia'>): number =>
+  stop.minMedia ?? route.minMedia;
+
 /** The owner's settings for one property on a route (update 60): a note, and whether photos are required there. */
-export async function updateStop(visitId: string, patch: { ownerNote?: string; photosRequired?: boolean | null }): Promise<Result> {
+export async function updateStop(visitId: string, patch: { ownerNote?: string; photosRequired?: boolean | null; minMedia?: number | null }): Promise<Result> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const row: Record<string, unknown> = {};
   if (patch.ownerNote !== undefined) row.owner_note = patch.ownerNote.trim() || null;
   if (patch.photosRequired !== undefined) row.photos_required = patch.photosRequired;
+  if (patch.minMedia !== undefined) row.min_media = patch.minMedia;
   const { error } = await supabase.from('snow_visits').update(row).eq('id', visitId);
   if (error) {
-    return fail(/owner_note|photos_required/i.test(error.message)
+    return fail(/min_media/i.test(error.message)
+      ? 'How many photos a property needs requires database update 112, which has not been installed yet.'
+      : /owner_note|photos_required/i.test(error.message)
       ? 'Notes and photo settings for a property need database update 60, which has not been installed yet.'
       : message(error, "Couldn't save the property settings."));
   }

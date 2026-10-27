@@ -277,7 +277,7 @@ function insertStop(routeId: string, sortOrder: number, input: NewStopInput): Ma
     status: 'pending',
     instructions: input.instructions?.trim() || undefined,
     requiresPhotos: input.requiresPhotos ?? rules.some((r) => r.requiresPhotos),
-    minPhotos: input.minPhotos ?? 1,
+    minPhotos: input.minPhotos ?? Math.max(1, ...rules.filter((r) => r.requiresPhotos).map((r) => r.minPhotos ?? 1)),
   }) as unknown as MaintenanceStop;
   insertStopChildren(stop, input);
   return stop;
@@ -391,6 +391,15 @@ export function reorderStops(routeId: string, orderedStopIds: string[]) {
     const s = route.stops.find((x) => x.id === id);
     if (s && s.sortOrder !== i) updateRow('maintenance_stops', id, { sortOrder: i });
   });
+}
+
+/** One rule for every stop of a route that is not finished (photos on or off, and how many). The owner can still change any one stop afterwards. */
+export function setRoutePhotoRule(routeId: string, requiresPhotos: boolean, minPhotos: number) {
+  const n = Math.max(1, Math.min(20, Math.round(minPhotos) || 1));
+  for (const s of Object.values(db.maintenance.stopById)) {
+    if (s.routeId !== routeId || s.status === 'completed' || s.status === 'skipped') continue;
+    updateRow('maintenance_stops', s.id, { requiresPhotos, minPhotos: n });
+  }
 }
 
 export function updateStop(stopId: string, patch: Partial<Pick<MaintenanceStop, 'instructions' | 'requiresPhotos' | 'minPhotos'>>) {
@@ -576,15 +585,25 @@ export function setTaskDone(taskId: string, done: boolean): Promise<Result> {
   });
 }
 
+/** Photos whose task should be ticked as soon as the photo is saved (the worker already pressed the task). */
+const tickWhenSaved = new Set<string>();
+/** Called once a queued photo is saved: ticks its task if the worker asked for that. */
+export async function afterStopPhotoSaved(photoId: string, taskId?: string): Promise<void> {
+  if (!tickWhenSaved.delete(photoId) || !taskId) return;
+  await setTaskDone(taskId, true);
+}
+
 /** Adds a stop photo (internal only). Uploads in the background. */
-export function addStopPhoto(stopId: string, localUri: string, caption?: string): MaintenancePhoto | undefined {
+export function addStopPhoto(stopId: string, localUri: string, caption?: string, taskId?: string, tickTaskWhenSaved = false): MaintenancePhoto | undefined {
   const stop = db.maintenance.stopById[stopId];
   if (!stop || stop.status === 'completed' || stop.status === 'skipped') return undefined;
   const needsUpload = !db.demo && !/^https?:\/\//i.test(localUri);
   const row = insertRow('maintenance_photos', {
     routeId: stop.routeId, stopId, propertyId: stop.propertyId, uploadedBy: db.personId, fileUrl: localUri, fileKey: '',
-    caption: caption?.trim() || undefined, isCustomerVisible: false, takenAt: new Date().toISOString(),
+    caption: caption?.trim() || undefined, isCustomerVisible: false, takenAt: new Date().toISOString(), taskId: taskId || undefined,
   }, { deferSave: needsUpload }) as unknown as MaintenancePhoto;
+  // The photo is uploaded in the background; the task it proves is ticked the moment its photo is safely saved (see completeMediaTarget).
+  if (taskId && tickTaskWhenSaved) tickWhenSaved.add(row.id);
   if (db.demo) logLocal('photo_added', { routeId: stop.routeId, stopId, metadata: { photo_id: row.id } });
   if (needsUpload) {
     // The shared queue compresses, uploads, and saves the record (always internal) only once the file is stored. A failure stays in the

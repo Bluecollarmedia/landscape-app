@@ -110,6 +110,8 @@ export interface MaintenanceServiceRule {
   /** Last one done before the app started tracking. */
   lastCompletedOn?: string;
   requiresPhotos: boolean;
+  /** How many photos a stop for this service needs (1 to 20). New stops start from this. */
+  minPhotos: number;
   /** Checklist items copied onto each stop for this service. */
   defaultChecklist: string[];
   instructions?: string;
@@ -235,6 +237,8 @@ export interface MaintenancePhoto {
   isCustomerVisible: boolean;
   sharedBy?: string;
   sharedAt?: string;
+  /** The task this photo is the proof for (when the stop needs one photo per task). */
+  taskId?: string;
   takenAt?: string;
   createdAt: string;
 }

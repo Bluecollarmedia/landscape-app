@@ -4,6 +4,7 @@
  *
  *   /(owner)/maintenance-service-add?propertyId=…
  */
+import { PhotoRuleEditor } from '@/components/maintenance/PhotoRuleEditor';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, Platform } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -180,10 +181,13 @@ export default function MaintenanceServiceAddScreen() {
         </Pressable>
         {more && (
           <ListSection title="OPTIONAL">
-            <View style={styles.switchRow}>
-              <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, flex: 1 }]}>Completion photos required</Text>
-              <Switch value={draft.requiresPhotos} onValueChange={(v) => patch({ requiresPhotos: v })} accessibilityLabel="Completion photos required" />
-            </View>
+            <PhotoRuleEditor
+              label="Completion photos required"
+              on={draft.requiresPhotos}
+              count={draft.minPhotos}
+              onChange={(on, count) => patch({ requiresPhotos: on, minPhotos: count })}
+              hint="When on, the crew takes one photo for each task before ticking it, and at least this many photos in all."
+            />
             <NoteField label="Checklist" placeholder={'Checklist for every visit, one per line\nBlow off driveway and walks'} value={draft.checklist} onChangeText={(t) => patch({ checklist: t })} />
             <NoteField label="Instructions" placeholder="Standing instructions for this service" value={draft.instructions} onChangeText={(t) => patch({ instructions: t })} />
             {!fixed && <DateRow label="Last done" value={draft.lastCompletedOn} onChange={(k) => patch({ lastCompletedOn: k })} optional onClear={() => patch({ lastCompletedOn: undefined })} />}

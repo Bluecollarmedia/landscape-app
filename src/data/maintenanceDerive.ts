@@ -102,6 +102,7 @@ export function deriveMaintenance(raw: MaintenanceRaw, people: Record<string, Pe
     seasonQuantity: num(r.seasonQuantity),
     priorCompletedCount: Number(r.priorCompletedCount ?? 0),
     requiresPhotos: !!r.requiresPhotos,
+    minPhotos: Math.max(1, Number(r.minPhotos ?? 1) || 1),
     defaultChecklist: Array.isArray(r.defaultChecklist) ? r.defaultChecklist.map(String) : [],
     isActive: r.isActive !== false,
     sortOrder: Number(r.sortOrder ?? 0),

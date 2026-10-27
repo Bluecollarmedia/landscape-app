@@ -22,14 +22,14 @@ export function FloatingTabBar() {
     <View style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) + 4 }]} pointerEvents="box-none">
       <View style={styles.bar}>
         {TABS.map((tab) => {
-          const on = tab.path === '/weather' ? pathname === '/weather' || pathname === '/weather/' : pathname.startsWith(tab.path);
+          const on = tab.path === '/weather' ? pathname === '/weather' || pathname === '/weather/' || pathname.startsWith('/weather/outlook') : pathname.startsWith(tab.path);
           return (
             <Pressable
               key={tab.path}
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
               accessibilityLabel={t(tab.label)}
-              onPress={() => { if (!on) router.replace(tab.path as any); }}
+              onPress={() => { if (pathname !== tab.path && pathname !== `${tab.path}/`) router.replace(tab.path as any); }}
               style={({ pressed }) => [styles.item, on && styles.itemOn, pressed && !on && { backgroundColor: WX.leafTint }]}
             >
               <MaterialCommunityIcons name={tab.icon} size={23} color={on ? WX.deep : WX.soft} />

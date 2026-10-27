@@ -164,6 +164,7 @@ export default function SettingsScreen() {
         {weatherRow.canChange ? (
           <SettingsGroup title="Brighton Weather" footer="When on, anyone who opens the app without signing in sees local weather first, with a Sign In button. Off keeps the usual welcome screen.">
             <SettingsRow icon="cloud" tint={tileColors.blue} title={weatherRow.title} subtitle={weatherRow.subtitle} value={weatherRow.value} onPress={weatherRow.confirm} />
+            <SettingsRow icon="cloud-snow" tint={tileColors.blue} title="Storm outlook" subtitle="Write a storm update for everyone to read" onPress={() => router.push('/(owner)/storm-outlook' as any)} />
           </SettingsGroup>
         ) : null}
 

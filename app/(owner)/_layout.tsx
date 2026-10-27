@@ -50,6 +50,8 @@ export default function OwnerLayout() {
         {/* Snow Mode activity log: opened from the snow dashboard and settings. */}
         <Stack.Screen name="snow-activity" />
         {/* Reported problems: opened from the dashboard card, More, and a notification. */}
+        {/* Brighton Weather storm outlook: opened from Settings (the owner writes it). */}
+        <Stack.Screen name="storm-outlook" />
         <Stack.Screen name="issues" />
         <Stack.Screen name="issue-detail" />
         <Stack.Screen name="setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />

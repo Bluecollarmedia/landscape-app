@@ -7,6 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useLanguage, useT } from '@/i18n';
 import { useWeather } from '@/hooks/useWeather';
+import { useCurrentStorm } from '@/hooks/useStorm';
+import { StormCard } from '@/components/weather/StormCard';
 import { readPlace, savePlace } from '@/data/weather';
 import { DEFAULT_PLACE, type Place } from '@/lib/weatherTowns';
 import {
@@ -125,6 +127,7 @@ export default function WeatherHome() {
   const stripRef = useRef<FlatList<StripRow>>(null);
   const [stripDate, setStripDate] = useState<string | null>(null);
   const { view, refresh, busy } = useWeather(place);
+  const { storm } = useCurrentStorm();
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => { readPlace().then(setPlace); }, []);
@@ -251,6 +254,12 @@ export default function WeatherHome() {
             <Text style={styles.bigMsg}>{t('Weather is unavailable right now')}</Text>
           )}
         </Animated.View>
+
+        {storm?.latest ? (
+          <View style={styles.gap}>
+            <StormCard storm={storm} onPress={() => router.push('/weather/outlook' as any)} />
+          </View>
+        ) : null}
 
         {stale && data ? (
           <Panel style={styles.gap}>

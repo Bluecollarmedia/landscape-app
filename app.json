@@ -90,6 +90,9 @@
     "owner": "abbacohen",
     "updates": {
       "url": "https://u.expo.dev/c9628d1e-80c3-4a58-a2bd-f008542a71d2"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

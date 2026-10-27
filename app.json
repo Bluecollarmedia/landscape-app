@@ -44,22 +44,6 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-widgets",
-        {
-          "groupIdentifier": "group.com.brightonlawn.app",
-          "widgets": [
-            {
-              "name": "BrightonWeather",
-              "displayName": "Brighton Forecast",
-              "description": "Your local weather, and Brighton's storm outlook when one is posted.",
-              "ios": {
-                "supportedFamilies": ["systemSmall", "systemMedium", "accessoryCircular", "accessoryRectangular", "accessoryInline"]
-              }
-            }
-          ]
-        }
-      ],
       "expo-font",
       "expo-image",
       "expo-dev-client",

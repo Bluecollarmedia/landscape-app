@@ -99,4 +99,9 @@ export const ES_WEATHER: Record<string, string> = {
   'High {high} at {hi} · Low {low} at {lo}': 'Máx. {high} a las {hi} · Mín. {low} a las {lo}',
   'Refresh': 'Actualizar',
   'Updating…': 'Actualizando…',
+  'Slide your finger across the chart, or use the arrows, to move hour by hour.': 'Desliza el dedo sobre el gráfico, o usa las flechas, para avanzar hora por hora.',
+  'Slide your finger across to read any hour': 'Desliza el dedo para ver cualquier hora',
+  'Chance of rain, next 24 hours. Slide your finger across to read any hour.': 'Probabilidad de lluvia, próximas 24 horas. Desliza el dedo para ver cualquier hora.',
+  'chance of rain': 'de probabilidad de lluvia',
+  'Back to weather': 'Volver al clima',
 };

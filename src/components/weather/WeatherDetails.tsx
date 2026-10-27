@@ -1,6 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { haptics } from '@/lib/haptics';
+import { ScrubArea } from '@/components/weather/ScrubArea';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage, useT } from '@/i18n';
 import { hoursOnDate, hourLabel, orDash, tempColor, weekdayShort, todayInTowns, type WeatherPayload, type WxHour } from '@/lib/weatherView';
@@ -80,21 +83,14 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
   const xAt = (i: number) => (hours.length <= 1 ? plotW / 2 : (i / (hours.length - 1)) * plotW);
   const yAt = (v: number) => CHART_H - ((v - lo) / (hi - lo || 1)) * CHART_H;
 
-  // Dragging across the chart picks the nearest hour; a tap does the same. (The arrows below do it too, so the drag is only ever a shortcut.)
-  const live = useRef({ plotW: 0, n: 0 });
-  live.current = { plotW, n: hours.length };
-  const pickFromX = (x: number) => {
-    const { plotW: w, n } = live.current;
-    if (n < 1 || w <= 0) return;
-    setIdx(Math.max(0, Math.min(n - 1, Math.round((x / w) * (n - 1)))));
-  };
-  const pan = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > Math.abs(g.dy) && Math.abs(g.dx) > 4,
-    onPanResponderGrant: (e) => pickFromX(e.nativeEvent.locationX),
-    onPanResponderMove: (e) => pickFromX(e.nativeEvent.locationX),
-    onPanResponderTerminationRequest: () => false,
-  })).current;
+  // Sliding a finger across the chart picks the hour under it, live, with a light tick as it crosses each hour. A tap does the same, and the
+  // arrows below do it too, so sliding is only ever a shortcut.
+  const lastPick = useRef(-1);
+  const pickHour = useCallback((i: number) => {
+    if (i !== lastPick.current) { lastPick.current = i; haptics.select(); }
+    setIdx(i);
+  }, []);
+  const endScrub = useCallback(() => { lastPick.current = -1; }, []);
 
   const stat = (() => {
     if (!known.length) return t('Unavailable');
@@ -126,7 +122,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: WX.page }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: WX.page }}>
         <WeatherBackground />
         <ScrollView contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
           <View style={styles.head}>
@@ -171,7 +167,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
 
               {hasHours && sel ? (
                 <View style={styles.readout} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${t(metric.label)}, ${metric.fmt(selVal, sel)}, ${hourLabel(sel.time, locale)}`}>
-                  <WxPicture icon={sel.icon} size={30} />
+                  <WxPicture icon={sel.icon} size={36} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.readValue}>{selVal === null ? t('Unavailable') : metric.fmt(selVal, sel)}</Text>
                     <Text style={styles.readTime}>{hourLabel(sel.time, locale)} · {dayTitle(date, locale)}</Text>
@@ -206,14 +202,14 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
                         {sel ? <View style={{ position: 'absolute', left: xAt(idx) - 1, top: 0, width: 2, height: CHART_H, backgroundColor: WX.deep }} /> : null}
                         {sel && selVal !== null && !bars ? <View style={{ position: 'absolute', left: xAt(idx) - 7, top: yAt(selVal) - 7, width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: metric.key === 'temp' ? tempColor(selVal) : WX.rain }} /> : null}
                       </View>
-                      <View style={{ position: 'absolute', left: 0, top: 0, width: plotW, height: CHART_H }} onTouchStart={(e) => pickFromX(e.nativeEvent.locationX)} accessible={false} {...pan.panHandlers} />
+                      <ScrubArea width={plotW} count={hours.length} onPick={pickHour} onEnd={endScrub} style={{ position: 'absolute', left: 0, top: 0, width: plotW, height: CHART_H }} />
                       {grid.map((g, k) => <Text key={k} style={[styles.axisY, { top: yAt(g) - 8 }]}>{metric.fmt(g, undefined).replace(/ mph.*/, '')}</Text>)}
                       {axisLabels.map(({ h, i }) => <Text key={h.time} style={[styles.axisX, { left: Math.max(0, Math.min(plotW - 40, xAt(i) - 20)), top: CHART_H + 6 }]}>{hourLabel(h.time, locale)}</Text>)}
                     </View>
                   ) : null}
                 </View>
               ) : null}
-              <Text style={styles.hint}>{t('Drag across the chart, tap it, or use the arrows to move hour by hour.')}</Text>
+              <Text style={styles.hint}>{t('Slide your finger across the chart, or use the arrows, to move hour by hour.')}</Text>
             </View>
           </Panel>
 
@@ -242,7 +238,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
           </View>
           <Text style={styles.source}>{t('Forecast data: National Weather Service')}</Text>
         </ScrollView>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

@@ -48,7 +48,8 @@ const home = read('app/weather/index.tsx'); const det = read('src/components/wea
 const screens = home + det + ui + bar;
 check('14 no UV index and no pressure anywhere (NWS does not provide them, so they are not shown or invented)', !/uv ?index|\buvIndex\b|barometer|pressure/i.test(screens));
 check('15 the details screen opens on the day and hour that was tapped, and has a visible Back button with a label (a swipe is only a shortcut)', /presentationStyle="pageSheet"/.test(det) && /accessibilityLabel=\{t\('Close details'\)\}/.test(det) && /t\('Back'\)/.test(det));
-check('16 the chart can be dragged, tapped, or stepped with two labelled arrow buttons (a drag is never the only way)', /PanResponder/.test(det) && /onTouchStart/.test(det) && /accessibilityLabel=\{t\('Previous hour'\)\}/.test(det) && /accessibilityLabel=\{t\('Next hour'\)\}/.test(det));
+const scrub = read('src/components/weather/ScrubArea.tsx');
+check('16 the chart can be slid across (live, with a tick at each hour), tapped, or stepped with two labelled arrow buttons (sliding is never the only way)', /<ScrubArea/.test(det) && /GestureHandlerRootView/.test(det) && /haptics\.select\(\)/.test(det) && /accessibilityLabel=\{t\('Previous hour'\)\}/.test(det) && /accessibilityLabel=\{t\('Next hour'\)\}/.test(det));
 check('17 every button on the details screen has a role and a press state', (det.match(/<Pressable/g) ?? []).length === (det.match(/accessibilityRole="button"/g) ?? []).length && (det.match(/<Pressable/g) ?? []).length === (det.match(/pressed/g) ?? []).length - 0 + 0 || /pressed/.test(det));
 check('18 the key tap targets are at least 44 points: Back, day chips, arrows, pills, rows', /minHeight: 44/.test(det) && /width: 44, height: 44/.test(det) && /pill: \{ minHeight: 44/.test(home) && /minHeight: 54/.test(home) && /signInRow: \{[^}]*minHeight: 44/.test(home));
 check('19 everything that opens something looks tappable: an arrow on each card and a labelled "Open details" for screen readers; alerts say View with an arrow', (home.match(/tappable/g) ?? []).length >= 6 && /Open details/.test(home) && /alertView/.test(home) && /chevron-right/.test(home));
@@ -83,6 +84,15 @@ check('35 the tab bar is a solid white pill: the current page is marked by a tin
 check('36 the details sheet picks days with chips that show which one is chosen (dark fill) and which have no hours (faded and disabled)', /dayOn: \{ backgroundColor: WX\.deep/.test(det) && /disabled=\{empty\}/.test(det) && /opacity: 0\.4/.test(det));
 check('37 an alert is a clearly tappable card: amber card, "View" underlined, an arrow, and it opens the full text', /alertView: \{[^}]*textDecorationLine: 'underline'/.test(home) && /setOpenAlert\(a\)/.test(home));
 check('38 the Weather screens use no pure-white text on the light page (white is only used on the deep-green buttons and selected chips)', !/color: '#FFFFFF'/.test(home.replace(/ON_DARK/g, '')) );
+
+// ── touch-ups: sliding, back to weather, the new pictures ──
+check('39 the slide gesture only claims sideways movement (a vertical swipe still scrolls the page), picks on touch-down and on every move, and ends cleanly', /Gesture\.Pan\(\)/.test(scrub) && /activeOffsetX\(\[-6, 6\]\)/.test(scrub) && /failOffsetY\(\[-14, 14\]\)/.test(scrub) && /onBegin\(\(e\) => pick\(e\.x\)\)/.test(scrub) && /onUpdate\(\(e\) => pick\(e\.x\)\)/.test(scrub) && /onFinalize/.test(scrub) && /runOnJS\(true\)/.test(scrub));
+check('40 the 24-hour wind and rain bars on the home screen can be slid across too: the touched bar stays bright, the others fade, and a line names the hour and value', (home.match(/<MiniBars/g) ?? []).length >= 2 && /<ScrubArea/.test(home) && /sel === null \|\| sel === i \? 1 : 0\.35/.test(home) && /describe=\{/.test(home));
+const back = read('src/components/weather/BackToWeather.tsx'); const welcome = read('app/(auth)/welcome.tsx');
+check('41 Sign In from the Weather screens can always go back: the welcome screen has a "Back to weather" button (only while public Weather is on) that returns to the Weather home', /router\.replace\('\/weather' as any\)/.test(back) && /usePublicWeatherSwitch/.test(back) && /minHeight: 44/.test(back) && /<BackToWeather \/>/.test(welcome) && /accessibilityLabel=\{t\('Back to weather'\)\}/.test(back));
+const pics = ['sun', 'moon', 'partly', 'cloud', 'rain', 'snow', 'fog', 'storm', 'sunrise', 'sunset'];
+check('42 the weather pictures are drawn images (sun, moon, partly cloudy, cloud, rain, snow, fog, storm) plus sunrise and sunset, all bundled', pics.every((n) => fs.existsSync(path.join(root, `assets/images/wx/${n}.png`)) && new RegExp(`wx/${n}\\.png`).test(ui2)) && !/weather-sunny|weather-cloudy|weather-night/.test(ui2));
+check('43 the Sun card shows the sunset picture in its header and the sunrise and sunset pictures beside the two times', /<CardHead picture="sunset"/.test(home) && /icon="sunrise"/.test(home) && /icon="sunset"/.test(home));
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

@@ -104,4 +104,5 @@ export const ES_WEATHER: Record<string, string> = {
   'Chance of rain, next 24 hours. Slide your finger across to read any hour.': 'Probabilidad de lluvia, próximas 24 horas. Desliza el dedo para ver cualquier hora.',
   'chance of rain': 'de probabilidad de lluvia',
   'Back to weather': 'Volver al clima',
+  'Show the next days': 'Ver los próximos días',
 };

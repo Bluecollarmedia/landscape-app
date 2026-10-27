@@ -94,5 +94,9 @@ const pics = ['sun', 'moon', 'partly', 'cloud', 'rain', 'snow', 'fog', 'storm', 
 check('42 the weather pictures are drawn images (sun, moon, partly cloudy, cloud, rain, snow, fog, storm) plus sunrise and sunset, all bundled', pics.every((n) => fs.existsSync(path.join(root, `assets/images/wx/${n}.png`)) && new RegExp(`wx/${n}\\.png`).test(ui2)) && !/weather-sunny|weather-cloudy|weather-night/.test(ui2));
 check('43 the Sun card shows the sunset picture in its header and the sunrise and sunset pictures beside the two times', /<CardHead picture="sunset"/.test(home) && /icon="sunrise"/.test(home) && /icon="sunset"/.test(home));
 
+// ── the hourly strip: 24 hours first, one arrow loads five days, a day label at every midnight ──
+check('44 the hourly strip starts with the next 24 hours and ends in one labelled arrow button (48 points); tapping it loads five days of hours at once and glides on to the first new day', /buildStrip\(hours, moreDays, locale\)/.test(home) && /hours\.slice\(0, 24\)/.test(home) && /STRIP_DAYS = 5/.test(home) && /accessibilityLabel=\{t\('Show the next days'\)\}/.test(home) && /moreBtn: \{ width: 48, height: 48/.test(home) && /scrollToIndex/.test(home));
+check('45 a day label (WED, THU...) stands in the strip at every midnight, so the day is always clear while scrolling', /kind: 'day'/.test(home) && /dayCol:/.test(home) && /toUpperCase\(\)/.test(home));
+
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

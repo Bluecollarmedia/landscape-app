@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
-import { GlassCard, Floaty } from '@/components/weather/WeatherUI';
+import { WX } from '@/components/weather/WeatherUI';
 
 const TABS: { path: string; label: string; icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'] }[] = [
   { path: '/weather', label: 'Weather', icon: 'weather-partly-cloudy' },
@@ -12,7 +12,7 @@ const TABS: { path: string; label: string; icon: React.ComponentProps<typeof Mat
   { path: '/weather/account', label: 'Account', icon: 'account-outline' },
 ];
 
-/** The Weather area's own tab bar: a floating glass capsule. (The app's other tab bars are untouched.) */
+/** The Weather area's own tab bar: a solid white pill floating above the page. (The app's other tab bars are untouched.) */
 export function FloatingTabBar() {
   const t = useT();
   const router = useRouter();
@@ -20,37 +20,36 @@ export function FloatingTabBar() {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) + 4 }]} pointerEvents="box-none">
-      <Floaty delay={400}>
-        <GlassCard style={styles.bar} solid>
-          <View style={styles.row}>
-            {TABS.map((tab) => {
-              const on = tab.path === '/weather' ? pathname === '/weather' || pathname === '/weather/' : pathname.startsWith(tab.path);
-              return (
-                <Pressable
-                  key={tab.path}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  accessibilityLabel={t(tab.label)}
-                  onPress={() => { if (!on) router.replace(tab.path as any); }}
-                  style={[styles.item, on && styles.itemOn]}
-                >
-                  <MaterialCommunityIcons name={tab.icon} size={22} color="#FFFFFF" />
-                  <Text style={[styles.label, on && { fontWeight: '700' }]} numberOfLines={1}>{t(tab.label)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </GlassCard>
-      </Floaty>
+      <View style={styles.bar}>
+        {TABS.map((tab) => {
+          const on = tab.path === '/weather' ? pathname === '/weather' || pathname === '/weather/' : pathname.startsWith(tab.path);
+          return (
+            <Pressable
+              key={tab.path}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={t(tab.label)}
+              onPress={() => { if (!on) router.replace(tab.path as any); }}
+              style={({ pressed }) => [styles.item, on && styles.itemOn, pressed && !on && { backgroundColor: WX.leafTint }]}
+            >
+              <MaterialCommunityIcons name={tab.icon} size={23} color={on ? WX.deep : WX.soft} />
+              <Text style={[styles.label, on && { color: WX.deep, fontWeight: '700' }]} numberOfLines={1}>{t(tab.label)}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 18, right: 18 },
-  bar: { borderRadius: 99 },
-  row: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 7, paddingHorizontal: 8 },
-  item: { alignItems: 'center', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 99, minWidth: 86 },
-  itemOn: { backgroundColor: 'rgba(255,255,255,0.26)' },
-  label: { color: '#FFFFFF', fontSize: 10, marginTop: 2 },
+  bar: {
+    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 7, paddingHorizontal: 8, borderRadius: 99,
+    backgroundColor: WX.white, borderWidth: 1, borderColor: WX.line,
+    shadowColor: '#14803C', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+  },
+  item: { alignItems: 'center', minHeight: 48, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 99, minWidth: 86 },
+  itemOn: { backgroundColor: WX.leafTint },
+  label: { color: WX.soft, fontSize: 10.5, marginTop: 2, fontWeight: '500' },
 });

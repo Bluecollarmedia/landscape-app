@@ -165,4 +165,13 @@ export const ES: Record<string, string> = {
   'Back to admin view': 'Volver a la vista de administrador',
   'Your route': 'Tu ruta',
   'Open my route': 'Abrir mi ruta',
+  'Clock': 'Reloj',
+  'Clock in': 'Marcar entrada',
+  'Clock back in': 'Volver a marcar entrada',
+  'Tap below to start your workday.': 'Toca abajo para empezar tu jornada.',
+  'Clocked out by mistake? Clock back in and your day keeps going.': '¿Marcaste la salida por error? Vuelve a marcar entrada y tu día sigue.',
+  'The time clock is not available yet': 'El reloj de tiempo aún no está disponible',
+  'Ask the owner to finish setting up time tracking.': 'Pide al dueño que termine de configurar el control de tiempo.',
+  'In': 'Entrada',
+  'Out': 'Salida',
 };

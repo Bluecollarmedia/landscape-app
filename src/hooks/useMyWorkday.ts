@@ -3,6 +3,8 @@ import { AppState } from 'react-native';
 import { todayKey } from '@/lib/ids';
 import { netMs, grossMs, type TimeBreak } from '@/lib/timeCalc';
 import { isCurrent, needsAnswer, WORKDAY_STALE_HOURS } from '@/lib/clockSession';
+import { getCurrentGps } from '@/lib/location';
+import { reportClockInLocation } from '@/data/yard';
 import {
   onTimeChanged, clockIn as apiClockIn, clockOut as apiClockOut, completeVisit as apiCompleteVisit, endBreak as apiEndBreak, loadMyDay, loadTruckOptions,
   startBreak as apiStartBreak, startVisit as apiStartVisit, claimStaleEnd as apiClaimStale,
@@ -114,7 +116,13 @@ export function useMyWorkday(enabled: boolean): Workday {
   }, 0), [todays]);
   void grossMs;
 
-  const clockIn = useCallback((truckId?: string) => act(() => apiClockIn(todayKey(), truckId).then(doApply)), [act, doApply]);
+  const clockIn = useCallback((truckId?: string) => act(async () => {
+    // The phone's location is read WHILE the clock-in happens, never before it: clocking in is never held up or refused because of it.
+    const where = getCurrentGps();
+    const r = await apiClockIn(todayKey(), truckId).then(doApply);
+    if (r.ok) void reportClockInLocation(r.data, where);
+    return r;
+  }), [act, doApply]);
   const clockOut = useCallback(() => act(() => apiClockOut().then(doApply)), [act, doApply]);
   const startBreak = useCallback(() => act(() => apiStartBreak().then(doApply)), [act, doApply]);
   const endBreak = useCallback(() => act(() => apiEndBreak().then(doApply)), [act, doApply]);

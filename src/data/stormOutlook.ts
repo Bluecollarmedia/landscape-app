@@ -66,6 +66,31 @@ export async function fetchOwnerStorm(): Promise<{ ok: true; storm: StormOutlook
   return { ok: true, storm: normalizeStorm(r.data) };
 }
 
+/** Every storm of the owner's company, newest first, whether or not public Weather is on (so the owner can see what can be deleted). */
+export async function fetchOwnerStormHistory(): Promise<{ ok: true; storms: StormOutlook[] } | { ok: false; message: string }> {
+  const r = await rpc('owner_storm_history');
+  if (!r.ok) return r;
+  return { ok: true, storms: normalizeStorms(r.data) };
+}
+
+/** Deletes one published update for everyone (the storm goes too if it was the only update). Owner only. */
+export async function deleteStormUpdate(versionId: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const r = await rpc('delete_storm_update', { p_version_id: versionId });
+  if (!r.ok) return r;
+  await save(CURRENT_KEY, null);
+  await save(HISTORY_KEY, null);
+  return { ok: true };
+}
+
+/** Deletes a whole storm and all of its updates for everyone, Storm History included. Owner only. */
+export async function deleteStorm(outlookId: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const r = await rpc('delete_storm_outlook', { p_outlook_id: outlookId });
+  if (!r.ok) return r;
+  await save(CURRENT_KEY, null);
+  await save(HISTORY_KEY, null);
+  return { ok: true };
+}
+
 export interface StormDraft {
   outlookId: string | null;
   name: string;

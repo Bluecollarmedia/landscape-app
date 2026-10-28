@@ -1,10 +1,10 @@
 /**
- * How Our Work pictures are made (pure: no phone, no network). The owner chose: photos HIGH quality, videos kept ORIGINAL (never compressed), and a
+ * How Our Work pictures are made (pure: no phone, no network). The owner chose (2026-10-28): photos shrunk to 1600 px, videos shrunk to 480p, and a
  * small square copy of every picture just for the grid, so a screen of tiles is light to load.
  */
 
-/** The long side of a full photo (a phone photo is usually 3000 to 4000 px, so this keeps it sharp but not huge). */
-export const FULL_LONG_SIDE = 2400;
+/** The long side of a full photo (a phone photo is usually 3000 to 4000 px, so this keeps it sharp but much lighter). */
+export const FULL_LONG_SIDE = 1600;
 export const FULL_QUALITY = 0.85;
 /** The grid copy: a centred square, this many pixels on a side. */
 export const THUMB_SIZE = 400;

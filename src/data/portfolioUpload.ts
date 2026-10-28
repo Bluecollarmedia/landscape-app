@@ -1,6 +1,6 @@
 /**
- * Sends the owner's pictures and videos for Our Work to the public bucket (phone only). Photos: saved high quality (long side up to 2400 px) plus a
- * small square copy for the grid. Videos: uploaded exactly as they are, plus a still frame for the grid. Nothing here compresses a video.
+ * Sends the owner's pictures and videos for Our Work to the public bucket (phone only). Photos: saved at a long side of up to 1600 px plus a
+ * small square copy for the grid. Videos: shrunk to 480p first (the original goes up if that cannot be done), plus a still frame for the grid.
  */
 import { uploadImage } from '@/lib/media';
 import {
@@ -10,7 +10,7 @@ import {
 export interface UploadedPhoto { url: string; key: string; thumbUrl: string; thumbKey: string; width: number; height: number }
 export interface UploadedVideo { url: string; key: string; thumbUrl: string | null; thumbKey: string | null }
 
-/** A photo: one high-quality copy and one small square copy. */
+/** A photo: one full copy (long side up to 1600 px) and one small square copy. */
 export async function uploadPortfolioPhoto(localUri: string, companyId: string, kind: PortfolioFolder = 'posts'): Promise<UploadedPhoto> {
   const { ImageManipulator, SaveFormat } = require('expo-image-manipulator') as typeof import('expo-image-manipulator');
   const probe = await ImageManipulator.manipulate(localUri).renderAsync();
@@ -31,9 +31,10 @@ export async function uploadPortfolioPhoto(localUri: string, companyId: string, 
   return { url: big.url, key: big.key, thumbUrl: thumb.url, thumbKey: thumb.key, width: full.width, height: full.height };
 }
 
-/** A video, as it is. The still frame for the grid is best effort: a video with no frame still posts (its tile just has no picture). */
+/** A video, shrunk to 480p. The still frame for the grid is best effort: a video with no frame still posts (its tile just has no picture). */
 export async function uploadPortfolioVideo(localUri: string, companyId: string, kind: PortfolioFolder = 'posts', frameAtS = 0.5): Promise<UploadedVideo> {
-  const up = await uploadImage(localUri, portfolioFolder(companyId, kind), 'video/mp4', undefined, { raw: true });
+  const { shrinkVideoUri } = require('@/lib/mediaCompress') as typeof import('@/lib/mediaCompress');
+  const up = await uploadImage(await shrinkVideoUri(localUri), portfolioFolder(companyId, kind), 'video/mp4', undefined, { raw: true });
   const frame = await videoFrameToFile(localUri, frameAtS);
   if (!frame) return { url: up.url, key: up.key, thumbUrl: null, thumbKey: null };
   try {

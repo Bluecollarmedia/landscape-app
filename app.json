@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.brightonlawn.app",
-      "buildNumber": "23",
+      "buildNumber": "24",
       "associatedDomains": [
         "applinks:brighton-app.netlify.app",
         "applinks:app.brightonlawn.com"
@@ -54,7 +54,13 @@
               "displayName": "Brighton Forecast",
               "description": "Your local weather, and Brighton's storm outlook when one is posted.",
               "ios": {
-                "supportedFamilies": ["systemSmall", "systemMedium", "accessoryCircular", "accessoryRectangular", "accessoryInline"]
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "accessoryCircular",
+                  "accessoryRectangular",
+                  "accessoryInline"
+                ]
               }
             }
           ]

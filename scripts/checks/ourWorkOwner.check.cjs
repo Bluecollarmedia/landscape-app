@@ -14,10 +14,10 @@ let bad = 0;
 let n = 0;
 const check = (name, ok, detail = '') => { n += 1; if (!ok) bad += 1; console.log(`${ok ? 'PASS' : 'FAIL'}  ${n} ${name}${ok ? '' : '  - ' + detail}`); };
 
-check('1 a big phone photo is saved with its long side at 2400, keeping its shape', JSON.stringify(M.fitLongSide(4032, 3024)) === JSON.stringify({ width: 2400, height: 1800 }) && JSON.stringify(M.fitLongSide(3024, 4032)) === JSON.stringify({ width: 1800, height: 2400 }));
+check('1 a big phone photo is saved with its long side at 1600, keeping its shape', JSON.stringify(M.fitLongSide(4032, 3024)) === JSON.stringify({ width: 1600, height: 1200 }) && JSON.stringify(M.fitLongSide(3024, 4032)) === JSON.stringify({ width: 1200, height: 1600 }));
 check('2 a photo that is already small is never enlarged, and a missing size is handled', JSON.stringify(M.fitLongSide(1200, 800)) === JSON.stringify({ width: 1200, height: 800 }) && M.fitLongSide(0, 10).width === 0);
 check('3 the grid copy is a centred square cut', JSON.stringify(M.squareCrop(4000, 3000)) === JSON.stringify({ originX: 500, originY: 0, size: 3000 }) && JSON.stringify(M.squareCrop(3000, 4000)) === JSON.stringify({ originX: 0, originY: 500, size: 3000 }) && M.THUMB_SIZE === 400);
-check('4 photos are high quality (0.85, the app\'s usual is 0.5) and the grid copy is small and light', M.FULL_QUALITY === 0.85 && M.THUMB_QUALITY < M.FULL_QUALITY && M.FULL_LONG_SIDE > 1600);
+check('4 photos are high quality (0.85, the app\'s usual is 0.5) and the grid copy is small and light', M.FULL_QUALITY === 0.85 && M.THUMB_QUALITY < M.FULL_QUALITY && M.FULL_LONG_SIDE === 1600);
 check('5 files go in the company\'s own portfolio folder, and the small copies in a thumbs folder under it', M.portfolioFolder('c1', 'posts') === 'c1/portfolio/posts' && M.thumbFolder('c1', 'posts') === 'c1/portfolio/posts/thumbs');
 check('6 a video is limited to 60 seconds and is NOT compressed', M.MAX_VIDEO_SECONDS === 60 && M.VIDEO_IS_COMPRESSED === false);
 
@@ -25,7 +25,7 @@ const media = read('src/lib/media.ts');
 check('7 the shared uploader can skip its own compression (raw) so Our Work\'s quality is kept, and every other screen still compresses as before', /opts\?: \{ raw\?: boolean \}/.test(media) && /startsWith\('image\/'\) && !opts\?\.raw/.test(media));
 const up = read('src/data/portfolioUpload.ts');
 check('8 a photo uploads as a high-quality copy plus a small square copy, both without the app\'s usual compression', /FULL_QUALITY/.test(up) && /squareCrop\(full\.width, full\.height\)/.test(up) && (up.match(/\{ raw: true \}/g) || []).length >= 4);
-check('9 a video uploads exactly as it is (no compression), with a best-effort still frame for the grid that never stops the post', /uploadImage\(localUri, portfolioFolder\(companyId, kind\), 'video\/mp4', undefined, \{ raw: true \}\)/.test(up) && !/prepareVideo|react-native-compressor|compressVideo/.test(up) && /catch \{\s*return \{ url: up\.url, key: up\.key, thumbUrl: null/.test(up));
+check('9 a video is shrunk to 480p first (the original if that fails), with a best-effort still frame for the grid that never stops the post', /uploadImage\(await shrinkVideoUri\(localUri\), portfolioFolder\(companyId, kind\), 'video\/mp4', undefined, \{ raw: true \}\)/.test(up) && /catch \{\s*return \{ url: up\.url, key: up\.key, thumbUrl: null/.test(up));
 
 const own = read('src/data/portfolioOwner.ts');
 check('10 a post that cannot save its pictures is not left behind half made', /portfolio_posts'\)\.delete\(\)\.eq\('id', postId\)/.test(own) && /if \(ins\.error\) \{/.test(own));

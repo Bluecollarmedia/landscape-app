@@ -28,7 +28,7 @@ const all = [p1, p2, v1, v2, mixed];
 
 check('2 the cover is the owner\'s pick, else the first photo, else the video\'s frame', L.postCoverUrl(p2) === 'cover/x' && L.postCoverUrl(p1) === 'u/p1a' && L.postCoverUrl(v1) === 't/v1a');
 check('3 the photo grid has every project post and only the video posts the owner chose to show there, newest first', L.gridPosts(all).map((p) => p.id).join() === 'm1,v2,p2,p1', L.gridPosts(all).map((p) => p.id).join());
-check('4 the Videos tab has one entry per video (also from a mixed post), newest first, each with its length', L.videoEntries(all).map((e) => e.media.id).join() === 'm1b,v2a,v1a' && L.videoEntries(all)[0].media.duration_s === 24);
+check('4 the Videos tab has only the reels (never the videos inside a photo post), newest first, each with its length', L.videoEntries(all).map((e) => e.media.id).join() === 'v2a,v1a' && L.videoEntries(all)[0].media.duration_s === 24);
 const counts = L.portfolioCounts([post('a', { tags: ['Pavers', 'Turf'], media: [media('1', 'photo'), media('2', 'photo'), media('3', 'video')] }), post('b', { tags: ['Turf'] }), v1]);
 check('5 the profile counts come from the posts: projects, photos and distinct services', counts.projects === 2 && counts.photos === 3 && counts.services === 2, JSON.stringify(counts));
 
@@ -87,7 +87,7 @@ check('35 the grid draws 30 tiles at first and 30 more near the end, and each ti
 check('36 switching apps pauses the video and the music where they are, and they carry on from the same spot (nothing is reset or torn down)', /useIsFocused\(\) && useAppActive\(\)/.test(read('app/weather/work-post.tsx')) && /useIsFocused\(\) && useAppActive\(\)/.test(read('app/weather/work-video.tsx')) && /AppState\.addEventListener\('change'/.test(read('src/hooks/useAppActive.ts')) && !/currentTime = 0/.test(read('app/weather/work-video.tsx')));
 // ── reels (swipe up through the videos) ──
 const reels = L.videoEntries(all);
-check('37 a reel opens at its own place in the list of reels, and at the first one when it is not found (-1 only when there are no reels)', L.reelIndexOf(reels, 'v2a') === 1 && L.reelIndexOf(reels, 'nope') === 0 && L.reelIndexOf([], 'v2a') === -1);
+check('37 a reel opens at its own place in the list of reels, and at the first one when it is not found (-1 only when there are no reels)', L.reelIndexOf(reels, 'v1a') === 1 && L.reelIndexOf(reels, 'nope') === 0 && L.reelIndexOf([], 'v2a') === -1);
 check('38 only the NEXT reel is prepared, and only once the one on screen has started playing; never two at once', L.reelToPreload(0, false, 3) === null && L.reelToPreload(0, true, 3) === 1 && L.reelToPreload(2, true, 3) === null && [0, 1, 2, 3].filter((i) => L.reelMode(i, 1, L.reelToPreload(1, true, 4)) !== 'idle').length === 2);
 check('39 a post that is only a video opens as a reel; a post with photos opens as a project', L.opensAsReel({ kind: 'video' }) === true && L.opensAsReel({ kind: 'post' }) === false && /opensAsReel\(p\)/.test(read('app/weather/work.tsx')));
 const reelScreen = read('app/weather/work-video.tsx');

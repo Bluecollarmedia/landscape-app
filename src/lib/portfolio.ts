@@ -118,11 +118,12 @@ export function gridPosts(posts: PortfolioPost[]): PortfolioPost[] {
   return posts.filter((p) => p.media.length > 0 && (p.kind === 'post' || p.show_in_grid)).sort(newestFirst);
 }
 
-/** One entry per video, for the Videos tab (a post with a video in it shows that video; its length is shown on the tile). Newest first. */
+/** One entry per reel, for the Videos tab and the swipe-up reels feed. Only reels (a post that is a single video) go here; the videos inside a photo post stay in that post. Newest first. */
 export interface VideoEntry { post: PortfolioPost; media: PortfolioMedia }
 export function videoEntries(posts: PortfolioPost[]): VideoEntry[] {
   const out: VideoEntry[] = [];
   for (const post of [...posts].sort(newestFirst)) {
+    if (post.kind !== 'video') continue;
     for (const media of sortedMedia(post)) if (media.kind === 'video') out.push({ post, media });
   }
   return out;

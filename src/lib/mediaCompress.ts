@@ -4,10 +4,7 @@
  * Photos use expo-image-manipulator (already in the app): resized so the long side is at most 1600 px, saved as JPEG at 50% quality.
  * The picker's own EXIF rotation is applied by the manipulator, so the stored photo is upright and keeps its aspect ratio.
  *
- * Videos need a native transcoder. The app does not include one yet: react-native-compressor must be added and the app rebuilt
- * (needs the owner's approval). Until then a video fails with a clear message and the person chooses Retry or "Upload original"; it is
- * never skipped quietly and never uploaded uncompressed without that choice. Once the library is present this adapter uses it with
- * a 480p cap and bitrate from planVideo().
+ * Videos use react-native-compressor (480p cap, bitrate from planVideo()); if that cannot run, the original video is sent instead.
  */
 import { Platform } from 'react-native';
 import { File, Directory, Paths } from 'expo-file-system';
@@ -78,9 +75,38 @@ export async function prepareImage(job: MediaJob): Promise<Prepared> {
   }
 }
 
-/** Videos are never compressed: they go up exactly as they were recorded or picked. */
+/**
+ * Videos are shrunk to 480p on the phone before they go up (react-native-compressor, bitrate from planVideo()), so they upload and load fast.
+ * If the compressor is missing, the phone cannot do it, or the result is not smaller, the original goes up instead: a video is never lost or blocked.
+ */
 export async function prepareVideo(job: MediaJob): Promise<Prepared> {
-  return { uri: job.sourceUri, bytes: job.bytesIn ?? sizeOf(job.sourceUri), width: job.width, height: job.height, mimeType: job.mimeType ?? 'video/mp4' };
+  const original: Prepared = { uri: job.sourceUri, bytes: job.bytesIn ?? sizeOf(job.sourceUri), width: job.width, height: job.height, mimeType: job.mimeType ?? 'video/mp4' };
+  if (Platform.OS === 'web' || isPrepared(job.sourceUri)) return original;
+  let compressor: { Video: { compress: (uri: string, opts: Record<string, unknown>, onProgress?: (p: number) => void) => Promise<string> } } | undefined;
+  try { compressor = require('react-native-compressor'); } catch { compressor = undefined; }
+  if (!compressor?.Video) return original;
+  const plan = planVideo({ width: job.width ?? VIDEO_FALLBACK, height: job.height ?? VIDEO_FALLBACK });
+  try {
+    // maxSize is the longest side: 854 keeps landscape at 854x480 and portrait at 480x854, aspect ratio unchanged. Audio is kept.
+    let uri = await compressor.Video.compress(job.sourceUri, { compressionMethod: 'manual', maxSize: Math.max(plan.width, plan.height), bitrate: plan.bitrate, minimumFileSizeForCompress: 0 });
+    // Move the result next to the app's other prepared files so the queue deletes it when the job ends.
+    const dest = outFile('mp4');
+    try { new File(uri).copy(dest); try { new File(uri).delete(); } catch { /* cache file */ } uri = dest.uri; } catch { /* use it where it is */ }
+    const bytes = sizeOf(uri);
+    if (bytes !== undefined && original.bytes !== undefined && bytes >= original.bytes) {
+      // Already tighter than the target: keep the original instead of a bigger "compressed" copy.
+      try { new File(uri).delete(); } catch { /* ignore */ }
+      return original;
+    }
+    return { uri, bytes, width: plan.width, height: plan.height, mimeType: 'video/mp4' };
+  } catch {
+    return original;
+  }
+}
+
+/** Shrinks a video file for the screens that upload straight away (Our Work posts and stories); the original comes back if it cannot be shrunk. */
+export async function shrinkVideoUri(uri: string): Promise<string> {
+  try { return (await prepareVideo({ sourceUri: uri, kind: 'video' } as unknown as MediaJob)).uri; } catch { return uri; }
 }
 
 // If the picker did not report the video's size, plan for a 1080p source (the result only sets maxSize, which never enlarges).

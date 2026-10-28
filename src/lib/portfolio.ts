@@ -63,6 +63,8 @@ export interface PublicPortfolio {
 export const TAG_CHOICES = ['Pavers', 'Turf', 'Lighting', 'Planting', 'Commercial', 'Snow'] as const;
 
 export const MAX_VIDEO_S = 60;
+/** A post holds up to 10 photos and videos (like Instagram). */
+export const MAX_POST_MEDIA = 10;
 export const MIN_CLIP_S = 5;
 export const MAX_CLIP_S = 60;
 export const CAPTION_MAX = 2200;
@@ -214,6 +216,7 @@ export interface PostDraft {
 export function postProblem(d: PostDraft): string | null {
   if (d.media.length < 1) return d.kind === 'video' ? 'Choose a video.' : 'Add at least one photo or video.';
   if (d.kind === 'video' && (d.media.length !== 1 || d.media[0].kind !== 'video')) return 'A video post holds exactly one video.';
+  if (d.media.length > MAX_POST_MEDIA) return `A post holds up to ${MAX_POST_MEDIA} photos and videos.`;
   if (d.media.some((m) => m.kind === 'video' && (m.duration_s == null || m.duration_s > MAX_VIDEO_S))) return `Videos can be up to ${MAX_VIDEO_S} seconds.`;
   if (d.caption.length > CAPTION_MAX) return 'The caption is too long.';
   if (d.town.length > 80) return 'The town is too long.';
@@ -266,3 +269,19 @@ export function reelMode(index: number, activeIndex: number, preloadIndex: numbe
 
 /** A post that is only a video opens as a reel; a post with photos opens as a project. */
 export const opensAsReel = (post: Pick<PortfolioPost, 'kind'>): boolean => post.kind === 'video';
+
+// ── Owner: highlights (the circles) ──────────────────────────────────────────────────────────────────────────────────────────
+
+export const HIGHLIGHT_NAME_MAX = 14;
+
+export interface HighlightDraft { name: string; mode: 'tag' | 'manual'; tag: string | null; postIds: string[] }
+
+/** The first thing wrong with a highlight, in plain words, or null when it can be saved. */
+export function highlightProblem(d: HighlightDraft): string | null {
+  const name = d.name.trim();
+  if (!name) return 'Give the highlight a name.';
+  if (name.length > HIGHLIGHT_NAME_MAX) return `Keep the name to ${HIGHLIGHT_NAME_MAX} letters so it fits under the circle.`;
+  if (d.mode === 'tag' && (!d.tag || !(TAG_CHOICES as readonly string[]).includes(d.tag))) return 'Choose the tag this highlight follows.';
+  if (d.mode === 'manual' && d.postIds.length === 0) return 'Choose at least one post.';
+  return null;
+}

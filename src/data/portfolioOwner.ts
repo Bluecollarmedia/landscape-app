@@ -7,7 +7,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { removeMedia } from '@/lib/media';
 import { db } from '@/data/store';
 import { portfolioFolder } from '@/lib/portfolioMedia';
-import { postProblem, type MediaKind, type PortfolioHighlight, type PortfolioMedia, type PortfolioPost, type PostKind } from '@/lib/portfolio';
+import { highlightProblem, postProblem, type MediaKind, type PortfolioHighlight, type PortfolioMedia, type PortfolioPost, type PostKind } from '@/lib/portfolio';
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 const UNREACHABLE = "Couldn't reach the server. Check your connection and try again.";
@@ -181,6 +181,62 @@ export async function deletePost(id: string, keys: (string | null | undefined)[]
     const { error } = await supabase.from('portfolio_posts').delete().eq('id', id);
     if (error) return { ok: false, error: friendly(error.message) };
     if (companyId) for (const k of keys) if (k && k.startsWith(`${portfolioFolder(companyId, 'posts')}/`)) void removeMedia(k);
+    return { ok: true, data: null };
+  } catch {
+    return { ok: false, error: UNREACHABLE };
+  }
+}
+
+// ── Highlights ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+export interface HighlightInput { name: string; mode: 'tag' | 'manual'; tag: string | null; coverUrl: string | null; postIds: string[] }
+
+/** Creates a highlight (id null) or changes one. Hand-picked posts are saved in the order given; an automatic one keeps no picks. */
+export async function saveHighlight(id: string | null, input: HighlightInput, position: number): Promise<Result<string>> {
+  const companyId = db.companyId;
+  if (!companyId) return { ok: false, error: 'Sign in again.' };
+  const bad = highlightProblem({ name: input.name, mode: input.mode, tag: input.tag, postIds: input.postIds });
+  if (bad) return { ok: false, error: bad };
+  try {
+    const fields = { name: input.name.trim(), mode: input.mode, tag: input.mode === 'tag' ? input.tag : null, cover_url: input.coverUrl };
+    let hid = id;
+    if (hid) {
+      const { error } = await supabase.from('portfolio_highlights').update(fields).eq('id', hid);
+      if (error) return { ok: false, error: friendly(error.message) };
+    } else {
+      const { data, error } = await supabase.from('portfolio_highlights').insert({ ...fields, company_id: companyId, position }).select('id').single();
+      if (error || !data) return { ok: false, error: friendly(error?.message ?? UNREACHABLE) };
+      hid = (data as { id: string }).id;
+    }
+    const clear = await supabase.from('portfolio_highlight_posts').delete().eq('highlight_id', hid);
+    if (clear.error) return { ok: false, error: friendly(clear.error.message) };
+    if (input.mode === 'manual') {
+      const ins = await supabase.from('portfolio_highlight_posts').insert(input.postIds.map((post_id, i) => ({ highlight_id: hid, post_id, position: i })));
+      if (ins.error) return { ok: false, error: friendly(ins.error.message) };
+    }
+    return { ok: true, data: hid as string };
+  } catch {
+    return { ok: false, error: UNREACHABLE };
+  }
+}
+
+export async function deleteHighlight(id: string): Promise<Result<null>> {
+  try {
+    const { error } = await supabase.from('portfolio_highlights').delete().eq('id', id);
+    if (error) return { ok: false, error: friendly(error.message) };
+    return { ok: true, data: null };
+  } catch {
+    return { ok: false, error: UNREACHABLE };
+  }
+}
+
+/** Saves the order of the circles (the first id is the first circle). */
+export async function saveHighlightOrder(ids: string[]): Promise<Result<null>> {
+  try {
+    for (let i = 0; i < ids.length; i++) {
+      const { error } = await supabase.from('portfolio_highlights').update({ position: i }).eq('id', ids[i]);
+      if (error) return { ok: false, error: friendly(error.message) };
+    }
     return { ok: true, data: null };
   } catch {
     return { ok: false, error: UNREACHABLE };

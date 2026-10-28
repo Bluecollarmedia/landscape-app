@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
-import { cachePortfolioEnabled, fetchPortfolioEnabled, loadPublicPortfolio, readCachedPortfolioEnabled } from '@/data/portfolio';
+import { cachePortfolioEnabled, fetchPortfolioEnabled, getLoadedPortfolio, loadPublicPortfolio, readCachedPortfolioEnabled } from '@/data/portfolio';
 import { WEATHER_ON_THIS_DEVICE } from '@/lib/weatherPlatform';
 import type { PublicPortfolio } from '@/lib/portfolio';
 
@@ -35,7 +35,10 @@ export type PortfolioView =
 
 /** The feed: loaded on open and whenever asked (pull to refresh). */
 export function usePublicPortfolio(): { view: PortfolioView; refresh: () => Promise<void> } {
-  const [view, setView] = useState<PortfolioView>({ status: 'loading' });
+  const [view, setView] = useState<PortfolioView>(() => {
+    const have = getLoadedPortfolio();
+    return have ? { status: 'ready', data: have, stale: false } : { status: 'loading' };
+  });
   const refresh = useCallback(async () => {
     const r = await loadPublicPortfolio();
     if (!r.ok) return setView((v) => (v.status === 'ready' ? v : { status: 'unavailable' }));

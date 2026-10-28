@@ -155,12 +155,13 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
             <Spacer />
           </HStack>
           <HStack>
-            {p.hours.map((h, i) => (
-              <VStack key={`${i}`} spacing={3} modifiers={[frame({ maxWidth: 10000 })]}>
-                <Text modifiers={[font({ size: 11 }), foregroundStyle(soft), lineLimit(1)]}>{h.label}</Text>
-                <Text modifiers={[font({ size: 13, weight: 'bold' }), foregroundStyle(ink)]}>{h.temp}</Text>
-              </VStack>
-            ))}
+            {p.hours.flatMap((h, i) => [
+              ...(i > 0 ? [<Spacer key={`s${i}`} />] : []),
+              <VStack key={`${i}`} spacing={3}>
+                <Text modifiers={[font({ size: 12 }), foregroundStyle(soft), lineLimit(1)]}>{h.label}</Text>
+                <Text modifiers={[font({ size: 12, weight: 'bold' }), foregroundStyle(ink)]}>{h.temp}</Text>
+              </VStack>,
+            ])}
           </HStack>
         </VStack>
       ) : null}

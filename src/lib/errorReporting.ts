@@ -30,15 +30,37 @@ function rememberError(text: string): void {
 ${text}`).catch(() => {}); } catch { /* nothing to do */ }
 }
 
-/** On launch: if the last run ended on an uncaught error, show it once (then forget it). */
+const LAST_STEP_KEY = 'lastStep.v1';
+const STEP_TTL_MS = 8000;
+let stepTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * A breadcrumb for crashes the safety net cannot catch (native ones): written just before a risky step, and wiped a few seconds later if the
+ * app is still alive. If the app dies in between, the next launch can say what it was doing.
+ */
+export function markStep(name: string): void {
+  try {
+    const s = storage();
+    if (!s) return;
+    if (stepTimer) clearTimeout(stepTimer);
+    void s.setItem(LAST_STEP_KEY, `${new Date().toISOString()} ${name}`).catch(() => {});
+    stepTimer = setTimeout(() => { void s.removeItem(LAST_STEP_KEY).catch(() => {}); }, STEP_TTL_MS);
+  } catch { /* nothing to do */ }
+}
+
+/** On launch: if the last run ended on an uncaught error (or died right after a marked step), say so once (then forget it). */
 export async function showLastErrorIfAny(): Promise<void> {
   try {
     const s = storage();
     const text = await s?.getItem(LAST_ERROR_KEY);
-    if (!text) return;
-    await s?.removeItem(LAST_ERROR_KEY);
+    const step = await s?.getItem(LAST_STEP_KEY);
+    if (text) await s?.removeItem(LAST_ERROR_KEY);
+    if (step) await s?.removeItem(LAST_STEP_KEY);
     if (Platform.OS === 'web') return;
-    Alert.alert('The app hit a problem last time', `${text.slice(0, 700)}
+    if (text) Alert.alert('The app hit a problem last time', `${text.slice(0, 700)}
+
+Please screenshot this and send it to support.`);
+    else if (step) Alert.alert('The app closed last time', `It closed right after: ${step.slice(0, 300)}
 
 Please screenshot this and send it to support.`);
   } catch { /* never block launch */ }

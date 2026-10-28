@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
+import { markStep } from '@/lib/errorReporting';
 import { OptimizedImage } from '@/components/ui';
 import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { StoryBackdrop, StoryCard } from '@/components/work/StoryCard';
@@ -98,17 +99,24 @@ export default function WeatherWorkStory() {
 
   const post = story.post_id ? feed?.posts.find((p) => p.id === story.post_id) : undefined;
   const target = story.kind === 'share' ? shareTarget(story, post) : null;
+  // Opening a post or a reel from here CLOSES the story first, then opens it (never the two on top of each other, each with its own video and
+  // timer alive); back from the post returns to Our Work. A breadcrumb is written first, so if the app dies here the next launch can say so.
+  const openAfterClosing = (what: string, href: { pathname: string; params: Record<string, string> }) => {
+    markStep(what);
+    goBack();
+    setTimeout(() => router.push(href as any), 150);
+  };
   const openTarget = () => {
     if (held.current || !target) return;   // a hold only shows the hint; a short tap opens
-    if (target.type === 'video') router.push({ pathname: '/weather/work-video', params: { post: target.postId, media: target.mediaId } } as any);
-    else router.push({ pathname: '/weather/work-post', params: { id: target.postId } } as any);
+    if (target.type === 'video') openAfterClosing('opening a reel from a story', { pathname: '/weather/work-video', params: { post: target.postId, media: target.mediaId } });
+    else openAfterClosing('opening a project from a story', { pathname: '/weather/work-post', params: { id: target.postId } });
   };
 
   // Inside a highlight, a small button at the bottom opens the post (or reel) the picture came from.
   const openFrame = () => {
     if (!post) return;
-    if (story.kind === 'video' && story.media_id) router.push({ pathname: '/weather/work-video', params: { post: post.id, media: story.media_id } } as any);
-    else router.push({ pathname: '/weather/work-post', params: { id: post.id } } as any);
+    if (story.kind === 'video' && story.media_id) openAfterClosing('opening a reel from a highlight', { pathname: '/weather/work-video', params: { post: post.id, media: story.media_id } });
+    else openAfterClosing('opening a project from a highlight', { pathname: '/weather/work-post', params: { id: post.id } });
   };
 
   return (

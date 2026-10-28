@@ -37,7 +37,7 @@ function guessContentType(uri: string, mimeType?: string): { contentType: string
  * its public URL. `folder` groups files, e.g. `${companyId}/projects/${projectId}`.
  * Already-remote URLs (http/https) are returned unchanged.
  */
-export async function uploadImage(localUri: string, folder: string, mimeType?: string, onProgress?: (p: number) => void): Promise<{ url: string; key: string }> {
+export async function uploadImage(localUri: string, folder: string, mimeType?: string, onProgress?: (p: number) => void, opts?: { raw?: boolean }): Promise<{ url: string; key: string }> {
   if (!isSupabaseConfigured || /^https?:\/\//i.test(localUri)) {
     return { url: localUri, key: localUri };
   }
@@ -46,7 +46,8 @@ export async function uploadImage(localUri: string, folder: string, mimeType?: s
   await requireSession();
   // Every photo is compressed before it leaves the phone (about 50% quality, long side at most 1600 px), whichever screen it came from.
   // Files the shared media queue already prepared are not touched again, and PDFs/videos pass through (videos: see mediaQueue).
-  if (contentType.startsWith('image/')) {
+  // `raw` is for a caller that has already made the picture exactly as it wants it (Our Work: high-quality photos and its own small copies).
+  if (contentType.startsWith('image/') && !opts?.raw) {
     const { prepareImage, isPrepared } = require('./mediaCompress') as typeof import('./mediaCompress');
     if (!isPrepared(localUri)) {
       const p = await prepareImage({ sourceUri: localUri, mimeType: contentType } as import('./mediaQueue').MediaJob);

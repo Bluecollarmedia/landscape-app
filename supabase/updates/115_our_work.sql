@@ -36,6 +36,7 @@ create table if not exists public.portfolio_posts (
   visible boolean not null default true,
   posted_at timestamptz not null default now(),
   cover_url text,
+  cover_thumb_url text,
   music_url text,
   music_title text,
   music_start_s numeric(8,2) check (music_start_s is null or music_start_s >= 0),
@@ -178,7 +179,7 @@ begin
 
   select coalesce(jsonb_agg(jsonb_build_object(
       'id', p.id, 'kind', p.kind, 'caption', p.caption, 'town', p.town, 'taken_on', p.taken_on, 'tags', to_jsonb(p.tags),
-      'show_in_grid', p.show_in_grid, 'posted_at', p.posted_at, 'cover_url', p.cover_url,
+      'show_in_grid', p.show_in_grid, 'posted_at', p.posted_at, 'cover_url', p.cover_url, 'cover_thumb_url', p.cover_thumb_url,
       'music_url', p.music_url, 'music_title', p.music_title, 'music_start_s', p.music_start_s, 'music_end_s', p.music_end_s,
       'music_fade', p.music_fade, 'keep_video_sound', p.keep_video_sound,
       'media', coalesce((select jsonb_agg(jsonb_build_object('id', m.id, 'kind', m.kind, 'url', m.url, 'thumb_url', m.thumb_url,

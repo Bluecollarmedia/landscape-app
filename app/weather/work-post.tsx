@@ -9,7 +9,8 @@ import { OptimizedImage } from '@/components/ui';
 import { WX } from '@/components/weather/WeatherUI';
 import { useClipMusic } from '@/components/work/useClipMusic';
 import { getLoadedPost } from '@/data/portfolio';
-import { requestNoteFor, sortedMedia, type PortfolioMedia } from '@/lib/portfolio';
+import { Image as ExpoImage } from 'expo-image';
+import { requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
 
 const INK = '#17301F';
@@ -35,6 +36,15 @@ export default function WeatherWorkPost() {
   // While a video with its own sound is on screen the music waits; the video's sound is off whenever the music replaces it.
   const musicActive = focused && !!post?.music_url && !(post?.keep_video_sound && onVideo);
   useClipMusic(post?.music_url ?? null, clip, { active: musicActive, muted, fade: post?.music_fade ?? true });
+
+  // Only the picture on screen is loaded. Once it has had a moment, the NEXT one is fetched quietly (one at a time), so swiping on is instant
+  // without asking for all of them when the post opens.
+  React.useEffect(() => {
+    const next = media[index + 1];
+    if (!focused || !next || next.kind !== 'photo') return;
+    const timer = setTimeout(() => { void ExpoImage.prefetch(next.url); }, 700);
+    return () => clearTimeout(timer);
+  }, [focused, index, media]);
 
   const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width)), [width]);
 
@@ -75,8 +85,12 @@ export default function WeatherWorkPost() {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          initialNumToRender={1}
+          maxToRenderPerBatch={1}
+          windowSize={2}
+          getItemLayout={(_d, i) => ({ length: width, offset: width * i, index: i })}
           onMomentumScrollEnd={onScrollEnd}
-          renderItem={({ item, index: i }) => <Slide media={item} size={width} playing={focused && i === index} sound={!muted && (!post.music_url || post.keep_video_sound)} />}
+          renderItem={({ item, index: i }) => <Slide media={item} size={width} load={shouldLoadSlide(i, index)} playing={focused && i === index} sound={!muted && (!post.music_url || post.keep_video_sound)} />}
         />
         {media.length > 1 ? <View style={styles.counter}><Text style={styles.counterText}>{index + 1}/{media.length}</Text></View> : null}
         {post.music_url ? (
@@ -112,7 +126,9 @@ export default function WeatherWorkPost() {
 }
 
 /** One picture or video in the swipe row. A video plays (muted unless it is allowed sound) only while it is the one on screen. */
-function Slide({ media, size, playing, sound }: { media: PortfolioMedia; size: number; playing: boolean; sound: boolean }) {
+function Slide({ media, size, load, playing, sound }: { media: PortfolioMedia; size: number; load: boolean; playing: boolean; sound: boolean }) {
+  // A slide that is not the one on screen stays an empty square: it does not ask for its picture or video.
+  if (!load) return <View style={{ width: size, height: size, backgroundColor: WX.leafTint }} />;
   if (media.kind === 'photo') return <OptimizedImage source={media.url} style={{ width: size, height: size }} contentFit="cover" />;
   return <SlideVideo media={media} size={size} playing={playing} sound={sound} />;
 }

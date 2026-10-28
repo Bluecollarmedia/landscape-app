@@ -82,5 +82,7 @@ const clipHook = read('src/components/work/useClipMusic.ts');
 check('32 the music part loops and fades through the tested rules', /nextLoopPosition/.test(clipHook) && /clipVolume/.test(clipHook) && /player\.pause\(\)/.test(clipHook));
 check('33 Our Work has Spanish', /'Our Work': /.test(read('src/i18n/es.weather.ts')) && /'Want something like this\? Request a quote'/.test(read('src/i18n/es.weather.ts')));
 
+check('34 a project with 10 photos loads only the one on screen (then quietly the next), never all of them at once', L.shouldLoadSlide(0, 0) === true && [1, 2, 3, 4, 5, 6, 7, 8, 9].every((i) => L.shouldLoadSlide(i, 0) === false) && /initialNumToRender=\{1\}/.test(read('app/weather/work-post.tsx')) && /load=\{shouldLoadSlide\(i, index\)\}/.test(read('app/weather/work-post.tsx')) && /if \(!load\) return/.test(read('app/weather/work-post.tsx')) && /prefetch\(next\.url\)/.test(read('app/weather/work-post.tsx')));
+check('35 the grid draws 30 tiles at first and 30 more near the end, and each tile uses the small picture when there is one', L.GRID_PAGE === 30 && L.growCount(30, 100) === 60 && L.growCount(90, 100) === 100 && /grid\.slice\(0, gridCount\)/.test(read('app/weather/work.tsx')) && L.postGridUrl({ ...post('g'), cover_thumb_url: 'small', cover_url: 'big' }) === 'small' && L.postGridUrl({ ...post('g2'), media: [media('x', 'photo', { thumb_url: 'tiny' })] }) === 'tiny' && L.postGridUrl(post('g3')) === 'u/g3a');
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

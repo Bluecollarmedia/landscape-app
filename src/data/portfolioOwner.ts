@@ -84,6 +84,8 @@ export interface NewPostInput {
   projectId?: string | null;
   coverUrl?: string | null;
   coverThumbUrl?: string | null;
+  /** The owner's own track and the part of it that plays (update 115). */
+  music?: { url: string; title: string; startS: number; endS: number; fade: boolean; keepVideoSound: boolean } | null;
   media: MediaInput[];
 }
 
@@ -104,6 +106,8 @@ export async function createPost(input: NewPostInput): Promise<Result<string>> {
       company_id: companyId, kind: input.kind, project_id: input.projectId ?? null, caption: input.caption.trim(), town: input.town.trim(), taken_on: input.takenOn.trim().slice(0, 30),
       tags: input.tags, show_in_grid: input.kind === 'video' ? input.showInGrid : true, visible: input.visible,
       cover_url: input.coverUrl ?? null, cover_thumb_url: input.coverThumbUrl ?? gridThumbOf(input.media),
+      music_url: input.music?.url ?? null, music_title: input.music?.title ?? null, music_start_s: input.music?.startS ?? null, music_end_s: input.music?.endS ?? null,
+      music_fade: input.music?.fade ?? true, keep_video_sound: input.music?.keepVideoSound ?? false,
     }).select('id').single();
     if (error || !data) return { ok: false, error: friendly(error?.message ?? UNREACHABLE) };
     const postId = (data as { id: string }).id;

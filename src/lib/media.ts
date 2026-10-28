@@ -23,6 +23,12 @@ export const r2Enabled = !!process.env.EXPO_PUBLIC_R2_PUBLIC_URL;
 function guessContentType(uri: string, mimeType?: string): { contentType: string; ext: string } {
   const lower = uri.split('?')[0].toLowerCase();
   const mime = (mimeType ?? '').toLowerCase();
+  if (mime.startsWith('audio/') || /\.(mp3|m4a|aac|wav)$/.test(lower)) {
+    if (mime === 'audio/mp4' || mime === 'audio/x-m4a' || lower.endsWith('.m4a')) return { contentType: 'audio/mp4', ext: 'm4a' };
+    if (mime === 'audio/aac' || lower.endsWith('.aac')) return { contentType: 'audio/aac', ext: 'aac' };
+    if (mime === 'audio/wav' || mime === 'audio/x-wav' || lower.endsWith('.wav')) return { contentType: 'audio/wav', ext: 'wav' };
+    return { contentType: 'audio/mpeg', ext: 'mp3' };
+  }
   if (mime === 'video/quicktime' || lower.endsWith('.mov')) return { contentType: 'video/quicktime', ext: 'mov' };
   if (mime.startsWith('video/') || lower.endsWith('.mp4') || lower.endsWith('.m4v')) return { contentType: 'video/mp4', ext: 'mp4' };
   if (mime === 'image/png' || lower.endsWith('.png')) return { contentType: 'image/png', ext: 'png' };

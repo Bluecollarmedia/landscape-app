@@ -259,10 +259,10 @@ export function WeatherHomeScreen({ embedded = false }: { embedded?: boolean }) 
         refreshControl={<RefreshControl refreshing={busy} onRefresh={refresh} tintColor={INK} />}
         contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 18, paddingBottom: insets.bottom + 130 }}
       >
-        <Image source={require('../../assets/images/weather-hero.jpg')} style={{ position: 'absolute', top: 0, left: 0, width: screenW, height: screenW * HERO_RATIO }} resizeMode="cover" accessible={false} />
+        <Image source={require('../../../assets/images/weather-hero.jpg')} style={{ position: 'absolute', top: 0, left: 0, width: screenW, height: screenW * HERO_RATIO }} resizeMode="cover" accessible={false} />
         <View style={styles.top}>
           <View style={styles.brand}>
-            <Image source={require('../../assets/images/logo-leaf.png')} style={styles.leaf} />
+            <Image source={require('../../../assets/images/logo-leaf.png')} style={styles.leaf} />
             <View>
               <Text style={styles.brandName}>BRIGHTON</Text>
               <Text style={styles.brandSub}>FORECAST</Text>

@@ -183,3 +183,10 @@ export function shareTarget(s: Pick<PortfolioStory, 'post_id' | 'media_id'>, pos
   const v = chosen ?? video;
   return v ? { type: 'video', postId: s.post_id, mediaId: v.id } : { type: 'post', postId: s.post_id };
 }
+
+/** "now", "5m", "3h": how long ago a story was added, shown next to the name at the top of the viewer. */
+export function agoLabel(createdAt: string, now: number): string {
+  const min = Math.floor((now - Date.parse(createdAt)) / 60_000);
+  if (!(min >= 1)) return 'now';
+  return min < 60 ? `${min}m` : `${Math.floor(min / 60)}h`;
+}

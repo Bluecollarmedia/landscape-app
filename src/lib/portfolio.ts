@@ -3,6 +3,7 @@
  * network), so it is tested without a phone. The data comes from update 115 (public_portfolio for visitors, the portfolio_* tables for the owner).
  */
 
+import { audioFormatOf } from '@/lib/mediaFormats';
 import type { PortfolioStory } from '@/lib/portfolioStories';
 
 export type MediaKind = 'photo' | 'video';
@@ -288,7 +289,6 @@ export function highlightProblem(d: HighlightDraft): string | null {
 
 // ── Music: the owner's track, the timeline and the handles ─────────────────────────────────────────────────────────────────────
 
-export const AUDIO_EXTENSIONS = ['mp3', 'm4a', 'aac', 'wav'] as const;
 export const MAX_TRACK_MB = 30;
 export const DEFAULT_CLIP_S = 30;
 
@@ -300,8 +300,7 @@ export function trackTitleFromFile(fileName: string): string {
 
 /** Is this a file Our Work can use as music (by its name or type)? */
 export function isUsableTrack(fileName: string, mimeType?: string | null): boolean {
-  const ext = fileName.toLowerCase().split('.').pop() ?? '';
-  return (AUDIO_EXTENSIONS as readonly string[]).includes(ext) || (mimeType ?? '').toLowerCase().startsWith('audio/');
+  return audioFormatOf(fileName, mimeType) !== null;
 }
 
 /** Where the part starts when a track is first chosen: about a quarter in for a long track (skipping a slow intro), the beginning for a short one. */

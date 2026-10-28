@@ -6,7 +6,7 @@ const path = require('path');
 const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8');
 const compile = (src) => {
   const m = { exports: {} };
-  new Function('module', 'exports', 'require', ts.transpileModule(src, { compilerOptions: { module: 'commonjs', esModuleInterop: true } }).outputText)(m, m.exports, () => ({}));
+  new Function('module', 'exports', 'require', ts.transpileModule(src, { compilerOptions: { module: 'commonjs', esModuleInterop: true } }).outputText)(m, m.exports, (name) => (name === '@/lib/mediaFormats' ? compile(read('src/lib/mediaFormats.ts')) : {}));
   return m.exports;
 };
 const L = compile(read('src/lib/portfolio.ts'));
@@ -105,7 +105,7 @@ check('47 the music chip name comes from the file name, and only audio files are
 check('48 the strip of video frames is spread evenly along the video', Q.frameTimes(24, 8).join() === '1.5,4.5,7.5,10.5,13.5,16.5,19.5,22.5' && Q.frameTimes(0, 8).length === 0);
 const server = read('supabase/functions/media/index.ts');
 const mediaLib = read('src/lib/media.ts');
-check('49 the media function accepts MP3, M4A, AAC and WAV (redeploy it), and the app knows these as audio', /'audio\/mpeg': 'mp3'/.test(server) && /'audio\/mp4': 'm4a'/.test(server) && /'audio\/aac': 'aac'/.test(server) && /'audio\/wav': 'wav'/.test(server) && /contentType: 'audio\/mpeg', ext: 'mp3'/.test(mediaLib));
+check('49 the media function accepts MP3, M4A, AAC and WAV (redeploy it), and the app knows these as audio', /'audio\/mpeg': 'mp3'/.test(server) && /'audio\/mp4': 'm4a'/.test(server) && /'audio\/aac': 'aac'/.test(server) && /'audio\/wav': 'wav'/.test(server) && /audioFormatOf\(lower, mime\)/.test(mediaLib) && /videoFormatOf\(lower, mime\)/.test(mediaLib));
 const music = read('src/components/work/MusicEditor.tsx');
 const musicData = read('src/data/portfolioMusic.ts');
 check('50 the owner imports their own track from the phone (a size limit, audio only), and the screen has a timeline with two handles and a middle to drag, readouts, and a play button that stops at the end of the part', /getDocumentAsync\(\{ type: \['audio\/\*'\]/.test(musicData) && /MAX_TRACK_MB/.test(musicData) && /pans\.start\.panHandlers/.test(music) && /pans\.end\.panHandlers/.test(music) && /pans\.move\.panHandlers/.test(music) && /Starts at/.test(music) && /Ends at/.test(music) && /currentTime >= clip\.endS/.test(music) && /Play the selected part/.test(music));
@@ -115,6 +115,20 @@ check('52 the cover can be a photo from the post, a frame of a video (slide alon
 const edr = read('src/components/work/PostEditorScreen.tsx');
 check('53 saving uploads the track once (with its start and end) and the cover (high quality plus a small grid copy), and music and cover can be changed or removed on an old post', /uploadTrack\(music\.track, companyId\)/.test(edr) && /uploadPortfolioPhoto\(coverLocal, companyId, 'covers'\)/.test(edr) && /music_url: musicInput\?\.url \?\? null/.test(edr) && /coverReset/.test(edr) && /<MusicEditor visible=\{musicOpen\}/.test(edr) && /<CoverEditor visible=\{coverOpen\}/.test(edr));
 check('54 a new post saves its music and cover with it', /music: musicInput, coverUrl: cover\?\.url \?\? null/.test(edr) && /music_url: input\.music\?\.url \?\? null/.test(read('src/data/portfolioOwner.ts')));
+
+// ── file formats ──
+const F = compile(read('src/lib/mediaFormats.ts'));
+const okAudio = [['song.mp3'], ['song.M4A'], ['voice.aac'], ['loop.wav'], ['pad.aiff'], ['pad.aif'], ['iphone.caf'], ['lossless.flac'], ['x', 'audio/mpeg'], ['x', 'audio/x-m4a'], ['x', 'audio/flac']];
+check('55 music: MP3, M4A, AAC, WAV, AIFF, CAF and FLAC are accepted, by file name or by type', okAudio.every(([n, m]) => F.audioProblem(n, m) === null));
+check('56 music: formats only some phones play (OGG, Opus, WMA) are turned away with a plain message, and so are non-audio files', /not play on every phone/.test(F.audioProblem('a.ogg')) && /not play on every phone/.test(F.audioProblem('a.wma')) && /Choose an audio file/.test(F.audioProblem('photo.jpg', 'image/jpeg')));
+check('57 music: each format is named correctly for upload (an M4A is not called an MP3)', F.audioFormatOf('a.m4a').contentType === 'audio/mp4' && F.audioFormatOf('a.flac').ext === 'flac' && F.audioFormatOf('a.mp3').contentType === 'audio/mpeg' && F.audioFormatOf('a.wav').contentType === 'audio/wav');
+check('58 video: MP4, MOV (iPhone), M4V and 3GP are accepted', ['a.mp4', 'a.MOV', 'a.m4v', 'a.3gp'].every((n) => F.videoProblem(n) === null) && F.videoProblem('x', 'video/quicktime') === null && F.videoFormatOf('a.mov').contentType === 'video/quicktime' && F.videoFormatOf('a.3gp').contentType === 'video/3gpp');
+check('59 video: WebM, MKV and AVI are turned away with a plain message; a file whose name is unknown is let through (the phone\'s own library only holds normal videos)', /do not play on every phone/.test(F.videoProblem('a.webm')) && /do not play on every phone/.test(F.videoProblem('a.mkv')) && /do not play on every phone/.test(F.videoProblem('a.avi')) && F.videoProblem(null, null) === null && F.videoProblem('', 'video/mp4') === null);
+check('60 pictures: JPEG, PNG, WebP, HEIC/HEIF, GIF, BMP, TIFF and AVIF are accepted, and something that is not a picture is turned away', ['a.jpg', 'a.PNG', 'a.webp', 'a.heic', 'a.heif', 'a.gif', 'a.bmp', 'a.tiff', 'a.avif'].every((n) => F.imageProblem(n) === null) && F.imageProblem('x', 'image/jpeg') === null && /Choose a picture/.test(F.imageProblem('doc.pdf', 'application/pdf')));
+const srv = read('supabase/functions/media/index.ts');
+check('61 the media function accepts every audio and video format listed here (redeploy it)', ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/aiff', 'audio/x-caf', 'audio/flac', 'video/mp4', 'video/quicktime', 'video/x-m4v', 'video/3gpp'].every((t) => srv.includes(`'${t}'`)));
+const ed2 = read('src/components/work/PostEditorScreen.tsx');
+check('62 the pickers check the format before anything is uploaded (posts, reels, stories, music), and photos are re-saved as JPEG so any picture the phone opens works', /videoProblem\(a\.fileName \?\? a\.uri, a\.mimeType\)/.test(ed2) && /imageProblem\(a\.fileName \?\? a\.uri, a\.mimeType\)/.test(ed2) && /videoProblem\(a\.fileName/.test(read('src/components/work/StoriesManagerScreen.tsx')) && /audioProblem\(a\.name, a\.mimeType\)/.test(read('src/data/portfolioMusic.ts')) && /format: SaveFormat\.JPEG/.test(read('src/data/portfolioUpload.ts')));
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

@@ -12,6 +12,7 @@ import { StoryBackdrop, StoryCard } from '@/components/work/StoryCard';
 import { addMediaStory, addShareStory, deleteStory, loadMyStories, loadPostsToShare } from '@/data/portfolioStoriesOwner';
 import { useTheme } from '@/providers/ThemeProvider';
 import { keepPicked } from '@/lib/keepPickedFile';
+import { imageProblem, videoProblem } from '@/lib/mediaFormats';
 import { postGridUrl, type PortfolioPost } from '@/lib/portfolio';
 import {
   DEFAULT_DESIGN, FRAME_WIDTH_MAX, MAX_STORY_VIDEO_S, RADIUS_MAX, SCALE_MAX, SCALE_MIN, STORY_COLORS, TEXT_MAX, normalizeDesign, stepValue, timeLeftLabel,
@@ -52,6 +53,8 @@ export function StoriesManagerScreen() {
     if (result.canceled || !result.assets[0]) return;
     const a = result.assets[0];
     const isVideo = a.type === 'video';
+    const wrongFormat = isVideo ? videoProblem(a.fileName ?? a.uri, a.mimeType) : imageProblem(a.fileName ?? a.uri, a.mimeType);
+    if (wrongFormat) { setProblem(wrongFormat); return; }
     const seconds = isVideo ? (a.duration ?? 0) / 1000 : null;
     if (isVideo && seconds !== null && seconds > MAX_STORY_VIDEO_S) { setProblem(`A story video can be up to ${MAX_STORY_VIDEO_S} seconds. Trim it first.`); return; }
     setBusy(true);

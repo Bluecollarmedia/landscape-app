@@ -18,6 +18,7 @@ import { uploadTrack } from '@/data/portfolioMusic';
 import { uploadPortfolioPhoto, uploadPortfolioVideo } from '@/data/portfolioUpload';
 import { db, rowsOf } from '@/data/store';
 import { keepPicked } from '@/lib/keepPickedFile';
+import { imageProblem, videoProblem } from '@/lib/mediaFormats';
 import { MAX_POST_MEDIA, MAX_VIDEO_S, TAG_CHOICES, formatDuration, moveItem, postProblem, sortedMedia, type MediaKind } from '@/lib/portfolio';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
@@ -104,6 +105,8 @@ export function PostEditorScreen() {
     const added: Item[] = [];
     for (const a of result.assets.slice(0, room)) {
       const isVideo = a.type === 'video';
+      const wrongFormat = isVideo ? videoProblem(a.fileName ?? a.uri, a.mimeType) : imageProblem(a.fileName ?? a.uri, a.mimeType);
+      if (wrongFormat) { setProblem(wrongFormat); continue; }
       const seconds = isVideo ? (a.duration ?? 0) / 1000 : null;
       if (isVideo && (seconds ?? 0) > MAX_VIDEO_S) { setProblem(`A video can be up to ${MAX_VIDEO_S} seconds. Trim it first.`); continue; }
       // The picked file is copied somewhere safe at once (the phone may remove its temporary copy before the upload ends).

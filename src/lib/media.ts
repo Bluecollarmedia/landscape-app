@@ -14,6 +14,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { uuid } from './ids';
 import { explainUploadError, SIGNED_OUT_UPLOAD_MESSAGE } from './uploadErrors';
 import { tooLargeMessage } from './uploadLimit';
+import { audioFormatOf, videoFormatOf } from './mediaFormats';
 
 export const MEDIA_BUCKET = 'media';
 
@@ -23,14 +24,12 @@ export const r2Enabled = !!process.env.EXPO_PUBLIC_R2_PUBLIC_URL;
 function guessContentType(uri: string, mimeType?: string): { contentType: string; ext: string } {
   const lower = uri.split('?')[0].toLowerCase();
   const mime = (mimeType ?? '').toLowerCase();
-  if (mime.startsWith('audio/') || /\.(mp3|m4a|aac|wav)$/.test(lower)) {
-    if (mime === 'audio/mp4' || mime === 'audio/x-m4a' || lower.endsWith('.m4a')) return { contentType: 'audio/mp4', ext: 'm4a' };
-    if (mime === 'audio/aac' || lower.endsWith('.aac')) return { contentType: 'audio/aac', ext: 'aac' };
-    if (mime === 'audio/wav' || mime === 'audio/x-wav' || lower.endsWith('.wav')) return { contentType: 'audio/wav', ext: 'wav' };
-    return { contentType: 'audio/mpeg', ext: 'mp3' };
-  }
-  if (mime === 'video/quicktime' || lower.endsWith('.mov')) return { contentType: 'video/quicktime', ext: 'mov' };
-  if (mime.startsWith('video/') || lower.endsWith('.mp4') || lower.endsWith('.m4v')) return { contentType: 'video/mp4', ext: 'mp4' };
+  // Audio and video: the same shared rules as Our Work's pickers (src/lib/mediaFormats.ts).
+  const audio = audioFormatOf(lower, mime);
+  if (audio) return { contentType: audio.contentType, ext: audio.ext };
+  const video = videoFormatOf(lower, mime);
+  if (video) return { contentType: video.contentType, ext: video.ext };
+  if (mime.startsWith('video/') || lower.endsWith('.m4v')) return { contentType: 'video/mp4', ext: 'mp4' };
   if (mime === 'image/png' || lower.endsWith('.png')) return { contentType: 'image/png', ext: 'png' };
   if (mime === 'image/webp' || lower.endsWith('.webp')) return { contentType: 'image/webp', ext: 'webp' };
   if (lower.endsWith('.heic') || lower.endsWith('.heif')) return { contentType: 'image/heic', ext: 'heic' };

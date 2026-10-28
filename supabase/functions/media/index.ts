@@ -91,6 +91,14 @@ const TYPES: Record<string, string> = {
   'audio/aac': 'aac',
   'audio/wav': 'wav',
   'audio/x-wav': 'wav',
+  'audio/aiff': 'aiff',
+  'audio/x-aiff': 'aiff',
+  'audio/x-caf': 'caf',
+  'audio/flac': 'flac',
+  'audio/x-flac': 'flac',
+  // More video containers every phone plays
+  'video/x-m4v': 'm4v',
+  'video/3gpp': '3gp',
 };
 const MAX_BYTES = 200 * 1024 * 1024;
 const CAN_DELETE = new Set(['owner', 'admin', 'manager', 'lead', 'worker']);

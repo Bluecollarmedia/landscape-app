@@ -5,7 +5,8 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { uploadImage } from '@/lib/media';
 import { portfolioFolder } from '@/lib/portfolioMedia';
-import { MAX_TRACK_MB, isUsableTrack } from '@/lib/portfolio';
+import { audioProblem } from '@/lib/mediaFormats';
+import { MAX_TRACK_MB } from '@/lib/portfolio';
 
 export interface PickedTrack { uri: string; fileName: string; mimeType: string | null; sizeBytes: number | null }
 
@@ -14,7 +15,8 @@ export async function pickTrack(): Promise<{ ok: true; track: PickedTrack } | { 
   const res = await DocumentPicker.getDocumentAsync({ type: ['audio/*'], copyToCacheDirectory: true, multiple: false });
   if (res.canceled || !res.assets?.[0]) return null;
   const a = res.assets[0];
-  if (!isUsableTrack(a.name, a.mimeType)) return { ok: false, error: 'Choose an audio file (MP3, M4A, AAC or WAV).' };
+  const bad = audioProblem(a.name, a.mimeType);
+  if (bad) return { ok: false, error: bad };
   if (a.size && a.size > MAX_TRACK_MB * 1024 * 1024) return { ok: false, error: `That track is bigger than ${MAX_TRACK_MB} MB. Choose a smaller one.` };
   return { ok: true, track: { uri: a.uri, fileName: a.name, mimeType: a.mimeType ?? null, sizeBytes: a.size ?? null } };
 }

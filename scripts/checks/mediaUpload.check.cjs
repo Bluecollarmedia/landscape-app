@@ -37,6 +37,8 @@ const load = (r2) => {
     if (name === './ids') return { uuid: () => 'uuid-1' };
     if (name === './uploadErrors') return errors;
     if (name === './uploadLimit') return { tooLargeMessage: () => null };
+    // The shared file-format rules (audio and video names), real.
+    if (name === './mediaFormats') return compile(read('src/lib/mediaFormats.ts'), () => ({}));
     // The phone's file upload is faked with the fake fetch (the harness has no phone): same answer shape as the real one.
     if (name === './uploadFile') return { putFile: async (uri, url, ct) => { const r = await globalThis.fetch(url, { method: 'PUT', headers: { 'Content-Type': ct }, body: {} }); return { status: r.status, body: typeof r.text === 'function' ? await r.text() : '' }; }, localFileSize: async () => 10 };
     // The real timeout helper, so the time limits in snowMedia work in this harness too.

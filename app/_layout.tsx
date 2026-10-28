@@ -29,6 +29,7 @@ import { hasOpenProjectWork } from '@/lib/workerAreas';
 import { useAdminWorksSnow } from '@/lib/adminSnowWork';
 import { WebDialogHost } from '@/components/ui/WebDialogHost';
 import { usePublicWeatherSwitch } from '@/hooks/usePublicWeatherSwitch';
+import { useWidgetSync } from '@/hooks/useWidgetSync';
 import { signedOutRedirect } from '@/lib/launchRoute';
 
 // On the website Alert.alert does nothing by itself; this points it at the app's own dialog (a phone keeps the system alert).
@@ -56,6 +57,8 @@ function RootNavigator() {
   // Tell the server which language this person uses, so its push notices come in it (update 95).
   useEffect(() => { if (appState === 'active' && isAuthenticated && user) syncLanguageToAccount(); }, [appState, isAuthenticated, user?.id]);
   usePrefetchKeyImages();
+  // The home and lock screen widgets get their forecast for everyone, signed in or not.
+  useWidgetSync();
 
   // Photo, birthday, hoodie and ID set aside while the account waited for email confirmation are saved on first sign-in.
   useEffect(() => {

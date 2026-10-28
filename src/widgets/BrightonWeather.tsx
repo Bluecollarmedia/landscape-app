@@ -1,11 +1,11 @@
 import { Gauge, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
-import { aspectRatio, background, clipped, containerBackground, font, foregroundStyle, frame, gaugeStyle, kerning, lineLimit, minimumScaleFactor, padding, resizable, shapes } from '@expo/ui/swift-ui/modifiers';
+import { aspectRatio, background, clipped, containerBackground, font, foregroundStyle, frame, gaugeStyle, kerning, lineLimit, minimumScaleFactor, padding, resizable } from '@expo/ui/swift-ui/modifiers';
 import { widgetURL } from '@expo/ui/swift-ui/modifiers';
 import { createWidget, type WidgetEnvironment } from 'expo-widgets';
 import type { WidgetProps } from '@/lib/widgetData';
 
 /**
- * Brighton Forecast on the home screen and the lock screen: small, medium (the next hours, or the storm outlook while one is posted), and the
+ * Brighton Forecast on the home screen and the lock screen: small, medium (the next hours), and the
  * three lock screen sizes. The look follows the approved mockup (light, minimal, the leaf and "BRIGHTON" on every size).
  *
  * A widget runs in its own small runtime, so everything it needs is inside this function (no outside constants, no hooks). The words and
@@ -21,8 +21,6 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
   const page = dark ? '#18241C' : '#FBFDF8';
   const green = dark ? '#8CCB63' : '#2E5E34';
   const rule = dark ? '#2B3B30' : '#DCE6D5';
-  const stormTint = dark ? '#1C3246' : '#E6F0FA';
-  const stormInk = dark ? '#8FC2EE' : '#1D5F9A';
   const open = widgetURL('brighton-lawn://weather');
   // The leaf is a picture file at its full size: it must be made resizable and fitted, or the frame alone does not shrink it and it covers the widget.
   const leafMods = (n: number) => [resizable(), aspectRatio({ contentMode: 'fit' }), frame({ width: n, height: n }), clipped()];
@@ -121,35 +119,15 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
         </VStack>
         <Spacer />
         <VStack alignment="trailing" spacing={3}>
-          {p.storm ? (
-            <Image systemName={p.symbol as any} size={38} color={p.symbolColor} />
-          ) : (
-            <VStack alignment="trailing" spacing={2}>
-              <VStack modifiers={[padding({ bottom: 4 })]}>{brand('BRIGHTON FORECAST', 15)}</VStack>
-              {p.uv ? <Text modifiers={[font({ size: 12, weight: 'bold' }), foregroundStyle(soft)]}>{p.uv}</Text> : null}
-              {p.rain ? <Text modifiers={[font({ size: 12 }), foregroundStyle(soft), lineLimit(1)]}>{p.rain}</Text> : null}
-            </VStack>
-          )}
+          <VStack alignment="trailing" spacing={2}>
+            <VStack modifiers={[padding({ bottom: 4 })]}>{brand('BRIGHTON FORECAST', 15)}</VStack>
+            {p.uv ? <Text modifiers={[font({ size: 12, weight: 'bold' }), foregroundStyle(soft)]}>{p.uv}</Text> : null}
+            {p.rain ? <Text modifiers={[font({ size: 12 }), foregroundStyle(soft), lineLimit(1)]}>{p.rain}</Text> : null}
+          </VStack>
         </VStack>
       </HStack>
       <Spacer />
-      {p.storm ? (
-        <VStack
-          alignment="leading"
-          spacing={2}
-          modifiers={[padding({ horizontal: 12, vertical: 8 }), frame({ maxWidth: 10000, alignment: 'leading' }), background(stormTint, shapes.roundedRectangle({ cornerRadius: 16 }))]}
-        >
-          <HStack spacing={5}>
-            {p.leaf ? <Image uiImage={p.leaf} modifiers={leafMods(14)} /> : null}
-            <Text modifiers={[font({ size: 11, weight: 'bold' }), kerning(1), foregroundStyle(stormInk), lineLimit(1)]}>{"BRIGHTON'S STORM OUTLOOK"}</Text>
-          </HStack>
-          <HStack>
-            <Text modifiers={[font({ size: 13, weight: 'bold' }), foregroundStyle(ink), lineLimit(1)]}>{p.storm.headline}</Text>
-            <Spacer />
-            {p.storm.range ? <Text modifiers={[font({ size: 13, weight: 'bold' }), foregroundStyle(stormInk), lineLimit(1)]}>{p.storm.range}</Text> : null}
-          </HStack>
-        </VStack>
-      ) : p.hours.length ? (
+      {p.hours.length ? (
         <VStack spacing={8}>
           <HStack modifiers={[frame({ maxWidth: 10000, height: 1 }), background(rule)]}>
             <Spacer />

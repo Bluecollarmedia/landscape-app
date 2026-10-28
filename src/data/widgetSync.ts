@@ -7,6 +7,7 @@
  */
 import { Image, Platform } from 'react-native';
 import { buildWidgetEntries } from '@/lib/widgetData';
+import { setViewTz } from '@/lib/weatherView';
 import type { WeatherPayload } from '@/lib/weatherView';
 
 let lastKey = '';
@@ -44,6 +45,7 @@ export async function syncWidgets(data: WeatherPayload | null): Promise<void> {
     const widgets = require('expo-widgets') as typeof import('expo-widgets');
     const widget = (require('@/widgets/BrightonWeather') as typeof import('@/widgets/BrightonWeather')).default;
     const leaf = await leafFile(widgets.widgetsDirectory ?? null);
+    setViewTz(data.tz);   // hour labels in the forecast place's own time zone, even when the Weather screen is not open
     const entries = buildWidgetEntries(data, Date.now(), leaf);
     widget.updateTimeline(entries.map((e) => ({ date: e.date, props: e.props })));
     lastKey = key;

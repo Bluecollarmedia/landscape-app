@@ -102,8 +102,9 @@ export function buildWidgetEntries(data: WeatherPayload, now: number, leaf: stri
     const h = data.hourly[idx];
     const s = symbolOf(i === 0 && data.current?.icon ? data.current.icon : h.icon);
     const strip: WidgetHour[] = [];
+    // "Now", then the next odd hours (11 AM, 1 PM, 3 PM, 5 PM at 10:20), like the approved picture.
     for (let k = 0; k < 5; k++) {
-      const hh = data.hourly[idx + k * 2];
+      const hh = data.hourly[idx + (k === 0 ? 0 : 2 * k - 1)];
       if (!hh) break;
       strip.push({ label: k === 0 && i === 0 ? 'Now' : hourLabel(hh.time, locale), temp: deg(hh.tempF), symbol: symbolOf(hh.icon).name });
     }

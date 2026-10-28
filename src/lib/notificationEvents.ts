@@ -13,6 +13,7 @@ export const EVENT_LABELS: Record<NotificationEventType, { label: string; icon: 
   photo_waiting_review: { label: 'Photos Pending', icon: 'camera', description: 'When new photos need your review' },
   customer_request_submitted: { label: 'Customer Request', icon: 'message-square', description: 'When a customer submits a request' },
   customer_message: { label: 'Customer Message', icon: 'message-circle', description: 'When a customer sends you a message' },
+  service_request: { label: 'Service Request', icon: 'inbox', description: 'When someone asks for work from the app' },
   schedule_changed: { label: 'Schedule Changed', icon: 'calendar', description: 'When the schedule is modified' },
   announcement_posted: { label: 'Announcement', icon: 'volume-2', description: 'When an announcement is posted' },
   schedule_conflict: { label: 'Schedule Conflict', icon: 'alert-triangle', description: 'When a scheduling conflict is detected' },

@@ -7,11 +7,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { EmptyState, GlassIconButton, Icon, InlineNotice, LoadingSpinner } from '@/components/ui';
+import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner } from '@/components/ui';
 import { SnowPill } from '@/components/snow/SnowPill';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
 import { useTheme } from '@/providers/ThemeProvider';
-import { deleteStormForGood, loadStormCounts, loadStorms, SERVICE_LABEL, STORM_STATUS_LABEL } from '@/data/snowStorms';
+import { deleteStormForGood, loadStormCounts, loadStorms, renameStorm, SERVICE_LABEL, STORM_STATUS_LABEL } from '@/data/snowStorms';
 import { deleteConfirmation } from '@/lib/snowStormDelete';
 import { servicesLabel, stormServices } from '@/lib/snowServices';
 import { longWhen, STORM_PILL } from '@/lib/snowStormView';
@@ -31,6 +31,8 @@ export function ManageStormsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
 
   const reload = useCallback(async () => {
     const res = await loadStorms();
@@ -40,6 +42,16 @@ export function ManageStormsScreen() {
     setStorms(res.data);
   }, []);
   useEffect(() => { reload(); }, [reload]);
+
+  async function saveName(s: SnowStorm) {
+    setBusyId(s.id);
+    const res = await renameStorm(s.id, draft);
+    setBusyId(null);
+    if (!res.ok) return showMessage('Couldn\'t rename the storm', res.error);
+    setRenaming(null);
+    setDone(`Renamed to ${draft.trim()}.`);
+    reload();
+  }
 
   async function onDelete(s: SnowStorm) {
     setBusyId(s.id);
@@ -67,7 +79,7 @@ export function ManageStormsScreen() {
         <GlassIconButton icon="chevron-left" onPress={() => router.back()} accessibilityLabel="Back" />
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>Manage storms</Text>
         <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2, marginBottom: spacing.lg }]}>
-          Delete a storm for good, whatever its status. You can't undo it.
+          Name a storm (this is the title on your dashboard), or delete one for good. Deleting can't be undone.
         </Text>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={error} style={{ marginBottom: spacing.md }} /> : null}
         {done ? <InlineNotice icon="check-circle" tone="success" text={done} style={{ marginBottom: spacing.md }} /> : null}
@@ -83,7 +95,20 @@ export function ManageStormsScreen() {
               return (
                 <View key={s.id} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{s.name}</Text>
+                    {renaming === s.id ? (
+                      <View style={{ gap: spacing.sm }}>
+                        <Input label="Storm name" value={draft} onChangeText={setDraft} autoFocus maxLength={60} returnKeyType="done" onSubmitEditing={() => saveName(s)} />
+                        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                          <Button title="Save name" size="sm" onPress={() => saveName(s)} disabled={busyId !== null || !draft.trim()} />
+                          <Button title="Cancel" size="sm" variant="secondary" onPress={() => setRenaming(null)} />
+                        </View>
+                      </View>
+                    ) : (
+                      <Pressable onPress={() => { setRenaming(s.id); setDraft(s.name); }} accessibilityRole="button" accessibilityLabel={`Rename ${s.name}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600', flexShrink: 1 }]}>{s.name}</Text>
+                        <Icon name="edit-2" size={14} color={colors.primary} />
+                      </Pressable>
+                    )}
                     <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
                       {servicesLabel(stormServices(s), (x) => SERVICE_LABEL[x])} {'·'} {when}
                     </Text>

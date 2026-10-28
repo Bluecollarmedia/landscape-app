@@ -30,6 +30,19 @@ export function otherStorms(storms: StormOverview[], active: StormOverview | und
   return active ? storms.filter((s) => s.id !== active.id) : storms;
 }
 
+/**
+ * What the owner's dashboard lists: only storms that are running right now. A draft is not running yet and an ended storm is
+ * history (both stay on the Storms tab), so neither appears here.
+ */
+export function runningStorms(storms: StormOverview[]): StormOverview[] {
+  return storms.filter((s) => s.status === 'dispatched');
+}
+
+/** "2 out of 40 stops complete": every route of the storm together. Skipped stops are closed out, so they count as done. */
+export function stopsCompleteLabel(storm: Pick<StormOverview, 'completed' | 'skipped' | 'total'>): string {
+  return storm.total > 0 ? `${storm.completed + storm.skipped} out of ${storm.total} stops complete` : 'No stops yet';
+}
+
 export type CrewStatus = 'planned' | 'not_started' | 'in_progress' | 'completed' | 'empty';
 
 export const CREW_STATUS_LABEL: Record<CrewStatus, string> = {
@@ -94,6 +107,11 @@ export function crewRows(storm: StormOverview): CrewRow[] {
       onSite: r.onSite,
     };
   });
+}
+
+/** The routes still being worked: a finished route comes off the dashboard the moment its last stop is closed. */
+export function openCrewRows(storm: StormOverview): CrewRow[] {
+  return crewRows(storm).filter((r) => r.status !== 'completed');
 }
 
 export interface StormHeadline {

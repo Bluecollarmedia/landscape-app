@@ -285,3 +285,68 @@ export function highlightProblem(d: HighlightDraft): string | null {
   if (d.mode === 'manual' && d.postIds.length === 0) return 'Choose at least one post.';
   return null;
 }
+
+// ── Music: the owner's track, the timeline and the handles ─────────────────────────────────────────────────────────────────────
+
+export const AUDIO_EXTENSIONS = ['mp3', 'm4a', 'aac', 'wav'] as const;
+export const MAX_TRACK_MB = 30;
+export const DEFAULT_CLIP_S = 30;
+
+/** "Sunset-Drive_final.mp3" → "Sunset Drive final" (the name shown on the music chip; the owner can change it). */
+export function trackTitleFromFile(fileName: string): string {
+  const base = fileName.replace(/\.[A-Za-z0-9]{2,4}$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return base.slice(0, 60) || 'My track';
+}
+
+/** Is this a file Our Work can use as music (by its name or type)? */
+export function isUsableTrack(fileName: string, mimeType?: string | null): boolean {
+  const ext = fileName.toLowerCase().split('.').pop() ?? '';
+  return (AUDIO_EXTENSIONS as readonly string[]).includes(ext) || (mimeType ?? '').toLowerCase().startsWith('audio/');
+}
+
+/** Where the part starts when a track is first chosen: about a quarter in for a long track (skipping a slow intro), the beginning for a short one. */
+export function defaultClip(trackS: number): Clip {
+  const start = trackS > 2 * DEFAULT_CLIP_S ? Math.round(trackS * 0.25) : 0;
+  return normalizeClip(start, start + DEFAULT_CLIP_S, trackS);
+}
+
+/** The handles' places along the timeline, as fractions 0 to 1. */
+export function clipFractions(c: Clip, trackS: number): { start: number; end: number } {
+  return trackS > 0 ? { start: Math.min(1, c.startS / trackS), end: Math.min(1, c.endS / trackS) } : { start: 0, end: 0 };
+}
+
+/** Dragging the whole part along the track: it keeps its length and stops at the ends of the track. */
+export function moveClip(c: Clip, trackS: number, newStartS: number): Clip {
+  const len = c.endS - c.startS;
+  const start = Math.min(Math.max(0, newStartS), Math.max(0, trackS - len));
+  return { startS: Math.round(start * 10) / 10, endS: Math.round((start + len) * 10) / 10 };
+}
+
+/** Dragging the left handle: the end stays, and the length stays between 5 and 60 seconds. */
+export function dragClipStart(c: Clip, trackS: number, newStartS: number): Clip {
+  void trackS;
+  const start = Math.max(0, c.endS - MAX_CLIP_S, Math.min(Math.max(0, newStartS), c.endS - MIN_CLIP_S));
+  return { startS: Math.round(start * 10) / 10, endS: c.endS };
+}
+
+/** Dragging the right handle: the start stays, the length stays between 5 and 60 seconds, and it cannot go past the end of the track. */
+export function dragClipEnd(c: Clip, trackS: number, newEndS: number): Clip {
+  return normalizeClip(c.startS, Math.max(newEndS, c.startS + MIN_CLIP_S), trackS);
+}
+
+/** The ruler marks under the timeline (every 10, 30 or 60 seconds depending on the track's length). */
+export function rulerMarks(trackS: number): number[] {
+  if (!(trackS > 0)) return [];
+  const step = trackS > 360 ? 60 : trackS > 120 ? 30 : 10;
+  const out: number[] = [];
+  for (let t = 0; t <= trackS; t += step) out.push(t);
+  return out;
+}
+
+// ── Cover: choosing a frame of a video ───────────────────────────────────────────────────────────────────────────────────────
+
+/** `count` moments spread along a video, for the strip of small frames (each in the middle of its slice, so none is a black first frame). */
+export function frameTimes(durationS: number, count: number): number[] {
+  if (!(durationS > 0) || count < 1) return [];
+  return Array.from({ length: count }, (_, i) => Math.round(((i + 0.5) / count) * durationS * 10) / 10);
+}

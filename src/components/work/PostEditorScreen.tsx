@@ -12,6 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage } from '@/components/ui';
 import { confirmAction } from '@/components/financials/ActionSheet';
 import { createPost, deletePost, loadOwnerPortfolio, saveMedia, setPostVisible, updatePost, type MediaInput, type OwnerPost } from '@/data/portfolioOwner';
+import { CoverEditor } from '@/components/work/CoverEditor';
+import { MusicEditor, type MusicDraft } from '@/components/work/MusicEditor';
+import { uploadTrack } from '@/data/portfolioMusic';
 import { uploadPortfolioPhoto, uploadPortfolioVideo } from '@/data/portfolioUpload';
 import { db, rowsOf } from '@/data/store';
 import { keepPicked } from '@/lib/keepPickedFile';
@@ -25,13 +28,19 @@ interface Item {
   /** Set for a picture that is already saved in the post. */
   id?: string;
   kind: MediaKind;
+  /** What is drawn in the tile (a small picture for a saved item). */
   uri: string;
+  /** The real file or address (the video itself, for picking a frame of it). */
+  full: string;
   /** True when the file is still on the phone and must be uploaded when saving. */
   local: boolean;
   durationS: number | null;
   thumbUrl: string | null;
   storageKey: string | null;
 }
+
+/** The post's music as the editor holds it (a saved track does not remember its length; the music screen reads it when opened). */
+type MusicState = Omit<MusicDraft, 'durationS'> & { durationS: number | null };
 
 let counter = 0;
 const nextKey = () => `i${Date.now().toString(36)}${counter++}`;
@@ -56,6 +65,12 @@ export function PostEditorScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [projectPicker, setProjectPicker] = useState(false);
+  const [music, setMusic] = useState<MusicState | null>(null);
+  const [musicOpen, setMusicOpen] = useState(false);
+  const [coverOpen, setCoverOpen] = useState(false);
+  /** A new cover (already cropped, still on the phone), or the owner chose to go back to the automatic one. */
+  const [coverLocal, setCoverLocal] = useState<string | null>(null);
+  const [coverReset, setCoverReset] = useState(false);
 
   useEffect(() => {
     if (!editingId) return;
@@ -68,8 +83,9 @@ export function PostEditorScreen() {
       if (!p) { setProblem('That post is not there any more.'); return; }
       setPost(p);
       setReel(p.kind === 'video');
+      if (p.music_url && p.music_start_s != null && p.music_end_s != null) setMusic({ track: null, url: p.music_url, title: p.music_title ?? 'My track', durationS: null, startS: p.music_start_s, endS: p.music_end_s, fade: p.music_fade, keepVideoSound: p.keep_video_sound });
       setCaption(p.caption); setTown(p.town); setTakenOn(p.taken_on); setTags(p.tags); setShowInGrid(p.show_in_grid); setVisible(p.visible);
-      setItems(sortedMedia(p).map((m) => ({ key: m.id, id: m.id, kind: m.kind, uri: m.thumb_url ?? m.url, local: false, durationS: m.duration_s, thumbUrl: m.thumb_url, storageKey: (m as { storage_key?: string | null }).storage_key ?? null })));
+      setItems(sortedMedia(p).map((m) => ({ key: m.id, id: m.id, kind: m.kind, uri: m.thumb_url ?? m.url, full: m.url, local: false, durationS: m.duration_s, thumbUrl: m.thumb_url, storageKey: (m as { storage_key?: string | null }).storage_key ?? null })));
     });
     return () => { alive = false; };
   }, [editingId]);
@@ -92,14 +108,14 @@ export function PostEditorScreen() {
       if (isVideo && (seconds ?? 0) > MAX_VIDEO_S) { setProblem(`A video can be up to ${MAX_VIDEO_S} seconds. Trim it first.`); continue; }
       // The picked file is copied somewhere safe at once (the phone may remove its temporary copy before the upload ends).
       const kept = await keepPicked(a.uri, isVideo ? 'video' : 'image');
-      added.push({ key: nextKey(), kind: isVideo ? 'video' : 'photo', uri: kept, local: true, durationS: seconds, thumbUrl: null, storageKey: null });
+      added.push({ key: nextKey(), kind: isVideo ? 'video' : 'photo', uri: kept, full: kept, local: true, durationS: seconds, thumbUrl: null, storageKey: null });
     }
     setItems((cur) => [...cur, ...added]);
   }
 
   function addFromProject(urls: string[]) {
     const free = Math.max(0, MAX_POST_MEDIA - items.length);
-    setItems((cur) => [...cur, ...urls.slice(0, free).map((u): Item => ({ key: nextKey(), kind: 'photo', uri: u, local: false, durationS: null, thumbUrl: null, storageKey: null }))]);
+    setItems((cur) => [...cur, ...urls.slice(0, free).map((u): Item => ({ key: nextKey(), kind: 'photo', uri: u, full: u, local: false, durationS: null, thumbUrl: null, storageKey: null }))]);
     setProjectPicker(false);
   }
 
@@ -130,20 +146,32 @@ export function PostEditorScreen() {
           inputs.push({ kind: 'video', url: up.url, key: up.key, thumbUrl: up.thumbUrl, durationS: i.durationS });
         }
       }
-      // 2. save the post
+      // 2. the music (the whole track goes up once; the part that plays is just a start and an end)
+      let musicInput: { url: string; title: string; startS: number; endS: number; fade: boolean; keepVideoSound: boolean } | null = null;
+      if (music) {
+        let musicUrl = music.url;
+        if (music.track) { setBusy('Uploading music…'); musicUrl = (await uploadTrack(music.track, companyId)).url; }
+        if (musicUrl) musicInput = { url: musicUrl, title: music.title, startS: music.startS, endS: music.endS, fade: music.fade, keepVideoSound: music.keepVideoSound };
+      }
+      // 3. the cover (cropped square: a high-quality copy and a small one for the grid)
+      let cover: { url: string; thumbUrl: string } | null = null;
+      if (coverLocal) { setBusy('Uploading cover…'); const up = await uploadPortfolioPhoto(coverLocal, companyId, 'covers'); cover = { url: up.url, thumbUrl: up.thumbUrl }; }
+      // 4. save the post
       setBusy('Saving…');
       if (!editingId) {
-        const r = await createPost({ kind: reel ? 'video' : 'post', caption, town, takenOn, tags, showInGrid, visible, media: inputs });
+        const r = await createPost({ kind: reel ? 'video' : 'post', caption, town, takenOn, tags, showInGrid, visible, music: musicInput, coverUrl: cover?.url ?? null, coverThumbUrl: cover?.thumbUrl ?? null, media: inputs });
         if (!r.ok) { setProblem(r.error); return; }
       } else if (post) {
         const ex = await mediaUrlsOf(post);
-        const r1 = await updatePost(post.id, { caption: caption.trim(), town: town.trim(), taken_on: takenOn.trim().slice(0, 30), tags, show_in_grid: reel ? showInGrid : true, visible });
+        const coverPatch = cover ? { cover_url: cover.url, cover_thumb_url: cover.thumbUrl } : coverReset ? { cover_url: null } : {};
+        const r1 = await updatePost(post.id, { ...coverPatch, caption: caption.trim(), town: town.trim(), taken_on: takenOn.trim().slice(0, 30), tags, show_in_grid: reel ? showInGrid : true, visible,
+          music_url: musicInput?.url ?? null, music_title: musicInput?.title ?? null, music_start_s: musicInput?.startS ?? null, music_end_s: musicInput?.endS ?? null, music_fade: musicInput?.fade ?? true, keep_video_sound: musicInput?.keepVideoSound ?? false });
         if (!r1.ok) { setProblem(r1.error); return; }
         // existing pictures keep their saved address; only the order and what was removed change
         const arranged: MediaInput[] = inputs.map((m) => (m.id ? { ...m, url: ex.urls[m.id] ?? m.url, thumbUrl: ex.thumbs[m.id] ?? m.thumbUrl } : m));
         const r2 = await saveMedia(post.id, arranged, post.media, ex.keys);
         if (!r2.ok) { setProblem(r2.error); return; }
-        if (!post.cover_url) await updatePost(post.id, { cover_thumb_url: arranged[0]?.thumbUrl ?? null });
+        if (!cover && (coverReset || !post.cover_url)) await updatePost(post.id, { cover_thumb_url: arranged[0]?.thumbUrl ?? null });
       }
       router.back();
     } catch (e) {
@@ -211,6 +239,24 @@ export function PostEditorScreen() {
               </View>
             </View>
 
+            <Pressable onPress={() => setCoverOpen(true)} accessibilityRole="button" style={({ pressed }) => [styles.musicRow, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.85 }]}>
+              <Icon name="crop" size={22} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Cover and crop</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{coverLocal ? 'New cover chosen' : post?.cover_url && !coverReset ? 'Your own cover' : 'Automatic: the first picture'}</Text>
+              </View>
+              <Text style={[typeScale.labelLarge, { color: colors.primary, fontWeight: '700' }]}>Change</Text>
+            </Pressable>
+
+            <Pressable onPress={() => setMusicOpen(true)} accessibilityRole="button" style={({ pressed }) => [styles.musicRow, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.85 }]}>
+              <Icon name="music" size={22} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Music</Text>
+                <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={1}>{music ? `${music.title} · ${formatDuration(music.startS)} to ${formatDuration(music.endS)}` : 'Add your own track and choose the part that plays'}</Text>
+              </View>
+              <Text style={[typeScale.labelLarge, { color: colors.primary, fontWeight: '700' }]}>{music ? 'Change' : 'Add'}</Text>
+            </Pressable>
+
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.md, gap: spacing.md }]}>
               <Input label="Caption" value={caption} onChangeText={setCaption} multiline maxLength={2200} placeholder="What was this job? Anything you want visitors to know." />
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
@@ -261,6 +307,8 @@ export function PostEditorScreen() {
         )}
       </ScrollView>
 
+      <CoverEditor visible={coverOpen} sources={items.map((i) => ({ key: i.key, kind: i.kind, uri: i.full, thumb: i.thumbUrl, durationS: i.durationS }))} onCancel={() => setCoverOpen(false)} onDone={(uri) => { setCoverLocal(uri); setCoverReset(uri === null); setCoverOpen(false); }} />
+      <MusicEditor visible={musicOpen} initial={music} hasVideo={items.some((i) => i.kind === 'video')} onCancel={() => setMusicOpen(false)} onDone={(m) => { setMusic(m); setMusicOpen(false); }} />
       <ProjectPhotoPicker visible={projectPicker} onClose={() => setProjectPicker(false)} onPick={addFromProject} limit={MAX_POST_MEDIA - items.length} />
     </View>
   );
@@ -346,6 +394,7 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: { minHeight: 40, paddingHorizontal: 14, borderRadius: 99, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  musicRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 60, padding: spacing.md, marginTop: spacing.md, borderRadius: radius.xl, borderWidth: StyleSheet.hairlineWidth },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
   sheetFoot: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth },
   projRow: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },

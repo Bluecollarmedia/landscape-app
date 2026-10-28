@@ -83,6 +83,14 @@ const TYPES: Record<string, string> = {
   'application/pdf': 'pdf',
   'video/mp4': 'mp4',
   'video/quicktime': 'mov',
+  // Our Work music (the owner's own tracks)
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/aac': 'aac',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
 };
 const MAX_BYTES = 200 * 1024 * 1024;
 const CAN_DELETE = new Set(['owner', 'admin', 'manager', 'lead', 'worker']);

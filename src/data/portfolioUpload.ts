@@ -46,6 +46,11 @@ export async function uploadPortfolioVideo(localUri: string, companyId: string, 
 
 /** One frame of a video, saved as a picture file (null when the phone cannot make it). */
 export async function videoFrameToFile(videoUri: string, atS: number): Promise<string | null> {
+  return (await videoFrameAt(videoUri, atS))?.uri ?? null;
+}
+
+/** The same, with the picture's size (the crop step needs it). */
+export async function videoFrameAt(videoUri: string, atS: number): Promise<{ uri: string; width: number; height: number } | null> {
   try {
     const { createVideoPlayer } = require('expo-video') as typeof import('expo-video');
     const { ImageManipulator, SaveFormat } = require('expo-image-manipulator') as typeof import('expo-image-manipulator');
@@ -54,7 +59,7 @@ export async function videoFrameToFile(videoUri: string, atS: number): Promise<s
       const [frame] = await player.generateThumbnailsAsync(atS, { maxWidth: 1080 });
       if (!frame) return null;
       const saved = await (await ImageManipulator.manipulate(frame).renderAsync()).saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
-      return saved.uri;
+      return { uri: saved.uri, width: saved.width, height: saved.height };
     } finally {
       player.release();
     }

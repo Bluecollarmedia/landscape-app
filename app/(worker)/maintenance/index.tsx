@@ -1,6 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert, Platform, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WeatherButton } from '@/components/weather/WeatherButton';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ServiceIcon } from '@/components/maintenance/ServiceIcon';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -60,6 +62,7 @@ function LegacyMaintenanceToday() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const tabBarClearance = useTabBarClearance();
   // The action button is pinned to the bottom of the WINDOW, not of this screen's container: native tabs sometimes
   // shrink the container to end above the tab bar, which used to leave the button floating too high. We measure how far
@@ -184,6 +187,9 @@ function LegacyMaintenanceToday() {
             locations={[0, 0.45, 1]}
             style={StyleSheet.absoluteFill}
           />
+          <View style={[styles.weatherWrap, { top: insets.top + spacing.sm }]}>
+            <WeatherButton to="/(worker)/weather" />
+          </View>
           <View style={styles.heroText}>
             <Text style={[typeScale.bodySmall, styles.heroShadow, { color: '#FFFFFF' }]}>{dateStr}</Text>
             <Text style={[typeScale.displayLarge, styles.heroShadow, { color: '#FFFFFF', marginTop: 2 }]}>{greeting}</Text>
@@ -478,6 +484,7 @@ function NextStopCard({ stop, onOpen, onDirections, crewMode, leader, leaderName
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   hero: { height: HERO_HEIGHT, width: '100%' },
+  weatherWrap: { position: 'absolute', left: spacing.lg },
   heroImage: { width: '100%', height: '100%' },
   heroText: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing['3xl'] + spacing.sm },
   heroShadow: { textShadowColor: 'rgba(0, 0, 0, 0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },

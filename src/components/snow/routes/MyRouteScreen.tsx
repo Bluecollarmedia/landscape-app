@@ -21,6 +21,8 @@ import { showMessage, confirmAction } from '@/components/financials/ActionSheet'
 import { pickSnowMedia } from '@/components/snow/pickSnowMedia';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
+import { WeatherButton } from '@/components/weather/WeatherButton';
+import { usePublicWeatherSwitch } from '@/hooks/usePublicWeatherSwitch';
 import { openDirections } from '@/lib/maps';
 import { useMediaJobs, waitForMediaJobs } from '@/lib/mediaQueueRuntime';
 import { SnowUploadStatus } from '@/components/snow/SnowUploadStatus';
@@ -45,6 +47,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
   const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const weatherOn = usePublicWeatherSwitch(false);
   const tabBarClearance = useTabBarClearance();
   const [routes, setRoutes] = useState<MyRoute[]>([]);
   const [routeId, setRouteId] = useState<string | null>(null);
@@ -155,6 +158,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
         keyboardShouldPersistTaps="handled"
       >
+        {weatherOn ? <View style={{ alignSelf: 'flex-start', marginBottom: spacing.md }}><WeatherButton to="/snow/worker/weather" /></View> : null}
         {topNotice}
         {clockedInSince ? (
           <View style={[styles.clockLine, { backgroundColor: colors.primarySurface }]} accessible accessibilityLabel={t('Clocked in since {time}. Clock out in the Time Clock tab.', { time: formatClock(clockedInSince) })}>

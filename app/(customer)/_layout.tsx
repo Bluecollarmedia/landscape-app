@@ -12,6 +12,7 @@ export default function CustomerLayout() {
       <Stack.Screen name="project" />
       <Stack.Screen name="document" />
       <Stack.Screen name="snow-updates" />
+      <Stack.Screen name="history" />
       <Stack.Screen name="maintenance-updates" />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="weather" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />

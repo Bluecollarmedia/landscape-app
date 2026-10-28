@@ -25,7 +25,7 @@ function CustomerNativeTabs() {
           sf={{ default: 'house', selected: 'house.fill' }}
           src={<NativeTabs.Trigger.VectorIcon family={Feather} name="home" />}
         />
-        <NativeTabs.Trigger.Label>{t('Projects')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t('Properties')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="messages">
@@ -73,7 +73,7 @@ function CustomerJSTabs() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t('Projects'),
+          title: t('Properties'),
           tabBarIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),

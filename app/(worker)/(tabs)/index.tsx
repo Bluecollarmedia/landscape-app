@@ -23,6 +23,7 @@ import { useAnnouncements } from '@/hooks/useAnnouncements';
 import { useCompanyYard } from '@/hooks/useCompanyYard';
 import { formatAddress } from '@/lib/address';
 import { useResources } from '@/hooks/useResources';
+import { WeatherButton } from '@/components/weather/WeatherButton';
 import { Avatar } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
@@ -399,6 +400,9 @@ function LandscapingToday() {
             style={StyleSheet.absoluteFill}
           />
 
+          <View style={[styles.weatherWrap, { top: insets.top + spacing.sm }]}>
+            <WeatherButton to="/(worker)/weather" />
+          </View>
           <View style={[styles.avatarWrap, { top: insets.top + spacing.sm }]}>
             <Avatar firstName={user?.firstName ?? ''} lastName={user?.lastName ?? ''} size={44} uri={user?.avatarUrl} />
           </View>
@@ -900,6 +904,7 @@ const styles = StyleSheet.create({
   hero: { height: HERO_HEIGHT, width: '100%' },
   heroImage: { width: '100%', height: '100%' },
   avatarWrap: { position: 'absolute', right: spacing.lg },
+  weatherWrap: { position: 'absolute', right: spacing.lg + 44 + spacing.sm },
   heroText: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 100 },
   yardRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', maxWidth: '100%', marginTop: spacing.sm, minHeight: 28 },
   yardPin: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },

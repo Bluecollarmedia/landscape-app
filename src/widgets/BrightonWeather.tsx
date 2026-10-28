@@ -1,5 +1,5 @@
 import { Gauge, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
-import { background, containerBackground, font, foregroundStyle, frame, gaugeStyle, kerning, lineLimit, minimumScaleFactor, padding, shapes } from '@expo/ui/swift-ui/modifiers';
+import { aspectRatio, background, clipped, containerBackground, font, foregroundStyle, frame, gaugeStyle, kerning, lineLimit, minimumScaleFactor, padding, resizable, shapes } from '@expo/ui/swift-ui/modifiers';
 import { widgetURL } from '@expo/ui/swift-ui/modifiers';
 import { createWidget, type WidgetEnvironment } from 'expo-widgets';
 import type { WidgetProps } from '@/lib/widgetData';
@@ -23,10 +23,12 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
   const stormTint = dark ? '#1C3246' : '#E6F0FA';
   const stormInk = dark ? '#8FC2EE' : '#1D5F9A';
   const open = widgetURL('brighton-lawn://weather');
+  // The leaf is a picture file at its full size: it must be made resizable and fitted, or the frame alone does not shrink it and it covers the widget.
+  const leafMods = (n: number) => [resizable(), aspectRatio({ contentMode: 'fit' }), frame({ width: n, height: n }), clipped()];
 
   const brand = (label: string, size: number) => (
     <HStack spacing={5}>
-      {p.leaf ? <Image uiImage={p.leaf} modifiers={[frame({ width: size, height: size })]} /> : null}
+      {p.leaf ? <Image uiImage={p.leaf} modifiers={leafMods(size)} /> : null}
       <Text modifiers={[font({ size: 9.5, weight: 'heavy' }), kerning(1.4), foregroundStyle(green), lineLimit(1)]}>{label}</Text>
     </HStack>
   );
@@ -53,7 +55,7 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
     }
     return (
       <VStack spacing={0} modifiers={[open]}>
-        {p.leaf ? <Image uiImage={p.leaf} modifiers={[frame({ width: 13, height: 13 })]} /> : null}
+        {p.leaf ? <Image uiImage={p.leaf} modifiers={leafMods(13)} /> : null}
         <Text modifiers={[font({ size: 20, weight: 'medium' })]}>{p.temp}</Text>
       </VStack>
     );
@@ -64,7 +66,7 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
     return (
       <VStack alignment="leading" spacing={1} modifiers={[open]}>
         <HStack spacing={4}>
-          {p.leaf ? <Image uiImage={p.leaf} modifiers={[frame({ width: 13, height: 13 })]} /> : null}
+          {p.leaf ? <Image uiImage={p.leaf} modifiers={leafMods(13)} /> : null}
           <Text modifiers={[font({ size: 12, weight: 'semibold' }), lineLimit(1)]}>{p.place}</Text>
         </HStack>
         <HStack spacing={6}>
@@ -127,7 +129,7 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
           modifiers={[padding({ horizontal: 12, vertical: 8 }), frame({ maxWidth: 10000, alignment: 'leading' }), background(stormTint, shapes.roundedRectangle({ cornerRadius: 14 }))]}
         >
           <HStack spacing={5}>
-            {p.leaf ? <Image uiImage={p.leaf} modifiers={[frame({ width: 14, height: 14 })]} /> : null}
+            {p.leaf ? <Image uiImage={p.leaf} modifiers={leafMods(14)} /> : null}
             <Text modifiers={[font({ size: 11, weight: 'bold' }), kerning(0.8), foregroundStyle(stormInk), lineLimit(1)]}>{"BRIGHTON'S STORM OUTLOOK"}</Text>
           </HStack>
           <HStack>

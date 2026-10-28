@@ -25,6 +25,7 @@ import { remindWorker } from '@/data/remindWorker';
 import { AdminJobCard } from '@/components/admin/AdminJobCard';
 import { NeedsOkCard } from '@/components/time/NeedsOkCard';
 import { showMessage } from '@/components/financials/ActionSheet';
+import { WeatherButton } from '@/components/weather/WeatherButton';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
@@ -240,16 +241,19 @@ export default function OwnerDashboard() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView bounces={false} ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-          <View>
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
-              {getGreeting()},
-            </Text>
-            <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]}>
-              {user?.firstName ?? 'Owner'}
-            </Text>
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
-              {getTodayLabel()}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, flexShrink: 1 }}>
+            <WeatherButton to="/(owner)/weather" />
+            <View style={{ flexShrink: 1 }}>
+              <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>
+                {getGreeting()},
+              </Text>
+              <Text style={[typeScale.displaySmall, { color: colors.textPrimary }]} numberOfLines={1}>
+                {user?.firstName ?? 'Owner'}
+              </Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+                {getTodayLabel()}
+              </Text>
+            </View>
           </View>
           <View style={styles.headerActions}>
             <Pressable

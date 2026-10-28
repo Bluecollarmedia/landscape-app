@@ -49,6 +49,7 @@ export const ES_WEATHER: Record<string, string> = {
   'That email address does not look right.': 'Ese correo electrónico no parece correcto.',
   'Please keep the description under 2000 characters.': 'Mantén la descripción en menos de 2000 caracteres.',
   "Couldn't send your request. Check your connection and try again, or call us.": 'No pudimos enviar tu solicitud. Revisa tu conexión e inténtalo de nuevo, o llámanos.',
+  'Weather, {temp}': 'Clima, {temp}',
   'Weather': 'Clima',
   'Storm History': 'Historial de tormentas',
   'Account': 'Cuenta',

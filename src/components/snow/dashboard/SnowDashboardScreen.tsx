@@ -19,6 +19,7 @@ import { snowDashboardHref } from '@/lib/snowLinks';
 import {
   dispatchedLabel, openCrewRows, runningStorms, stopsCompleteLabel, stormHeadline, type CrewRow, type CrewStatus, type StormHeadline,
 } from '@/lib/snowDashboardView';
+import { WeatherButton } from '@/components/weather/WeatherButton';
 import { snowStatus } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -64,9 +65,12 @@ export function SnowDashboardScreen() {
   const header = (
     <>
       <View style={styles.topRow}>
-        <View style={styles.modeChip}>
-          <Icon name="cloud-snow" size={15} color={colors.primary} />
-          <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Snow Mode</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <WeatherButton to="/snow/owner/weather" />
+          <View style={styles.modeChip}>
+            <Icon name="cloud-snow" size={15} color={colors.primary} />
+            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Snow Mode</Text>
+          </View>
         </View>
         {headline ? <Pill label={headline.badgeLabel} tone={headline.dispatched ? snowStatus.dispatched : snowStatus.scheduled} /> : null}
       </View>

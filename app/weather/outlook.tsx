@@ -10,11 +10,16 @@ import { Panel, WX } from '@/components/weather/WeatherUI';
 
 /** Brighton's storm outlook: the page every visitor sees. It shows the latest saved update of the storm that is published right now. */
 export default function WeatherOutlook() {
+  return <WeatherOutlookScreen />;
+}
+
+/** `embedded` is the signed-in version (a sheet over the forecast): its buttons close the sheet instead of using the public routes. */
+export function WeatherOutlookScreen({ embedded = false, onBack }: { embedded?: boolean; onBack?: () => void }) {
   const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { storm, ready } = useCurrentStorm();
-  const goBack = () => { if (router.canGoBack()) router.back(); else router.replace('/weather' as any); };
+  const goBack = () => { if (onBack) onBack(); else if (router.canGoBack()) router.back(); else router.replace('/weather' as any); };
 
   if (!storm?.latest) {
     return (
@@ -38,8 +43,8 @@ export default function WeatherOutlook() {
         outlook={storm}
         version={storm.latest}
         onBack={goBack}
-        onSeeForecast={() => router.replace('/weather' as any)}
-        onSeeUpdates={() => router.push('/weather/history' as any)}
+        onSeeForecast={() => (embedded ? goBack() : router.replace('/weather' as any))}
+        onSeeUpdates={embedded ? undefined : () => router.push('/weather/history' as any)}
       />
     </ScrollView>
   );

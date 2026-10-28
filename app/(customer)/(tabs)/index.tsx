@@ -9,6 +9,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { ScreenContainer } from '@/components/layout';
 import { EmptyState } from '@/components/ui';
 import { AnnouncementBanner } from '@/components/customer/AnnouncementBanner';
+import { WeatherButton } from '@/components/weather/WeatherButton';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
@@ -79,9 +80,12 @@ export default function CustomerHomeScreen() {
 
   return (
     <ScreenContainer scrollable padded>
-      <View style={{ paddingTop: insets.top + spacing.sm, marginBottom: spacing.md }}>
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t('Welcome Back')}</Text>
-        <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontWeight: '800' }]}>{user?.firstName ?? 'there'}</Text>
+      <View style={{ paddingTop: insets.top + spacing.sm, marginBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <WeatherButton to="/(customer)/weather" />
+        <View style={{ flexShrink: 1 }}>
+          <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>{t('Welcome Back')}</Text>
+          <Text style={[typeScale.headingLarge, { color: colors.textPrimary, fontWeight: '800' }]}>{user?.firstName ?? 'there'}</Text>
+        </View>
       </View>
 
       <AnnouncementBanner />

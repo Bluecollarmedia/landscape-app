@@ -6,7 +6,7 @@ import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ScrubArea } from '@/components/weather/ScrubArea';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage, useT } from '@/i18n';
-import { hoursOnDate, hourLabel, orDash, tempColor, uvColor, viewTz, weekdayShort, todayInTowns, type WeatherPayload, type WxHour } from '@/lib/weatherView';
+import { axisStep, hourParts, hoursOnDate, hourLabel, orDash, tempColor, uvColor, viewTz, weekdayShort, todayInTowns, type WeatherPayload, type WxHour } from '@/lib/weatherView';
 import { Panel, WX, WeatherBackground, WxPicture } from '@/components/weather/WeatherUI';
 
 export type MetricKey = 'temp' | 'feels' | 'uv' | 'pop' | 'rain' | 'wind' | 'gust' | 'humidity' | 'dew' | 'cloud';
@@ -35,6 +35,20 @@ const CHART_H = 190;
 const hourOf = (iso: string): number => Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: viewTz() }).format(new Date(iso)));
 const dayTitle = (date: string, locale: string): string => new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
 
+/** The labels under the chart: every hour that fits (every 2nd when the day is too long to fit them all), centred under its dot. */
+function axisLabels(hours: WxHour[], plotW: number, locale: string, xAt: (i: number) => number): Chart['axis'] {
+  const step = axisStep(hours.length, plotW);
+  const out: Chart['axis'] = [];
+  hours.forEach((h, i) => {
+    const hr = hourOf(h.time);
+    if (hr % step !== 0) return;
+    const parts = hourParts(h.time, locale);
+    const first = out.length === 0;
+    out.push({ key: h.time, left: Math.max(0, Math.min(plotW - 40, xAt(i) - 20)), label: parts.num, sub: parts.period && (first || hr === 0 || hr === 12) ? parts.period : null });
+  });
+  return out;
+}
+
 /** Everything the chart needs, worked out once for a day, a figure and a width. Sliding a finger changes only the cursor, never this. */
 interface Chart {
   keys: string[];
@@ -46,7 +60,8 @@ interface Chart {
   xs: number[];
   ys: Array<number | null>;
   grid: Array<{ y: number; label: string }>;
-  axis: Array<{ key: string; left: number; label: string }>;
+  /** One label per hour that fits: the hour's number, and its AM/PM underneath at the first one and at noon and midnight. */
+  axis: Array<{ key: string; left: number; label: string; sub: string | null }>;
   stat: string;
   yRange: [number, number];
 }
@@ -82,7 +97,7 @@ function buildChart(hours: WxHour[], metric: Metric, plotW: number, locale: stri
     xs: hours.map((_, i) => xAt(i)),
     ys: values.map((v) => (v === null ? null : yAt(v))),
     grid: [0, 1, 2, 3].map((k) => { const g = lo + ((hi - lo) * k) / 3; return { y: yAt(g), label: metric.fmt(g, undefined).replace(/ mph.*/, '') }; }),
-    axis: hours.map((h, i) => ({ h, i })).filter(({ h }) => [0, 6, 12, 18].includes(hourOf(h.time))).map(({ h, i }) => ({ key: h.time, left: Math.max(0, Math.min(plotW - 40, xAt(i) - 20)), label: hourLabel(h.time, locale) })),
+    axis: axisLabels(hours, plotW, locale, xAt),
     stat,
     yRange: [lo, hi],
   };
@@ -273,14 +288,19 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
               {hasHours ? (
                 <View onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)} style={{ marginTop: 10 }}>
                   {width > 0 ? (
-                    <View style={{ height: CHART_H + 26 }}>
+                    <View style={{ height: CHART_H + 40 }}>
                       <View style={{ height: CHART_H, width: plotW }} accessible={false}>
                         <ChartMarks chart={chart} metricKey={metricKey} />
                         {sel ? <Cursor chart={chart} idx={Math.min(idx, hours.length - 1)} metricKey={metricKey} /> : null}
                       </View>
                       <ScrubArea width={plotW} count={hours.length} onPick={pickHour} style={{ position: 'absolute', left: 0, top: 0, width: plotW, height: CHART_H }} />
                       {chart.grid.map((g, k) => <Text key={k} style={[styles.axisY, { top: g.y - 8 }]}>{g.label}</Text>)}
-                      {chart.axis.map((a) => <Text key={a.key} style={[styles.axisX, { left: a.left, top: CHART_H + 6 }]}>{a.label}</Text>)}
+                      {chart.axis.map((a) => (
+                        <View key={a.key} style={[styles.axisX, { left: a.left, top: CHART_H + 6 }]}>
+                          <Text style={styles.axisXText}>{a.label}</Text>
+                          {a.sub ? <Text style={styles.axisSub}>{a.sub}</Text> : null}
+                        </View>
+                      ))}
                     </View>
                   ) : null}
                 </View>
@@ -326,7 +346,9 @@ const styles = StyleSheet.create({
   step: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: WX.line },
   empty: { color: SOFT, fontSize: 13.5, marginTop: 14 },
   axisY: { position: 'absolute', right: 0, width: AXIS_W - 4, textAlign: 'right', color: SOFT, fontSize: 11 },
-  axisX: { position: 'absolute', width: 40, textAlign: 'center', color: SOFT, fontSize: 11 },
+  axisX: { position: 'absolute', width: 40, alignItems: 'center' },
+  axisXText: { color: SOFT, fontSize: 11 },
+  axisSub: { color: SOFT, fontSize: 9, fontWeight: '700', marginTop: 1 },
   hint: { color: WX.faint, fontSize: 12, marginTop: 10 },
   section: { color: INK, fontSize: 14, fontWeight: '700', marginTop: 20, marginBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

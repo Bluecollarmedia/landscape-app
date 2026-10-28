@@ -254,3 +254,21 @@ export function uvAdvice(level: UvLevel): string {
     : level === 'Very high' ? 'Extra care: sunscreen, hat, and shade around midday.'
     : 'Avoid the sun in the middle of the day.';
 }
+
+// ── The chart's hour labels: one for every hour that fits ───────────────────────────────────────────────────────────────────────
+
+/** An hour split into its number and its AM/PM (null in 24-hour languages, where there is no AM/PM). */
+export function hourParts(iso: string, locale: string): { num: string; period: string | null } {
+  const parts = new Intl.DateTimeFormat(locale, { hour: 'numeric', timeZone: VIEW_TZ }).formatToParts(new Date(iso));
+  return { num: parts.find((p) => p.type === 'hour')?.value ?? '', period: parts.find((p) => p.type === 'dayPeriod')?.value ?? null };
+}
+
+/**
+ * How many hours apart the labels under a chart are: every hour (1) while each label has at least `minGap` points to itself, otherwise every 2nd,
+ * 3rd... hour. 15 hours across a phone get a label each; a 24-hour day gets one every 2 hours.
+ */
+export function axisStep(hourCount: number, plotW: number, minGap = 16): number {
+  if (hourCount < 2 || !(plotW > 0)) return 1;
+  const gap = plotW / (hourCount - 1);
+  return Math.max(1, Math.ceil(minGap / gap));
+}

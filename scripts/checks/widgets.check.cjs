@@ -30,9 +30,9 @@ const payload = (o = {}) => ({
   hourly: hours(), daily: [], alerts: [], source: 'x', ...o,
 });
 const NOW = T0 + 20 * 60_000; // 10:20 AM
-const first = (p, st = null) => buildWidgetEntries(p, st, NOW, null)[0].props;
+const first = (p) => buildWidgetEntries(p, NOW, null)[0].props;
 
-const e = buildWidgetEntries(payload(), null, NOW, null);
+const e = buildWidgetEntries(payload(), NOW, null);
 check('one entry per coming hour (24), the first one is for right now', e.length === WIDGET_HOURS && e[0].date.getTime() === NOW);
 check('later entries start on the hour', e[1].date.getTime() === T0 + 3_600_000 && e[2].date.getTime() === T0 + 2 * 3_600_000);
 check('the first entry uses the current conditions; later ones use that hour', e[0].props.temp === '41°' && e[0].props.condition === 'Mostly Sunny' && e[1].props.temp === '41°' && e[2].props.temp === '42°' && e[2].props.condition === 'Sunny', JSON.stringify([e[1].props.temp, e[2].props.temp, e[2].props.condition]));
@@ -44,27 +44,21 @@ check('UV is shown only when there is a figure of 1 or more', e[0].props.uv === 
 check('a missing temperature is an en dash, never 0', first(payload({ current: { tempF: null, text: '', icon: 'sun', isDaytime: true }, hourly: hours({ tempF: null }) })).temp === '–');
 check('missing high and low show nothing rather than 0', first(payload({ today: { highF: null, lowF: null } })).highLow === '');
 
-const storm = (latest = {}, o = {}) => ({
-  id: 's1', name: 'Tuesday', status: 'active', created_at: '', ended_at: null, version_count: 1, versions: [], ...o,
-  latest: { id: 'v', version_no: 1, headline: 'Plan for snow Tuesday night', message: 'm', message_es: null, snow_low: 3, snow_high: 6, starts_at: null, ends_at: null, disclaimer: 'd', actual_snow: null, actual_source: null, is_final: false, published_at: '', map_url: null, ...latest },
-});
-let s = first(payload(), storm()).storm;
-check('an active storm shows its headline and its snowfall range', !!s && s.headline === 'Plan for snow Tuesday night' && /^3.6 in$/.test(s.range), JSON.stringify(s));
-s = first(payload(), storm({ snow_low: null, snow_high: null })).storm;
-check('a storm with no estimate shows no range at all (never 0)', !!s && s.range === '', JSON.stringify(s));
-check('an ended storm or no storm shows no banner', first(payload(), storm({}, { status: 'ended' })).storm === null && first(payload()).storm === null);
+check('a posted storm outlook never appears on the widgets (the owner does not want it there)', !('storm' in first(payload())) && !/STORM OUTLOOK|\.storm/.test(read('src/widgets/BrightonWeather.tsx')) && !/storm/i.test(read('src/data/widgetSync.ts').replace(/\/\*[\s\S]*?\*\//g, '')));
 
-const bare = buildWidgetEntries(payload({ hourly: [] }), null, NOW, null);
+const bare = buildWidgetEntries(payload({ hourly: [] }), NOW, null);
 check('with no hourly forecast there is one honest entry from the current conditions', bare.length === 1 && bare[0].props.temp === '41°' && bare[0].props.hours.length === 0);
 check('every entry carries the place; the gauge only appears when low and high make sense', e.every((x) => x.props.place === 'Lakewood') && !!e[0].props.gauge && e[0].props.gauge.low === 38 && first(payload({ today: { highF: 40, lowF: 40 } })).gauge === null);
 
 // ── static ──
 const w = read('src/widgets/BrightonWeather.tsx');
-check('the widget declares the widget directive and every approved size', w.includes("'widget';") && ['systemSmall', 'accessoryCircular', 'accessoryRectangular', 'accessoryInline'].every((f) => w.includes(f)) && w.includes('STORM OUTLOOK') && w.includes('BRIGHTON FORECAST'));
+check('the widget declares the widget directive and every approved size', w.includes("'widget';") && ['systemSmall', 'accessoryCircular', 'accessoryRectangular', 'accessoryInline'].every((f) => w.includes(f)) && w.includes('BRIGHTON FORECAST'));
 check('tapping any widget opens the weather screen', w.includes('brighton-lawn://weather'));
 const sync = read('src/data/widgetSync.ts');
 check('syncing does nothing off the iPhone and never throws (older builds without widgets just skip it)', sync.includes("Platform.OS !== 'ios'") && /try \{[\s\S]*require\('expo-widgets'\)[\s\S]*\} catch/.test(sync));
-check('the home screen feeds the widgets', read('app/weather/index.tsx').includes('syncWidgets(data, storm)'));
+check('the weather screen feeds the widgets', read('app/weather/index.tsx').includes('syncWidgets(data)'));
+const hook = read('src/hooks/useWidgetSync.ts');
+check('the widgets are fed in the background for everyone, signed in or not (mounted in the root layout, not in the weather screen)', /useWidgetSync\(\);/.test(read('app/_layout.tsx')) && /loadWeather\(place\)/.test(hook) && /readLastWeather/.test(hook) && !/useAuth|isAuthenticated/.test(hook));
 const app = JSON.parse(read('app.json'));
 const plug = app.expo.plugins.find((p) => Array.isArray(p) && p[0] === 'expo-widgets');
 check('app.json sets up the widget with an app group and the five sizes', !!plug && plug[1].groupIdentifier === 'group.com.brightonlawn.app' && plug[1].widgets[0].name === 'BrightonWeather' && plug[1].widgets[0].ios.supportedFamilies.length === 5);

@@ -1,14 +1,13 @@
 /**
  * Hands the Brighton Forecast widgets their forecast (iPhone only).
  *
- * Called whenever a fresh forecast or storm outlook is on screen. It gives the phone a timeline (one entry per coming hour) so the widget keeps
+ * Called whenever a fresh forecast is on hand (the weather screen, and the background sync in useWidgetSync). It gives the phone a timeline (one entry per coming hour) so the widget keeps
  * showing the right temperature between app opens. Everything here is best effort and never throws: on a phone whose app build does not have the
  * widgets yet (an over-the-air update reaching an older build), on the web, or when anything goes wrong, it simply does nothing.
  */
 import { Image, Platform } from 'react-native';
 import { buildWidgetEntries } from '@/lib/widgetData';
 import type { WeatherPayload } from '@/lib/weatherView';
-import type { StormOutlook } from '@/lib/stormView';
 
 let lastKey = '';
 let leafPromise: Promise<string | null> | null = null;
@@ -36,16 +35,16 @@ function leafFile(dir: string | null): Promise<string | null> {
   return leafPromise;
 }
 
-export async function syncWidgets(data: WeatherPayload | null, storm: StormOutlook | null): Promise<void> {
+export async function syncWidgets(data: WeatherPayload | null): Promise<void> {
   if (Platform.OS !== 'ios' || !data) return;
-  // Nothing new to say: same place, same forecast, same storm version.
-  const key = `${data.town}|${data.fetchedAt}|${storm?.id ?? ''}|${storm?.latest?.version_no ?? ''}|${storm?.status ?? ''}`;
+  // Nothing new to say: same place, same forecast.
+  const key = `${data.town}|${data.fetchedAt}`;
   if (key === lastKey) return;
   try {
     const widgets = require('expo-widgets') as typeof import('expo-widgets');
     const widget = (require('@/widgets/BrightonWeather') as typeof import('@/widgets/BrightonWeather')).default;
     const leaf = await leafFile(widgets.widgetsDirectory ?? null);
-    const entries = buildWidgetEntries(data, storm, Date.now(), leaf);
+    const entries = buildWidgetEntries(data, Date.now(), leaf);
     widget.updateTimeline(entries.map((e) => ({ date: e.date, props: e.props })));
     lastKey = key;
   } catch {

@@ -171,8 +171,8 @@ export default function WeatherHome() {
   const now = useNow(5 * 60_000);   // the sun arc and the moon only need a coarse clock
   const today = useToday(data?.tz);
   const stale = view.status === 'stale' && !busy;
-  // The home screen and lock screen widgets follow whatever forecast and storm outlook are on screen.
-  useEffect(() => { void syncWidgets(data, storm); }, [data, storm]);
+  // The home screen and lock screen widgets follow whatever forecast is on screen.
+  useEffect(() => { void syncWidgets(data); }, [data]);
 
 
   // Hero fades and drifts slowly as the cards slide up over it.

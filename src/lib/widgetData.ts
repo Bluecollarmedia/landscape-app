@@ -6,7 +6,6 @@
  * Anything the forecast has no figure for is left out or shown as an en dash, never as 0.
  */
 import { hourLabel, type WeatherPayload, type WxHour, type WxIcon } from '@/lib/weatherView';
-import { snowRange, type StormOutlook } from '@/lib/stormView';
 
 export interface WidgetHour { label: string; temp: string; symbol: string }
 export interface WidgetProps {
@@ -22,7 +21,6 @@ export interface WidgetProps {
   /** "No rain expected", "Rain chance 60%", or empty when there is no figure. */
   rain: string;
   hours: WidgetHour[];
-  storm: { headline: string; range: string } | null;
   /** The leaf logo as a file address in the widgets' shared folder, or null (then the widgets just leave it out). */
   leaf: string | null;
   /** For the lock screen circle: where the temperature sits between today's low and high. */
@@ -74,11 +72,8 @@ function rainLine(hourly: WxHour[], from: number): string {
   return `Rain chance ${Math.round(max)}%`;
 }
 
-export function buildWidgetEntries(data: WeatherPayload, storm: StormOutlook | null, now: number, leaf: string | null, locale = 'en-US'): WidgetEntry[] {
+export function buildWidgetEntries(data: WeatherPayload, now: number, leaf: string | null, locale = 'en-US'): WidgetEntry[] {
   const first = currentHourIndex(data.hourly, now);
-  const stormProps = storm && storm.status === 'active' && storm.latest
-    ? { headline: storm.latest.headline, range: snowRange(storm.latest) ?? '' }
-    : null;
   const highLow = (() => {
     const h = data.today?.highF; const l = data.today?.lowF;
     return isNum(h) || isNum(l) ? `H ${deg(h)}  L ${deg(l)}` : '';
@@ -96,7 +91,7 @@ export function buildWidgetEntries(data: WeatherPayload, storm: StormOutlook | n
       date: new Date(now),
       props: {
         place: data.townName, temp: deg(c?.tempF), condition: c?.text || s.word, symbol: s.name, symbolColor: s.color, highLow, uv: '', rain: '',
-        hours: [], storm: stormProps, leaf, gauge: gaugeOf(c?.tempF ?? null),
+        hours: [], leaf, gauge: gaugeOf(c?.tempF ?? null),
       },
     }];
   }
@@ -125,7 +120,6 @@ export function buildWidgetEntries(data: WeatherPayload, storm: StormOutlook | n
         uv: isNum(h.uvIndex) && h.uvIndex >= 1 ? `UV ${Math.round(h.uvIndex)}` : '',
         rain: rainLine(data.hourly, idx),
         hours: strip,
-        storm: stormProps,
         leaf,
         gauge: gaugeOf(temp ?? null),
       },

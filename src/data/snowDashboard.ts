@@ -18,7 +18,11 @@ import type {
 export type DashboardVisit = Pick<
   SnowVisit,
   'id' | 'stormId' | 'routeId' | 'propertyId' | 'propertyName' | 'position' | 'status' | 'arrivedAt' | 'completedAt'
->;
+> & {
+  /** This stop's own photo rule (updates 60 and 112); missing = follow the route. */
+  photosRequired?: boolean;
+  minMedia?: number;
+};
 
 export type DashboardRoute = Pick<
   SnowRoute,
@@ -60,6 +64,8 @@ export interface SnowDashboardInput {
   mediaToReview: { count: number; oldest: string } | null;
   /** null = shift records aren't available (table not set up yet); never read as "no problems". */
   openShifts: OpenShift[] | null;
+  /** Extra crew leads per route id (update 110); a route can have any number besides its main lead. */
+  extraLeadsByRoute?: Record<string, string[]>;
   /** Person id → display name. */
   nameOf: (personId?: string) => string | undefined;
   now: Date;
@@ -72,6 +78,9 @@ export interface RouteOverview {
   stormId: string;
   name: string;
   leadPersonId?: string;
+  /** Every lead's name (the main lead first), so a route with seven leads shows seven. */
+  leadNames: string[];
+  /** The leads joined for display ("A, B, C"); undefined when nobody is assigned. */
   leadName?: string;
   cancelled: boolean;
   mediaRequired: boolean;
@@ -160,9 +169,9 @@ function mediaShortfalls(input: SnowDashboardInput) {
     if (!dispatched.has(v.stormId)) continue;
     if (v.status !== 'arrived' && v.status !== 'completed') continue;
     const route = routeById.get(v.routeId);
-    if (!route || route.cancelledAt || !route.mediaRequired) continue;
+    if (!route || route.cancelledAt || !(v.photosRequired ?? route.mediaRequired)) continue;
     const have = input.mediaCountByVisit[v.id] ?? 0;
-    if (have < route.minMedia) out.push({ visit: v, route, have });
+    if (have < (v.minMedia ?? route.minMedia)) out.push({ visit: v, route, have });
   }
   return out;
 }
@@ -195,7 +204,7 @@ export function buildNeedsAttention(input: SnowDashboardInput): AttentionItem[] 
   // completed short, so a completed one here means the requirement was turned on
   // or raised after it was finished.
   for (const { visit, route, have } of mediaShortfalls(input)) {
-    const need = route.minMedia;
+    const need = visit.minMedia ?? route.minMedia;
     const completed = visit.status === 'completed';
     items.push({
       key: `media:${visit.id}`,
@@ -214,7 +223,7 @@ export function buildNeedsAttention(input: SnowDashboardInput): AttentionItem[] 
   for (const storm of input.storms) {
     if (storm.status !== 'dispatched') continue;
     for (const route of input.routes) {
-      if (route.stormId !== storm.id || route.cancelledAt || route.leadPersonId) continue;
+      if (route.stormId !== storm.id || route.cancelledAt || route.leadPersonId || input.extraLeadsByRoute?.[route.id]?.length) continue;
       const open = input.visits.filter((v) => v.routeId === route.id && (v.status === 'pending' || v.status === 'arrived')).length;
       if (open === 0) continue;
       items.push({
@@ -289,12 +298,16 @@ export function buildStormOverview(input: SnowDashboardInput, attention: Attenti
           const skipped = visits.filter((v) => v.status === 'skipped').length;
           const onSite = visits.filter((v) => v.status === 'arrived').length;
           const next = visits.find((v) => v.status === 'pending' || v.status === 'arrived');
+          const leadNames = [r.leadPersonId, ...(input.extraLeadsByRoute?.[r.id] ?? [])]
+            .filter((id, i, all): id is string => !!id && all.indexOf(id) === i)
+            .map((id) => input.nameOf(id) ?? 'Unnamed');
           return {
             id: r.id,
             stormId: r.stormId,
             name: r.name,
             leadPersonId: r.leadPersonId,
-            leadName: input.nameOf(r.leadPersonId),
+            leadNames,
+            leadName: leadNames.length ? leadNames.join(', ') : undefined,
             cancelled: !!r.cancelledAt,
             mediaRequired: r.mediaRequired,
             minMedia: r.minMedia,

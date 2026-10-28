@@ -46,6 +46,7 @@ interface Loaded {
   mediaCountByVisit: Record<string, number>;
   pendingSkips: DashboardSkipRequest[];
   extraStormNames: Record<string, string>;
+  extraLeadsByRoute: Record<string, string[]>;
   openShifts: OpenShift[] | null;
   mediaToReview: { count: number; oldest: string } | null;
 }
@@ -93,27 +94,38 @@ async function load(companyId: string): Promise<{ ok: true; data: Loaded } | { o
   const otherStormIds = [...new Set(pendingSkips.map((s) => s.stormId))].filter((id) => !stormIds.has(id));
   const allIds = [...stormIds, ...otherStormIds];
   if (allIds.length === 0) {
-    return { ok: true, data: { storms, routes: [], visits: [], mediaCountByVisit: {}, pendingSkips, extraStormNames: {}, openShifts, mediaToReview } };
+    return { ok: true, data: { storms, routes: [], visits: [], mediaCountByVisit: {}, pendingSkips, extraStormNames: {}, extraLeadsByRoute: {}, openShifts, mediaToReview } };
   }
 
-  const [routesRes, visitsRes, mediaRes, extraRes] = await Promise.all([
+  const [routesRes, visitsRes, mediaRes, extraRes, leadsRes] = await Promise.all([
     supabase.from('snow_routes')
       .select('id, storm_id, service, name, position, lead_person_id, media_required, min_media, cancelled_at')
       .in('storm_id', allIds),
-    supabase.from('snow_visits')
-      .select('id, storm_id, route_id, property_id, property_name, position, status, arrived_at, completed_at')
-      .in('storm_id', allIds).limit(10000),
+    // Each stop's own photo rule (updates 60, 112); a database without them loads the plain columns.
+    (async () => {
+      const own = await supabase.from('snow_visits')
+        .select('id, storm_id, route_id, property_id, property_name, position, status, arrived_at, completed_at, photos_required, min_media')
+        .in('storm_id', allIds).limit(10000);
+      if (!own.error || !/photos_required|min_media/i.test(own.error.message ?? '')) return own;
+      return supabase.from('snow_visits')
+        .select('id, storm_id, route_id, property_id, property_name, position, status, arrived_at, completed_at')
+        .in('storm_id', allIds).limit(10000);
+    })(),
     stormIds.size
       ? supabase.from('snow_completion_media').select('visit_id').in('storm_id', [...stormIds]).limit(50000)
       : Promise.resolve({ data: [] as Row[], error: null }),
     otherStormIds.length
       ? supabase.from('snow_storms').select('id, name').in('id', otherStormIds)
       : Promise.resolve({ data: [] as Row[], error: null }),
+    // More leads per route (update 110). A database without it just shows the main lead.
+    supabase.from('snow_route_extra_leads').select('route_id, person_id').eq('company_id', companyId),
   ]);
   for (const res of [routesRes, visitsRes, mediaRes, extraRes]) if (res.error) return fail(res.error);
 
   const mediaCountByVisit: Record<string, number> = {};
   for (const m of mediaRes.data ?? []) mediaCountByVisit[m.visit_id] = (mediaCountByVisit[m.visit_id] ?? 0) + 1;
+  const extraLeadsByRoute: Record<string, string[]> = {};
+  if (!leadsRes.error) for (const l of leadsRes.data ?? []) (extraLeadsByRoute[l.route_id] ??= []).push(l.person_id);
   const extraStormNames: Record<string, string> = {};
   for (const s of extraRes.data ?? []) extraStormNames[s.id] = s.name;
 
@@ -127,6 +139,7 @@ async function load(companyId: string): Promise<{ ok: true; data: Loaded } | { o
       mediaCountByVisit,
       pendingSkips,
       extraStormNames,
+      extraLeadsByRoute,
       openShifts,
       mediaToReview,
     },

@@ -15,23 +15,32 @@ export function StreetSuggestions({ text, onPick }: { text: string; onPick: (pla
   const { colors } = useTheme();
   const [rows, setRows] = useState<Suggestion[]>([]);
   const [problem, setProblem] = useState('');
+  /** 'looking' while a lookup is out, 'none' when Google answered with nothing: so the owner always sees what is happening. */
+  const [phase, setPhase] = useState<'idle' | 'looking' | 'none'>('idle');
   const token = useRef(newSessionToken());
   // After a pick the field text changes by itself; do not immediately suggest again for it.
   const picked = useRef<string | null>(null);
 
   useEffect(() => {
     if (!placesEnabled) return;
-    if (picked.current !== null && picked.current === text) { setRows([]); return; }
+    if (picked.current !== null && picked.current === text) { setRows([]); setPhase('idle'); return; }
     picked.current = null;
+    if (text.trim().length < 3) { setRows([]); setProblem(''); setPhase('idle'); return; }
     const ctl = new AbortController();
+    setPhase('looking');
     // Wait for a pause in typing, so a few letters are one lookup, not five.
     const t = setTimeout(async () => {
       const found = await fetchSuggestions(text, token.current, ctl.signal);
-      if (!ctl.signal.aborted) { setRows(found); setProblem(found.length ? '' : lastPlacesProblem()); }
+      if (!ctl.signal.aborted) { setRows(found); setProblem(found.length ? '' : lastPlacesProblem()); setPhase(found.length ? 'idle' : 'none'); }
     }, 300);
     return () => { clearTimeout(t); ctl.abort(); };
   }, [text]);
 
+  const note = (text: string) => <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: -spacing.sm, marginBottom: spacing.sm }]}>{text}</Text>;
+  // Said out loud on purpose: a silent list that never appears looks the same whether the key is missing, Google refused, or nothing matched.
+  if (!placesEnabled && text.trim().length >= 3) return note('Address suggestions are not turned on in this version of the app. Type the full address.');
+  if (placesEnabled && rows.length === 0 && !problem && phase === 'looking') return note('Looking up addresses...');
+  if (placesEnabled && rows.length === 0 && !problem && phase === 'none') return note('No matching address found. Keep typing the full street address, or enter it yourself.');
   if (placesEnabled && rows.length === 0 && problem) {
     return <Text style={[typeScale.caption, { color: colors.warning, marginTop: -spacing.sm, marginBottom: spacing.sm }]}>{`Address suggestions are not working right now (${problem}). You can still type the address.`}</Text>;
   }

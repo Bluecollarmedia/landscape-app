@@ -26,6 +26,9 @@ export default function OwnerLayout() {
         <Stack.Screen name="search" options={{ presentation: 'modal' }} />
         <Stack.Screen name="notification-center" options={{ presentation: 'modal' }} />
         <Stack.Screen name="service-requests" />
+        <Stack.Screen name="our-work" />
+        <Stack.Screen name="our-work-post" />
+        <Stack.Screen name="our-work-highlights" />
         <Stack.Screen name="our-work-stories" />
         {/* The little weather button on the dashboard opens the full forecast over whatever is showing. */}
         <Stack.Screen name="weather" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />

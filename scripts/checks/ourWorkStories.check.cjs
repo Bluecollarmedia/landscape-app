@@ -65,7 +65,7 @@ check('26 videos go up as they are (never compressed) and a story lands in the o
 check('27 the owner can share a project or video: pick it, then design the card with a live preview before sharing', /startShare/.test(mgr) && /loadPostsToShare/.test(mgr) && /<Preview design=\{design\}/.test(mgr) && /addShareStory\(/.test(mgr) && /storyProblem\(\{ kind: 'share'/.test(own));
 check('28 the card has colours, a gradient or blurred picture, frame colour, border thickness, roundness, size, and text above or below', /'Blurred picture'/.test(mgr) && /Frame color/.test(mgr) && /Border thickness/.test(mgr) && /Roundness/.test(mgr) && /Card size/.test(mgr) && /Above the card/.test(mgr) && /Text color/.test(mgr));
 check('29 the owner sees every story that is up with its time left and can take any down (asked first)', /timeLeftLabel\(s\.expires_at/.test(mgr) && /deleteStory\(s\.id\)/.test(mgr) && /Take this down\?/.test(mgr));
-check('30 the owner reaches it from More in both owner areas', /our-work-stories/.test(read('app/(owner)/(tabs)/more/index.tsx')) && /our-work-stories/.test(read('app/snow/owner/(tabs)/more.tsx')) && fs.existsSync(path.join(__dirname, '../../app/(owner)/our-work-stories.tsx')) && fs.existsSync(path.join(__dirname, '../../app/snow/owner/our-work-stories.tsx')));
+check('30 the owner reaches it from Our Work (More > Our Work > Story) in both owner areas', /our-work-stories/.test(read('src/components/work/OurWorkManagerScreen.tsx')) && fs.existsSync(path.join(__dirname, '../../app/(owner)/our-work-stories.tsx')) && fs.existsSync(path.join(__dirname, '../../app/snow/owner/our-work-stories.tsx')));
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

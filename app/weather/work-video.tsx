@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
 import { WX } from '@/components/weather/WeatherUI';
 import { ScrubBar } from '@/components/work/ScrubBar';
+import { useAppActive } from '@/hooks/useAppActive';
 import { useClipMusic } from '@/components/work/useClipMusic';
 import { getLoadedPost } from '@/data/portfolio';
 import { formatDuration, requestNoteFor } from '@/lib/portfolio';
@@ -26,7 +27,8 @@ export default function WeatherWorkVideo() {
   const params = useLocalSearchParams<{ post?: string; media?: string }>();
   const post = getLoadedPost(params.post);
   const item = post?.media.find((m) => m.id === params.media && m.kind === 'video');
-  const focused = useIsFocused();
+  // Pauses (does not reset) when the person leaves the screen or the app; carries on from the same spot when they return.
+  const focused = useIsFocused() && useAppActive();
   const [sound, setSound] = useState(false);
   const [paused, setPaused] = useState(false);
   const [now, setNow] = useState(0);

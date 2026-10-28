@@ -8,6 +8,7 @@ import { useT } from '@/i18n';
 import { OptimizedImage } from '@/components/ui';
 import { WX } from '@/components/weather/WeatherUI';
 import { useClipMusic } from '@/components/work/useClipMusic';
+import { useAppActive } from '@/hooks/useAppActive';
 import { getLoadedPost } from '@/data/portfolio';
 import { Image as ExpoImage } from 'expo-image';
 import { requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia } from '@/lib/portfolio';
@@ -26,7 +27,8 @@ export default function WeatherWorkPost() {
   const { width } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const post = getLoadedPost(id);
-  const focused = useIsFocused();
+  // "On screen" also means the app is in front: switching apps pauses the music and any video, and they carry on when the person returns.
+  const focused = useIsFocused() && useAppActive();
   const [index, setIndex] = useState(0);
   const [muted, setMuted] = useState(false);
 

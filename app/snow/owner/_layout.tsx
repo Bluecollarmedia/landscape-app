@@ -16,6 +16,7 @@ export default function SnowOwnerLayout() {
       <Stack.Screen name="message-customers" />
       <Stack.Screen name="manage-storms" />
       <Stack.Screen name="service-requests" />
+      <Stack.Screen name="weather" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="storm-outlook" />
       <Stack.Screen name="edit-profile" />
     </Stack>

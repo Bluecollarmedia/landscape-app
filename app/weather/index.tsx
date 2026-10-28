@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +18,7 @@ import {
 } from '@/lib/weatherView';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { PlacePicker } from '@/components/weather/PlacePicker';
+import { WeatherOutlookScreen } from './outlook';
 import { Panel, WX, WxPicture } from '@/components/weather/WeatherUI';
 import { ScrubArea } from '@/components/weather/ScrubArea';
 import { WeatherDetails, type DetailsStart, type MetricKey } from '@/components/weather/WeatherDetails';
@@ -143,8 +144,19 @@ function CardHead({ icon, title, tappable, picture }: { icon?: Icon; title: stri
   );
 }
 
+/** The public Weather route. */
 export default function WeatherHome() {
+  return <WeatherHomeScreen />;
+}
+
+/**
+ * The forecast screen. `embedded` is the signed-in version, opened from the little weather button on the owner's and the customer's home:
+ * it has a Close button instead of Sign In, and the storm outlook opens as a sheet over it (the public routes are not used, so nobody is
+ * moved out of their own area).
+ */
+export function WeatherHomeScreen({ embedded = false }: { embedded?: boolean }) {
   const t = useT();
+  const [outlookOpen, setOutlookOpen] = useState(false);
   const { language } = useLanguage();
   const locale = language === 'es' ? 'es' : 'en-US';
   const router = useRouter();
@@ -256,12 +268,21 @@ export default function WeatherHome() {
               <Text style={styles.brandSub}>FORECAST</Text>
             </View>
           </View>
-          <Pressable onPress={() => router.push('/(auth)/welcome' as any)} accessibilityRole="button" accessibilityLabel={t('Sign In')} style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.8 }]}>
-            <View style={styles.signInRow}>
-              <Text style={styles.signInText}>{t('Sign In')}</Text>
-              <MaterialCommunityIcons name="arrow-right" size={15} color={ON_DARK} />
-            </View>
-          </Pressable>
+          {embedded ? (
+            <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('Close')} style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.8 }]}>
+              <View style={styles.signInRow}>
+                <Text style={styles.signInText}>{t('Close')}</Text>
+                <MaterialCommunityIcons name="close" size={15} color={ON_DARK} />
+              </View>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => router.push('/(auth)/welcome' as any)} accessibilityRole="button" accessibilityLabel={t('Sign In')} style={({ pressed }) => [styles.signIn, pressed && { opacity: 0.8 }]}>
+              <View style={styles.signInRow}>
+                <Text style={styles.signInText}>{t('Sign In')}</Text>
+                <MaterialCommunityIcons name="arrow-right" size={15} color={ON_DARK} />
+              </View>
+            </Pressable>
+          )}
         </View>
 
         <Animated.View style={[heroStyle, { minHeight: 290 }]}>
@@ -292,7 +313,7 @@ export default function WeatherHome() {
 
         {storm?.latest ? (
           <View style={styles.gap}>
-            <StormCard storm={storm} onPress={() => router.push('/weather/outlook' as any)} />
+            <StormCard storm={storm} onPress={() => (embedded ? setOutlookOpen(true) : router.push('/weather/outlook' as any))} />
           </View>
         ) : null}
 
@@ -615,6 +636,14 @@ export default function WeatherHome() {
       ) : null}
 
       <WeatherDetails visible={!!details} data={data} start={details} onClose={() => setDetails(null)} />
+
+      {embedded ? (
+        <Modal visible={outlookOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOutlookOpen(false)}>
+          <View style={{ flex: 1, backgroundColor: WX.page }}>
+            <WeatherOutlookScreen embedded onBack={() => setOutlookOpen(false)} />
+          </View>
+        </Modal>
+      ) : null}
 
       <PlacePicker visible={pickTown} current={place} onClose={() => setPickTown(false)} onPick={(p) => { setPlace(p); void savePlace(p); setPickTown(false); }} />
 

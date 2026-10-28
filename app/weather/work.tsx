@@ -7,6 +7,7 @@ import { useT } from '@/i18n';
 import { OptimizedImage } from '@/components/ui';
 import { Panel, WX } from '@/components/weather/WeatherUI';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { useSeenStories } from '@/data/portfolioStories';
 import { usePublicPortfolio } from '@/hooks/usePortfolio';
 import { activeStories, ringState, startIndex } from '@/lib/portfolioStories';
@@ -92,11 +93,11 @@ export default function WeatherWork() {
         <Pressable onPress={openStories} disabled={ring === 'none'} accessibilityRole={ring === 'none' ? 'image' : 'button'} accessibilityLabel={ring === 'none' ? 'Brighton' : t('Watch our story')}>
           {ring === 'unseen' ? (
             <LinearGradient colors={['#8CCB63', '#2E5E34', '#F2B632']} style={styles.ring}>
-              <View style={styles.ringInner}><View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 40, height: 40, tintColor: '#2E5E34' }} /></View></View>
+              <View style={styles.ringInner}><ProfileAvatar uri={data.profile.avatar_url} size={80} /></View>
             </LinearGradient>
           ) : (
             <View style={[styles.ring, { backgroundColor: ring === 'seen' ? '#C5D2C0' : 'transparent' }]}>
-              <View style={styles.ringInner}><View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 40, height: 40, tintColor: '#2E5E34' }} /></View></View>
+              <View style={styles.ringInner}><ProfileAvatar uri={data.profile.avatar_url} size={80} /></View>
             </View>
           )}
         </Pressable>

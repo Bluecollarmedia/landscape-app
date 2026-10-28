@@ -9,6 +9,7 @@ import { useT } from '@/i18n';
 import { OptimizedImage } from '@/components/ui';
 import { WX } from '@/components/weather/WeatherUI';
 import { ScrubBar } from '@/components/work/ScrubBar';
+import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { useClipMusic } from '@/components/work/useClipMusic';
 import { getLoadedPortfolio } from '@/data/portfolio';
 import { useAppActive } from '@/hooks/useAppActive';
@@ -139,7 +140,8 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
       </Pressable>
       {!live ? null : (
         <>
-          <LinearGradient colors={['transparent', 'rgba(8,16,12,0.85)']} style={[styles.shade, { height: height * 0.5 }]} pointerEvents="none" />
+          {/* The video plays on top at full brightness, edge to edge. Only a short soft fade sits at the very bottom, behind the words and the seek bar. */}
+          <LinearGradient colors={['transparent', 'rgba(8,16,12,0.55)']} style={[styles.shade, { height: Math.min(300, height * 0.3) }]} pointerEvents="none" />
           {paused ? <View style={styles.pauseWrap} pointerEvents="none"><View style={styles.pauseDot}><MaterialCommunityIcons name="play" size={40} color="#FFFFFF" /></View></View> : null}
 
           <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
@@ -161,7 +163,7 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
           <View style={[styles.bottom, { paddingBottom: insets.bottom + 16 }]} pointerEvents="box-none">
             <View style={styles.captionBox} pointerEvents="none">
               <View style={styles.authorRow}>
-                <View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 18, height: 18, tintColor: '#2E5E34' }} /></View>
+                <ProfileAvatar uri={getLoadedPortfolio()?.profile.avatar_url} size={34} />
                 <Text style={styles.handle}>brightonlawn</Text>
                 {post.town ? <Text style={styles.town}>{post.town}</Text> : null}
               </View>

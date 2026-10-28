@@ -3,6 +3,8 @@
  * network), so it is tested without a phone. The data comes from update 115 (public_portfolio for visitors, the portfolio_* tables for the owner).
  */
 
+import type { PortfolioStory } from '@/lib/portfolioStories';
+
 export type MediaKind = 'photo' | 'video';
 export type PostKind = 'post' | 'video';
 
@@ -53,6 +55,8 @@ export interface PublicPortfolio {
   profile: PortfolioProfile;
   posts: PortfolioPost[];
   highlights: PortfolioHighlight[];
+  /** Stories still inside their 24 hours (missing in a feed saved before stories existed). */
+  stories?: PortfolioStory[];
 }
 
 /** The tags an owner can put on a post (the same words as the circles at the top). */

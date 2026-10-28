@@ -8,6 +8,7 @@
 --   * portfolio_posts / portfolio_media: the posts, and the photos and videos in each one. portfolio_highlights / portfolio_highlight_posts:
 --     the circles at the top (Patios, Turf...). Only the company's active owner or admin can read or change these tables.
 --   * public_portfolio_config(): anyone may ask "is Our Work on?" (answers only {"enabled": true|false}).
+--   * portfolio_stories: the 24-hour stories (a photo, a video, or a designed card that points to a post).
 --   * public_portfolio(): anyone (signed in or not) may read the portfolio, but ONLY while the switch is on, and only posts marked visible.
 --     It returns no customer names, no addresses and nothing that is not meant for the public.
 -- The photos, videos and music files themselves live in the public media bucket (uploaded by the owner through the media function).
@@ -82,6 +83,25 @@ create table if not exists public.portfolio_highlight_posts (
   primary key (highlight_id, post_id)
 );
 
+-- Stories: short-lived items (24 hours) shown as a ring around the profile picture. Three kinds: a photo, a video (up to 60 seconds), or a
+-- "share": a framed card for one of the posts, whose look the owner designs (design = background, frame, text); tapping it opens that post.
+create table if not exists public.portfolio_stories (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id) on delete cascade,
+  kind text not null check (kind in ('photo','video','share')),
+  media_url text,
+  media_thumb_url text,
+  duration_s numeric(8,2) check (duration_s is null or (duration_s > 0 and duration_s <= 60)),
+  post_id uuid references public.portfolio_posts(id) on delete cascade,
+  media_id uuid references public.portfolio_media(id) on delete set null,
+  design jsonb not null default '{}'::jsonb,
+  created_by uuid references public.people(id) on delete set null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '24 hours'),
+  check ((kind = 'share' and post_id is not null) or (kind in ('photo','video') and media_url is not null))
+);
+create index if not exists idx_portfolio_stories_company on public.portfolio_stories(company_id, created_at);
+
 -- Who may manage the portfolio: the company's active owner or an active admin.
 create or replace function public.portfolio_manager(cid uuid)
 returns boolean language sql stable security definer set search_path = public as $$
@@ -97,12 +117,13 @@ alter table public.portfolio_posts enable row level security;
 alter table public.portfolio_media enable row level security;
 alter table public.portfolio_highlights enable row level security;
 alter table public.portfolio_highlight_posts enable row level security;
-revoke all on public.portfolio_settings, public.portfolio_posts, public.portfolio_media, public.portfolio_highlights, public.portfolio_highlight_posts from public, anon, authenticated;
+alter table public.portfolio_stories enable row level security;
+revoke all on public.portfolio_settings, public.portfolio_posts, public.portfolio_media, public.portfolio_highlights, public.portfolio_highlight_posts, public.portfolio_stories from public, anon, authenticated;
 
 grant select on public.portfolio_settings to authenticated;
 grant insert (company_id, handle, bio, website, updated_by) on public.portfolio_settings to authenticated;
 grant update (handle, bio, website, updated_by, updated_at) on public.portfolio_settings to authenticated;
-grant select, insert, update, delete on public.portfolio_posts, public.portfolio_media, public.portfolio_highlights, public.portfolio_highlight_posts to authenticated;
+grant select, insert, update, delete on public.portfolio_posts, public.portfolio_media, public.portfolio_highlights, public.portfolio_highlight_posts, public.portfolio_stories to authenticated;
 
 drop policy if exists portfolio_settings_manage on public.portfolio_settings;
 create policy portfolio_settings_manage on public.portfolio_settings for all to authenticated
@@ -120,6 +141,10 @@ drop policy if exists portfolio_highlight_posts_manage on public.portfolio_highl
 create policy portfolio_highlight_posts_manage on public.portfolio_highlight_posts for all to authenticated
   using (exists (select 1 from public.portfolio_highlights h where h.id = highlight_id and public.portfolio_manager(h.company_id)))
   with check (exists (select 1 from public.portfolio_highlights h where h.id = highlight_id and public.portfolio_manager(h.company_id)));
+
+drop policy if exists portfolio_stories_manage on public.portfolio_stories;
+create policy portfolio_stories_manage on public.portfolio_stories for all to authenticated
+  using (public.portfolio_manager(company_id)) with check (public.portfolio_manager(company_id));
 
 -- Is Our Work on? Anyone may ask; the answer is only {"enabled": true|false}.
 create or replace function public.public_portfolio_config()
@@ -166,6 +191,7 @@ declare
   prof jsonb;
   posts jsonb;
   hls jsonb;
+  sts jsonb;
 begin
   select s.company_id into cid
     from public.portfolio_settings s
@@ -194,7 +220,16 @@ begin
     ) order by h.position), '[]'::jsonb) into hls
     from public.portfolio_highlights h where h.company_id = cid;
 
-  return jsonb_build_object('enabled', true, 'profile', prof, 'posts', posts, 'highlights', hls);
+  -- Stories still within their 24 hours, oldest first. A shared card is included only while the post it points to is visible.
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'id', st.id, 'kind', st.kind, 'media_url', st.media_url, 'media_thumb_url', st.media_thumb_url, 'duration_s', st.duration_s,
+      'post_id', st.post_id, 'media_id', st.media_id, 'design', st.design, 'created_at', st.created_at, 'expires_at', st.expires_at
+    ) order by st.created_at), '[]'::jsonb) into sts
+    from public.portfolio_stories st
+   where st.company_id = cid and st.expires_at > now()
+     and (st.kind <> 'share' or exists (select 1 from public.portfolio_posts pp where pp.id = st.post_id and pp.visible));
+
+  return jsonb_build_object('enabled', true, 'profile', prof, 'posts', posts, 'highlights', hls, 'stories', sts);
 end;
 $$;
 revoke all on function public.public_portfolio() from public;

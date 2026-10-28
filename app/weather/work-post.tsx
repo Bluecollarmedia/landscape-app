@@ -36,9 +36,10 @@ export default function WeatherWorkPost() {
   const media = post ? sortedMedia(post) : [];
   const onVideo = media[index]?.kind === 'video';
   const clip = post?.music_url && post.music_start_s != null && post.music_end_s != null ? { startS: post.music_start_s, endS: post.music_end_s } : null;
-  // While a video with its own sound is on screen the music waits; the video's sound is off whenever the music replaces it.
-  const musicActive = focused && !!post?.music_url && !(post?.keep_video_sound && onVideo);
-  useClipMusic(post?.music_url ?? null, clip, { active: musicActive, muted, fade: post?.music_fade ?? true });
+  // While a video with its own sound is on screen the music is lowered (not stopped) and comes back up after; the video's sound is off whenever the music replaces it.
+  const musicActive = focused && !!post?.music_url;
+  const duck = !!post?.keep_video_sound && onVideo;
+  useClipMusic(post?.music_url ?? null, clip, { active: musicActive, muted, fade: post?.music_fade ?? true, duck });
 
   // Only the picture on screen is loaded. Once it has had a moment, the NEXT one is fetched quietly (one at a time), so swiping on is instant
   // without asking for all of them when the post opens.
@@ -138,9 +139,10 @@ function Slide({ media, size, load, playing, sound }: { media: PortfolioMedia; s
 
 function SlideVideo({ media, size, playing, sound }: { media: PortfolioMedia; size: number; playing: boolean; sound: boolean }) {
   const player = useVideoPlayer(media.url, (p) => { p.loop = true; p.muted = true; });
-  React.useEffect(() => { player.muted = !sound; }, [player, sound]);
-  React.useEffect(() => { if (playing) player.play(); else player.pause(); }, [player, playing]);
-  return <VideoView player={player} style={{ width: size, height: size }} contentFit="cover" nativeControls={false} />;
+  // Every touch of the player is guarded: once the slide is gone the player is released, and touching it then would close the app.
+  React.useEffect(() => { try { player.muted = !sound; } catch { /* released */ } }, [player, sound]);
+  React.useEffect(() => { try { if (playing) player.play(); else player.pause(); } catch { /* released */ } }, [player, playing]);
+  return <VideoView player={player} style={{ width: size, height: size }} contentFit="cover" nativeControls={false} allowsVideoFrameAnalysis={false} />;
 }
 
 const styles = StyleSheet.create({

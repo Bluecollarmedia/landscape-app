@@ -153,7 +153,7 @@ export default function WeatherWork() {
         <View style={{ width }}>
           {videos.length === 0 ? <Text style={[styles.soft, styles.empty]}>{t('No videos yet.')}</Text> : (
             <View style={styles.grid}>
-              {videos.slice(0, videoCount).map((v) => <VideoTile key={v.media.id} post={v.post} url={v.media.thumb_url ?? postGridUrl(v.post)} seconds={v.media.duration_s} size={tile} onPress={() => openVideo(v.post, v.media.id)} />)}
+              {videos.slice(0, videoCount).map((v) => <VideoTile key={v.media.id} post={v.post} url={postGridUrl(v.post) ?? v.media.thumb_url} seconds={v.media.duration_s} size={tile} onPress={() => openVideo(v.post, v.media.id)} />)}
             </View>
           )}
         </View>

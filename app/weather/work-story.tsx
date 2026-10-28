@@ -184,9 +184,9 @@ function StoryLayer({ story, post, width, height, playing, sound, holding, onHol
 /** A story video: a fresh player for each one, played from the start, paused (not reset) when held or when the screen is covered. */
 function StoryVideo({ url, playing, sound }: { url: string; playing: boolean; sound: boolean }) {
   const player = useVideoPlayer(url, (p) => { p.loop = false; p.muted = true; });
-  useEffect(() => { player.muted = !sound; }, [player, sound]);
-  useEffect(() => { if (playing) player.play(); else player.pause(); }, [player, playing]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
+  useEffect(() => { try { player.muted = !sound; } catch { /* released */ } }, [player, sound]);
+  useEffect(() => { try { if (playing) player.play(); else player.pause(); } catch { /* released */ } }, [player, playing]);
+  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsVideoFrameAnalysis={false} />;
 }
 
 const styles = StyleSheet.create({

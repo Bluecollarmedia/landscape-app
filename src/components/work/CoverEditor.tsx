@@ -10,7 +10,7 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Icon, InlineNotice, OptimizedImage } from '@/components/ui';
 import { PhotoCropper, type PickedImage } from '@/components/media/PhotoCropper';
-import { videoFrameAt } from '@/data/portfolioUpload';
+import { videoFrameAt, waitUntilReady } from '@/data/portfolioUpload';
 import { keepPicked } from '@/lib/keepPickedFile';
 import { fractionOf, formatDuration, frameTimes, timeAtFraction } from '@/lib/portfolio';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -122,7 +122,12 @@ function FramePicker({ video, onPicked, onProblem, problem }: { video: CoverSour
       const { createVideoPlayer } = require('expo-video') as typeof import('expo-video');
       const p = createVideoPlayer(video.uri);
       player.current = p;
-      void p.generateThumbnailsAsync(times, { maxWidth: 200 }).then((r) => { if (alive) setThumbs(r); }).catch(() => onProblem("Couldn't read frames from this video."));
+      // The frames can only be read once the video has loaded; wait for that first (a frame asked for too early fails on iOS).
+      void waitUntilReady(p).then((ok) => {
+        if (!alive) return;
+        if (!ok) { onProblem("Couldn't read frames from this video."); return; }
+        return p.generateThumbnailsAsync(times, { maxWidth: 200 }).then((r) => { if (alive) setThumbs(r); });
+      }).catch(() => { if (alive) onProblem("Couldn't read frames from this video."); });
     } catch { onProblem("Couldn't read frames from this video."); }
     return () => { alive = false; try { player.current?.release(); } catch { /* gone */ } player.current = null; };
   }, [video.uri, times, onProblem]);

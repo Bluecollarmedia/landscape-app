@@ -92,7 +92,8 @@ function Reel({ entry, mode, height, sound, focused, scrubbing, onSound, onStart
   entry: VideoEntry; mode: ReelMode; height: number; sound: boolean; focused: boolean; scrubbing: boolean;
   onSound: () => void; onStarted: () => void; onScrubChange: (s: boolean) => void; onClose: () => void; onRequest: (n: { services: string[]; note: string }) => void;
 }) {
-  const poster = entry.media.thumb_url ?? postGridUrl(entry.post);
+  // The owner's chosen cover first; otherwise the frame the app took when the video was posted.
+  const poster = postGridUrl(entry.post) ?? entry.media.thumb_url;
   if (mode === 'idle') {
     return <View style={{ height, backgroundColor: '#0E1A12' }}>{poster ? <OptimizedImage source={poster} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}</View>;
   }
@@ -120,23 +121,25 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
       if (!scrubbing) setNow(currentTime);
       if (currentTime > 0.1) onStarted();
     });
-    return () => sub.remove();
+    return () => { try { sub.remove(); } catch { /* already gone */ } };
   }, [player, live, scrubbing, onStarted]);
-  useEffect(() => { if (player.duration > 0) setLength((l) => l || player.duration); });
-  useEffect(() => { player.muted = !live || !sound || musicReplaces; }, [player, live, sound, musicReplaces]);
-  useEffect(() => { if (playing) player.play(); else player.pause(); }, [player, playing]);
+  // Every touch of the player is guarded: once the reel is gone the player is released, and touching it then would close the app.
+  useEffect(() => { try { if (player.duration > 0) setLength((l) => l || player.duration); } catch { /* released */ } });
+  useEffect(() => { try { player.muted = !live || !sound || musicReplaces; } catch { /* released */ } }, [player, live, sound, musicReplaces]);
+  useEffect(() => { try { if (playing) player.play(); else player.pause(); } catch { /* released */ } }, [player, playing]);
 
   const clip = post.music_url && post.music_start_s != null && post.music_end_s != null ? { startS: post.music_start_s, endS: post.music_end_s } : null;
-  useClipMusic(post.music_url ?? null, clip, { active: playing && musicReplaces, muted: !sound, fade: post.music_fade });
+  // A reel that keeps its own sound plays its music lowered underneath it; otherwise the music replaces the reel's sound.
+  useClipMusic(post.music_url ?? null, clip, { active: playing && !!post.music_url, muted: !sound, fade: post.music_fade, duck: !musicReplaces });
 
-  const seek = useCallback((s: number) => { player.currentTime = s; setNow(s); }, [player]);
+  const seek = useCallback((s: number) => { try { player.currentTime = s; } catch { /* released */ } setNow(s); }, [player]);
   const ask = requestNoteFor(post);
   const share = () => { void Share.share({ message: `${post.caption || 'Brighton Lawn & Landscape'}  brightonlawn.com` }); };
 
   return (
     <View style={{ height, backgroundColor: '#0E1A12' }}>
       <Pressable style={StyleSheet.absoluteFill} disabled={!live} onPress={() => setPaused((p) => !p)} accessibilityRole="button" accessibilityLabel={paused ? t('Play') : t('Pause')}>
-        <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+        <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsVideoFrameAnalysis={false} />
       </Pressable>
       {!live ? null : (
         <>

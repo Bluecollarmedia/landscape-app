@@ -50,14 +50,38 @@ export async function videoFrameToFile(videoUri: string, atS: number): Promise<s
   return (await videoFrameAt(videoUri, atS))?.uri ?? null;
 }
 
-/** The same, with the picture's size (the crop step needs it). */
+/**
+ * Waits until a player has loaded its video (status readyToPlay), so a frame can be taken from it. Taking a frame before that fails on iOS:
+ * the player has no asset yet. Gives up after `timeoutMs` (resolves false) and never throws.
+ */
+export function waitUntilReady(player: import('expo-video').VideoPlayer, timeoutMs = 8000): Promise<boolean> {
+  return new Promise((resolve) => {
+    let done = false;
+    let sub: { remove: () => void } | null = null;
+    const finish = (ok: boolean) => { if (done) return; done = true; clearTimeout(timer); try { sub?.remove(); } catch { /* gone */ } resolve(ok); };
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    try {
+      if (player.status === 'readyToPlay') { finish(true); return; }
+      if (player.status === 'error') { finish(false); return; }
+      sub = player.addListener('statusChange', ({ status }) => { if (status === 'readyToPlay') finish(true); else if (status === 'error') finish(false); });
+      // It may have become ready between the first look and the listener; look once more.
+      const now: string = player.status;
+      if (now === 'readyToPlay') finish(true);
+    } catch { finish(false); }
+  });
+}
+
+/** The same, with the picture's size (the crop step needs it). The moment asked for first; the very start if that fails. */
 export async function videoFrameAt(videoUri: string, atS: number): Promise<{ uri: string; width: number; height: number } | null> {
   try {
     const { createVideoPlayer } = require('expo-video') as typeof import('expo-video');
     const { ImageManipulator, SaveFormat } = require('expo-image-manipulator') as typeof import('expo-image-manipulator');
     const player = createVideoPlayer(videoUri);
     try {
-      const [frame] = await player.generateThumbnailsAsync(atS, { maxWidth: 1080 });
+      await waitUntilReady(player);
+      let frame: import('expo-video').VideoThumbnail | undefined;
+      try { [frame] = await player.generateThumbnailsAsync(atS, { maxWidth: 1080 }); } catch { frame = undefined; }
+      if (!frame && atS > 0) { try { [frame] = await player.generateThumbnailsAsync(0, { maxWidth: 1080 }); } catch { frame = undefined; } }
       if (!frame) return null;
       const saved = await (await ImageManipulator.manipulate(frame).renderAsync()).saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
       return { uri: saved.uri, width: saved.width, height: saved.height };

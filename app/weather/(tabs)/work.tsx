@@ -16,6 +16,7 @@ import {
   type PortfolioPost, type PublicPortfolio,
 } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
+import { websiteHref } from '@/lib/portfolio';
 
 const INK = '#17301F';
 const GAP = 2;
@@ -111,7 +112,11 @@ export default function WeatherWork() {
       <View style={styles.bioBox}>
         <Text style={styles.name}>Brighton Lawn &amp; Landscape</Text>
         {data.profile.bio ? <Text style={styles.bio}>{data.profile.bio}</Text> : null}
-        {data.profile.website ? <Text style={styles.link}>{data.profile.website}</Text> : null}
+        {data.profile.website ? (
+          <Pressable onPress={() => { void Linking.openURL(websiteHref(data.profile.website)); }} accessibilityRole="link" accessibilityLabel={t('Open {site}', { site: data.profile.website })} hitSlop={8}>
+            <Text style={styles.link}>{data.profile.website}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.buttons}>

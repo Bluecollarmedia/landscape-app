@@ -7,7 +7,8 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensio
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage } from '@/components/ui';
+import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage, ProgressBar } from '@/components/ui';
+import { percentOf } from '@/lib/uploadProgress';
 import { StoryBackdrop, StoryCard } from '@/components/work/StoryCard';
 import { addMediaStory, addShareStory, deleteStory, loadMyStories, loadPostsToShare } from '@/data/portfolioStoriesOwner';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -33,6 +34,8 @@ export function StoriesManagerScreen() {
   const [posts, setPosts] = useState<PortfolioPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  /** The bar while a photo or video is being sent (0 to 1); null when nothing is being sent. */
+  const [progress, setProgress] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [chosen, setChosen] = useState<PortfolioPost | null>(null);
   const [design, setDesign] = useState<StoryDesign>(DEFAULT_DESIGN);
@@ -60,7 +63,9 @@ export function StoriesManagerScreen() {
     setBusy(true);
     // The picked file is copied somewhere safe at once (the phone may remove its temporary copy before the upload ends).
     const kept = await keepPicked(a.uri, isVideo ? 'video' : 'image');
-    const r = await addMediaStory({ kind: isVideo ? 'video' : 'photo', localUri: kept, mimeType: a.mimeType, durationS: seconds });
+    setProgress(0);
+    const r = await addMediaStory({ kind: isVideo ? 'video' : 'photo', localUri: kept, mimeType: a.mimeType, durationS: seconds }, setProgress);
+    setProgress(null);
     setBusy(false);
     if (!r.ok) { setProblem(r.error); return; }
     await reload();
@@ -106,6 +111,12 @@ export function StoriesManagerScreen() {
           Photos, videos and shared cards. Each one stays up for 24 hours.
         </Text>
         {problem ? <InlineNotice icon="alert-circle" tone="error" text={problem} style={{ marginBottom: spacing.md }} /> : null}
+        {progress !== null ? (
+          <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityLiveRegion="polite" accessibilityLabel={`Uploading ${percentOf(progress)}%`}>
+            <Text style={[typeScale.labelLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Uploading…</Text>
+            <ProgressBar progress={percentOf(progress)} showLabel />
+          </View>
+        ) : null}
 
         {mode === 'list' ? (
           <>
@@ -252,6 +263,7 @@ function Stepper({ label, value, suffix = '', onMinus, onPlus }: { label: string
 }
 
 const styles = StyleSheet.create({
+  progressCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, marginBottom: spacing.md },
   screen: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
   thumb: { width: 52, height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },

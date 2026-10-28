@@ -9,13 +9,14 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, us
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage } from '@/components/ui';
+import { Button, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage, ProgressBar } from '@/components/ui';
+import { overallProgress, percentOf, uploadLabel } from '@/lib/uploadProgress';
 import { confirmAction } from '@/components/financials/ActionSheet';
 import { createPost, deletePost, loadOwnerPortfolio, saveMedia, setPostVisible, updatePost, type MediaInput, type OwnerPost } from '@/data/portfolioOwner';
 import { CoverEditor } from '@/components/work/CoverEditor';
 import { MusicEditor, type MusicDraft } from '@/components/work/MusicEditor';
 import { uploadTrack } from '@/data/portfolioMusic';
-import { uploadPortfolioPhoto, uploadPortfolioVideo } from '@/data/portfolioUpload';
+import { uploadPortfolioPhoto, uploadPortfolioVideo, videoFrameToFile } from '@/data/portfolioUpload';
 import { db, rowsOf } from '@/data/store';
 import { keepPicked } from '@/lib/keepPickedFile';
 import { imageProblem, videoProblem } from '@/lib/mediaFormats';
@@ -64,6 +65,8 @@ export function PostEditorScreen() {
   const [showInGrid, setShowInGrid] = useState(true);
   const [visible, setVisible] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  /** One bar for the whole save: every file is an equal step, and the file being sent moves the bar through its step. */
+  const [progress, setProgress] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [projectPicker, setProjectPicker] = useState(false);
   const [music, setMusic] = useState<MusicState | null>(null);
@@ -137,30 +140,48 @@ export function PostEditorScreen() {
       const inputs: MediaInput[] = [];
       let n = 0;
       const toSend = items.filter((i) => i.local).length;
+      const totalSteps = toSend + (music?.track ? 1 : 0) + (coverLocal ? 1 : 0) + 1;
+      let done = 0;
+      const report = (f: number) => setProgress(overallProgress(done, totalSteps, f));
+      report(0);
       for (const i of items) {
         if (!i.local) { inputs.push({ id: i.id, kind: i.kind, url: i.uri, key: i.storageKey, thumbUrl: i.thumbUrl, durationS: i.durationS }); continue; }
         n += 1;
-        setBusy(`Uploading ${n} of ${toSend}…`);
+        setBusy(`${uploadLabel(n, toSend)}…`);
         if (i.kind === 'photo') {
-          const up = await uploadPortfolioPhoto(i.uri, companyId);
+          const up = await uploadPortfolioPhoto(i.uri, companyId, 'posts', report);
           inputs.push({ kind: 'photo', url: up.url, key: up.key, thumbUrl: up.thumbUrl });
         } else {
-          const up = await uploadPortfolioVideo(i.uri, companyId);
+          const up = await uploadPortfolioVideo(i.uri, companyId, 'posts', 0.5, report);
           inputs.push({ kind: 'video', url: up.url, key: up.key, thumbUrl: up.thumbUrl, durationS: i.durationS });
         }
+        done += 1;
+        report(0);
       }
       // 2. the music (the whole track goes up once; the part that plays is just a start and an end)
       let musicInput: { url: string; title: string; startS: number; endS: number; fade: boolean; keepVideoSound: boolean } | null = null;
       if (music) {
         let musicUrl = music.url;
-        if (music.track) { setBusy('Uploading music…'); musicUrl = (await uploadTrack(music.track, companyId)).url; }
+        if (music.track) { setBusy('Uploading music…'); musicUrl = (await uploadTrack(music.track, companyId, report)).url; done += 1; report(0); }
         if (musicUrl) musicInput = { url: musicUrl, title: music.title, startS: music.startS, endS: music.endS, fade: music.fade, keepVideoSound: music.keepVideoSound };
       }
       // 3. the cover (cropped square: a high-quality copy and a small one for the grid)
       let cover: { url: string; thumbUrl: string } | null = null;
-      if (coverLocal) { setBusy('Uploading cover…'); const up = await uploadPortfolioPhoto(coverLocal, companyId, 'covers'); cover = { url: up.url, thumbUrl: up.thumbUrl }; }
+      if (coverLocal) { setBusy('Uploading cover…'); const up = await uploadPortfolioPhoto(coverLocal, companyId, 'covers', report); cover = { url: up.url, thumbUrl: up.thumbUrl }; done += 1; report(0); }
+      // 3b. a reel whose video never got a still frame (an older upload) would show a blank cover: take one from the video now.
+      if (!cover && reel) {
+        const first = inputs.find((m) => m.kind === 'video');
+        if (first && !first.thumbUrl) {
+          setBusy('Making the cover…');
+          try {
+            const frame = await videoFrameToFile(first.url, 0.5);
+            if (frame) { const up = await uploadPortfolioPhoto(frame, companyId, 'covers', report); cover = { url: up.url, thumbUrl: up.thumbUrl }; first.thumbUrl = up.thumbUrl; }
+          } catch { /* the reel still saves; its cover stays automatic */ }
+        }
+      }
       // 4. save the post
       setBusy('Saving…');
+      report(0.5);
       if (!editingId) {
         const r = await createPost({ kind: reel ? 'video' : 'post', caption, town, takenOn, tags, showInGrid, visible, music: musicInput, coverUrl: cover?.url ?? null, coverThumbUrl: cover?.thumbUrl ?? null, media: inputs });
         if (!r.ok) { setProblem(r.error); return; }
@@ -176,11 +197,13 @@ export function PostEditorScreen() {
         if (!r2.ok) { setProblem(r2.error); return; }
         if (!cover && (coverReset || !post.cover_url)) await updatePost(post.id, { cover_thumb_url: arranged[0]?.thumbUrl ?? null });
       }
+      setProgress(1);
       router.back();
     } catch (e) {
       setProblem(e instanceof Error && e.message ? e.message : "Couldn't save. Check your connection and try again.");
     } finally {
       setBusy(null);
+      setProgress(null);
     }
   }
 
@@ -212,7 +235,12 @@ export function PostEditorScreen() {
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>{title}</Text>
         <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2, marginBottom: spacing.lg }]}>{modeLabel}</Text>
         {problem ? <InlineNotice icon="alert-circle" tone="error" text={problem} style={{ marginBottom: spacing.md }} /> : null}
-        {busy ? <InlineNotice icon="upload-cloud" tone="info" text={busy} style={{ marginBottom: spacing.md }} /> : null}
+        {busy ? (
+          <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityLiveRegion="polite" accessibilityLabel={`${busy} ${percentOf(progress ?? 0)}%`}>
+            <Text style={[typeScale.labelLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{busy}</Text>
+            <ProgressBar progress={percentOf(progress ?? 0)} showLabel />
+          </View>
+        ) : null}
 
         {loading ? <LoadingSpinner /> : (
           <>
@@ -390,6 +418,7 @@ const styles = StyleSheet.create({
   vid: { position: 'absolute', left: 4, bottom: 4, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(8,16,12,0.65)' },
   vidText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '700' },
   cover: { position: 'absolute', left: 4, top: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99, backgroundColor: '#2E5E34' },
+  progressCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, marginBottom: spacing.md },
   coverText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '700' },
   x: { position: 'absolute', right: 4, top: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: '#B3261E', alignItems: 'center', justifyContent: 'center' },
   moves: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },

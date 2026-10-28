@@ -10,8 +10,9 @@ import {
 export interface UploadedPhoto { url: string; key: string; thumbUrl: string; thumbKey: string; width: number; height: number }
 export interface UploadedVideo { url: string; key: string; thumbUrl: string | null; thumbKey: string | null }
 
-/** A photo: one full copy (long side up to 1600 px) and one small square copy. */
-export async function uploadPortfolioPhoto(localUri: string, companyId: string, kind: PortfolioFolder = 'posts'): Promise<UploadedPhoto> {
+/** A photo: one full copy (long side up to 1600 px) and one small square copy. `onProgress` goes 0 to 1 across both. */
+export async function uploadPortfolioPhoto(localUri: string, companyId: string, kind: PortfolioFolder = 'posts', onProgress?: (p: number) => void): Promise<UploadedPhoto> {
+  onProgress?.(0);
   const { ImageManipulator, SaveFormat } = require('expo-image-manipulator') as typeof import('expo-image-manipulator');
   const probe = await ImageManipulator.manipulate(localUri).renderAsync();
   const fit = fitLongSide(probe.width, probe.height, FULL_LONG_SIDE);
@@ -26,21 +27,30 @@ export async function uploadPortfolioPhoto(localUri: string, companyId: string, 
     .resize({ width: THUMB_SIZE })
     .renderAsync()).saveAsync({ compress: THUMB_QUALITY, format: SaveFormat.JPEG });
 
-  const big = await uploadImage(full.uri, portfolioFolder(companyId, kind), 'image/jpeg', undefined, { raw: true });
+  const big = await uploadImage(full.uri, portfolioFolder(companyId, kind), 'image/jpeg', (p) => onProgress?.(p * 0.9), { raw: true });
+  onProgress?.(0.9);
   const thumb = await uploadImage(small.uri, thumbFolder(companyId, kind), 'image/jpeg', undefined, { raw: true });
+  onProgress?.(1);
   return { url: big.url, key: big.key, thumbUrl: thumb.url, thumbKey: thumb.key, width: full.width, height: full.height };
 }
 
 /** A video, shrunk to 480p. The still frame for the grid is best effort: a video with no frame still posts (its tile just has no picture). */
-export async function uploadPortfolioVideo(localUri: string, companyId: string, kind: PortfolioFolder = 'posts', frameAtS = 0.5): Promise<UploadedVideo> {
+export async function uploadPortfolioVideo(localUri: string, companyId: string, kind: PortfolioFolder = 'posts', frameAtS = 0.5, onProgress?: (p: number) => void): Promise<UploadedVideo> {
   const { shrinkVideoUri } = require('@/lib/mediaCompress') as typeof import('@/lib/mediaCompress');
-  const up = await uploadImage(await shrinkVideoUri(localUri), portfolioFolder(companyId, kind), 'video/mp4', undefined, { raw: true });
+  onProgress?.(0);
+  const source = await shrinkVideoUri(localUri);
+  // The video's own bytes are most of the wait: they move the bar from 5% to 90%; the still frame for the grid is the last bit.
+  onProgress?.(0.05);
+  const up = await uploadImage(source, portfolioFolder(companyId, kind), 'video/mp4', (p) => onProgress?.(0.05 + p * 0.85), { raw: true });
+  onProgress?.(0.9);
   const frame = await videoFrameToFile(localUri, frameAtS);
-  if (!frame) return { url: up.url, key: up.key, thumbUrl: null, thumbKey: null };
+  if (!frame) { onProgress?.(1); return { url: up.url, key: up.key, thumbUrl: null, thumbKey: null }; }
   try {
     const thumb = await uploadImage(frame, thumbFolder(companyId, kind), 'image/jpeg', undefined, { raw: true });
+    onProgress?.(1);
     return { url: up.url, key: up.key, thumbUrl: thumb.url, thumbKey: thumb.key };
   } catch {
+    onProgress?.(1);
     return { url: up.url, key: up.key, thumbUrl: null, thumbKey: null };
   }
 }

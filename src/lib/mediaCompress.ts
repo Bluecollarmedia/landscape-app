@@ -88,11 +88,20 @@ export async function prepareVideo(job: MediaJob): Promise<Prepared> {
   const plan = planVideo({ width: job.width ?? VIDEO_FALLBACK, height: job.height ?? VIDEO_FALLBACK });
   try {
     // maxSize is the longest side: 854 keeps landscape at 854x480 and portrait at 480x854, aspect ratio unchanged. Audio is kept.
-    let uri = await compressor.Video.compress(job.sourceUri, { compressionMethod: 'manual', maxSize: Math.max(plan.width, plan.height), bitrate: plan.bitrate, minimumFileSizeForCompress: 0 });
-    // Move the result next to the app's other prepared files so the queue deletes it when the job ends.
+    const made = await compressor.Video.compress(job.sourceUri, { compressionMethod: 'manual', maxSize: Math.max(plan.width, plan.height), bitrate: plan.bitrate, minimumFileSizeForCompress: 0 });
+    // The LEGACY file API, like the photos: on some phones the new File API cannot see a file the compressor just wrote, so a copy made with it
+    // can be missing (the upload then said "the file is gone"). The result is checked to be a real file before it is handed on; if it is not,
+    // the original goes up.
+    const legacy = require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
+    const exists = async (u: string) => { try { const i = await legacy.getInfoAsync(u); return i.exists && (i.size ?? 0) > 0 ? i.size ?? 0 : 0; } catch { return 0; } };
+    let uri = made;
     const dest = outFile('mp4');
-    try { new File(uri).copy(dest); try { new File(uri).delete(); } catch { /* cache file */ } uri = dest.uri; } catch { /* use it where it is */ }
-    const bytes = sizeOf(uri);
+    try {
+      await legacy.copyAsync({ from: made, to: dest.uri });
+      if (await exists(dest.uri)) { uri = dest.uri; try { await legacy.deleteAsync(made, { idempotent: true }); } catch { /* cache file */ } }
+    } catch { /* keep the compressor's own file */ }
+    const bytes = (await exists(uri)) || undefined;
+    if (!bytes) return original;
     if (bytes !== undefined && original.bytes !== undefined && bytes >= original.bytes) {
       // Already tighter than the target: keep the original instead of a bigger "compressed" copy.
       try { new File(uri).delete(); } catch { /* ignore */ }

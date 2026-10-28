@@ -372,3 +372,10 @@ export function highlightFrames(h: PortfolioHighlight, posts: PortfolioPost[]): 
   }
   return out;
 }
+
+/** The address to open for the website shown on the profile: "brightonlawn.com" becomes "https://brightonlawn.com"; a full address is kept. */
+export function websiteHref(site: string | null | undefined): string {
+  const s = (site ?? '').trim();
+  if (!s) return '';
+  return /^https?:\/\//i.test(s) ? s : `https://${s.replace(/^\/+/, '')}`;
+}

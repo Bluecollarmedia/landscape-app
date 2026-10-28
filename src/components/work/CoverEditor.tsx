@@ -39,6 +39,14 @@ export function CoverEditor({ visible, sources, onCancel, onDone }: {
 
   useEffect(() => { if (visible) { setStep('choose'); setProblem(null); setVideo(null); setCrop(null); } }, [visible]);
 
+  // The crop screen is a sheet inside this sheet. iOS cannot close the outer one while the inner one is still up (it leaves a blank white
+  // sheet behind), so the crop sheet is closed first and the result is handed on a moment later.
+  function finish(croppedUri: string | null) {
+    setCrop(null);
+    setStep('choose');
+    setTimeout(() => onDone(croppedUri), 450);
+  }
+
   async function openCropFor(uri: string) {
     setBusy(true);
     try {
@@ -87,14 +95,14 @@ export function CoverEditor({ visible, sources, onCancel, onDone }: {
               ))}
             </View>
             <Button title="Upload a picture from my phone" variant="secondary" onPress={upload} loading={busy} />
-            <Button title="Use the first picture (automatic)" variant="secondary" onPress={() => onDone(null)} />
+            <Button title="Use the first picture (automatic)" variant="secondary" onPress={() => finish(null)} />
           </ScrollView>
         ) : null}
 
         {step === 'frame' && video ? <FramePicker video={video} onPicked={(f) => { setCrop(f); setStep('crop'); }} onProblem={setProblem} problem={problem} /> : null}
       </View>
 
-      <PhotoCropper image={step === 'crop' ? crop : null} aspect={1} title="Crop the cover" onCancel={() => setStep(video ? 'frame' : 'choose')} onDone={(uri) => onDone(uri)} />
+      <PhotoCropper image={step === 'crop' ? crop : null} aspect={1} title="Crop the cover" onCancel={() => setStep(video ? 'frame' : 'choose')} onDone={finish} />
     </Modal>
   );
 }

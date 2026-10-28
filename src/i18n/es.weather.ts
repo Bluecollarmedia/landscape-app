@@ -39,6 +39,7 @@ export const ES_WEATHER: Record<string, string> = {
   'Send another request': 'Enviar otra solicitud',
   'Call {phone}': 'Llamar al {phone}',
   'Call us': 'Llámanos',
+  'Open {site}': 'Abrir {site}',
   'Email us': 'Escríbenos',
   'Need work done, or already part of the team?': '¿Necesitas un trabajo o ya eres parte del equipo?',
   'Choose at least one service.': 'Elige al menos un servicio.',

@@ -1,6 +1,6 @@
 /**
  * The owner's own music for a post (phone only): pick an audio file from the phone, read how long it is, and upload it. The whole track is saved
- * once together with the part chosen (start and end); the app plays just that part. Nothing here talks to a music service.
+ * once (shrunk to a small AAC file so it starts fast) together with the part chosen (start and end); the app plays just that part. Nothing here talks to a music service.
  */
 import * as DocumentPicker from 'expo-document-picker';
 import { uploadImage } from '@/lib/media';
@@ -37,7 +37,23 @@ export async function readTrackDuration(uri: string): Promise<number | null> {
   }
 }
 
-/** Sends the track as it is. */
-export async function uploadTrack(track: PickedTrack, companyId: string): Promise<{ url: string; key: string }> {
-  return uploadImage(track.uri, portfolioFolder(companyId, 'music'), track.mimeType ?? undefined, undefined, { raw: true });
+/**
+ * Shrinks the track on the phone (AAC in an .m4a, medium quality: a 10 MB song becomes about 2 MB, which is what makes the music start fast
+ * in a post), then sends it. If the phone cannot shrink it, the track goes up as it is.
+ */
+export async function shrinkTrack(track: PickedTrack): Promise<{ uri: string; mimeType: string | null }> {
+  try {
+    const compressor = require('react-native-compressor') as { Audio?: { compress: (uri: string, o: { quality?: 'low' | 'medium' | 'high'; bitrate?: number }) => Promise<string> } };
+    if (!compressor.Audio) return { uri: track.uri, mimeType: track.mimeType };
+    const out = await compressor.Audio.compress(track.uri, { quality: 'medium' });
+    return out ? { uri: out, mimeType: 'audio/mp4' } : { uri: track.uri, mimeType: track.mimeType };
+  } catch {
+    return { uri: track.uri, mimeType: track.mimeType };
+  }
+}
+
+/** Sends the track, shrunk first. */
+export async function uploadTrack(track: PickedTrack, companyId: string, onProgress?: (p: number) => void): Promise<{ url: string; key: string }> {
+  const small = await shrinkTrack(track);
+  return uploadImage(small.uri, portfolioFolder(companyId, 'music'), small.mimeType ?? undefined, onProgress, { raw: true });
 }

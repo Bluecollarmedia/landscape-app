@@ -33,6 +33,7 @@ export default function WeatherLayout() {
         <Tabs.Screen name="work" />
         <Tabs.Screen name="work-post" options={{ href: null }} />
         <Tabs.Screen name="work-video" options={{ href: null }} />
+        <Tabs.Screen name="work-story" options={{ href: null }} />
         <Tabs.Screen name="request" />
         <Tabs.Screen name="account" />
         <Tabs.Screen name="outlook" options={{ href: null }} />

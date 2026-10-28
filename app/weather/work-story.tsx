@@ -1,0 +1,192 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Image, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useT } from '@/i18n';
+import { OptimizedImage } from '@/components/ui';
+import { StoryBackdrop, StoryCard } from '@/components/work/StoryCard';
+import { markStorySeen, useSeenStories } from '@/data/portfolioStories';
+import { getLoadedPortfolio } from '@/data/portfolio';
+import { useAppActive } from '@/hooks/useAppActive';
+import { postGridUrl, type PortfolioPost } from '@/lib/portfolio';
+import {
+  activeStories, agoLabel, nextIndex, normalizeDesign, previousIndex, shareTarget, startIndex, storyDurationMs, tapZone, type PortfolioStory,
+} from '@/lib/portfolioStories';
+
+const HOLD_MS = 250;
+
+/**
+ * Stories, full screen, like Instagram: a thin progress bar per story at the top; tap the right side for the next one and the left third for the
+ * previous one; hold to pause; swipe down to close. A shared card shows the project (or video) in the owner's frame: hold it and it says
+ * "Tap to see reel"; tap it and it opens. Photos stay a few seconds, a video plays its own length. What has been watched is remembered on this phone.
+ */
+export default function WeatherWorkStory() {
+  const t = useT();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const { start } = useLocalSearchParams<{ start?: string }>();
+  const feed = getLoadedPortfolio();
+  const stories = useMemo(() => activeStories(feed?.stories, Date.now()), [feed]);
+  const seen = useSeenStories();
+  const focused = useIsFocused() && useAppActive();
+  const [index, setIndex] = useState(() => {
+    const n = Number(start);
+    return Number.isInteger(n) && n >= 0 && n < stories.length ? n : startIndex(stories, seen);
+  });
+  const [holding, setHolding] = useState(false);
+  const [sound, setSound] = useState(false);
+  const story = stories[index];
+
+  const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); }, [router]);
+
+  // ── the timer for the story on screen (stops while held, while another screen is on top, or when the app is switched away) ──
+  const progress = useRef(new Animated.Value(0)).current;
+  const value = useRef(0);
+  const run = useRef<Animated.CompositeAnimation | null>(null);
+  useEffect(() => { const id = progress.addListener(({ value: v }) => { value.current = v; }); return () => progress.removeListener(id); }, [progress]);
+  const advance = useCallback(() => {
+    const n = nextIndex(index, stories.length);
+    if (n === null) goBack(); else setIndex(n);
+  }, [index, stories.length, goBack]);
+  const advanceRef = useRef(advance);
+  advanceRef.current = advance;
+
+  useEffect(() => { progress.setValue(0); value.current = 0; }, [index, progress]);
+  const playing = focused && !holding;
+  useEffect(() => {
+    if (!story) return;
+    if (!playing) { run.current?.stop(); return; }
+    const remaining = storyDurationMs(story) * (1 - value.current);
+    run.current = Animated.timing(progress, { toValue: 1, duration: Math.max(1, remaining), easing: Easing.linear, useNativeDriver: false });
+    run.current.start(({ finished }) => { if (finished) advanceRef.current(); });
+    return () => run.current?.stop();
+  }, [story, playing, progress]);
+
+  useEffect(() => { if (story) void markStorySeen(story.id, stories.map((s) => s.id)); }, [story, stories]);
+
+  // ── touch: tap = next/previous, hold = pause, swipe down = close ──
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const held = useRef(false);
+  const press = {
+    onPressIn: () => { held.current = false; holdTimer.current = setTimeout(() => { held.current = true; setHolding(true); }, HOLD_MS); },
+    onPressOut: () => { if (holdTimer.current) clearTimeout(holdTimer.current); if (held.current) setHolding(false); },
+  };
+  const onBackgroundPress = (x: number) => {
+    if (held.current) return;
+    if (tapZone(x, width) === 'previous') setIndex(previousIndex(index)); else advance();
+  };
+  const pan = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponderCapture: (_e, g) => g.dy > 18 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
+    onPanResponderRelease: (_e, g) => { if (g.dy > 90) goBack(); },
+  }), [goBack]);
+
+  if (!story) {
+    return (
+      <View style={[styles.empty, { paddingTop: insets.top + 14 }]}>
+        <Text style={styles.emptyTitle}>{t('There are no stories right now.')}</Text>
+        <Pressable onPress={goBack} accessibilityRole="button" style={styles.emptyBtn}><Text style={styles.emptyBtnText}>{t('Back')}</Text></Pressable>
+      </View>
+    );
+  }
+
+  const post = story.post_id ? feed?.posts.find((p) => p.id === story.post_id) : undefined;
+  const target = story.kind === 'share' ? shareTarget(story, post) : null;
+  const openTarget = () => {
+    if (held.current || !target) return;   // a hold only shows the hint; a short tap opens
+    if (target.type === 'video') router.push({ pathname: '/weather/work-video', params: { post: target.postId, media: target.mediaId } } as any);
+    else router.push({ pathname: '/weather/work-post', params: { id: target.postId } } as any);
+  };
+
+  return (
+    <View style={styles.screen} {...pan.panHandlers}>
+      <StoryLayer key={story.id} story={story} post={post} width={width} height={height} playing={playing} sound={sound} holding={holding} onHold={press} onTap={onBackgroundPress} onOpen={openTarget} />
+
+      <View style={[styles.top, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+        <View style={styles.segments} pointerEvents="none">
+          {stories.map((s, i) => (
+            <View key={s.id} style={styles.segment}>
+              {i < index ? <View style={[styles.segmentFill, { width: '100%' }]} /> : null}
+              {i === index ? <Animated.View style={[styles.segmentFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} /> : null}
+            </View>
+          ))}
+        </View>
+        <View style={styles.who}>
+          <View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 18, height: 18, tintColor: '#2E5E34' }} /></View>
+          <Text style={styles.handle}>{feed?.profile.handle ?? 'brightonlawn'}</Text>
+          <Text style={styles.ago}>{agoLabel(story.created_at, Date.now())}</Text>
+          <View style={{ flex: 1 }} />
+          {story.kind === 'video' ? (
+            <Pressable onPress={() => setSound((s) => !s)} accessibilityRole="button" accessibilityLabel={sound ? t('Sound on, tap to turn off') : t('Sound off, tap to turn on')} style={styles.roundBtn}>
+              <MaterialCommunityIcons name={sound ? 'volume-high' : 'volume-off'} size={22} color="#FFFFFF" />
+            </Pressable>
+          ) : null}
+          <Pressable onPress={goBack} accessibilityRole="button" accessibilityLabel={t('Close')} style={styles.roundBtn}><MaterialCommunityIcons name="close" size={24} color="#FFFFFF" /></Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** What fills the screen for one story: the photo, the video, or the owner's framed card over its background. */
+function StoryLayer({ story, post, width, height, playing, sound, holding, onHold, onTap, onOpen }: {
+  story: PortfolioStory; post: PortfolioPost | undefined; width: number; height: number; playing: boolean; sound: boolean; holding: boolean;
+  onHold: { onPressIn: () => void; onPressOut: () => void }; onTap: (x: number) => void; onOpen: () => void;
+}) {
+  const t = useT();
+  const insets = useSafeAreaInsets();
+  const background = (
+    <Pressable style={StyleSheet.absoluteFill} {...onHold} onPress={(e) => onTap(e.nativeEvent.locationX)} accessibilityRole="button" accessibilityLabel={t('Next story')}>
+      {story.kind === 'photo' && story.media_url ? <OptimizedImage source={story.media_url} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+      {story.kind === 'video' && story.media_url ? <StoryVideo url={story.media_url} playing={playing} sound={sound} /> : null}
+    </Pressable>
+  );
+  if (story.kind !== 'share') return <View style={StyleSheet.absoluteFill}>{background}</View>;
+
+  const design = normalizeDesign(story.design);
+  const cover = post ? postGridUrl(post) : null;
+  const isVideo = !!post?.media.some((m) => m.kind === 'video') && post.kind === 'video';
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <StoryBackdrop design={design} coverUrl={cover} />
+      {background}
+      <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', paddingTop: insets.top + 40 }]} pointerEvents="box-none">
+        <Pressable {...onHold} onPress={onOpen} accessibilityRole="button" accessibilityLabel={isVideo ? t('Tap to see reel') : t('Tap to see project')}>
+          <StoryCard design={design} coverUrl={cover} isVideo={isVideo} width={width} />
+        </Pressable>
+        {holding ? (
+          <View style={styles.hint} pointerEvents="none"><MaterialCommunityIcons name="gesture-tap" size={18} color="#0F2A17" /><Text style={styles.hintText}>{isVideo ? t('Tap to see reel') : t('Tap to see project')}</Text></View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/** A story video: a fresh player for each one, played from the start, paused (not reset) when held or when the screen is covered. */
+function StoryVideo({ url, playing, sound }: { url: string; playing: boolean; sound: boolean }) {
+  const player = useVideoPlayer(url, (p) => { p.loop = false; p.muted = true; });
+  useEffect(() => { player.muted = !sound; }, [player, sound]);
+  useEffect(() => { if (playing) player.play(); else player.pause(); }, [player, playing]);
+  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#0E1A12' },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 30, backgroundColor: '#F7FAF4' },
+  emptyTitle: { color: '#0B4736', fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  emptyBtn: { minHeight: 44, paddingHorizontal: 24, borderRadius: 99, backgroundColor: '#E3F1DC', alignItems: 'center', justifyContent: 'center' },
+  emptyBtnText: { color: '#17301F', fontSize: 15, fontWeight: '700' },
+  top: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10 },
+  segments: { flexDirection: 'row', gap: 4 },
+  segment: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.35)', overflow: 'hidden' },
+  segmentFill: { height: '100%', backgroundColor: '#FFFFFF' },
+  who: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#E6F0DE', alignItems: 'center', justifyContent: 'center' },
+  handle: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '700' },
+  ago: { color: '#FFFFFF', fontSize: 13, opacity: 0.8 },
+  roundBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  hint: { position: 'absolute', bottom: 130, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 99, backgroundColor: '#FFFFFF' },
+  hintText: { color: '#0F2A17', fontSize: 15, fontWeight: '800' },
+});

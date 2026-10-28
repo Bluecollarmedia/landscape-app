@@ -6,7 +6,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
 import { OptimizedImage } from '@/components/ui';
 import { Panel, WX } from '@/components/weather/WeatherUI';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSeenStories } from '@/data/portfolioStories';
 import { usePublicPortfolio } from '@/hooks/usePortfolio';
+import { activeStories, ringState, startIndex } from '@/lib/portfolioStories';
 import {
   formatDuration, GRID_PAGE, gridPosts, growCount, highlightCoverUrl, portfolioCounts, postGridUrl, postsForHighlight, videoEntries, visibleHighlights,
   type PortfolioHighlight, type PortfolioPost, type PublicPortfolio,
@@ -34,6 +37,7 @@ export default function WeatherWork() {
   const [gridCount, setGridCount] = useState(GRID_PAGE);
   const [videoCount, setVideoCount] = useState(GRID_PAGE);
   const pager = useRef<ScrollView>(null);
+  const seen = useSeenStories();
 
   const onRefresh = useCallback(async () => { setRefreshing(true); await refresh(); setRefreshing(false); }, [refresh]);
   const goPage = (i: number) => { setPage(i); pager.current?.scrollTo({ x: i * width, animated: true }); };
@@ -61,6 +65,10 @@ export default function WeatherWork() {
   const videos = videoEntries(data.posts);
   const circles = visibleHighlights(data.highlights, data.posts);
   const tile = (width - GAP * 2) / 3;
+  // The ring around the profile picture: coloured while a story is unwatched, grey when all are watched, none without stories.
+  const stories = activeStories(data.stories, Date.now());
+  const ring = ringState(stories, seen);
+  const openStories = () => router.push({ pathname: '/weather/work-story', params: { start: String(startIndex(stories, seen)) } } as any);
   const openPost = (p: PortfolioPost) => router.push({ pathname: '/weather/work-post', params: { id: p.id } } as any);
   const openVideo = (p: PortfolioPost, mediaId: string) => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any);
 
@@ -78,9 +86,17 @@ export default function WeatherWork() {
       <Text style={styles.handle}>{data.profile.handle}</Text>
 
       <View style={styles.profileRow}>
-        <View style={styles.ring}>
-          <View style={styles.ringInner}><View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 40, height: 40, tintColor: '#2E5E34' }} /></View></View>
-        </View>
+        <Pressable onPress={openStories} disabled={ring === 'none'} accessibilityRole={ring === 'none' ? 'image' : 'button'} accessibilityLabel={ring === 'none' ? 'Brighton' : t('Watch our story')}>
+          {ring === 'unseen' ? (
+            <LinearGradient colors={['#8CCB63', '#2E5E34', '#F2B632']} style={styles.ring}>
+              <View style={styles.ringInner}><View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 40, height: 40, tintColor: '#2E5E34' }} /></View></View>
+            </LinearGradient>
+          ) : (
+            <View style={[styles.ring, { backgroundColor: ring === 'seen' ? '#C5D2C0' : 'transparent' }]}>
+              <View style={styles.ringInner}><View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 40, height: 40, tintColor: '#2E5E34' }} /></View></View>
+            </View>
+          )}
+        </Pressable>
         <View style={styles.counts}>
           <Count n={counts.projects} label={t('Projects')} />
           <Count n={counts.photos} label={t('Photos')} />
@@ -194,7 +210,7 @@ const styles = StyleSheet.create({
   soft: { color: WX.soft, fontSize: 14.5 },
   handle: { color: INK, fontSize: 17, fontWeight: '700', textAlign: 'center', marginTop: 6 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 22, paddingHorizontal: 18, marginTop: 14 },
-  ring: { width: 92, height: 92, borderRadius: 46, padding: 3, backgroundColor: '#53A246' },
+  ring: { width: 92, height: 92, borderRadius: 46, padding: 3 },
   ringInner: { flex: 1, borderRadius: 46, backgroundColor: WX.page, padding: 3 },
   avatar: { flex: 1, borderRadius: 46, backgroundColor: WX.leafTint, alignItems: 'center', justifyContent: 'center' },
   counts: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },

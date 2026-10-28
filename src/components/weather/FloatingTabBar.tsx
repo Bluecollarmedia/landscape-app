@@ -24,6 +24,8 @@ export function FloatingTabBar() {
   // Our Work is in the bar only while the owner's switch for it is on.
   const workOn = usePortfolioEnabled();
   const tabs = TABS.filter((tab) => tab.path !== '/weather/work' || workOn);
+  // Full-screen viewers (a video, a story) have no tab bar over them.
+  if (pathname.startsWith('/weather/work-video') || pathname.startsWith('/weather/work-story')) return null;
   return (
     <View style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) + 4 }]} pointerEvents="box-none">
       <View style={styles.bar}>

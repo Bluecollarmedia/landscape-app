@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { WX, WeatherBackground } from '@/components/weather/WeatherUI';
-import { WeatherHomeScreen } from '../../weather/index';
+import { WeatherHomeScreen } from '../../weather/(tabs)/index';
 
 /** The full forecast for a Snow worker, opened from the little weather button on their Route tab. It slides up over the screen they were on. */
 export default function SignedInWeather() {

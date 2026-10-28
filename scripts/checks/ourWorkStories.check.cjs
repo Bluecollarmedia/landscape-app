@@ -47,7 +47,7 @@ check('16 stories are in the unrun database file: 24-hour expiry, owner/admin on
 check('17 a shared card shows publicly only while its post is visible', /st\.kind <> 'share' or exists \(select 1 from public\.portfolio_posts pp where pp\.id = st\.post_id and pp\.visible\)/.test(sql));
 // ── the viewer and the ring (step 2) ──
 const viewer = read('app/weather/work-story.tsx');
-const home = read('app/weather/work.tsx');
+const home = read('app/weather/(tabs)/work.tsx');
 check('18 the story viewer has a progress bar per story, taps (left third back, otherwise on), hold to pause, and swipe down to close', /storyDurationMs\(story\)/.test(viewer) && /tapZone\(x, width\)/.test(viewer) && /HOLD_MS/.test(viewer) && /setHolding\(true\)/.test(viewer) && /PanResponder/.test(viewer) && /g\.dy > 90\) goBack\(\)/.test(viewer) && /nextIndex\(index, stories\.length\)/.test(viewer));
 check('19 a shared card: hold shows "Tap to see reel", a short tap opens the reel (or project), and the hold itself never opens it', /holding \? \(/.test(viewer) && /Tap to see reel/.test(viewer) && /if \(held\.current \|\| !target\) return/.test(viewer) && /shareTarget\(story, post\)/.test(viewer) && /pathname: '\/weather\/work-video'/.test(viewer));
 check('20 the story timer stops while held, while another screen is on top and when the app is switched away', /const playing = focused && !holding/.test(viewer) && /useIsFocused\(\) && useAppActive\(\)/.test(viewer));
@@ -55,7 +55,7 @@ check('21 each watched story is remembered on the phone, and a video story gets 
 check('22 the profile picture has the ring: coloured while unwatched, grey when watched, none without stories; tapping it opens the stories at the first unwatched one', /ringState\(stories, seen\)/.test(home) && /startIndex\(stories, seen\)/.test(home) && /ring === 'unseen'/.test(home) && /#C5D2C0/.test(home));
 const cardSrc = read('src/components/work/StoryCard.tsx');
 check('23 the shared card is drawn from the owner\'s design (background, frame colour, thickness, roundness, size, text), not saved as one flat picture', /normalizeDesign/.test(cardSrc) && /borderWidth: design\.frameWidth/.test(cardSrc) && /borderRadius: design\.radius/.test(cardSrc) && /design\.background === 'blur'/.test(cardSrc) && /textPlace === 'top'/.test(cardSrc));
-check('24 full-screen viewers (video and story) have no tab bar over them', /work-video'\) \|\| pathname\.startsWith\('\/weather\/work-story'\)\) return null/.test(read('src/components/weather/FloatingTabBar.tsx')) && /name="work-story" options=\{\{ href: null \}\}/.test(read('app/weather/_layout.tsx')));
+check('24 full-screen viewers (video and story) have no tab bar over them', /work-video'\) \|\| pathname\.startsWith\('\/weather\/work-story'\)\) return null/.test(read('src/components/weather/FloatingTabBar.tsx')) && /<Stack\.Screen name="work-story" \/>/.test(read('app/weather/_layout.tsx')));
 
 // ── the owner's tools (step 3) ──
 const mgr = read('src/components/work/StoriesManagerScreen.tsx');

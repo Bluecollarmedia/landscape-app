@@ -39,10 +39,10 @@ check('14 the owner and admins get a notification for each request', /insert int
 check('15 only status, who handled it and when can be changed by the owner', /grant update \(status, handled_by, handled_at\)/.test(sql));
 
 // ── the app ──
-const layout = read('app/weather/_layout.tsx');
+const layout = read('app/weather/(tabs)/_layout.tsx');
 const bar = read('src/components/weather/FloatingTabBar.tsx');
 check('16 the Request tab is in the Weather area and in its tab bar, and the old Account tab is renamed Brighton', /name="request"/.test(layout) && /\/weather\/request/.test(bar) && /label: 'Brighton'/.test(bar) && !/label: 'Account'/.test(bar));
-const screen = read('app/weather/request.tsx');
+const screen = read('app/weather/(tabs)/request.tsx');
 check('17 the form checks, then sends, and shows the problem in words', /requestProblem\(input\)/.test(screen) && /submitServiceRequest\(input\)/.test(screen) && /setProblem/.test(screen));
 check('18 the form never needs a sign-in', !/useAuth|isAuthenticated/.test(screen));
 check('19 the owner has the list in both owner areas, and a row in each More screen', fs.existsSync(path.join(__dirname, '../../app/(owner)/service-requests.tsx')) && fs.existsSync(path.join(__dirname, '../../app/snow/owner/service-requests.tsx')) && /service-requests/.test(read('app/(owner)/(tabs)/more/index.tsx')) && /service-requests/.test(read('app/snow/owner/(tabs)/more.tsx')));

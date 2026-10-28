@@ -1,15 +1,14 @@
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import { weatherSwitch } from '@/data/publicWeather';
 import { WX, WeatherBackground } from '@/components/weather/WeatherUI';
-import { FloatingTabBar } from '@/components/weather/FloatingTabBar';
 import { WEATHER_ON_THIS_DEVICE } from '@/lib/weatherPlatform';
 
 /**
- * The public Brighton Weather area: one light page behind its screens (Weather, Storm History, Our Work while the owner has it on, Request, Brighton) and its own floating tab bar.
- * The screens are tabs that stay alive once opened, so switching is instant and each keeps its place (scroll position, the hourly strip, the open storm).
- * The storm outlook page is a fourth, hidden tab: it has no button in the bar and is opened from the home card or the history.
+ * The public Brighton Weather area: one light page behind its screens. The five tabs (Weather, Storm History, Our Work, Request, Brighton) live in (tabs);
+ * a project, a reel and a story are screens in this stack on top of them, so each slides in, swipes back from the left edge, and is closed for real
+ * when you leave (its videos and music stop and are released).
  * While it is open the app re-asks the owner's switch every 60 seconds; if Weather has been switched off, the app's launch routing
  * moves the visitor to the welcome screen.
  */
@@ -23,21 +22,12 @@ export default function WeatherLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: WX.page }}>
       <WeatherBackground />
-      <Tabs
-        backBehavior="history"
-        tabBar={() => <FloatingTabBar />}
-        screenOptions={{ headerShown: false, lazy: true, sceneStyle: { backgroundColor: 'transparent' } }}
-      >
-        <Tabs.Screen name="index" />
-        <Tabs.Screen name="history" />
-        <Tabs.Screen name="work" />
-        <Tabs.Screen name="work-post" options={{ href: null }} />
-        <Tabs.Screen name="work-video" options={{ href: null }} />
-        <Tabs.Screen name="work-story" options={{ href: null }} />
-        <Tabs.Screen name="request" />
-        <Tabs.Screen name="account" />
-        <Tabs.Screen name="outlook" options={{ href: null }} />
-      </Tabs>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="work-post" />
+        <Stack.Screen name="work-video" />
+        <Stack.Screen name="work-story" />
+      </Stack>
     </View>
   );
 }

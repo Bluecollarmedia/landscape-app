@@ -44,7 +44,7 @@ const fnTowns = [...wx.matchAll(/'([a-z-]+)': \{ name: '[^']+', lat: ([\d.-]+), 
 check('13 the app\'s town points are exactly the data function\'s points (so sunrise and the forecast are for the same place)', fnTowns.length === 8 && fnTowns.every(([k, la, lo]) => { const c = towns.townCoords(k); return c.lat === la && c.lon === lo; }), JSON.stringify(fnTowns));
 
 // ── the screens follow the rules (file text) ──
-const home = read('app/weather/index.tsx'); const det = read('src/components/weather/WeatherDetails.tsx'); const ui = read('src/components/weather/WeatherUI.tsx'); const bar = read('src/components/weather/FloatingTabBar.tsx');
+const home = read('app/weather/(tabs)/index.tsx'); const det = read('src/components/weather/WeatherDetails.tsx'); const ui = read('src/components/weather/WeatherUI.tsx'); const bar = read('src/components/weather/FloatingTabBar.tsx');
 const screens = home + det + ui + bar;
 check('14 no pressure and no air quality anywhere (the National Weather Service does not provide them, so they are not shown or invented); UV is shown only as a labelled estimate', !/barometer|pressure|air quality|airQuality/i.test(screens) && /An estimate worked out from the sun/.test(home));
 check('15 the details screen opens on the day and hour that was tapped, and has a visible Back button with a label (a swipe is only a shortcut)', /<BottomSheetModal/.test(det) && /accessibilityLabel=\{t\('Close details'\)\}/.test(det) && /t\('Back'\)/.test(det));

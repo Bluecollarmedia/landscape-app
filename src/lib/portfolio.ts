@@ -349,3 +349,25 @@ export function frameTimes(durationS: number, count: number): number[] {
   if (!(durationS > 0) || count < 1) return [];
   return Array.from({ length: count }, (_, i) => Math.round(((i + 0.5) / count) * durationS * 10) / 10);
 }
+
+// ── Highlights play like a story that never expires ──────────────────────────────────────────────────────────────────────────────
+
+export const MAX_HIGHLIGHT_FRAMES = 60;
+
+/**
+ * What a highlight plays: every photo and video of its posts, one after another, in the story viewer (the circle opens a story, not a grid).
+ * A photo shows a few seconds, a video its own length. They never expire. Capped so one circle never plays for ages.
+ */
+export function highlightFrames(h: PortfolioHighlight, posts: PortfolioPost[]): PortfolioStory[] {
+  const out: PortfolioStory[] = [];
+  for (const post of postsForHighlight(h, posts)) {
+    for (const m of sortedMedia(post)) {
+      if (out.length >= MAX_HIGHLIGHT_FRAMES) return out;
+      out.push({
+        id: `${post.id}:${m.id}`, kind: m.kind === 'video' ? 'video' : 'photo', media_url: m.url, media_thumb_url: m.thumb_url, duration_s: m.duration_s,
+        post_id: post.id, media_id: m.id, design: null, created_at: post.posted_at, expires_at: '9999-12-31T00:00:00.000Z',
+      });
+    }
+  }
+  return out;
+}

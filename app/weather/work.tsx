@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Image, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,8 +11,8 @@ import { useSeenStories } from '@/data/portfolioStories';
 import { usePublicPortfolio } from '@/hooks/usePortfolio';
 import { activeStories, ringState, startIndex } from '@/lib/portfolioStories';
 import {
-  formatDuration, GRID_PAGE, gridPosts, growCount, highlightCoverUrl, opensAsReel, portfolioCounts, postGridUrl, postsForHighlight, videoEntries, visibleHighlights,
-  type PortfolioHighlight, type PortfolioPost, type PublicPortfolio,
+  formatDuration, GRID_PAGE, gridPosts, growCount, highlightCoverUrl, opensAsReel, portfolioCounts, postGridUrl, videoEntries, visibleHighlights,
+  type PortfolioPost, type PublicPortfolio,
 } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
 
@@ -32,7 +32,6 @@ export default function WeatherWork() {
   const { view, refresh } = usePublicPortfolio();
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(0);
-  const [open, setOpen] = useState<PortfolioHighlight | null>(null);
   // Only the first page of tiles is drawn; more are drawn as the person scrolls near the end (a long feed never loads all at once).
   const [gridCount, setGridCount] = useState(GRID_PAGE);
   const [videoCount, setVideoCount] = useState(GRID_PAGE);
@@ -124,7 +123,7 @@ export default function WeatherWork() {
           {circles.map((h) => {
             const uri = highlightCoverUrl(h, data.posts);   // a circle is 64 points wide: its picture comes from the small copy when there is one
             return (
-              <Pressable key={h.id} onPress={() => setOpen(h)} accessibilityRole="button" accessibilityLabel={h.name} style={styles.circleItem}>
+              <Pressable key={h.id} onPress={() => router.push({ pathname: '/weather/work-story', params: { highlight: h.id } } as any)} accessibilityRole="button" accessibilityLabel={h.name} style={styles.circleItem}>
                 <View style={styles.circleRing}>{uri ? <OptimizedImage source={uri} style={styles.circleImg} /> : <View style={[styles.circleImg, { backgroundColor: WX.leafTint }]} />}</View>
                 <Text style={styles.circleLabel} numberOfLines={1}>{h.name}</Text>
               </Pressable>
@@ -158,20 +157,6 @@ export default function WeatherWork() {
           )}
         </View>
       </ScrollView>
-
-      <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(null)}>
-        <View style={{ flex: 1, backgroundColor: WX.page }}>
-          <View style={styles.sheetHead}>
-            <Text style={styles.sheetTitle}>{open?.name}</Text>
-            <Pressable onPress={() => setOpen(null)} accessibilityRole="button" accessibilityLabel={t('Close')} hitSlop={10} style={styles.sheetClose}><Text style={styles.sheetCloseText}>{t('Close')}</Text></Pressable>
-          </View>
-          <ScrollView>
-            <View style={styles.grid}>
-              {open ? postsForHighlight(open, data.posts).map((p) => <Tile key={p.id} post={p} size={tile} onPress={() => { setOpen(null); openPost(p); }} />) : null}
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
     </ScrollView>
   );
 }

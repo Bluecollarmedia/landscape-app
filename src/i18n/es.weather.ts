@@ -85,6 +85,8 @@ export const ES_WEATHER: Record<string, string> = {
   'Tap to see reel': 'Toca para ver el video',
   'Tap to see project': 'Toca para ver el proyecto',
   'Watch our story': 'Ver nuestra historia',
+  'See reel': 'Ver el video',
+  'See project': 'Ver el proyecto',
   'Weather': 'Clima',
   'Storm History': 'Historial de tormentas',
   'Account': 'Cuenta',

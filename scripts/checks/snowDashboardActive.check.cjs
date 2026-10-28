@@ -55,6 +55,6 @@ const data = read('src/data/snowStorms.ts');
 check('11 renaming a storm updates only its name, trimmed, and refuses an empty name', /update\(\{ name: clean \}\)/.test(data) && /if \(!clean\) return fail/.test(data));
 const manage = read('src/components/snow/storms/ManageStormsScreen.tsx');
 check('12 Manage storms lets the owner tap a name to rename it', /renameStorm\(s\.id, draft\)/.test(manage) && /Rename \$\{s\.name\}/.test(manage));
-check('13 Snow More says Manage storms is where a storm is named', /Name a storm \(the title on your dashboard\)/.test(read('app/snow/owner/(tabs)/more.tsx')));
+check('13 Snow More says Manage storms is where a storm is named', /Name a storm: this is the title on your dashboard/.test(read('app/snow/owner/(tabs)/more.tsx')));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

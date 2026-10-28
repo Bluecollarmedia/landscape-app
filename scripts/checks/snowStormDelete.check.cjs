@@ -72,7 +72,7 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
   const settings = read('app/snow/owner/(tabs)/more.tsx');
   const screen = read('src/components/snow/storms/ManageStormsScreen.tsx');
   check('12 Snow More has a Manage storms row that opens the screen', /title="Manage storms"/.test(settings) && /manage-storms/.test(settings) && /manage-storms/.test(read('app/snow/owner/_layout.tsx')) && fs.existsSync(path.join(__dirname, '../../app/snow/owner/manage-storms.tsx')));
-  check('13 the screen lists every status and every storm has a Delete button that asks first with the real counts', /loadStorms\(\)/.test(screen) && /loadStormCounts/.test(screen) && /confirmAction\(c\.title, c\.message, c\.confirm/.test(screen) && /accessibilityLabel=\{`Delete \$\{s\.name\}`\}/.test(screen));
+  check('13 the screen lists every storm and has NO delete (renaming only, by the owner's choice)', /loadStorms\(\)/.test(screen) && !/deleteStormForGood|Delete \$\{s\.name\}|trash-2/.test(screen));
   check('14 it is not on the dashboard', !/Manage storms|manage-storms/.test(read('src/components/snow/dashboard/SnowDashboardScreen.tsx')));
   console.log(bad ? `\n${bad} failed` : '\nall passed');
   process.exit(bad ? 1 : 0);

@@ -85,7 +85,7 @@ export default function SnowOwnerMoreScreen() {
           </Group>
 
           <Group title="Storms">
-            <Row icon="trash-2" title="Manage storms" subtitle="Name a storm (the title on your dashboard), or delete one" onPress={() => router.push('/snow/owner/manage-storms' as any)} />
+            <Row icon="trash-2" title="Manage storms" subtitle="Name a storm: this is the title on your dashboard" onPress={() => router.push('/snow/owner/manage-storms' as any)} />
           </Group>
 
           <Group title="You">

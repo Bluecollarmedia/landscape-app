@@ -6,6 +6,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
 import { OptimizedImage } from '@/components/ui';
+import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { StoryBackdrop, StoryCard } from '@/components/work/StoryCard';
 import { markStorySeen, useSeenStories } from '@/data/portfolioStories';
 import { getLoadedPortfolio } from '@/data/portfolio';
@@ -130,7 +131,7 @@ export default function WeatherWorkStory() {
           ))}
         </View>
         <View style={styles.who}>
-          <View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 18, height: 18, tintColor: '#2E5E34' }} /></View>
+          <ProfileAvatar uri={feed?.profile.avatar_url} size={34} />
           <Text style={styles.handle}>{hl ? hl.name : feed?.profile.handle ?? 'brightonlawn'}</Text>
           {hl ? null : <Text style={styles.ago}>{agoLabel(story.created_at, Date.now())}</Text>}
           <View style={{ flex: 1 }} />

@@ -17,7 +17,7 @@ const friendly = (m: string) => (/relation .* does not exist|schema cache|could 
 /** A saved photo or video, with where its file is stored (so removing it from the post can also remove the file). */
 export interface OwnerMedia extends PortfolioMedia { storage_key?: string | null }
 export interface OwnerPost extends PortfolioPost { visible: boolean; media: OwnerMedia[] }
-export interface OwnerSettings { enabled: boolean; handle: string; bio: string; website: string }
+export interface OwnerSettings { enabled: boolean; handle: string; bio: string; website: string; avatar_url?: string | null }
 export interface OwnerPortfolio { settings: OwnerSettings; posts: OwnerPost[]; highlights: PortfolioHighlight[] }
 
 const DEFAULT_SETTINGS: OwnerSettings = { enabled: false, handle: 'brightonlawn', bio: '', website: '' };
@@ -28,7 +28,7 @@ export async function loadOwnerPortfolio(): Promise<Result<OwnerPortfolio>> {
   if (!isSupabaseConfigured) return { ok: false, error: UNREACHABLE };
   try {
     const [s, p, h] = await Promise.all([
-      supabase.from('portfolio_settings').select('enabled, handle, bio, website').maybeSingle(),
+      supabase.from('portfolio_settings').select('enabled, handle, bio, website, avatar_url').maybeSingle(),
       supabase.from('portfolio_posts').select(POST_COLUMNS).order('posted_at', { ascending: false }).limit(200),
       supabase.from('portfolio_highlights').select('id, name, cover_url, mode, tag, position, post_ids:portfolio_highlight_posts(post_id, position)').order('position', { ascending: true }),
     ]);
@@ -44,16 +44,16 @@ export async function loadOwnerPortfolio(): Promise<Result<OwnerPortfolio>> {
 }
 
 /** The text under the name on Our Work. */
-export async function saveProfile(input: { bio: string; website: string }): Promise<Result<null>> {
+export async function saveProfile(input: { bio: string; website: string; /** undefined: leave as is; null: back to the leaf logo; text: the picture's address */ avatarUrl?: string | null }): Promise<Result<null>> {
   const companyId = db.companyId;
   if (!companyId) return { ok: false, error: 'Sign in again.' };
   const bio = input.bio.trim().slice(0, 300);
   const website = input.website.trim().slice(0, 120);
   try {
-    const upd = await supabase.from('portfolio_settings').update({ bio, website, updated_by: db.personId ?? null, updated_at: new Date().toISOString() }).eq('company_id', companyId).select('company_id');
+    const upd = await supabase.from('portfolio_settings').update({ bio, website, ...(input.avatarUrl !== undefined ? { avatar_url: input.avatarUrl } : {}), updated_by: db.personId ?? null, updated_at: new Date().toISOString() }).eq('company_id', companyId).select('company_id');
     if (upd.error) return { ok: false, error: friendly(upd.error.message) };
     if (!upd.data?.length) {
-      const ins = await supabase.from('portfolio_settings').insert({ company_id: companyId, bio, website, updated_by: db.personId ?? null });
+      const ins = await supabase.from('portfolio_settings').insert({ company_id: companyId, bio, website, avatar_url: input.avatarUrl ?? null, updated_by: db.personId ?? null });
       if (ins.error) return { ok: false, error: friendly(ins.error.message) };
     }
     return { ok: true, data: null };

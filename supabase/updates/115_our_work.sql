@@ -20,6 +20,7 @@ create table if not exists public.portfolio_settings (
   handle text not null default 'brightonlawn' check (char_length(handle) between 2 and 30),
   bio text not null default '' check (char_length(bio) <= 300),
   website text not null default '' check (char_length(website) <= 120),
+  avatar_url text check (avatar_url is null or char_length(avatar_url) <= 600),
   updated_by uuid references public.people(id) on delete set null,
   updated_at timestamptz not null default now()
 );
@@ -121,8 +122,8 @@ alter table public.portfolio_stories enable row level security;
 revoke all on public.portfolio_settings, public.portfolio_posts, public.portfolio_media, public.portfolio_highlights, public.portfolio_highlight_posts, public.portfolio_stories from public, anon, authenticated;
 
 grant select on public.portfolio_settings to authenticated;
-grant insert (company_id, handle, bio, website, updated_by) on public.portfolio_settings to authenticated;
-grant update (handle, bio, website, updated_by, updated_at) on public.portfolio_settings to authenticated;
+grant insert (company_id, handle, bio, website, avatar_url, updated_by) on public.portfolio_settings to authenticated;
+grant update (handle, bio, website, avatar_url, updated_by, updated_at) on public.portfolio_settings to authenticated;
 grant select, insert, update, delete on public.portfolio_posts, public.portfolio_media, public.portfolio_highlights, public.portfolio_highlight_posts, public.portfolio_stories to authenticated;
 
 drop policy if exists portfolio_settings_manage on public.portfolio_settings;
@@ -200,7 +201,7 @@ begin
    limit 1;
   if cid is null then return jsonb_build_object('enabled', false); end if;
 
-  select jsonb_build_object('handle', s.handle, 'bio', s.bio, 'website', s.website) into prof
+  select jsonb_build_object('handle', s.handle, 'bio', s.bio, 'website', s.website, 'avatar_url', s.avatar_url) into prof
     from public.portfolio_settings s where s.company_id = cid;
 
   select coalesce(jsonb_agg(jsonb_build_object(

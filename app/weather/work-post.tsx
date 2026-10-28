@@ -7,9 +7,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
 import { OptimizedImage } from '@/components/ui';
 import { WX } from '@/components/weather/WeatherUI';
+import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { useClipMusic } from '@/components/work/useClipMusic';
 import { useAppActive } from '@/hooks/useAppActive';
-import { getLoadedPost } from '@/data/portfolio';
+import { getLoadedPortfolio, getLoadedPost } from '@/data/portfolio';
 import { Image as ExpoImage } from 'expo-image';
 import { requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
@@ -73,7 +74,7 @@ export default function WeatherWorkPost() {
       </View>
 
       <View style={styles.author}>
-        <View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 20, height: 20, tintColor: '#2E5E34' }} /></View>
+        <ProfileAvatar uri={getLoadedPortfolio()?.profile.avatar_url} size={38} />
         <View style={{ flex: 1 }}>
           <Text style={styles.handle}>brightonlawn</Text>
           {post.town ? <Text style={styles.town}>{post.town}</Text> : null}

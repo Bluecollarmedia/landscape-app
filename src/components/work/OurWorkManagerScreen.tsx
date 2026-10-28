@@ -3,11 +3,15 @@
  * the name, links to the story and the Highlights, and every post with its own show/hide switch and an Edit button. New post and New reel start here.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage } from '@/components/ui';
 import { confirmAction, showMessage } from '@/components/financials/ActionSheet';
+import { ProfileAvatar } from '@/components/work/ProfileAvatar';
+import { uploadPortfolioPhoto } from '@/data/portfolioUpload';
+import { keepPicked } from '@/lib/keepPickedFile';
 import { loadOwnerPortfolio, saveProfile, setPostVisible, type OwnerPortfolio, type OwnerPost } from '@/data/portfolioOwner';
 import { setPortfolioEnabled } from '@/data/portfolio';
 import { db } from '@/data/store';
@@ -35,6 +39,7 @@ export function OurWorkManagerScreen({ base }: { base: string }) {
   const [bio, setBio] = useState('');
   const [website, setWebsite] = useState('');
   const [savedNote, setSavedNote] = useState<string | null>(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async (first = false) => {
@@ -43,7 +48,7 @@ export function OurWorkManagerScreen({ base }: { base: string }) {
     if (!r.ok) { setProblem(r.error); return; }
     setProblem(null);
     setData(r.data);
-    if (first) { setBio(r.data.settings.bio); setWebsite(r.data.settings.website); }
+    if (first) { setBio(r.data.settings.bio); setWebsite(r.data.settings.website); setAvatar(r.data.settings.avatar_url ?? null); }
   }, []);
   useEffect(() => { void reload(true); }, [reload]);
 
@@ -71,6 +76,35 @@ export function OurWorkManagerScreen({ base }: { base: string }) {
     setProblem(null);
     setSavedNote('Saved.');
     setTimeout(() => setSavedNote(null), 2500);
+  }
+
+  /** Choose the profile picture: pick a photo and crop it square (the phone's own crop), then it is saved and shown at once. */
+  async function changePicture() {
+    setProblem(null);
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { setProblem('Turn on photo access for Brighton Lawn in the Settings app.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 });
+    if (result.canceled || !result.assets[0] || !db.companyId) return;
+    setBusy(true);
+    try {
+      const kept = await keepPicked(result.assets[0].uri, 'image');
+      const up = await uploadPortfolioPhoto(kept, db.companyId, 'covers');
+      const r = await saveProfile({ bio, website, avatarUrl: up.thumbUrl });
+      if (!r.ok) { setProblem(r.error); return; }
+      setAvatar(up.thumbUrl);
+    } catch (e) {
+      setProblem(e instanceof Error && e.message ? e.message : "Couldn't upload that picture.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function useLeafLogo() {
+    setBusy(true);
+    const r = await saveProfile({ bio, website, avatarUrl: null });
+    setBusy(false);
+    if (!r.ok) { setProblem(r.error); return; }
+    setAvatar(null);
   }
 
   async function toggleVisible(p: OwnerPost, visible: boolean) {
@@ -110,6 +144,16 @@ export function OurWorkManagerScreen({ base }: { base: string }) {
 
             <Text style={[typeScale.labelSmall, styles.heading, { color: colors.textTertiary }]}>ABOUT US</Text>
             <View style={[styles.cardCol, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <ProfileAvatar uri={avatar} size={64} />
+                <View style={{ flex: 1, gap: spacing.xs }}>
+                  <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Profile picture</Text>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                    <Button title="Change picture" size="sm" variant="secondary" onPress={changePicture} loading={busy} />
+                    {avatar ? <Button title="Use the leaf" size="sm" variant="secondary" onPress={useLeafLogo} disabled={busy} /> : null}
+                  </View>
+                </View>
+              </View>
               <Input label="Bio" value={bio} onChangeText={setBio} multiline maxLength={300} placeholder="Landscape construction and commercial maintenance across New Jersey." />
               <Input label="Website" value={website} onChangeText={setWebsite} maxLength={120} autoCapitalize="none" placeholder="brightonlawn.com" />
               <Button title={savedNote ?? 'Save'} size="sm" onPress={saveText} loading={busy} />

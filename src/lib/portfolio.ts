@@ -49,7 +49,7 @@ export interface PortfolioHighlight {
   post_ids: string[];
 }
 
-export interface PortfolioProfile { handle: string; bio: string; website: string }
+export interface PortfolioProfile { handle: string; bio: string; website: string; /** The picture the owner chose for the profile (the leaf logo when empty). */ avatar_url?: string | null }
 
 export interface PublicPortfolio {
   enabled: boolean;

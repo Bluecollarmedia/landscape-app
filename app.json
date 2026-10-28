@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.brightonlawn.app",
-      "buildNumber": "20",
+      "buildNumber": "21",
       "associatedDomains": [
         "applinks:brighton-app.netlify.app",
         "applinks:app.brightonlawn.com"

@@ -75,7 +75,7 @@ export interface CrewRow {
   id: string;
   name: string;
   initials: string;
-  /** "Lead: Jane Doe", or a neutral note when nobody is assigned. */
+  /** "Lead: Jane Doe" / "Leads: Jane Doe, Sam Lee, ...", or a neutral note when nobody is assigned. */
   leadLabel: string;
   completed: number;
   total: number;
@@ -96,7 +96,7 @@ export function crewRows(storm: StormOverview): CrewRow[] {
       id: r.id,
       name: r.name,
       initials: crewInitials(r.name),
-      leadLabel: r.leadName ? `Lead: ${r.leadName}` : 'No lead assigned',
+      leadLabel: r.leadName ? `${r.leadNames.length > 1 ? 'Leads' : 'Lead'}: ${r.leadName}` : 'No lead assigned',
       completed: r.completed,
       total: r.total,
       skipped: r.skipped,

@@ -317,7 +317,7 @@ function OtherStormCard({ storm, onOpenStorm, onOpenRoute }: { storm: StormOverv
               {r.attentionCount > 0 && <StatusBadge label={`${r.attentionCount} need${r.attentionCount === 1 ? 's' : ''} attention`} status="warning" />}
             </View>
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 2 }]}>
-              Lead: {r.leadName ?? 'Not assigned'}
+              {r.leadNames.length > 1 ? 'Leads' : 'Lead'}: {r.leadName ?? 'Not assigned'}
               {r.mediaRequired ? ` · ${r.minMedia} photo${r.minMedia === 1 ? '' : 's'} required` : ''}
             </Text>
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: 2 }]}>

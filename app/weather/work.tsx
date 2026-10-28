@@ -8,7 +8,7 @@ import { OptimizedImage } from '@/components/ui';
 import { Panel, WX } from '@/components/weather/WeatherUI';
 import { usePublicPortfolio } from '@/hooks/usePortfolio';
 import {
-  formatDuration, gridPosts, highlightCoverUrl, portfolioCounts, postCoverUrl, postsForHighlight, videoEntries, visibleHighlights,
+  formatDuration, GRID_PAGE, gridPosts, growCount, highlightCoverUrl, portfolioCounts, postGridUrl, postsForHighlight, videoEntries, visibleHighlights,
   type PortfolioHighlight, type PortfolioPost, type PublicPortfolio,
 } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
@@ -30,6 +30,9 @@ export default function WeatherWork() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState<PortfolioHighlight | null>(null);
+  // Only the first page of tiles is drawn; more are drawn as the person scrolls near the end (a long feed never loads all at once).
+  const [gridCount, setGridCount] = useState(GRID_PAGE);
+  const [videoCount, setVideoCount] = useState(GRID_PAGE);
   const pager = useRef<ScrollView>(null);
 
   const onRefresh = useCallback(async () => { setRefreshing(true); await refresh(); setRefreshing(false); }, [refresh]);
@@ -62,7 +65,16 @@ export default function WeatherWork() {
   const openVideo = (p: PortfolioPost, mediaId: string) => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any);
 
   return (
-    <ScrollView contentContainerStyle={{ paddingTop: top, paddingBottom: insets.bottom + 130 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={INK} />}>
+    <ScrollView
+      scrollEventThrottle={100}
+      onScroll={(e) => {
+        const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+        if (contentOffset.y + layoutMeasurement.height > contentSize.height - 700) {
+          setGridCount((c) => growCount(c, grid.length));
+          setVideoCount((c) => growCount(c, videos.length));
+        }
+      }}
+      contentContainerStyle={{ paddingTop: top, paddingBottom: insets.bottom + 130 }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={INK} />}>
       <Text style={styles.handle}>{data.profile.handle}</Text>
 
       <View style={styles.profileRow}>
@@ -90,7 +102,7 @@ export default function WeatherWork() {
       {circles.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.circles}>
           {circles.map((h) => {
-            const uri = highlightCoverUrl(h, data.posts);
+            const uri = highlightCoverUrl(h, data.posts);   // a circle is 64 points wide: its picture comes from the small copy when there is one
             return (
               <Pressable key={h.id} onPress={() => setOpen(h)} accessibilityRole="button" accessibilityLabel={h.name} style={styles.circleItem}>
                 <View style={styles.circleRing}>{uri ? <OptimizedImage source={uri} style={styles.circleImg} /> : <View style={[styles.circleImg, { backgroundColor: WX.leafTint }]} />}</View>
@@ -114,14 +126,14 @@ export default function WeatherWork() {
         <View style={{ width }}>
           {grid.length === 0 ? <Text style={[styles.soft, styles.empty]}>{t('No projects yet.')}</Text> : (
             <View style={styles.grid}>
-              {grid.map((p) => <Tile key={p.id} post={p} size={tile} onPress={() => openPost(p)} />)}
+              {grid.slice(0, gridCount).map((p) => <Tile key={p.id} post={p} size={tile} onPress={() => openPost(p)} />)}
             </View>
           )}
         </View>
         <View style={{ width }}>
           {videos.length === 0 ? <Text style={[styles.soft, styles.empty]}>{t('No videos yet.')}</Text> : (
             <View style={styles.grid}>
-              {videos.map((v) => <VideoTile key={v.media.id} post={v.post} url={v.media.thumb_url ?? postCoverUrl(v.post)} seconds={v.media.duration_s} size={tile} onPress={() => openVideo(v.post, v.media.id)} />)}
+              {videos.slice(0, videoCount).map((v) => <VideoTile key={v.media.id} post={v.post} url={v.media.thumb_url ?? postGridUrl(v.post)} seconds={v.media.duration_s} size={tile} onPress={() => openVideo(v.post, v.media.id)} />)}
             </View>
           )}
         </View>
@@ -155,7 +167,7 @@ function Count({ n, label }: { n: number; label: string }) {
 
 /** A square in the photo grid: the cover, with a small icon when the post has several pictures or a video. */
 function Tile({ post, size, onPress }: { post: PortfolioPost; size: number; onPress: () => void }) {
-  const uri = postCoverUrl(post);
+  const uri = postGridUrl(post);
   const many = post.media.length > 1;
   const video = post.media.some((m) => m.kind === 'video');
   return (

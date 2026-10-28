@@ -25,6 +25,8 @@ export interface PortfolioPost {
   show_in_grid: boolean;
   posted_at: string;
   cover_url: string | null;
+  /** A small (about 360 px) copy of the cover for the grid, made when the owner saves the post. */
+  cover_thumb_url?: string | null;
   music_url: string | null;
   music_title: string | null;
   music_start_s: number | null;
@@ -80,6 +82,28 @@ export function postCoverUrl(post: PortfolioPost): string | null {
   return media.find((m) => m.kind === 'photo')?.url ?? media.find((m) => m.kind === 'video')?.thumb_url ?? null;
 }
 
+/**
+ * The SMALL picture for a grid tile (so a screen of tiles is light to load): the small copy of the cover, else the first photo's small copy,
+ * else the full-size picture as a last resort, else the video's frame.
+ */
+export function postGridUrl(post: PortfolioPost): string | null {
+  if (post.cover_thumb_url) return post.cover_thumb_url;
+  if (post.cover_url) return post.cover_url;
+  const media = sortedMedia(post);
+  const photo = media.find((m) => m.kind === 'photo');
+  return photo ? photo.thumb_url ?? photo.url : media.find((m) => m.kind === 'video')?.thumb_url ?? null;
+}
+
+/** How many grid tiles are drawn at first, and how many more each time the person scrolls near the end. */
+export const GRID_PAGE = 30;
+export const growCount = (count: number, total: number): number => Math.min(total, count + GRID_PAGE);
+
+/**
+ * Which pictures in a swipe row may load: only the one on screen. (The next one is fetched quietly afterwards, one at a time, by the screen.)
+ * A post with 10 photos therefore asks for 1 picture when it opens, not 10.
+ */
+export const shouldLoadSlide = (slideIndex: number, currentIndex: number): boolean => slideIndex === currentIndex;
+
 export const hasVideo = (post: PortfolioPost): boolean => post.media.some((m) => m.kind === 'video');
 
 /** The posts in the photo grid: every project post, and a video post only when the owner chose to show it there. Newest first. */
@@ -119,7 +143,7 @@ export function postsForHighlight(h: PortfolioHighlight, posts: PortfolioPost[])
 export function highlightCoverUrl(h: PortfolioHighlight, posts: PortfolioPost[]): string | null {
   if (h.cover_url) return h.cover_url;
   const first = postsForHighlight(h, posts)[0];
-  return first ? postCoverUrl(first) : null;
+  return first ? postGridUrl(first) : null;
 }
 
 /** A highlight with nothing in it is not shown to visitors. */

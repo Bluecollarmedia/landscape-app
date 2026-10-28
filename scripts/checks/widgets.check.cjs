@@ -36,7 +36,7 @@ const e = buildWidgetEntries(payload(), NOW, null);
 check('one entry per coming hour (24), the first one is for right now', e.length === WIDGET_HOURS && e[0].date.getTime() === NOW);
 check('later entries start on the hour', e[1].date.getTime() === T0 + 3_600_000 && e[2].date.getTime() === T0 + 2 * 3_600_000);
 check('the first entry uses the current conditions; later ones use that hour', e[0].props.temp === '41°' && e[0].props.condition === 'Mostly Sunny' && e[1].props.temp === '41°' && e[2].props.temp === '42°' && e[2].props.condition === 'Sunny', JSON.stringify([e[1].props.temp, e[2].props.temp, e[2].props.condition]));
-check('the strip starts with "Now" and has five entries two hours apart', e[0].props.hours.length === 5 && e[0].props.hours[0].label === 'Now' && e[0].props.hours[1].temp === '42°' && e[0].props.hours[4].temp === '48°', JSON.stringify(e[0].props.hours));
+check('the strip starts with "Now" then the next odd hours (+1, +3, +5, +7), five entries', e[0].props.hours.length === 5 && e[0].props.hours[0].label === 'Now' && e[0].props.hours[1].temp === '41°' && e[0].props.hours[2].temp === '43°' && e[0].props.hours[4].temp === '47°', JSON.stringify(e[0].props.hours));
 check('high and low are shown together', e[0].props.highLow === 'H 61°  L 38°');
 check('a clear forecast says no rain is expected; a wet one gives the chance', e[0].props.rain === 'No rain expected' && first(payload({ hourly: hours({ popPct: 70 }) })).rain === 'Rain chance 70%');
 check('no rain figure at all gives no rain line (never an invented "no rain")', first(payload({ hourly: hours({ popPct: null }) })).rain === '');

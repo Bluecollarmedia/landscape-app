@@ -1,109 +1,180 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Image, Linking, Pressable, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, Image, Linking, Pressable, Share, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
+import { OptimizedImage } from '@/components/ui';
 import { WX } from '@/components/weather/WeatherUI';
 import { ScrubBar } from '@/components/work/ScrubBar';
-import { useAppActive } from '@/hooks/useAppActive';
 import { useClipMusic } from '@/components/work/useClipMusic';
-import { getLoadedPost } from '@/data/portfolio';
-import { formatDuration, requestNoteFor } from '@/lib/portfolio';
+import { getLoadedPortfolio } from '@/data/portfolio';
+import { useAppActive } from '@/hooks/useAppActive';
+import { formatDuration, postGridUrl, reelIndexOf, reelMode, reelToPreload, requestNoteFor, videoEntries, type ReelMode, type VideoEntry } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
 
 /**
- * One video, full screen. It plays on a loop with the sound off (tap the speaker for sound); tap the picture to pause. The seek bar is thin until
- * a finger touches it, then it grows (and the rest dims) so it is easy to scrub. If the post has the owner's music and the video's own sound is
- * not kept, the music plays in place of the video's sound.
+ * Reels, full screen, like Instagram: a video opens tall and uncropped, loops, and you swipe UP for the next reel (and down to go back). Sound is
+ * off to start (one speaker button for all of them); tap the picture to pause. The seek bar is thin until a finger touches it, then it grows and the
+ * rest dims. Only the reel on screen plays; once it has started, just the NEXT one is prepared in the background (never two at once), and every
+ * reel gets a fresh player that starts at 0. If a post has the owner's music and the video's own sound is not kept, the music plays in its place.
  */
 export default function WeatherWorkVideo() {
   const t = useT();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const params = useLocalSearchParams<{ post?: string; media?: string }>();
-  const post = getLoadedPost(params.post);
-  const item = post?.media.find((m) => m.id === params.media && m.kind === 'video');
-  // Pauses (does not reset) when the person leaves the screen or the app; carries on from the same spot when they return.
+  const feed = getLoadedPortfolio();
+  const entries = useMemo(() => (feed ? videoEntries(feed.posts) : []), [feed]);
+  const startAt = reelIndexOf(entries, params.media);
   const focused = useIsFocused() && useAppActive();
+  const [active, setActive] = useState(Math.max(0, startAt));
+  const [started, setStarted] = useState(false);
   const [sound, setSound] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const [now, setNow] = useState(0);
-  const [length, setLength] = useState(item?.duration_s ?? 0);
   const [scrubbing, setScrubbing] = useState(false);
 
-  const player = useVideoPlayer(item?.url ?? null, (p) => { p.loop = true; p.muted = true; p.timeUpdateEventInterval = 0.25; });
-  const musicReplaces = !!post?.music_url && !post.keep_video_sound;
+  const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); }, [router]);
+  const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.round(e.nativeEvent.contentOffset.y / height);
+    setActive((cur) => { if (cur !== i) setStarted(false); return i; });
+  }, [height]);
+  const onStarted = useCallback(() => setStarted(true), []);
+  const preload = reelToPreload(active, started, entries.length);
 
-  useEffect(() => {
-    const sub = player.addListener('timeUpdate', ({ currentTime }) => { if (!scrubbing) setNow(currentTime); });
-    return () => sub.remove();
-  }, [player, scrubbing]);
-  useEffect(() => { if (player.duration > 0) setLength((l) => l || player.duration); });
-  useEffect(() => { player.muted = !sound || musicReplaces; }, [player, sound, musicReplaces]);
-  useEffect(() => { if (focused && !paused) player.play(); else player.pause(); }, [player, focused, paused]);
-
-  const clip = post?.music_url && post.music_start_s != null && post.music_end_s != null ? { startS: post.music_start_s, endS: post.music_end_s } : null;
-  useClipMusic(post?.music_url ?? null, clip, { active: focused && musicReplaces && !paused, muted: !sound, fade: post?.music_fade ?? true });
-
-  const seek = useCallback((s: number) => { player.currentTime = s; setNow(s); }, [player]);
-  const goBack = () => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); };
-
-  if (!post || !item) {
+  if (startAt < 0) {
     return (
-      <View style={[styles.empty, { paddingTop: insets.top + 14 }]}>
+      <View style={styles.empty}>
         <Text style={styles.emptyTitle}>{t('This video is not available.')}</Text>
         <Pressable onPress={goBack} accessibilityRole="button" style={styles.emptyBtn}><Text style={styles.emptyBtnText}>{t('Back')}</Text></Pressable>
       </View>
     );
   }
 
+  return (
+    <View style={styles.screen}>
+      <FlatList
+        data={entries}
+        keyExtractor={(e) => e.media.id}
+        pagingEnabled
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!scrubbing}
+        initialScrollIndex={Math.max(0, startAt)}
+        getItemLayout={(_d, i) => ({ length: height, offset: height * i, index: i })}
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        windowSize={3}
+        onMomentumScrollEnd={onScrollEnd}
+        renderItem={({ item, index }) => (
+          <Reel
+            entry={item}
+            mode={reelMode(index, active, preload)}
+            height={height}
+            sound={sound}
+            focused={focused}
+            scrubbing={scrubbing}
+            onSound={() => setSound((s) => !s)}
+            onStarted={onStarted}
+            onScrubChange={setScrubbing}
+            onClose={goBack}
+            onRequest={(note) => router.push({ pathname: '/weather/request', params: { services: note.services.join('|'), note: note.note } } as any)}
+          />
+        )}
+      />
+    </View>
+  );
+}
+
+/** One reel. Idle reels are a still picture; the active one plays; the next one (preload) is buffered and waits, silent, out of sight. */
+function Reel({ entry, mode, height, sound, focused, scrubbing, onSound, onStarted, onScrubChange, onClose, onRequest }: {
+  entry: VideoEntry; mode: ReelMode; height: number; sound: boolean; focused: boolean; scrubbing: boolean;
+  onSound: () => void; onStarted: () => void; onScrubChange: (s: boolean) => void; onClose: () => void; onRequest: (n: { services: string[]; note: string }) => void;
+}) {
+  const poster = entry.media.thumb_url ?? postGridUrl(entry.post);
+  if (mode === 'idle') {
+    return <View style={{ height, backgroundColor: '#0E1A12' }}>{poster ? <OptimizedImage source={poster} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}</View>;
+  }
+  return <ReelPlayer entry={entry} live={mode === 'active'} height={height} sound={sound} focused={focused} scrubbing={scrubbing} onSound={onSound} onStarted={onStarted} onScrubChange={onScrubChange} onClose={onClose} onRequest={onRequest} />;
+}
+
+function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, onStarted, onScrubChange, onClose, onRequest }: {
+  entry: VideoEntry; live: boolean; height: number; sound: boolean; focused: boolean; scrubbing: boolean;
+  onSound: () => void; onStarted: () => void; onScrubChange: (s: boolean) => void; onClose: () => void; onRequest: (n: { services: string[]; note: string }) => void;
+}) {
+  const t = useT();
+  const insets = useSafeAreaInsets();
+  const { post, media: item } = entry;
+  const [paused, setPaused] = useState(false);
+  const [now, setNow] = useState(0);
+  const [length, setLength] = useState(item.duration_s ?? 0);
+  const musicReplaces = !!post.music_url && !post.keep_video_sound;
+  const playing = live && focused && !paused;
+
+  // A fresh player for this reel, starting at 0. Its picture and sound are only used while it is the reel on screen.
+  const player = useVideoPlayer(item.url, (p) => { p.loop = true; p.muted = true; p.timeUpdateEventInterval = 0.25; });
+  useEffect(() => {
+    const sub = player.addListener('timeUpdate', ({ currentTime }) => {
+      if (!live) return;
+      if (!scrubbing) setNow(currentTime);
+      if (currentTime > 0.1) onStarted();
+    });
+    return () => sub.remove();
+  }, [player, live, scrubbing, onStarted]);
+  useEffect(() => { if (player.duration > 0) setLength((l) => l || player.duration); });
+  useEffect(() => { player.muted = !live || !sound || musicReplaces; }, [player, live, sound, musicReplaces]);
+  useEffect(() => { if (playing) player.play(); else player.pause(); }, [player, playing]);
+
+  const clip = post.music_url && post.music_start_s != null && post.music_end_s != null ? { startS: post.music_start_s, endS: post.music_end_s } : null;
+  useClipMusic(post.music_url ?? null, clip, { active: playing && musicReplaces, muted: !sound, fade: post.music_fade });
+
+  const seek = useCallback((s: number) => { player.currentTime = s; setNow(s); }, [player]);
   const ask = requestNoteFor(post);
-  const openRequest = () => router.push({ pathname: '/weather/request', params: { services: ask.services.join('|'), note: ask.note } } as any);
   const share = () => { void Share.share({ message: `${post.caption || 'Brighton Lawn & Landscape'}  brightonlawn.com` }); };
 
   return (
-    <View style={styles.screen}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={() => setPaused((p) => !p)} accessibilityRole="button" accessibilityLabel={paused ? t('Play') : t('Pause')}>
+    <View style={{ height, backgroundColor: '#0E1A12' }}>
+      <Pressable style={StyleSheet.absoluteFill} disabled={!live} onPress={() => setPaused((p) => !p)} accessibilityRole="button" accessibilityLabel={paused ? t('Play') : t('Pause')}>
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
       </Pressable>
-      <LinearGradient colors={['transparent', 'rgba(8,16,12,0.85)']} style={[styles.shade, { height: height * 0.5 }]} pointerEvents="none" />
-      {paused ? <View style={styles.pauseWrap} pointerEvents="none"><View style={styles.pauseDot}><MaterialCommunityIcons name="play" size={40} color="#FFFFFF" /></View></View> : null}
+      {!live ? null : (
+        <>
+          <LinearGradient colors={['transparent', 'rgba(8,16,12,0.85)']} style={[styles.shade, { height: height * 0.5 }]} pointerEvents="none" />
+          {paused ? <View style={styles.pauseWrap} pointerEvents="none"><View style={styles.pauseDot}><MaterialCommunityIcons name="play" size={40} color="#FFFFFF" /></View></View> : null}
 
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
-        <Pressable onPress={goBack} accessibilityRole="button" accessibilityLabel={t('Close')} style={styles.roundBtn}><MaterialCommunityIcons name="close" size={24} color="#FFFFFF" /></Pressable>
-        <View style={styles.pill}><Text style={styles.pillText}>{formatDuration(now)} / {formatDuration(length)}</Text></View>
-        <View style={{ width: 44 }} />
-      </View>
-
-      <View style={[styles.side, { bottom: insets.bottom + 250 }]}>
-        <Pressable onPress={() => setSound((s) => !s)} accessibilityRole="button" accessibilityLabel={sound ? t('Sound on, tap to turn off') : t('Sound off, tap to turn on')} style={styles.sideBtn}>
-          <MaterialCommunityIcons name={sound ? 'volume-high' : 'volume-off'} size={24} color="#FFFFFF" />
-        </Pressable>
-        <Pressable onPress={() => { void Linking.openURL(BRIGHTON_PHONE_LINK); }} accessibilityRole="button" accessibilityLabel={t('Call us')} style={styles.sideBtn}><MaterialCommunityIcons name="phone-outline" size={23} color="#FFFFFF" /></Pressable>
-        <Pressable onPress={share} accessibilityRole="button" accessibilityLabel={t('Share')} style={styles.sideBtn}><MaterialCommunityIcons name="send-outline" size={23} color="#FFFFFF" /></Pressable>
-      </View>
-
-      {scrubbing ? <View style={styles.dim} pointerEvents="none" /> : null}
-
-      <View style={[styles.bottom, { paddingBottom: insets.bottom + 16 }]} pointerEvents="box-none">
-        <View style={styles.captionBox} pointerEvents="none">
-          <View style={styles.authorRow}>
-            <View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 18, height: 18, tintColor: '#2E5E34' }} /></View>
-            <Text style={styles.handle}>brightonlawn</Text>
-            {post.town ? <Text style={styles.town}>{post.town}</Text> : null}
+          <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('Close')} style={styles.roundBtn}><MaterialCommunityIcons name="close" size={24} color="#FFFFFF" /></Pressable>
+            <View style={styles.pill}><Text style={styles.pillText}>{formatDuration(now)} / {formatDuration(length)}</Text></View>
+            <View style={{ width: 44 }} />
           </View>
-          {post.caption ? <Text style={styles.caption} numberOfLines={3}>{post.caption}</Text> : null}
-          {post.tags.length ? <View style={styles.tags}>{post.tags.map((tag) => <View key={tag} style={styles.tag}><Text style={styles.tagText}>{t(tag)}</Text></View>)}</View> : null}
-        </View>
-        <ScrubBar currentS={now} durationS={length || item.duration_s || 0} onSeek={seek} onScrubChange={setScrubbing} />
-        <Pressable onPress={openRequest} accessibilityRole="button" style={({ pressed }) => [styles.request, pressed && { opacity: 0.85 }]}>
-          <Text style={styles.requestText}>{t('Want something like this? Request a quote')}</Text>
-        </Pressable>
-      </View>
+
+          <View style={[styles.side, { bottom: insets.bottom + 250 }]}>
+            <Pressable onPress={onSound} accessibilityRole="button" accessibilityLabel={sound ? t('Sound on, tap to turn off') : t('Sound off, tap to turn on')} style={styles.sideBtn}>
+              <MaterialCommunityIcons name={sound ? 'volume-high' : 'volume-off'} size={24} color="#FFFFFF" />
+            </Pressable>
+            <Pressable onPress={() => { void Linking.openURL(BRIGHTON_PHONE_LINK); }} accessibilityRole="button" accessibilityLabel={t('Call us')} style={styles.sideBtn}><MaterialCommunityIcons name="phone-outline" size={23} color="#FFFFFF" /></Pressable>
+            <Pressable onPress={share} accessibilityRole="button" accessibilityLabel={t('Share')} style={styles.sideBtn}><MaterialCommunityIcons name="send-outline" size={23} color="#FFFFFF" /></Pressable>
+          </View>
+
+          {scrubbing ? <View style={styles.dim} pointerEvents="none" /> : null}
+
+          <View style={[styles.bottom, { paddingBottom: insets.bottom + 16 }]} pointerEvents="box-none">
+            <View style={styles.captionBox} pointerEvents="none">
+              <View style={styles.authorRow}>
+                <View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 18, height: 18, tintColor: '#2E5E34' }} /></View>
+                <Text style={styles.handle}>brightonlawn</Text>
+                {post.town ? <Text style={styles.town}>{post.town}</Text> : null}
+              </View>
+              {post.caption ? <Text style={styles.caption} numberOfLines={3}>{post.caption}</Text> : null}
+              {post.tags.length ? <View style={styles.tags}>{post.tags.map((tag) => <View key={tag} style={styles.tag}><Text style={styles.tagText}>{t(tag)}</Text></View>)}</View> : null}
+            </View>
+            <ScrubBar currentS={now} durationS={length || item.duration_s || 0} onSeek={seek} onScrubChange={onScrubChange} />
+            <Pressable onPress={() => onRequest(ask)} accessibilityRole="button" style={({ pressed }) => [styles.request, pressed && { opacity: 0.85 }]}>
+              <Text style={styles.requestText}>{t('Want something like this? Request a quote')}</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
     </View>
   );
 }

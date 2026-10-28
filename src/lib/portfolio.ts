@@ -241,3 +241,28 @@ export function requestNoteFor(post: Pick<PortfolioPost, 'town' | 'caption' | 't
   const where = post.town ? ` in ${post.town}` : '';
   return { services, note: `Something like your project${where}.` };
 }
+
+// ── The reels feed (swipe up through the videos) ─────────────────────────────────────────────────────────────────────────────────
+
+/** Where a reel sits in the list of reels (0 when it is not found, so the viewer still opens on the first one). -1 means "no reels at all". */
+export function reelIndexOf(entries: VideoEntry[], mediaId: string | undefined): number {
+  if (entries.length === 0) return -1;
+  const i = mediaId ? entries.findIndex((e) => e.media.id === mediaId) : -1;
+  return i < 0 ? 0 : i;
+}
+
+/**
+ * Which reel gets prepared in the background: only the NEXT one, and only once the one on screen has actually started playing; never two at once.
+ * Everything else stays as a still picture, so scrolling a long list never loads a pile of videos.
+ */
+export function reelToPreload(activeIndex: number, activeStarted: boolean, count: number): number | null {
+  return activeStarted && activeIndex + 1 < count ? activeIndex + 1 : null;
+}
+
+export type ReelMode = 'active' | 'preload' | 'idle';
+export function reelMode(index: number, activeIndex: number, preloadIndex: number | null): ReelMode {
+  return index === activeIndex ? 'active' : index === preloadIndex ? 'preload' : 'idle';
+}
+
+/** A post that is only a video opens as a reel; a post with photos opens as a project. */
+export const opensAsReel = (post: Pick<PortfolioPost, 'kind'>): boolean => post.kind === 'video';

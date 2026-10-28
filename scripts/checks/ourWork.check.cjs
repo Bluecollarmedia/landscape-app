@@ -64,5 +64,23 @@ check('23 videos are limited to 60 seconds and a post has at most 8 tags and a 2
 
 const data = read('src/data/portfolio.ts');
 check('24 the app asks the database through the two public functions and changes the switch through the owner-only one', /rpc\('public_portfolio_config'\)/.test(data) && /rpc\('public_portfolio'\)/.test(data) && /rpc\('set_portfolio_enabled'/.test(data));
+// ── the screens visitors see ──
+const bar = read('src/components/weather/FloatingTabBar.tsx');
+check('25 the Our Work tab is in the bar only while the owner\'s switch is on', /usePortfolioEnabled\(\)/.test(bar) && /tab\.path !== '\/weather\/work' \|\| workOn/.test(bar));
+const lay = read('app/weather/_layout.tsx');
+check('26 the Weather area has the Our Work screen and, as hidden screens, the project and the full-screen video', /name="work"/.test(lay) && /name="work-post" options=\{\{ href: null \}\}/.test(lay) && /name="work-video" options=\{\{ href: null \}\}/.test(lay));
+const work = read('app/weather/work.tsx');
+check('27 Our Work has the profile counts, the circles, the photo grid and (one swipe to the left) the videos, each video tile showing its length', /portfolioCounts/.test(work) && /visibleHighlights/.test(work) && /gridPosts/.test(work) && /videoEntries/.test(work) && /pagingEnabled/.test(work) && /formatDuration\(seconds\)/.test(work));
+check('28 Our Work has no follower count, no follow button and no likes', !/follow|likes/i.test(work) && !/follow|likes/i.test(read('app/weather/work-post.tsx')));
+const postScreen = read('app/weather/work-post.tsx');
+check('29 a project\'s music plays only while the project is open and on screen, can be muted from its chip, and waits while a video with its own sound is showing', /useIsFocused/.test(postScreen) && /useClipMusic/.test(postScreen) && /setMuted\(\(m\) => !m\)/.test(postScreen) && /keep_video_sound && onVideo/.test(postScreen));
+check('30 "Want something like this?" opens the Request form already filled in', /requestNoteFor/.test(postScreen) && /pathname: '\/weather\/request'/.test(postScreen) && /useLocalSearchParams<\{ services\?: string; note\?: string \}>/.test(read('app/weather/request.tsx')));
+const vid = read('app/weather/work-video.tsx');
+const scrub = read('src/components/work/ScrubBar.tsx');
+check('31 the full-screen video shows its length, has a sound button (off to start), pauses on tap, and a seek bar that grows under a finger and dims the screen', /formatDuration\(now\)/.test(vid) && /useState\(false\)/.test(vid) && /setPaused/.test(vid) && /<ScrubBar/.test(vid) && /scrubbing \? <View style=\{styles\.dim\}/.test(vid) && /SCRUB_BAR_HEIGHT\.scrubbing/.test(scrub) && /PanResponder/.test(scrub));
+const clipHook = read('src/components/work/useClipMusic.ts');
+check('32 the music part loops and fades through the tested rules', /nextLoopPosition/.test(clipHook) && /clipVolume/.test(clipHook) && /player\.pause\(\)/.test(clipHook));
+check('33 Our Work has Spanish', /'Our Work': /.test(read('src/i18n/es.weather.ts')) && /'Want something like this\? Request a quote'/.test(read('src/i18n/es.weather.ts')));
+
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

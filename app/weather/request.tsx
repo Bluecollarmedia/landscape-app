@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -28,6 +29,14 @@ export default function WeatherRequest() {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // "Want something like this?" on a project opens this form with that project's services ticked and a note started.
+  const params = useLocalSearchParams<{ services?: string; note?: string }>();
+  useEffect(() => {
+    if (!params.services && !params.note) return;
+    const wanted = (params.services ?? '').split('|').filter((s) => (SERVICE_CHOICES as readonly string[]).includes(s));
+    if (wanted.length) setServices(toggleAll(wanted));
+    if (params.note) setDetails((d) => d || params.note || '');
+  }, [params.services, params.note]);
   const [sent, setSent] = useState<{ type: PropertyType; services: string[]; town: string } | null>(null);
 
   async function send() {
@@ -136,6 +145,11 @@ export default function WeatherRequest() {
       <Text style={styles.fine}>{t("We'll only use your details to answer this request.")}</Text>
     </KeyboardAwareScrollView>
   );
+}
+
+/** The services from a project, in the website's order. */
+function toggleAll(wanted: string[]): string[] {
+  return SERVICE_CHOICES.filter((s) => wanted.includes(s));
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {

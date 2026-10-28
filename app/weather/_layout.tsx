@@ -7,7 +7,7 @@ import { FloatingTabBar } from '@/components/weather/FloatingTabBar';
 import { WEATHER_ON_THIS_DEVICE } from '@/lib/weatherPlatform';
 
 /**
- * The public Brighton Weather area: one light page behind four screens (Weather, Storm History, Request, Brighton) and its own floating tab bar.
+ * The public Brighton Weather area: one light page behind its screens (Weather, Storm History, Our Work while the owner has it on, Request, Brighton) and its own floating tab bar.
  * The screens are tabs that stay alive once opened, so switching is instant and each keeps its place (scroll position, the hourly strip, the open storm).
  * The storm outlook page is a fourth, hidden tab: it has no button in the bar and is opened from the home card or the history.
  * While it is open the app re-asks the owner's switch every 60 seconds; if Weather has been switched off, the app's launch routing
@@ -30,6 +30,9 @@ export default function WeatherLayout() {
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="history" />
+        <Tabs.Screen name="work" />
+        <Tabs.Screen name="work-post" options={{ href: null }} />
+        <Tabs.Screen name="work-video" options={{ href: null }} />
         <Tabs.Screen name="request" />
         <Tabs.Screen name="account" />
         <Tabs.Screen name="outlook" options={{ href: null }} />

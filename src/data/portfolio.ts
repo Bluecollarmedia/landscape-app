@@ -6,7 +6,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { shareInFlight } from '@/lib/sharedRequest';
-import type { PublicPortfolio } from '@/lib/portfolio';
+import type { PortfolioPost, PublicPortfolio } from '@/lib/portfolio';
+
+/** The feed as last loaded in this run of the app, so a post or video opens at once without asking again. */
+let loadedFeed: PublicPortfolio | null = null;
+export const getLoadedPortfolio = (): PublicPortfolio | null => loadedFeed;
+export const getLoadedPost = (id: string | undefined): PortfolioPost | null => (id ? loadedFeed?.posts.find((p) => p.id === id) ?? null : null);
 
 const SWITCH_KEY = 'portfolio.enabled.v1';
 const FEED_KEY = 'portfolio.feed.v1';
@@ -60,6 +65,7 @@ export async function loadPublicPortfolio(): Promise<{ ok: true; data: PublicPor
       const answer = data as PublicPortfolio | null;
       if (!error && answer && typeof answer.enabled === 'boolean') {
         if (answer.enabled) {
+          loadedFeed = answer;
           void AsyncStorage.setItem(FEED_KEY, JSON.stringify(answer)).catch(() => {});
           return { ok: true, data: answer, stale: false };
         }
@@ -71,7 +77,7 @@ export async function loadPublicPortfolio(): Promise<{ ok: true; data: PublicPor
   try {
     const raw = await AsyncStorage.getItem(FEED_KEY);
     const saved = raw ? (JSON.parse(raw) as PublicPortfolio) : null;
-    if (saved?.enabled) return { ok: true, data: saved, stale: true };
+    if (saved?.enabled) { loadedFeed = loadedFeed ?? saved; return { ok: true, data: saved, stale: true }; }
   } catch { /* nothing saved */ }
   return { ok: false };
 }

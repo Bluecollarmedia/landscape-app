@@ -30,7 +30,7 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
   const brand = (label: string, size: number) => (
     <HStack spacing={5}>
       {p.leaf ? <Image uiImage={p.leaf} modifiers={leafMods(size)} /> : null}
-      <Text modifiers={[font({ size: 9.5, weight: 'heavy' }), kerning(1.4), foregroundStyle(green), lineLimit(1)]}>{label}</Text>
+      <Text modifiers={[font({ size: 9.5, weight: 'heavy' }), kerning(1.6), foregroundStyle(green), lineLimit(1)]}>{label}</Text>
     </HStack>
   );
 
@@ -50,7 +50,7 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
           currentValueLabel={
             <VStack spacing={0}>
               {p.leaf ? <Image uiImage={p.leaf} modifiers={leafMods(13)} /> : null}
-              <Text modifiers={[font({ size: 17, weight: 'medium' })]}>{p.temp}</Text>
+              <Text modifiers={[font({ size: 17, weight: 'regular' })]}>{p.temp}</Text>
             </VStack>
           }
           modifiers={[gaugeStyle('circularCapacity'), open]}
@@ -62,7 +62,7 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
     return (
       <VStack spacing={0} modifiers={[open]}>
         {p.leaf ? <Image uiImage={p.leaf} modifiers={leafMods(13)} /> : null}
-        <Text modifiers={[font({ size: 20, weight: 'medium' })]}>{p.temp}</Text>
+        <Text modifiers={[font({ size: 20, weight: 'regular' })]}>{p.temp}</Text>
       </VStack>
     );
   }
@@ -94,7 +94,7 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
         {brand('BRIGHTON', 15)}
         <Spacer />
         <HStack alignment="top">
-          <VStack alignment="leading" spacing={0}>
+          <VStack alignment="leading" spacing={1}>
             <Text modifiers={[font({ size: 13, weight: 'bold' }), foregroundStyle(ink), lineLimit(1)]}>{p.place}</Text>
             <Text modifiers={[font({ size: 42, weight: 'light' }), foregroundStyle(ink), minimumScaleFactor(0.7)]}>{p.temp}</Text>
           </VStack>
@@ -102,8 +102,10 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
           <Image systemName={p.symbol as any} size={38} color={p.symbolColor} />
         </HStack>
         <Spacer />
-        <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(ink), lineLimit(1)]}>{p.condition}</Text>
-        <Text modifiers={[font({ size: 12 }), foregroundStyle(soft), lineLimit(1)]}>{[p.highLow, p.uv].filter(Boolean).join('  ·  ')}</Text>
+        <VStack alignment="leading" spacing={2}>
+          <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(ink), lineLimit(1)]}>{p.condition}</Text>
+          <Text modifiers={[font({ size: 12 }), foregroundStyle(soft), lineLimit(1)]}>{[p.highLow, p.uv].filter(Boolean).join('  ·  ')}</Text>
+        </VStack>
       </VStack>
     );
   }
@@ -112,7 +114,7 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
   return (
     <VStack alignment="leading" spacing={0} modifiers={[containerBackground(page, 'widget'), open]}>
       <HStack alignment="top">
-        <VStack alignment="leading" spacing={0}>
+        <VStack alignment="leading" spacing={1}>
           <Text modifiers={[font({ size: 13, weight: 'bold' }), foregroundStyle(ink), lineLimit(1)]}>{p.place}</Text>
           <Text modifiers={[font({ size: 42, weight: 'light' }), foregroundStyle(ink), minimumScaleFactor(0.7)]}>{p.temp}</Text>
           <Text modifiers={[font({ size: 12 }), foregroundStyle(soft), lineLimit(1)]}>{[p.condition, p.highLow].filter(Boolean).join('  ·  ')}</Text>
@@ -123,7 +125,7 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
             <Image systemName={p.symbol as any} size={38} color={p.symbolColor} />
           ) : (
             <VStack alignment="trailing" spacing={2}>
-              {brand('BRIGHTON FORECAST', 15)}
+              <VStack modifiers={[padding({ bottom: 4 })]}>{brand('BRIGHTON FORECAST', 15)}</VStack>
               {p.uv ? <Text modifiers={[font({ size: 12, weight: 'bold' }), foregroundStyle(soft)]}>{p.uv}</Text> : null}
               {p.rain ? <Text modifiers={[font({ size: 12 }), foregroundStyle(soft), lineLimit(1)]}>{p.rain}</Text> : null}
             </VStack>
@@ -135,11 +137,11 @@ const BrightonWeather = (p: WidgetProps, env: WidgetEnvironment) => {
         <VStack
           alignment="leading"
           spacing={2}
-          modifiers={[padding({ horizontal: 12, vertical: 8 }), frame({ maxWidth: 10000, alignment: 'leading' }), background(stormTint, shapes.roundedRectangle({ cornerRadius: 14 }))]}
+          modifiers={[padding({ horizontal: 12, vertical: 8 }), frame({ maxWidth: 10000, alignment: 'leading' }), background(stormTint, shapes.roundedRectangle({ cornerRadius: 16 }))]}
         >
           <HStack spacing={5}>
             {p.leaf ? <Image uiImage={p.leaf} modifiers={leafMods(14)} /> : null}
-            <Text modifiers={[font({ size: 11, weight: 'bold' }), kerning(0.8), foregroundStyle(stormInk), lineLimit(1)]}>{"BRIGHTON'S STORM OUTLOOK"}</Text>
+            <Text modifiers={[font({ size: 11, weight: 'bold' }), kerning(1), foregroundStyle(stormInk), lineLimit(1)]}>{"BRIGHTON'S STORM OUTLOOK"}</Text>
           </HStack>
           <HStack>
             <Text modifiers={[font({ size: 13, weight: 'bold' }), foregroundStyle(ink), lineLimit(1)]}>{p.storm.headline}</Text>

@@ -17,23 +17,62 @@ export function describeError(error: unknown): { message: string; where: string 
 
 let installed = false;
 let lastShown = 0;
+let ours: ((e: unknown, fatal?: boolean) => void) | null = null;
+
+const LAST_ERROR_KEY = 'lastFatalError.v1';
+const storage = (): { setItem: (k: string, v: string) => Promise<void>; getItem: (k: string) => Promise<string | null>; removeItem: (k: string) => Promise<void> } | null => {
+  try { return require('@react-native-async-storage/async-storage').default; } catch { return null; }
+};
+
+/** Keeps the text of the last uncaught error, so that if the app still closes, the next launch can say why. */
+function rememberError(text: string): void {
+  try { void storage()?.setItem(LAST_ERROR_KEY, `${new Date().toISOString()}
+${text}`).catch(() => {}); } catch { /* nothing to do */ }
+}
+
+/** On launch: if the last run ended on an uncaught error, show it once (then forget it). */
+export async function showLastErrorIfAny(): Promise<void> {
+  try {
+    const s = storage();
+    const text = await s?.getItem(LAST_ERROR_KEY);
+    if (!text) return;
+    await s?.removeItem(LAST_ERROR_KEY);
+    if (Platform.OS === 'web') return;
+    Alert.alert('The app hit a problem last time', `${text.slice(0, 700)}
+
+Please screenshot this and send it to support.`);
+  } catch { /* never block launch */ }
+}
+
+/** Puts the safety net back if another library replaced it after launch. Cheap; safe to call more than once. */
+export function ensureGlobalErrorHandler(): void {
+  const utils = (globalThis as { ErrorUtils?: { getGlobalHandler?: () => unknown; setGlobalHandler?: (h: (e: unknown, fatal?: boolean) => void) => void } }).ErrorUtils;
+  if (!ours || !utils?.setGlobalHandler || utils.getGlobalHandler?.() === ours) return;
+  const replacement = utils.getGlobalHandler?.() as ((e: unknown, fatal?: boolean) => void) | undefined;
+  const mine = ours;
+  const wrapped = (error: unknown, isFatal?: boolean) => { if (isFatal) mine(error, isFatal); else replacement?.(error, isFatal); };
+  utils.setGlobalHandler(wrapped);
+}
 
 export function installGlobalErrorHandler(now: () => number = Date.now): void {
   const utils = (globalThis as { ErrorUtils?: { getGlobalHandler?: () => unknown; setGlobalHandler?: (h: (e: unknown, fatal?: boolean) => void) => void } }).ErrorUtils;
   if (installed || !utils?.setGlobalHandler) return;
   installed = true;
   const previous = utils.getGlobalHandler?.() as ((e: unknown, fatal?: boolean) => void) | undefined;
-  utils.setGlobalHandler((error, isFatal) => {
+  ours = (error, isFatal) => {
     if (!isFatal) { previous?.(error, isFatal); return; }
     const { message, where } = describeError(error);
     console.warn('[error] caught instead of crashing:', message, where);
+    rememberError(`${message}${where ? `
+${where}` : ''}`);
     if (now() - lastShown < ERROR_ALERT_COOLDOWN_MS) return;
     lastShown = now();
     const text = `${message}${where ? `\n\n${where}` : ''}\n\nTell support what you were doing. You can keep using the app; if something looks wrong, close and reopen it.`;
     if (Platform.OS === 'web') (globalThis as { alert?: (m: string) => void }).alert?.(`Something went wrong\n\n${text}`);
     else Alert.alert('Something went wrong', text);
-  });
+  };
+  utils.setGlobalHandler(ours);
 }
 
 /** For tests. */
-export function _resetErrorHandlerForTests() { installed = false; lastShown = 0; }
+export function _resetErrorHandlerForTests() { installed = false; lastShown = 0; ours = null; }

@@ -20,7 +20,7 @@ import { SignInWelcome } from '@/components/branding/WelcomeOverlay';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { applyPendingSignup } from '@/data/pendingSignup';
 import { useModeAccess } from '@/hooks/useModeAccess';
-import { installGlobalErrorHandler } from '@/lib/errorReporting';
+import { ensureGlobalErrorHandler, installGlobalErrorHandler, showLastErrorIfAny } from '@/lib/errorReporting';
 import { installWebAlert } from '@/lib/webDialog';
 import { syncLanguageToAccount } from '@/i18n';
 import { db } from '@/data/store';
@@ -147,6 +147,12 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  // Another library may swap the global error handler after launch; put ours back (twice, a little apart), and show last time's error if the app closed on one.
+  useEffect(() => {
+    ensureGlobalErrorHandler();
+    const timers = [setTimeout(ensureGlobalErrorHandler, 3000), setTimeout(ensureGlobalErrorHandler, 10000), setTimeout(() => { void showLastErrorIfAny(); }, 2500)];
+    return () => timers.forEach(clearTimeout);
+  }, []);
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>

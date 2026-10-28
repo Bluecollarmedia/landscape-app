@@ -95,6 +95,7 @@ export type NotificationEventType =
   | 'photo_waiting_review'
   | 'customer_request_submitted'
   | 'customer_message'
+  | 'service_request'
   | 'schedule_changed'
   | 'schedule_conflict'
   | 'announcement_posted'
@@ -130,7 +131,7 @@ export interface AppNotification {
   title: string;
   body: string;
   status: NotificationStatus;
-  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement' | 'quote' | 'change_order' | 'invoice' | 'issue' | 'time_workday' | 'time_visit' | 'time_skip';
+  linkedEntityType?: 'worker' | 'project' | 'message' | 'assignment' | 'request' | 'photo' | 'checkin' | 'announcement' | 'quote' | 'change_order' | 'invoice' | 'issue' | 'time_workday' | 'time_visit' | 'time_skip' | 'service_request';
   linkedEntityId?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;

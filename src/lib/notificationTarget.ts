@@ -22,6 +22,8 @@ export function ownerNotificationTarget(n: NotificationLike): OwnerTarget | null
   if (!id) return null;
   if (DOC_TYPES.has(type)) return { pathname: '/(owner)/document', params: { kind: type, id } };
   if (type === 'issue') return { pathname: '/(owner)/issue-detail', params: { id } };
+  // A service request from the public Request tab (update 114) opens the list of requests.
+  if (type === 'service_request') return '/(owner)/service-requests';
   // Hours & Labor (update 64): open the workday or visit behind the alert; a skip request opens the overview, where it is decided.
   if (type === 'time_workday') return { pathname: '/(owner)/more/labor-day', params: { id } };
   if (type === 'time_visit') return { pathname: '/(owner)/more/labor-visit', params: { id } };

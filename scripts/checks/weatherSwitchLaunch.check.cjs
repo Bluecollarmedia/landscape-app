@@ -138,7 +138,7 @@ const settle = () => new Promise((r) => setImmediate(r));
   const changed = Object.entries(fp).filter(([f, h]) => sha(read(f)) !== h).map(([f]) => f);
   check('28 the welcome, sign-in, forgot-password, create-company screens, the auth layout and the sign-in welcome overlay are unchanged', changed.length === 0, changed.join(', '));
   const wfiles = fs.existsSync(path.join(root, 'app/weather')) ? fs.readdirSync(path.join(root, 'app/weather')).sort().join() : '';
-  check('29 the Weather area is exactly its layout and four screens (home, outlook, history, account), and no other new area exists', wfiles === '_layout.tsx,account.tsx,history.tsx,index.tsx,outlook.tsx', wfiles);
+  check('29 the Weather area is exactly its layout and five screens (home, outlook, history, request, account), and no other new area exists', wfiles === '_layout.tsx,account.tsx,history.tsx,index.tsx,outlook.tsx,request.tsx', wfiles);
   check('30 the Weather screens are built, and the owner\'s switch still decides: the database default is OFF', WEATHER_EXPERIENCE_BUILT === true && /enabled boolean not null default false/.test(read('supabase/updates/103_public_weather_switch.sql')));
   check('31 app.json has nothing about weather or location changes apart from the widget setup (permission text untouched)', !/weather/i.test(JSON.stringify(JSON.parse(read('app.json'), (k, v) => (Array.isArray(v) && v[0] === 'expo-widgets' ? undefined : v)))) && /Brighton Lawn uses your location to check you in when you arrive at a job site\./.test(read('app.json')));
   const walk = (d) => fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap((e) => e.isDirectory() ? (e.name === 'node_modules' ? [] : walk(path.join(d, e.name))) : [path.join(d, e.name)]);

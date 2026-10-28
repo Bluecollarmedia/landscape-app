@@ -130,5 +130,17 @@ check('61 the media function accepts every audio and video format listed here (r
 const ed2 = read('src/components/work/PostEditorScreen.tsx');
 check('62 the pickers check the format before anything is uploaded (posts, reels, stories, music), and photos are re-saved as JPEG so any picture the phone opens works', /videoProblem\(a\.fileName \?\? a\.uri, a\.mimeType\)/.test(ed2) && /imageProblem\(a\.fileName \?\? a\.uri, a\.mimeType\)/.test(ed2) && /videoProblem\(a\.fileName/.test(read('src/components/work/StoriesManagerScreen.tsx')) && /audioProblem\(a\.name, a\.mimeType\)/.test(read('src/data/portfolioMusic.ts')) && /format: SaveFormat\.JPEG/.test(read('src/data/portfolioUpload.ts')));
 
+// ── highlights play like a story that never expires ──
+const hlTag = { id: 'h', name: 'Patios', cover_url: null, mode: 'tag', tag: 'Pavers', position: 0, post_ids: [] };
+const hp = [post('a', { tags: ['Pavers'], posted_at: '2026-10-05T00:00:00Z', media: [media('a1', 'photo', { position: 1 }), media('a2', 'video', { position: 0 })] }), post('b', { tags: ['Pavers'], posted_at: '2026-10-02T00:00:00Z' }), post('c', { tags: ['Turf'] })];
+const frames = L.highlightFrames(hlTag, hp);
+check('63 a highlight plays the photos and videos of its posts one after another (newest post first, each post in its own order)', frames.map((f) => f.media_id).join() === 'a2,a1,ba' && frames.map((f) => f.kind).join() === 'video,photo,photo', frames.map((f) => f.media_id).join());
+check('64 a highlight\'s frames never expire, and a video frame keeps its own length', frames.every((f) => Date.parse(f.expires_at) > Date.parse('3000-01-01')) && frames[0].duration_s === 24);
+check('65 one circle never plays for ages (at most 60 frames)', L.highlightFrames(hlTag, [post('big', { tags: ['Pavers'], media: Array.from({ length: 80 }, (_, i) => media(`m${i}`, 'photo', { position: i })) })]).length === 60);
+const home2 = read('app/weather/work.tsx');
+const viewer2 = read('app/weather/work-story.tsx');
+check('66 tapping a circle opens the story viewer (not a grid sheet), and the old sheet is gone', /pathname: '\/weather\/work-story', params: \{ highlight: h\.id \}/.test(home2) && !/<Modal/.test(home2) && !/setOpen/.test(home2));
+check('67 the story viewer plays a highlight (its name at the top, no "2h" age), with the same taps, hold and swipe down, does not remember it as watched, and has a button to open the post or reel', /highlightFrames\(hl, feed\.posts\)/.test(viewer2) && /hl \? hl\.name/.test(viewer2) && /if \(story && !hl\)/.test(viewer2) && /See reel/.test(viewer2) && /See project/.test(viewer2));
+
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

@@ -10,7 +10,7 @@ import { StoryBackdrop, StoryCard } from '@/components/work/StoryCard';
 import { markStorySeen, useSeenStories } from '@/data/portfolioStories';
 import { getLoadedPortfolio } from '@/data/portfolio';
 import { useAppActive } from '@/hooks/useAppActive';
-import { postGridUrl, type PortfolioPost } from '@/lib/portfolio';
+import { highlightFrames, postGridUrl, type PortfolioPost } from '@/lib/portfolio';
 import {
   activeStories, agoLabel, nextIndex, normalizeDesign, previousIndex, shareTarget, startIndex, storyDurationMs, tapZone, type PortfolioStory,
 } from '@/lib/portfolioStories';
@@ -27,9 +27,11 @@ export default function WeatherWorkStory() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const { start } = useLocalSearchParams<{ start?: string }>();
+  const { start, highlight } = useLocalSearchParams<{ start?: string; highlight?: string }>();
   const feed = getLoadedPortfolio();
-  const stories = useMemo(() => activeStories(feed?.stories, Date.now()), [feed]);
+  // A highlight plays like a story that never expires: its posts' photos and videos, one after another, in this same viewer.
+  const hl = highlight ? feed?.highlights.find((h) => h.id === highlight) : undefined;
+  const stories = useMemo(() => (hl && feed ? highlightFrames(hl, feed.posts) : activeStories(feed?.stories, Date.now())), [feed, hl]);
   const seen = useSeenStories();
   const focused = useIsFocused() && useAppActive();
   const [index, setIndex] = useState(() => {
@@ -65,7 +67,8 @@ export default function WeatherWorkStory() {
     return () => run.current?.stop();
   }, [story, playing, progress]);
 
-  useEffect(() => { if (story) void markStorySeen(story.id, stories.map((s) => s.id)); }, [story, stories]);
+  // Only real stories are remembered as watched (a highlight is always there to watch again).
+  useEffect(() => { if (story && !hl) void markStorySeen(story.id, stories.map((s) => s.id)); }, [story, stories, hl]);
 
   // ── touch: tap = next/previous, hold = pause, swipe down = close ──
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,9 +103,22 @@ export default function WeatherWorkStory() {
     else router.push({ pathname: '/weather/work-post', params: { id: target.postId } } as any);
   };
 
+  // Inside a highlight, a small button at the bottom opens the post (or reel) the picture came from.
+  const openFrame = () => {
+    if (!post) return;
+    if (story.kind === 'video' && story.media_id) router.push({ pathname: '/weather/work-video', params: { post: post.id, media: story.media_id } } as any);
+    else router.push({ pathname: '/weather/work-post', params: { id: post.id } } as any);
+  };
+
   return (
     <View style={styles.screen} {...pan.panHandlers}>
       <StoryLayer key={story.id} story={story} post={post} width={width} height={height} playing={playing} sound={sound} holding={holding} onHold={press} onTap={onBackgroundPress} onOpen={openTarget} />
+
+      {hl && post ? (
+        <Pressable onPress={openFrame} accessibilityRole="button" style={({ pressed }) => [styles.seePill, { bottom: insets.bottom + 28 }, pressed && { opacity: 0.85 }]}>
+          <Text style={styles.seeText}>{story.kind === 'video' ? t('See reel') : t('See project')}</Text>
+        </Pressable>
+      ) : null}
 
       <View style={[styles.top, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
         <View style={styles.segments} pointerEvents="none">
@@ -115,8 +131,8 @@ export default function WeatherWorkStory() {
         </View>
         <View style={styles.who}>
           <View style={styles.avatar}><Image source={require('../../assets/images/logo-leaf.png')} style={{ width: 18, height: 18, tintColor: '#2E5E34' }} /></View>
-          <Text style={styles.handle}>{feed?.profile.handle ?? 'brightonlawn'}</Text>
-          <Text style={styles.ago}>{agoLabel(story.created_at, Date.now())}</Text>
+          <Text style={styles.handle}>{hl ? hl.name : feed?.profile.handle ?? 'brightonlawn'}</Text>
+          {hl ? null : <Text style={styles.ago}>{agoLabel(story.created_at, Date.now())}</Text>}
           <View style={{ flex: 1 }} />
           {story.kind === 'video' ? (
             <Pressable onPress={() => setSound((s) => !s)} accessibilityRole="button" accessibilityLabel={sound ? t('Sound on, tap to turn off') : t('Sound off, tap to turn on')} style={styles.roundBtn}>
@@ -187,6 +203,8 @@ const styles = StyleSheet.create({
   handle: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '700' },
   ago: { color: '#FFFFFF', fontSize: 13, opacity: 0.8 },
   roundBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  seePill: { position: 'absolute', alignSelf: 'center', minHeight: 44, paddingHorizontal: 22, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
+  seeText: { color: '#0F2A17', fontSize: 15, fontWeight: '800' },
   hint: { position: 'absolute', bottom: 130, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 99, backgroundColor: '#FFFFFF' },
   hintText: { color: '#0F2A17', fontSize: 15, fontWeight: '800' },
 });

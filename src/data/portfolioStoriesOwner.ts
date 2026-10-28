@@ -39,7 +39,7 @@ export async function loadPostsToShare(): Promise<Result<PortfolioPost[]>> {
   }
 }
 
-/** Adds a photo or a video (up to 60 seconds) to the story. A video is shrunk to 480p first (the original goes up if that cannot be done). */
+/** Adds a photo or a video (up to 60 seconds) to the story. A video is shrunk to 720p first (the original goes up if that cannot be done). */
 export async function addMediaStory(input: { kind: 'photo' | 'video'; localUri: string; mimeType?: string; durationS?: number | null }, onProgress?: (p: number) => void): Promise<Result<null>> {
   const bad = storyProblem({ kind: input.kind, mediaUrl: input.localUri, durationS: input.durationS ?? null });
   if (bad) return { ok: false, error: bad };

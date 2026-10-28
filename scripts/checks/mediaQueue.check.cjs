@@ -21,14 +21,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('2c a small photo is never enlarged', plan.planImage({ width: 800, height: 600, bytes: 900_000, mimeType: 'image/png' }).width === 800);
   check('2d a file the app already prepared is left alone', plan.planImage({ width: 4000, height: 3000, bytes: 1e6, mimeType: 'image/jpeg', alreadyPrepared: true }).action === 'skip');
   const v = plan.planVideo({ width: 1920, height: 1080 });
-  check('3 1080p landscape video becomes 854 x 480', v.width === 854 && v.height === 480 && v.resize, JSON.stringify(v));
+  check('3 1080p landscape video becomes 1280 x 720', v.width === 1280 && v.height === 720 && v.resize, JSON.stringify(v));
   const vp = plan.planVideo({ width: 1080, height: 1920 });
-  check('3b portrait video becomes 480 x 854 (ratio kept, not stretched)', vp.width === 480 && vp.height === 854, JSON.stringify(vp));
+  check('3b portrait video becomes 720 x 1280 (ratio kept, not stretched)', vp.width === 720 && vp.height === 1280, JSON.stringify(vp));
   const v43 = plan.planVideo({ width: 1440, height: 1080 });
-  check('3c a 4:3 video fits inside 854 x 480 with the same ratio and even numbers (640 x 480)', v43.width === 640 && v43.height === 480, JSON.stringify(v43));
+  check('3c a 4:3 video fits inside 1280 x 720 with the same ratio and even numbers (960 x 720)', v43.width === 960 && v43.height === 720, JSON.stringify(v43));
   const small = plan.planVideo({ width: 640, height: 360 });
-  check('3d a video already under 480p is never enlarged', small.width === 640 && small.height === 360 && !small.resize);
-  check('3e the video bitrate is sensible (between 0.6 and 1.5 Mbps) and the size is always even', v.bitrate >= 600_000 && v.bitrate <= 1_500_000 && plan.planVideo({ width: 1001, height: 563 }).width % 2 === 0);
+  check('3d a video already under 720p is never enlarged', small.width === 640 && small.height === 360 && !small.resize);
+  check('3e the video bitrate is sensible (between 1 and 4 Mbps, about 2.8 at 720p) and the size is always even', v.bitrate >= 2_500_000 && v.bitrate <= 3_000_000 && plan.planVideo({ width: 1001, height: 563 }).width % 2 === 0);
 
   // ── the queue ──
   const mkDeps = (over = {}) => {

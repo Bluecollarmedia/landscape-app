@@ -4,7 +4,7 @@
  * Photos use expo-image-manipulator (already in the app): resized so the long side is at most 1600 px, saved as JPEG at 50% quality.
  * The picker's own EXIF rotation is applied by the manipulator, so the stored photo is upright and keeps its aspect ratio.
  *
- * Videos use react-native-compressor (480p cap, bitrate from planVideo()); if that cannot run, the original video is sent instead.
+ * Videos use react-native-compressor (720p cap, bitrate from planVideo()); if that cannot run, the original video is sent instead.
  */
 import { Platform } from 'react-native';
 import { File, Directory, Paths } from 'expo-file-system';
@@ -76,7 +76,7 @@ export async function prepareImage(job: MediaJob): Promise<Prepared> {
 }
 
 /**
- * Videos are shrunk to 480p on the phone before they go up (react-native-compressor, bitrate from planVideo()), so they upload and load fast.
+ * Videos are shrunk to 720p on the phone before they go up (react-native-compressor, bitrate from planVideo()), so they upload and load fast.
  * If the compressor is missing, the phone cannot do it, or the result is not smaller, the original goes up instead: a video is never lost or blocked.
  */
 export async function prepareVideo(job: MediaJob): Promise<Prepared> {
@@ -87,7 +87,7 @@ export async function prepareVideo(job: MediaJob): Promise<Prepared> {
   if (!compressor?.Video) return original;
   const plan = planVideo({ width: job.width ?? VIDEO_FALLBACK, height: job.height ?? VIDEO_FALLBACK });
   try {
-    // maxSize is the longest side: 854 keeps landscape at 854x480 and portrait at 480x854, aspect ratio unchanged. Audio is kept.
+    // maxSize is the longest side: 1280 keeps landscape at 1280x720 and portrait at 720x1280, aspect ratio unchanged. Audio is kept.
     const made = await compressor.Video.compress(job.sourceUri, { compressionMethod: 'manual', maxSize: Math.max(plan.width, plan.height), bitrate: plan.bitrate, minimumFileSizeForCompress: 0 });
     // The LEGACY file API, like the photos: on some phones the new File API cannot see a file the compressor just wrote, so a copy made with it
     // can be missing (the upload then said "the file is gone"). The result is checked to be a real file before it is handed on; if it is not,

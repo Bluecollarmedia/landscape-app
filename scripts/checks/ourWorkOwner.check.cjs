@@ -25,7 +25,7 @@ const media = read('src/lib/media.ts');
 check('7 the shared uploader can skip its own compression (raw) so Our Work\'s quality is kept, and every other screen still compresses as before', /opts\?: \{ raw\?: boolean \}/.test(media) && /startsWith\('image\/'\) && !opts\?\.raw/.test(media));
 const up = read('src/data/portfolioUpload.ts');
 check('8 a photo uploads as a high-quality copy plus a small square copy, both without the app\'s usual compression', /FULL_QUALITY/.test(up) && /squareCrop\(full\.width, full\.height\)/.test(up) && (up.match(/\{ raw: true \}/g) || []).length >= 4);
-check('9 a video is shrunk to 480p first (the original if that fails), with a best-effort still frame for the grid that never stops the post', /uploadImage\(source, portfolioFolder\(companyId, kind\), 'video\/mp4', \(p\) => onProgress\?\.\(0\.05 \+ p \* 0\.85\), \{ raw: true \}\)/.test(up) && /const source = await shrinkVideoUri\(localUri\)/.test(up) && /catch \{\s*onProgress\?\.\(1\);\s*return \{ url: up\.url, key: up\.key, thumbUrl: null/.test(up));
+check('9 a video is shrunk to 720p first (the original if that fails), with a best-effort still frame for the grid that never stops the post', /uploadImage\(source, portfolioFolder\(companyId, kind\), 'video\/mp4', \(p\) => onProgress\?\.\(0\.05 \+ p \* 0\.85\), \{ raw: true \}\)/.test(up) && /const source = await shrinkVideoUri\(localUri\)/.test(up) && /catch \{\s*onProgress\?\.\(1\);\s*return \{ url: up\.url, key: up\.key, thumbUrl: null/.test(up));
 
 const own = read('src/data/portfolioOwner.ts');
 check('10 a post that cannot save its pictures is not left behind half made', /portfolio_posts'\)\.delete\(\)\.eq\('id', postId\)/.test(own) && /if \(ins\.error\) \{/.test(own));

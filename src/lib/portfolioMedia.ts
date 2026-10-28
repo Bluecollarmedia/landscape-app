@@ -1,5 +1,5 @@
 /**
- * How Our Work pictures are made (pure: no phone, no network). The owner chose (2026-10-28): photos shrunk to 1600 px, videos shrunk to 480p, and a
+ * How Our Work pictures are made (pure: no phone, no network). The owner chose (2026-10-28): photos shrunk to 1600 px, videos shrunk to 720p, and a
  * small square copy of every picture just for the grid, so a screen of tiles is light to load.
  */
 

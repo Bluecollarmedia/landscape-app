@@ -1,6 +1,6 @@
 /**
  * Sends the owner's pictures and videos for Our Work to the public bucket (phone only). Photos: saved at a long side of up to 1600 px plus a
- * small square copy for the grid. Videos: shrunk to 480p first (the original goes up if that cannot be done), plus a still frame for the grid.
+ * small square copy for the grid. Videos: shrunk to 720p first (the original goes up if that cannot be done), plus a still frame for the grid.
  */
 import { uploadImage } from '@/lib/media';
 import {
@@ -34,7 +34,7 @@ export async function uploadPortfolioPhoto(localUri: string, companyId: string, 
   return { url: big.url, key: big.key, thumbUrl: thumb.url, thumbKey: thumb.key, width: full.width, height: full.height };
 }
 
-/** A video, shrunk to 480p. The still frame for the grid is best effort: a video with no frame still posts (its tile just has no picture). */
+/** A video, shrunk to 720p. The still frame for the grid is best effort: a video with no frame still posts (its tile just has no picture). */
 export async function uploadPortfolioVideo(localUri: string, companyId: string, kind: PortfolioFolder = 'posts', frameAtS = 0.5, onProgress?: (p: number) => void): Promise<UploadedVideo> {
   const { shrinkVideoUri } = require('@/lib/mediaCompress') as typeof import('@/lib/mediaCompress');
   onProgress?.(0);

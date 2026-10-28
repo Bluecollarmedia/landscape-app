@@ -9,8 +9,7 @@ const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? '
 
 const worker = read('app/(owner)/(tabs)/workers/[id].tsx');
 check('1 a deactivated worker\'s profile has Reactivate (the database function that never restores admin rights)', /Reactivate Worker/.test(worker) && /team\.reactivate\(p\.id, true,/.test(worker));
-const note = read('src/components/snow/dashboard/EndedStormNote.tsx');
-check('2 the Snow dashboard tells the owner a storm ended (last 24 hours) and links to it', /eq\('status', 'ended'\)\.gte\('ended_at', since\)/.test(note) && /<EndedStormNote \/>/.test(read('src/components/snow/dashboard/SnowDashboardScreen.tsx')));
+check('2 the Snow dashboard no longer lists ended storms (they live on the Storms tab)', !fs.existsSync(path.join(__dirname, '../../src/components/snow/dashboard/EndedStormNote.tsx')) && !/EndedStormNote/.test(read('src/components/snow/dashboard/SnowDashboardScreen.tsx')));
 const strip = read('src/components/ui/DateStrip.tsx');
 check('3 one day strip: tap a day to pick it, tap again or All to clear', /onSelect\(selected === d \? null : d\)/.test(strip) && /accessibilityState=\{\{ selected: on \}\}/.test(strip));
 check('4 Maintenance routes filter by the picked day', /<DateStrip dates=\{days\} selected=\{day\} onSelect=\{setDay\} \/>/.test(read('app/(owner)/(tabs)/maintenance/routes/index.tsx')) && /r\.serviceDate === day/.test(read('app/(owner)/(tabs)/maintenance/routes/index.tsx')));

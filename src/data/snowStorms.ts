@@ -102,6 +102,17 @@ export async function loadStorms(): Promise<Result<SnowStorm[]>> {
   return ok((data ?? []).map((r) => fromDb<SnowStorm>(r as Row)));
 }
 
+/** Give a storm a new name (the owner's own title, e.g. "Big Halloween Storm"). Only the name changes. */
+export async function renameStorm(stormId: string, name: string): Promise<Result> {
+  if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
+  const clean = name.trim();
+  if (!clean) return fail('Type a name for the storm.');
+  const { data, error } = await supabase.from('snow_storms').update({ name: clean }).eq('id', stormId).select('id');
+  if (error) return fail(message(error, 'Couldn\'t rename the storm.'));
+  if (!data?.length) return fail('Only the owner or an admin can rename a storm.');
+  return ok(undefined);
+}
+
 export interface EligibleProperty {
   propertyId: string;
   name: string;

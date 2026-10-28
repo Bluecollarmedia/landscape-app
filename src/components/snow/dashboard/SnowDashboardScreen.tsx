@@ -4,7 +4,6 @@
  * app's own (see src/lib/snowDashboardView.ts, which only picks and shapes them). Nothing here changes a record.
  */
 import { AdminSnowRouteCard } from './AdminSnowRouteCard';
-import { EndedStormNote } from './EndedStormNote';
 import { servicesLabel, stormServices } from '@/lib/snowServices';
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
@@ -18,7 +17,7 @@ import { SERVICE_LABEL } from '@/data/snowStorms';
 import type { AttentionItem, StormOverview } from '@/data/snowDashboard';
 import { snowDashboardHref } from '@/lib/snowLinks';
 import {
-  crewRows, dispatchedLabel, otherStorms, pickActiveStorm, stormHeadline, type CrewRow, type CrewStatus, type StormHeadline,
+  dispatchedLabel, openCrewRows, runningStorms, stopsCompleteLabel, stormHeadline, type CrewRow, type CrewStatus, type StormHeadline,
 } from '@/lib/snowDashboardView';
 import { snowStatus } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
@@ -57,9 +56,10 @@ export function SnowDashboardScreen() {
   const tabBarClearance = useTabBarClearance();
   const { state, storms, needsAttention, refreshing, onRefresh, reload } = useSnowDashboard();
 
-  const active = pickActiveStorm(storms);
+  const running = runningStorms(storms);
+  const active = running[0];
   const headline = active ? stormHeadline(active) : undefined;
-  const others = otherStorms(storms, active);
+  const others = running.slice(1);
 
   const header = (
     <>
@@ -103,7 +103,6 @@ export function SnowDashboardScreen() {
       >
         {header}
         <AdminSnowRouteCard />
-        <EndedStormNote />
         {state.kind === 'error' && (
           <Pressable onPress={reload} accessibilityRole="button" accessibilityLabel="Couldn't refresh. Tap to try again">
             <InlineNotice icon="alert-circle" tone="error" text={`Couldn't refresh: ${state.message}. Tap to try again.`} style={{ marginTop: spacing.md }} />
@@ -118,8 +117,8 @@ export function SnowDashboardScreen() {
         ) : (
           <View style={[styles.card, { backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg }]}>
             <Icon name="cloud-snow" size={22} color={colors.textTertiary} />
-            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>No storm is planned or dispatched right now.</Text>
-            <Button title="Crew" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
+            <Text style={[typeScale.bodySmall, { color: colors.textSecondary, textAlign: 'center' }]}>No storm is running right now. Past and planned storms are on the Storms tab.</Text>
+            <Button title="New storm" icon="plus" size="sm" onPress={() => router.push('/snow/owner/storm-new')} />
           </View>
         )}
 
@@ -158,7 +157,7 @@ export function SnowDashboardScreen() {
         {others.length > 0 && (
           <>
             <Text style={[typeScale.overline, styles.label, { color: colors.textSecondary }]}>
-              {active ? 'Other storms' : 'Storm overview'}
+              Other running storms
             </Text>
             {others.map((s) => (
               <OtherStormCard key={s.id} storm={s} onOpenStorm={() => openStorm(s.id)} onOpenRoute={(routeId) => openRoute(s.id, routeId)} />
@@ -175,38 +174,25 @@ export function SnowDashboardScreen() {
 function ActiveStormCard({ storm, headline }: { storm: StormOverview; headline: StormHeadline }) {
   const { colors } = useTheme();
   const services = servicesLabel(stormServices(storm), (x) => SERVICE_LABEL[x]);
-  const routes = `${headline.routeCount} ${headline.routeCount === 1 ? 'Route' : 'Routes'}`;
   const stateTone = headline.stateLabel === 'Completed' ? snowStatus.completed : headline.stateLabel === 'In Progress' ? snowStatus.dispatched : snowStatus.scheduled;
-  const stats: { icon: React.ComponentProps<typeof Icon>['name']; color: string; value: string; label: string }[] = [
-    { icon: 'check-circle', color: colors.success, value: String(headline.completed), label: 'Completed' },
-    { icon: 'clock', color: colors.textSecondary, value: String(headline.remaining), label: 'Remaining' },
-    { icon: 'percent', color: colors.primary, value: `${headline.percent}%`, label: 'Complete' },
-    { icon: 'map-pin', color: colors.primary, value: String(headline.routeCount), label: 'Routes' },
-  ];
   return (
     <View style={[styles.heroCard, { backgroundColor: colors.surface }]}>
       <View style={[styles.heroBand, { backgroundColor: colors.primaryDark }]}>
         <View style={{ flex: 1 }}>
           <Text style={[typeScale.headingLarge, { color: '#FFFFFF' }]} numberOfLines={2}>{storm.name}</Text>
           <Text style={[typeScale.bodyMedium, { color: 'rgba(255,255,255,0.85)', marginTop: 2 }]} numberOfLines={1}>
-            {services}{headline.routeCount ? ` · ${routes}` : ''}
+            {services}
             {storm.reopenedCount > 0 ? ` · Reopened${storm.reopenedCount > 1 ? ` ${storm.reopenedCount}×` : ''}` : ''}
           </Text>
         </View>
         <Pill label={headline.stateLabel} tone={stateTone} onDark />
       </View>
       <View style={styles.heroBody}>
-        <View style={styles.statRow}>
-          {stats.map((s) => (
-            <View key={s.label} style={[styles.stat, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]} accessible accessibilityLabel={`${s.value} ${s.label}`}>
-              <Icon name={s.icon} size={18} color={s.color} />
-              <Text style={[typeScale.headingLarge, { color: colors.textPrimary, marginTop: 2 }]}>{s.value}</Text>
-              <Text style={[typeScale.caption, { color: colors.textSecondary, textAlign: 'center' }]} numberOfLines={1}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
-        <ProgressBar progress={headline.percent} height={8} style={{ marginTop: spacing.md }} />
-        <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.sm }]}>{headline.summary}</Text>
+        <Text style={[typeScale.headingLarge, { color: colors.textPrimary }]} accessibilityRole="summary">{stopsCompleteLabel(storm)}</Text>
+        <ProgressBar progress={headline.percent} height={10} style={{ marginTop: spacing.sm }} />
+        {storm.skipped > 0 ? (
+          <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>{storm.skipped} skipped (counted as done)</Text>
+        ) : null}
         {storm.attentionCount > 0 ? (
           <Text style={[typeScale.caption, { color: colors.warning, marginTop: 2 }]}>
             {storm.attentionCount} need{storm.attentionCount === 1 ? 's' : ''} attention
@@ -221,7 +207,8 @@ function CrewsSection({ storm, headline, onOpenStorm, onViewAll }: {
   storm: StormOverview; headline: StormHeadline; onOpenStorm: () => void; onViewAll: () => void;
 }) {
   const { colors } = useTheme();
-  const rows = crewRows(storm);
+  const rows = openCrewRows(storm);
+  const allDone = rows.length === 0 && storm.total > 0;
   return (
     <>
       <View style={styles.sectionHead}>
@@ -236,9 +223,9 @@ function CrewsSection({ storm, headline, onOpenStorm, onViewAll }: {
       {rows.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>
-            No properties in this storm yet. Open the storm to add properties and crews.
+            {allDone ? 'Every route is finished.' : 'No properties in this storm yet. Open the storm to add properties and crews.'}
           </Text>
-          <Button title="Open storm" icon="chevron-right" size="sm" variant="secondary" onPress={onOpenStorm} style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }} />
+          {allDone ? null : <Button title="Open storm" icon="chevron-right" size="sm" variant="secondary" onPress={onOpenStorm} style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }} />}
         </View>
       ) : (
         <>
@@ -309,14 +296,12 @@ function OtherStormCard({ storm, onOpenStorm, onOpenRoute }: { storm: StormOverv
       </Pressable>
 
       <Text style={[typeScale.caption, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-        {storm.total
-          ? `${storm.completed} completed, ${storm.remaining} remaining${storm.skipped ? `, ${storm.skipped} skipped` : ''} of ${storm.total} stops`
-          : 'No stops yet'}
+        {stopsCompleteLabel(storm)}
         {storm.attentionCount ? ` · ${storm.attentionCount} need${storm.attentionCount === 1 ? 's' : ''} attention` : ''}
       </Text>
       {storm.total ? <ProgressBar progress={Math.round(storm.progress * 100)} style={{ marginTop: spacing.xs }} /> : null}
 
-      {storm.routes.map((r) => (
+      {storm.routes.filter((r) => !r.cancelled && r.remaining > 0).map((r) => (
         <Pressable
           key={r.id}
           onPress={() => onOpenRoute(r.id)}
@@ -359,8 +344,6 @@ const styles = StyleSheet.create({
   heroCard: { borderRadius: radius.xl, overflow: 'hidden', marginTop: spacing.lg },
   heroBand: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.xl },
   heroBody: { padding: spacing.md, marginTop: -spacing.md, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, backgroundColor: 'transparent' },
-  statRow: { flexDirection: 'row', gap: spacing.sm },
-  stat: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: 4, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth },
   sectionHead: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginBottom: 2 },
   viewAll: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 32 },
   crewRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },

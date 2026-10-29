@@ -30,13 +30,15 @@ export default function WeatherWorkVideo() {
   const t = useT();
   const router = useRouter();
   const { height } = useWindowDimensions();
-  const params = useLocalSearchParams<{ post?: string; media?: string; returnTo?: string }>();
+  const params = useLocalSearchParams<{ post?: string; media?: string }>();
   // Opened from a shared link with nothing loaded yet: the feed is fetched first (usePublicPortfolio), then the reel is looked up.
   const { view } = usePublicPortfolio();
   const feed = view.status === 'ready' || view.status === 'loading' ? getLoadedPortfolio() : getLoadedPortfolio();
   const entries = useMemo(() => (feed ? videoEntries(feed.posts) : []), [feed]);
   const startAt = reelIndexOf(entries, params.media);
-  const focused = useIsFocused() && useAppActive();
+  const isFocused = useIsFocused();
+  const appActive = useAppActive();
+  const focused = isFocused && appActive;
   const [active, setActive] = useState(Math.max(0, startAt));
   const [started, setStarted] = useState(false);
   const [sound, setSound] = useState(false);
@@ -44,13 +46,7 @@ export default function WeatherWorkVideo() {
   // While a reel is held (2x) the list does not scroll, so the finger can wander anywhere and the hold stays.
   const [holding, setHolding] = useState(false);
 
-  // Closing the reels: back to where they were opened from. Opened from the feed (returnTo), the feed is reopened on that post a moment later,
-  // so the person lands where they left off.
-  const goBack = useCallback(() => {
-    if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any);
-    const returnTo = params.returnTo;
-    if (returnTo) setTimeout(() => router.push({ pathname: '/weather/work-post', params: { id: returnTo } } as any), 200);
-  }, [router, params.returnTo]);
+  const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); }, [router]);
   const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.y / height);
     setActive((cur) => { if (cur !== i) setStarted(false); return i; });

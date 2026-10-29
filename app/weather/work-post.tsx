@@ -19,8 +19,6 @@ import { markStep } from '@/lib/errorReporting';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
 
 const INK = '#17301F';
-/** A card is about the picture (a square) plus its header, buttons and words. Used to place the list on the tapped post before anything is measured. */
-const CARD_EXTRA = 232;
 
 /**
  * Projects, as a feed you scroll down through (like Instagram's home feed): every post one after another, opened on the one that was tapped.
@@ -44,7 +42,8 @@ export default function WeatherWorkPost() {
   const stillLoading = !post && view.status === 'loading';
   // "On screen" also means the app is in front: switching apps pauses the music and any video, and they carry on when the person returns.
   const isFocused = useIsFocused();
-  const focused = isFocused && useAppActive();
+  const appActive = useAppActive();
+  const focused = isFocused && appActive;
   // Opening the full-screen reels: the feed CLOSES first (its players go with it) and the reels open a moment later, exactly like a story
   // opening a project. A third screen stacked on the feed (grid -> feed -> reels) kept closing the app even with every player taken down first,
   // while a second screen never does. The reels are told which post they came from (returnTo), so closing them reopens the feed on that post.
@@ -54,8 +53,7 @@ export default function WeatherWorkPost() {
   const openReel = useCallback((p: PortfolioPost, mediaId: string) => {
     markStep('opening a reel from the feed');
     setLeaving(true);
-    if (router.canGoBack()) router.back();
-    setTimeout(() => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId, returnTo: p.id } } as any), 150);
+    setTimeout(() => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any), 150);
   }, [router]);
   // The post that is mostly on screen is the one that plays (its music, its video); the others sit still.
   const [activeId, setActiveId] = useState<string | undefined>(id);
@@ -78,7 +76,15 @@ export default function WeatherWorkPost() {
   }
 
   const goBack = () => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); };
-  const estimate = width + CARD_EXTRA;
+  // The tapped post is put at the top of the feed, fully in view, using the cards' REAL heights (no guessed height): once the list has its
+  // content, it scrolls to that post; if the post has not been drawn yet, it jumps near it first and then settles exactly on it.
+  const listRef = useRef<FlatList<PortfolioPost>>(null);
+  const placed = useRef(false);
+  const placeStart = () => {
+    if (placed.current || startAt <= 0) return;
+    placed.current = true;
+    try { listRef.current?.scrollToIndex({ index: startAt, animated: false, viewPosition: 0 }); } catch { /* handled by onScrollToIndexFailed */ }
+  };
 
   return (
     <View style={{ flex: 1, paddingTop: insets.top + 6 }}>
@@ -88,13 +94,16 @@ export default function WeatherWorkPost() {
         <View style={{ width: 44 }} />
       </View>
       <FlatList
+        ref={listRef}
         data={posts}
         keyExtractor={(p) => p.id}
         renderItem={({ item }) => <PostCard post={item} width={width} active={live && item.id === activeId} warm={live && item.id === nextId} focused={live} onOpenReel={openReel} />}
-        initialScrollIndex={startAt}
-        getItemLayout={(_d, i) => ({ length: estimate, offset: estimate * i, index: i })}
-        onScrollToIndexFailed={() => { /* the estimate was off: the list stays where it landed, which is near the tapped post */ }}
-        initialNumToRender={2}
+        onContentSizeChange={placeStart}
+        onScrollToIndexFailed={(info) => {
+          listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+          setTimeout(() => listRef.current?.scrollToIndex({ index: info.index, animated: false, viewPosition: 0 }), 120);
+        }}
+        initialNumToRender={Math.min(posts.length, Math.max(2, startAt + 2))}
         maxToRenderPerBatch={2}
         windowSize={5}
         removeClippedSubviews

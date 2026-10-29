@@ -37,7 +37,9 @@ export default function WeatherWorkStory() {
   const hl = highlight ? feed?.highlights.find((h) => h.id === highlight) : undefined;
   const stories = useMemo(() => (hl && feed ? highlightFrames(hl, feed.posts) : activeStories(feed?.stories, Date.now())), [feed, hl]);
   const seen = useSeenStories();
-  const focused = useIsFocused() && useAppActive();
+  const isFocused = useIsFocused();
+  const appActive = useAppActive();
+  const focused = isFocused && appActive;
   const [index, setIndex] = useState(() => {
     const n = Number(start);
     return Number.isInteger(n) && n >= 0 && n < stories.length ? n : startIndex(stories, seen);

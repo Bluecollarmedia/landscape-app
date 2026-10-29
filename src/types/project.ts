@@ -117,6 +117,8 @@ export interface ProjectSettings {
   customerCanRequest: boolean;
   customerCanViewPhotos: boolean;
   customerCanComment: boolean;
+  /** Progress is estimated from the tasks (database, update 121). False = the owner sets it by hand. Missing means on. */
+  autoProgress?: boolean;
   createdAt: string;
   updatedAt: string;
 }

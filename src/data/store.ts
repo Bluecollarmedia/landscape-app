@@ -63,7 +63,7 @@ const TABLES = {
   projects: { scope: 'company', cols: ['id', 'companyId', 'customerId', 'propertyId', 'name', 'taskLeadId', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'status', 'progress', 'startDate', 'estimatedEndDate', 'completedAt', 'notes', 'coverPhotoUrl', 'customerProjectCode', 'customerClaimedBy', 'customerClaimedAt', 'createdAt', 'updatedAt'] },
   project_team: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'addedAt', 'removedAt'] },
   project_tasks: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'title', 'description', 'status', 'sortOrder', 'assignedTo', 'completedAt', 'completedBy', 'createdAt', 'updatedAt'] },
-  project_settings: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'customerInteractionEnabled', 'completionPhotoRequired', 'checkinRadiusMeters', 'customerCanRequest', 'customerCanViewPhotos', 'customerCanComment', 'createdAt', 'updatedAt'] },
+  project_settings: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'customerInteractionEnabled', 'completionPhotoRequired', 'checkinRadiusMeters', 'customerCanRequest', 'customerCanViewPhotos', 'customerCanComment', 'autoProgress', 'createdAt', 'updatedAt'] },
   project_photos: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'taskId', 'assignmentId', 'uploadedBy', 'fileKey', 'fileUrl', 'caption', 'customerDescription', 'isCustomerVisible', 'sharedBy', 'sharedAt', 'photoType', 'timePhase', 'takenAt', 'createdAt'] },
   project_updates: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'createdBy', 'title', 'body', 'isCustomerVisible', 'photoIds', 'createdAt', 'updatedAt'] },
   project_messages: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'senderId', 'body', 'createdAt'] },

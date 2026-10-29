@@ -26,6 +26,7 @@ import { ProjectPrivateNotes } from '@/components/projects/ProjectPrivateNotes';
 import { useIsProjectOwner, useOwnerNotes } from '@/data/ownerProjectNotes';
 import { MessageThread } from '@/components/messages/MessageThread';
 import { db, rowsOf, updateRow } from '@/data/store';
+import { estimateProgress } from '@/lib/projectProgress';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
@@ -401,9 +402,42 @@ export default function ProjectDetailScreen() {
               </Text>
             </View>
             <ProgressBar progress={p.progress} height={8} style={{ marginTop: spacing.sm }} />
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
-              Manually set by owner
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }}>
+              <View style={{ flex: 1, marginRight: spacing.sm }}>
+                <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Estimate from tasks</Text>
+                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+                  {settings.autoProgress !== false
+                    ? 'Updates by itself as tasks are checked off (an in-progress task counts half).'
+                    : 'You set the number by hand. Checking off tasks does not change it.'}
+                </Text>
+              </View>
+              <Switch
+                value={settings.autoProgress !== false}
+                onValueChange={(v) => {
+                  updateSettings({ autoProgress: v });
+                  if (v) { const est = estimateProgress(taskStats); if (est != null) updateProject({ progress: est }); }
+                }}
+                accessibilityLabel="Estimate progress from tasks"
+              />
+            </View>
+            {settings.autoProgress === false ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md }}>
+                <Pressable
+                  onPress={() => updateProject({ progress: Math.max(0, p.progress - 5) })}
+                  accessibilityRole="button" accessibilityLabel="Lower progress by 5 percent"
+                  style={{ paddingVertical: spacing.xs, paddingHorizontal: spacing.lg, borderRadius: radius.full, backgroundColor: colors.primarySurface }}
+                >
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>− 5%</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => updateProject({ progress: Math.min(100, p.progress + 5) })}
+                  accessibilityRole="button" accessibilityLabel="Raise progress by 5 percent"
+                  style={{ paddingVertical: spacing.xs, paddingHorizontal: spacing.lg, borderRadius: radius.full, backgroundColor: colors.primarySurface }}
+                >
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>+ 5%</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
 
           <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />

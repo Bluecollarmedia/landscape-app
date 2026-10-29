@@ -252,6 +252,7 @@ export const ES_CUSTOMER: Record<string, string> = {
   '{name}. Crew on site.': '{name}. El equipo está en el lugar.',
   '{name}. Crew assigned.': '{name}. Equipo asignado.',
   'Past work': 'Trabajos anteriores',
+  'Work completed': 'Trabajo completado',
   '{count} completed': '{count} completados',
   'Right now': 'Ahora mismo',
   'All done': 'Todo listo',

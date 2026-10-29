@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
+import { useScrollToTop } from '@/lib/scrollTop';
 import { Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +39,8 @@ export default function WeatherWork() {
   const [gridCount, setGridCount] = useState(GRID_PAGE);
   const [videoCount, setVideoCount] = useState(GRID_PAGE);
   const pager = useRef<ScrollView>(null);
+  const pageRef = useRef<ScrollView>(null);
+  useScrollToTop('/weather/work', useCallback(() => { pageRef.current?.scrollTo({ y: 0, animated: true }); }, []));
   const seen = useSeenStories();
 
   const onRefresh = useCallback(async () => { setRefreshing(true); await refresh(); setRefreshing(false); }, [refresh]);
@@ -77,6 +80,7 @@ export default function WeatherWork() {
 
   return (
     <ScrollView
+      ref={pageRef}
       scrollEventThrottle={100}
       onScroll={(e) => {
         const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;

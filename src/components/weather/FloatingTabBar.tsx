@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
+import { scrollTopOf } from '@/lib/scrollTop';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
@@ -37,7 +38,11 @@ export function FloatingTabBar() {
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
               accessibilityLabel={t(tab.label)}
-              onPress={() => { if (pathname !== tab.path && pathname !== `${tab.path}/`) router.navigate(tab.path as any); }}
+              onPress={() => {
+                // Tapping the tab you are already on takes that page back to its top (a long page, the Our Work feed, anything).
+                if (on) scrollTopOf(tab.path);
+                else router.navigate(tab.path as any);
+              }}
               style={({ pressed }) => [styles.item, on && styles.itemOn, pressed && !on && { backgroundColor: WX.leafTint }]}
             >
               <MaterialCommunityIcons name={tab.icon} size={23} color={on ? WX.deep : WX.soft} />

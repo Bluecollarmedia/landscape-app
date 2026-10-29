@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useScrollToTop } from '@/lib/scrollTop';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,8 @@ import {
  * lands in the owner's Service Requests list (update 114). No account is needed.
  */
 export default function WeatherRequest() {
+  const pageRef = useRef<React.ElementRef<typeof KeyboardAwareScrollView>>(null);
+  useScrollToTop('/weather/request', useCallback(() => { pageRef.current?.scrollTo({ y: 0, animated: true }); }, []));
   const t = useT();
   const insets = useSafeAreaInsets();
   const [propertyType, setPropertyType] = useState<PropertyType>('residential');
@@ -57,7 +60,7 @@ export default function WeatherRequest() {
 
   if (sent) {
     return (
-      <KeyboardAwareScrollView contentContainerStyle={[pad, { alignItems: 'center' }]} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView ref={pageRef} contentContainerStyle={[pad, { alignItems: 'center' }]} keyboardShouldPersistTaps="handled">
         <View style={styles.doneBadge}>
           <View style={styles.doneDot}><MaterialCommunityIcons name="check" size={30} color={WX.white} /></View>
         </View>
@@ -82,7 +85,7 @@ export default function WeatherRequest() {
   }
 
   return (
-    <KeyboardAwareScrollView contentContainerStyle={pad} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <KeyboardAwareScrollView ref={pageRef} contentContainerStyle={pad} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <Text style={styles.kicker}>BRIGHTON LAWN &amp; LANDSCAPE</Text>
       <Text style={styles.title}>{t('Request a service')}</Text>
       <Text style={styles.sub}>{t("Tell us what you need and we'll reach out. No account needed.")}</Text>

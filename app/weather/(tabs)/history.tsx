@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useScrollToTop } from '@/lib/scrollTop';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +14,8 @@ const SNOW = '#1D5F9A';
 
 /** Storm History: every storm outlook Brighton has posted, newest first. Tap one to read each update. Nothing posted is ever overwritten. */
 export default function WeatherHistory() {
+  const pageRef = useRef<ScrollView>(null);
+  useScrollToTop('/weather/history', useCallback(() => { pageRef.current?.scrollTo({ y: 0, animated: true }); }, []));
   const t = useT();
   const { language } = useLanguage();
   const locale = language === 'es' ? 'es' : 'en-US';
@@ -37,7 +40,7 @@ export default function WeatherHistory() {
   if (open) {
     const measured = open.versions.find((v) => v.actual_snow !== null) ?? null;
     return (
-      <ScrollView contentContainerStyle={pad} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={pageRef} contentContainerStyle={pad} showsVerticalScrollIndicator={false}>
         <Pressable onPress={() => setOpenId(null)} accessibilityRole="button" accessibilityLabel={t('Storm History')} style={({ pressed }) => [styles.back, pressed && { opacity: 0.7 }]}>
           <MaterialCommunityIcons name="chevron-left" size={22} color={WX.ink} />
           <Text style={styles.backText}>{t('Storm History')}</Text>
@@ -79,7 +82,7 @@ export default function WeatherHistory() {
   }
 
   return (
-    <ScrollView contentContainerStyle={pad} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={WX.deep} />}>
+    <ScrollView ref={pageRef} contentContainerStyle={pad} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={WX.deep} />}>
       <Text style={styles.title}>{t('Storm History')}</Text>
       <Text style={styles.sub}>{t('Every storm outlook Brighton has posted. Nothing is ever overwritten.')}</Text>
       {storms.length === 0 ? (

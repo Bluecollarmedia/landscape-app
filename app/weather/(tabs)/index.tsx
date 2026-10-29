@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useScrollToTop } from '@/lib/scrollTop';
 import { FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -170,6 +171,8 @@ export function WeatherHomeScreen({ embedded = false }: { embedded?: boolean }) 
   const [arcW, setArcW] = useState(0);
   const [moreDays, setMoreDays] = useState(false);
   const stripRef = useRef<FlatList<StripRow>>(null);
+  const pageRef = useRef<Animated.ScrollView>(null);
+  useScrollToTop('/weather', useCallback(() => { pageRef.current?.scrollTo({ y: 0, animated: true }); }, []));
   const [stripDate, setStripDate] = useState<string | null>(null);
   const { view, refresh, busy } = useWeather(place);
   const { storm } = useCurrentStorm();
@@ -253,6 +256,7 @@ export function WeatherHomeScreen({ embedded = false }: { embedded?: boolean }) 
   return (
     <View style={{ flex: 1 }}>
       <Animated.ScrollView
+        ref={pageRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}

@@ -80,20 +80,43 @@ const MORE_W = 66;
 const STRIP_DAYS = 5;
 
 /** What the hourly strip shows: first the next 24 hours, then (after the arrow) five days of hours. */
-type StripRow = { kind: 'hour'; key: string; h: WxHour; isNow: boolean } | { kind: 'more'; key: string };
-function buildStrip(hours: WxHour[], expanded: boolean): StripRow[] {
+type StripRow = { kind: 'hour'; key: string; h: WxHour; isNow: boolean } | { kind: 'sun'; key: string; at: number; rising: boolean; date: string } | { kind: 'more'; key: string };
+function buildStrip(hours: WxHour[], expanded: boolean, at: { lat: number; lon: number }): StripRow[] {
   if (!hours.length) return [];
   const dates: string[] = [];
   for (const h of hours) { const d = localDay(h.time); if (!dates.includes(d)) dates.push(d); }
   const allowed = new Set(dates.slice(0, STRIP_DAYS));
   const shown = expanded ? hours.filter((h) => allowed.has(localDay(h.time))) : hours.slice(0, 24);
   const rows: StripRow[] = [];
-  shown.forEach((h, i) => { rows.push({ kind: 'hour', key: h.time, h, isNow: i === 0 }); });
+  // Sunrise and sunset sit between the hours they fall in, like Apple Weather's strip.
+  const suns: { at: number; rising: boolean; date: string }[] = [];
+  for (const d of dates.slice(0, STRIP_DAYS)) {
+    const st = sunTimes(d, at.lat, at.lon);
+    if (st) suns.push({ at: st.rise, rising: true, date: d }, { at: st.set, rising: false, date: d });
+  }
+  shown.forEach((h, i) => {
+    rows.push({ kind: 'hour', key: h.time, h, isNow: i === 0 });
+    const from = Date.parse(h.time);
+    const to = shown[i + 1] ? Date.parse(shown[i + 1].time) : from + 3_600_000;
+    for (const e of suns) if (e.at >= from && e.at < to && (i > 0 || e.at > from)) rows.push({ kind: 'sun', key: `sun${e.at}`, at: e.at, rising: e.rising, date: localDay(h.time) });
+  });
   if (!expanded && hours.length > shown.length) rows.push({ kind: 'more', key: 'more' });
   return rows;
 }
-const rowWidth = (r: StripRow) => (r.kind === 'hour' ? HOUR_W : MORE_W);
+const rowWidth = (r: StripRow) => (r.kind === 'more' ? MORE_W : HOUR_W);
 const STRIP_PAD = DAY_W + 10;   // the width the pinned day label covers at the left
+
+const SunItem = memo(function SunItem({ at, rising, locale, word }: { at: number; rising: boolean; locale: string; word: string }) {
+  const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: viewTz() }).format(new Date(at));
+  return (
+    <View style={styles.hour} accessible accessibilityLabel={`${word} ${time}`}>
+      <Text style={styles.hourText}>{time}</Text>
+      <WxPicture icon={rising ? 'sunrise' : 'sunset'} size={40} />
+      <Text style={styles.hourValue}>{word}</Text>
+      <Text style={styles.hourSub}> </Text>
+    </View>
+  );
+});
 
 const HourItem = memo(function HourItem({ h, isNow, metric, locale, now, onPress, label }: { h: WxHour; isNow: boolean; metric: HourMetric; locale: string; now: string; onPress: (h: WxHour) => void; label: string }) {
   const value =
@@ -230,7 +253,7 @@ export function WeatherHomeScreen({ embedded = false }: { embedded?: boolean }) 
   const feelsDiff = first && first.feelsF !== null && first.tempF !== null ? Math.round(first.feelsF - first.tempF) : null;
   const metricOf = (m: MetricKey): DetailsStart => ({ date: today, metric: m });
 
-  const stripRows = useMemo(() => buildStrip(hours, moreDays), [hours, moreDays]);
+  const stripRows = useMemo(() => buildStrip(hours, moreDays, place), [hours, moreDays, place.lat, place.lon]);
   const stripOffsets = useMemo(() => { const o: number[] = []; let x = 0; for (const r of stripRows) { o.push(x); x += rowWidth(r); } return o; }, [stripRows]);
   const stripHours = useMemo(() => stripRows.filter((r): r is Extract<StripRow, { kind: 'hour' }> => r.kind === 'hour'), [stripRows]);
   const firstDate = stripHours[0] ? localDay(stripHours[0].h.time) : '';
@@ -240,10 +263,11 @@ export function WeatherHomeScreen({ embedded = false }: { embedded?: boolean }) 
   const pinnedLabel = pinnedDate ? weekdayShort(pinnedDate, locale).replace('.', '').toUpperCase() : '';
   const onStripScroll = useCallback((e: { nativeEvent: { contentOffset: { x: number } } }) => {
     if (!stripHours.length) return;
-    const i = Math.min(stripHours.length - 1, Math.max(0, Math.floor((e.nativeEvent.contentOffset.x + STRIP_PAD) / HOUR_W)));
-    const d = localDay(stripHours[i].h.time);
+    const i = Math.min(stripRows.length - 1, Math.max(0, Math.floor((e.nativeEvent.contentOffset.x + STRIP_PAD) / HOUR_W)));
+    const r = stripRows[i];
+    const d = r.kind === 'hour' ? localDay(r.h.time) : r.kind === 'sun' ? r.date : localDay(stripHours[stripHours.length - 1].h.time);
     setStripDate((prev) => (prev === d ? prev : d));
-  }, [stripHours]);
+  }, [stripHours, stripRows]);
   // The arrow loads everything at once (five days), then glides on to where the first new day begins.
   const showMoreDays = useCallback(() => {
     const at = stripRows.findIndex((r) => r.kind === 'more');
@@ -382,6 +406,8 @@ export function WeatherHomeScreen({ embedded = false }: { embedded?: boolean }) 
                   renderItem={({ item }) =>
                     item.kind === 'hour' ? (
                       <HourItem h={item.h} isNow={item.isNow} metric={hourMetric} locale={locale} now={t('Now')} onPress={openHour} label={`${hourLabel(item.h.time, locale)}${hourMetric === 'uv' && item.h.uvIndex !== null ? `. ${t('UV index {n}', { n: item.h.uvIndex })}, ${t(uvLevel(item.h.uvIndex))}` : ''}. ${t('Open details')}`} />
+                    ) : item.kind === 'sun' ? (
+                      <SunItem at={item.at} rising={item.rising} locale={locale} word={t(item.rising ? 'Sunrise' : 'Sunset')} />
                     ) : (
                       <View style={styles.moreWrap}>
                         <Pressable onPress={showMoreDays} accessibilityRole="button" accessibilityLabel={t('Show the next days')} style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.7 }]}>

@@ -12,8 +12,10 @@ import { ScrubBar } from '@/components/work/ScrubBar';
 import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { useClipMusic } from '@/components/work/useClipMusic';
 import { getLoadedPortfolio } from '@/data/portfolio';
+import { usePublicPortfolio } from '@/hooks/usePortfolio';
+import { config } from '@/lib/config';
 import { useAppActive } from '@/hooks/useAppActive';
-import { formatDuration, postGridUrl, reelIndexOf, reelMode, reelToPreload, requestNoteFor, videoEntries, type ReelMode, type VideoEntry } from '@/lib/portfolio';
+import { formatDuration, postGridUrl, reelIndexOf, reelMode, reelToPreload, requestNoteFor, videoEntries, type ReelMode, type VideoEntry, shareLinkFor, shareTextFor } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
 
 /**
@@ -27,7 +29,9 @@ export default function WeatherWorkVideo() {
   const router = useRouter();
   const { height } = useWindowDimensions();
   const params = useLocalSearchParams<{ post?: string; media?: string }>();
-  const feed = getLoadedPortfolio();
+  // Opened from a shared link with nothing loaded yet: the feed is fetched first (usePublicPortfolio), then the reel is looked up.
+  const { view } = usePublicPortfolio();
+  const feed = view.status === 'ready' || view.status === 'loading' ? getLoadedPortfolio() : getLoadedPortfolio();
   const entries = useMemo(() => (feed ? videoEntries(feed.posts) : []), [feed]);
   const startAt = reelIndexOf(entries, params.media);
   const focused = useIsFocused() && useAppActive();
@@ -134,7 +138,11 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
 
   const seek = useCallback((s: number) => { try { player.currentTime = s; } catch { /* released */ } setNow(s); }, [player]);
   const ask = requestNoteFor(post);
-  const share = () => { void Share.share({ message: `${post.caption || 'Brighton Lawn & Landscape'}  brightonlawn.com` }); };
+  // The share sheet gets the words and the LINK to this reel (iOS shares the link itself; the message carries it too for the rest).
+  const share = () => {
+    const link = shareLinkFor(config.webUrl, post, item.id);
+    void Share.share(link ? { message: `${shareTextFor(post)}\n${link}`, url: link } : { message: `${shareTextFor(post)}  brightonlawn.com` });
+  };
 
   return (
     <View style={{ height, backgroundColor: '#0E1A12' }}>

@@ -379,3 +379,20 @@ export function websiteHref(site: string | null | undefined): string {
   if (!s) return '';
   return /^https?:\/\//i.test(s) ? s : `https://${s.replace(/^\/+/, '')}`;
 }
+
+/**
+ * The link shared for a project or a reel: the website address the app claims (associatedDomains), so on a phone with the app it opens the
+ * project or reel itself; anyone else lands on the website. Empty when the app has no website address.
+ */
+export function shareLinkFor(webUrl: string, post: Pick<PortfolioPost, 'id'>, mediaId?: string | null): string {
+  const base = (webUrl ?? '').replace(/\/+$/, '');
+  if (!base) return '';
+  return mediaId ? `${base}/weather/work-video?post=${encodeURIComponent(post.id)}&media=${encodeURIComponent(mediaId)}` : `${base}/weather/work-post?id=${encodeURIComponent(post.id)}`;
+}
+
+/** The words that go with the link: the caption (and town), or the company name. */
+export function shareTextFor(post: Pick<PortfolioPost, 'caption' | 'town'>): string {
+  const caption = (post.caption ?? '').trim();
+  const town = (post.town ?? '').trim();
+  return `${caption || 'Brighton Lawn & Landscape'}${town ? ` (${town})` : ''}`;
+}

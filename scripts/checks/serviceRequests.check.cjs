@@ -51,6 +51,12 @@ check('20 tapping the notification opens the list', target.ownerNotificationTarg
 const es = compile(read('src/i18n/es.weather.ts')).ES_WEATHER;
 check('21 every service and every form message has Spanish', lib.SERVICE_CHOICES.every((s) => es[s]) && ['Request a service', 'Send request', 'Request sent', 'Enter your name.', 'Choose at least one service.'].every((k) => es[k]));
 const data = read('src/data/serviceRequests.ts');
+const fn = read('supabase/functions/notify-request/index.ts');
+const sql118 = read('supabase/updates/118_request_email.sql');
+check('23 update 118 makes the request function return the new id and adds emailed_at (the rest of the function is as in 114)', /return jsonb_build_object\('ok', true, 'id', rid\);/.test(sql118) && /add column if not exists emailed_at timestamptz/.test(sql118) && /grant execute on function public\.submit_service_request\(.*\) to anon, authenticated/.test(sql118) && !/return jsonb_build_object\('ok', true\);/.test(sql118));
+check('24 right after a request is sent the app asks notify-request to email the owner, and a failure there is never shown to the visitor', /supabase\.functions\.invoke\('notify-request', \{ body: \{ id \} \}\)\.catch\(\(\) => \{\}\)/.test(data) && /typeof id === 'string'/.test(data));
+check('25 notify-request is one self-contained file (pasted into the website), emails only owners and admins of that company, only a fresh request, and only once', !/from '\.\.\/_shared/.test(fn) && /in\('role', \['owner', 'admin'\]\)/.test(fn) && /FRESH_MS = 15 \* 60 \* 1000/.test(fn) && /\.is\('emailed_at', null\)/.test(fn) && /api\.resend\.com\/emails/.test(fn) && /reply_to: looksLikeEmail\(r\.email\) \? r\.email : undefined/.test(fn));
+check('26 the email says who, how to reach them, where, what services and the details, and the subject names them', /Name: \$\{r\.name\}/.test(fn) && /Phone: \$\{r\.phone\}/.test(fn) && /Town \/ ZIP: \$\{r\.town\}/.test(fn) && /Services: \$\{r\.services\.join/.test(fn) && /Details: /.test(fn) && /subject: `New service request: \$\{r\.name\} \(\$\{r\.town\}\)`/.test(fn));
 check('22 sending uses the server function and never writes to the table directly', /rpc\('submit_service_request'/.test(data) && !/from\('service_requests'\)\s*\.insert/.test(data));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

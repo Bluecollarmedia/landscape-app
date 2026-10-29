@@ -11,8 +11,10 @@ import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { useClipMusic } from '@/components/work/useClipMusic';
 import { useAppActive } from '@/hooks/useAppActive';
 import { getLoadedPortfolio, getLoadedPost } from '@/data/portfolio';
+import { usePublicPortfolio } from '@/hooks/usePortfolio';
+import { config } from '@/lib/config';
 import { Image as ExpoImage } from 'expo-image';
-import { requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia } from '@/lib/portfolio';
+import { requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia, shareLinkFor, shareTextFor } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
 
 const INK = '#17301F';
@@ -27,7 +29,10 @@ export default function WeatherWorkPost() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id?: string }>();
+  // Opened from a shared link with nothing loaded yet: the feed is fetched first (usePublicPortfolio), then the post is looked up.
+  const { view } = usePublicPortfolio();
   const post = getLoadedPost(id);
+  const stillLoading = !post && view.status === 'loading';
   // "On screen" also means the app is in front: switching apps pauses the music and any video, and they carry on when the person returns.
   const focused = useIsFocused() && useAppActive();
   const [index, setIndex] = useState(0);
@@ -55,7 +60,7 @@ export default function WeatherWorkPost() {
   if (!post) {
     return (
       <View style={[styles.empty, { paddingTop: insets.top + 14 }]}>
-        <Text style={styles.title}>{t('This project is not available.')}</Text>
+        <Text style={styles.title}>{stillLoading ? t('Loading…') : t('This project is not available.')}</Text>
         <Pressable onPress={() => router.back()} accessibilityRole="button" style={styles.back}><Text style={styles.backText}>{t('Back')}</Text></Pressable>
       </View>
     );
@@ -64,7 +69,11 @@ export default function WeatherWorkPost() {
   const goBack = () => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); };
   const ask = requestNoteFor(post);
   const openRequest = () => router.push({ pathname: '/weather/request', params: { services: ask.services.join('|'), note: ask.note } } as any);
-  const share = () => { void Share.share({ message: `${post.caption || 'Brighton Lawn & Landscape'}${post.town ? ` (${post.town})` : ''}  brightonlawn.com` }); };
+  // The share sheet gets the words and the LINK to this project (iOS shares the link itself; the message carries it too for the rest).
+  const share = () => {
+    const link = shareLinkFor(config.webUrl, post);
+    void Share.share(link ? { message: `${shareTextFor(post)}\n${link}`, url: link } : { message: `${shareTextFor(post)}  brightonlawn.com` });
+  };
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 130 }}>

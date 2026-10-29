@@ -45,16 +45,17 @@ export default function WeatherWorkPost() {
   // "On screen" also means the app is in front: switching apps pauses the music and any video, and they carry on when the person returns.
   const isFocused = useIsFocused();
   const focused = isFocused && useAppActive();
-  // Opening the full-screen reels: the feed's video players are taken down FIRST (stills in their place), and the reels open a moment later.
-  // Two screens of live players on top of each other closed the app (the phone's crash note said so); this keeps them apart, and the feed
-  // keeps its place for the way back.
+  // Opening the full-screen reels: the feed CLOSES first (its players go with it) and the reels open a moment later, exactly like a story
+  // opening a project. A third screen stacked on the feed (grid -> feed -> reels) kept closing the app even with every player taken down first,
+  // while a second screen never does. The reels are told which post they came from (returnTo), so closing them reopens the feed on that post.
   const [leaving, setLeaving] = useState(false);
   useEffect(() => { if (isFocused) setLeaving(false); }, [isFocused]);
   const live = focused && !leaving;
   const openReel = useCallback((p: PortfolioPost, mediaId: string) => {
     markStep('opening a reel from the feed');
     setLeaving(true);
-    setTimeout(() => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any), 250);
+    if (router.canGoBack()) router.back();
+    setTimeout(() => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId, returnTo: p.id } } as any), 150);
   }, [router]);
   // The post that is mostly on screen is the one that plays (its music, its video); the others sit still.
   const [activeId, setActiveId] = useState<string | undefined>(id);

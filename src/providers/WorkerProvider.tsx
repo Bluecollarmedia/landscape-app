@@ -386,20 +386,25 @@ export function WorkerProvider({ children }: { children: React.ReactNode }) {
   const projectTasksFn = useCallback((projectId: string): ProjectTask[] =>
     db.tasks[projectId] ?? [], [v]);
 
-  const isTaskLead = useCallback((projectId: string) =>
-    db.projects.find(p => p.id === projectId)?.taskLeadId === workerId, [v, workerId]);
+  // Who may check off a job's tasks (update 120): its Task Lead always; anyone else on the job too, unless the owner turned on
+  // "Only the Task Lead checks off tasks" (company.taskLeadOnly). Kept under the old name: every screen asks "may I change tasks here?".
+  const isTaskLead = useCallback((projectId: string) => {
+    if (db.projects.find(p => p.id === projectId)?.taskLeadId === workerId) return true;
+    if (db.company?.taskLeadOnly) return false;
+    return db.assignments.some(a => a.projectId === projectId && a.personId === workerId && a.status !== 'cancelled' && a.status !== 'reassigned');
+  }, [v, workerId]);
 
   // The database refuses task changes from anyone but the Task Lead, so stop
   // here with the reason instead of showing a change that won't save.
   const leadOrExplain = useCallback((projectId?: string) => {
     const lead = db.projects.find(p => p.id === projectId)?.taskLeadId;
-    if (lead === workerId) return true;
+    if (projectId && isTaskLead(projectId)) return true;
     const name = lead ? db.people[lead] : undefined;
     showTaskLeadNotice(lead
       ? (name ? tr('Only the Task Lead, {name}, can change tasks on this job.', { name: name.firstName }) : tr('Only the Task Lead can change tasks on this job.'))
       : tr('This job has no Task Lead yet. Ask the owner to pick one.'));
     return false;
-  }, [v, workerId]);
+  }, [v, workerId, isTaskLead]);
 
   const startTask = useCallback((taskId: string) => {
     const task = findRow('project_tasks', taskId);

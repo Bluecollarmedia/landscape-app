@@ -300,6 +300,8 @@ export default function ProjectDetailScreen() {
   const [newPhotoType, setNewPhotoType] = useState<PhotoType>('progress');
   const [newPhotoTaskId, setNewPhotoTaskId] = useState('');
   const [newPhotoCaption, setNewPhotoCaption] = useState('');
+  // Asked while adding: share with the customer now (and the one optional description serves both the team and the customer).
+  const [newPhotoShare, setNewPhotoShare] = useState(false);
   const [showPhotoTaskPicker, setShowPhotoTaskPicker] = useState(false);
 
   if (!project) {
@@ -1446,9 +1448,13 @@ export default function ProjectDetailScreen() {
         <View style={[styles.taskStatsHeader, { gap: spacing.sm }]}>
           <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>Task Lead</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-            {p.taskLeadId
-              ? 'Only the Task Lead can start and complete tasks. The rest of the crew can see them.'
-              : 'Pick one worker to run the task list. Until then, workers can\'t change tasks.'}
+            {db.company?.taskLeadOnly
+              ? (p.taskLeadId
+                ? 'Only the Task Lead can start and complete tasks. The rest of the crew can see them.'
+                : 'Pick one worker to run the task list. Until then, workers cannot change tasks.')
+              : (p.taskLeadId
+                ? 'Anyone on this job can check off tasks. (More → Settings → Tasks can limit this to the Task Lead.)'
+                : 'Anyone on this job can check off tasks. Picking a Task Lead is optional. (More → Settings → Tasks can limit checking off to the Task Lead.)')}
           </Text>
           {team.length ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -1590,6 +1596,7 @@ export default function ProjectDetailScreen() {
     setNewPhotoType('progress');
     setNewPhotoTaskId('');
     setNewPhotoCaption('');
+    setNewPhotoShare(false);
     setShowAddPhoto(true);
   }
 
@@ -1601,7 +1608,8 @@ export default function ProjectDetailScreen() {
       uploadedBy: user?.id ?? '',
       fileUrl: newPhotoUri,
       caption: newPhotoCaption.trim() || undefined,
-      isCustomerVisible: false,
+      isCustomerVisible: newPhotoShare,
+      ...(newPhotoShare ? { customerDescription: newPhotoCaption.trim() || undefined, sharedBy: user?.id, sharedAt: new Date().toISOString() } : {}),
       photoType: newPhotoType,
       takenAt: new Date().toISOString(),
     });
@@ -2720,6 +2728,27 @@ export default function ProjectDetailScreen() {
                 <OptimizedImage source={newPhotoUri} style={[styles.reviewImage, { marginTop: spacing.lg }]} />
               )}
 
+              <View style={[styles.taskPhotoNote, { backgroundColor: newPhotoShare ? colors.primarySurface : colors.backgroundTertiary, marginTop: spacing.lg, alignItems: 'center' }]}>
+                <Icon name={newPhotoShare ? 'eye' : 'lock'} size={16} color={newPhotoShare ? colors.primary : colors.textSecondary} />
+                <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '700' }]}>Share with the customer?</Text>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                    {newPhotoShare ? 'The customer will see this photo in their portal.' : 'Off: only your team sees this photo.'}
+                  </Text>
+                </View>
+                <Switch value={newPhotoShare} onValueChange={setNewPhotoShare} accessibilityLabel="Share this photo with the customer" />
+              </View>
+
+              <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Description (optional)</Text>
+              <TextInput
+                style={[styles.composerInput, styles.composerBody, { backgroundColor: colors.surface, borderColor: colors.borderLight, color: colors.textPrimary, marginTop: spacing.xs }]}
+                value={newPhotoCaption}
+                onChangeText={setNewPhotoCaption}
+                placeholder={newPhotoShare ? 'What does this photo show? The customer sees this.' : 'What does this photo show?'}
+                placeholderTextColor={colors.textTertiary}
+                multiline
+              />
+
               <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Photo Type</Text>
               <View style={styles.taskStatusPickerRow}>
                 {(['before', 'progress', 'after', 'issue'] as PhotoType[]).map(t => (
@@ -2761,23 +2790,6 @@ export default function ProjectDetailScreen() {
                   ))}
                 </View>
               )}
-
-              <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Note (internal, optional)</Text>
-              <TextInput
-                style={[styles.composerInput, styles.composerBody, { backgroundColor: colors.surface, borderColor: colors.borderLight, color: colors.textPrimary, marginTop: spacing.xs }]}
-                value={newPhotoCaption}
-                onChangeText={setNewPhotoCaption}
-                placeholder="What does this photo show?"
-                placeholderTextColor={colors.textTertiary}
-                multiline
-              />
-
-              <View style={[styles.taskPhotoNote, { backgroundColor: colors.backgroundTertiary }]}>
-                <Icon name="lock" size={14} color={colors.textSecondary} />
-                <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, flex: 1 }]}>
-                  This photo will be added as Internal. Share it with the customer from Photo Details when you're ready.
-                </Text>
-              </View>
 
               <View style={styles.actions}>
                 <Button title="Add Photo" onPress={handleCreatePhoto} icon="plus" fullWidth />

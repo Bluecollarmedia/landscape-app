@@ -21,7 +21,7 @@ import type { AppState } from '@/providers/AuthProvider';
 import { ListSection } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
-import { db, useDb } from '@/data/store';
+import { db, useDb, updateRow } from '@/data/store';
 import { documentDefaults } from '@/data/financials';
 import { useCompanyYard } from '@/hooks/useCompanyYard';
 import { useStorageInfo, useStorageLimit } from '@/hooks/useStorage';
@@ -174,6 +174,17 @@ export default function SettingsScreen() {
             <SettingsRow icon="cloud-snow" tint={tileColors.blue} title="Storm outlook" subtitle="Write a storm update for everyone to read" onPress={() => router.push('/(owner)/storm-outlook' as any)} />
           </SettingsGroup>
         ) : null}
+
+        <SettingsGroup title="Tasks" footer="By default anyone assigned to a job can check off its tasks. Turn this on to let only the job's Task Lead do it (you pick the lead on each project).">
+          <SettingsRow
+            icon="check-square"
+            tint={tileColors.green}
+            title="Who checks off tasks"
+            subtitle="Tap to change"
+            value={db.company?.taskLeadOnly ? 'Task Lead only' : 'Anyone on the job'}
+            onPress={() => { if (db.company) updateRow('companies', db.company.id, { taskLeadOnly: !db.company.taskLeadOnly }); }}
+          />
+        </SettingsGroup>
 
         <SettingsGroup title="Quotes & Invoices">
           <SettingsRow

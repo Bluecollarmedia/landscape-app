@@ -12,7 +12,7 @@ import { useSeenStories } from '@/data/portfolioStories';
 import { usePublicPortfolio } from '@/hooks/usePortfolio';
 import { activeStories, ringState, startIndex } from '@/lib/portfolioStories';
 import {
-  formatDuration, GRID_PAGE, gridPosts, growCount, highlightCoverUrl, opensAsReel, portfolioCounts, postGridUrl, videoEntries, visibleHighlights,
+  formatDuration, GRID_PAGE, gridPosts, growCount, highlightCoverUrl, portfolioCounts, postGridUrl, videoEntries, visibleHighlights,
   type PortfolioPost, type PublicPortfolio,
 } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
@@ -71,11 +71,9 @@ export default function WeatherWork() {
   const ring = ringState(stories, seen);
   const openStories = () => router.push({ pathname: '/weather/work-story', params: { start: String(startIndex(stories, seen)) } } as any);
   const openVideo = (p: PortfolioPost, mediaId: string) => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any);
-  // A post that is only a video (a reel) opens as a reel you can swipe up through; a post with photos opens as a project.
-  const openPost = (p: PortfolioPost) => {
-    const reel = opensAsReel(p) ? p.media.find((m) => m.kind === 'video') : undefined;
-    if (reel) openVideo(p, reel.id); else router.push({ pathname: '/weather/work-post', params: { id: p.id } } as any);
-  };
+  // Every tile in the grid opens the feed on that post (a reel sits in the feed as a square preview; tapping it there goes full screen).
+  // The Videos tab opens the full-screen reels straight away.
+  const openPost = (p: PortfolioPost) => router.push({ pathname: '/weather/work-post', params: { id: p.id } } as any);
 
   return (
     <ScrollView

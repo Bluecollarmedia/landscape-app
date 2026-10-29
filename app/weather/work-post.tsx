@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { FlatList, Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { FlatList, Linking, Pressable, Share, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ViewToken } from 'react-native';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -14,14 +14,19 @@ import { getLoadedPortfolio, getLoadedPost } from '@/data/portfolio';
 import { usePublicPortfolio } from '@/hooks/usePortfolio';
 import { config } from '@/lib/config';
 import { Image as ExpoImage } from 'expo-image';
-import { requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia, shareLinkFor, shareTextFor } from '@/lib/portfolio';
+import { feedPosts, formatDuration, requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia, type PortfolioPost, shareLinkFor, shareTextFor } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
 
 const INK = '#17301F';
+/** A card is about the picture (a square) plus its header, buttons and words. Used to place the list on the tapped post before anything is measured. */
+const CARD_EXTRA = 232;
 
 /**
- * Inside a project: its photos and videos side by side (swipe), with the owner's music playing under them while the post is open. Leaving the
- * post stops the music. The tap on the music chip mutes it. "Want something like this?" opens the Request form already filled in.
+ * Projects, as a feed you scroll down through (like Instagram's home feed): every post one after another, opened on the one that was tapped.
+ * A project shows its photos and videos side by side (swipe), with the owner's music playing under it while it is the post on screen. A reel
+ * sits in the feed as a square preview (playing quietly, never full screen by itself); tapping it opens the full-screen reels, and coming back
+ * lands on the same spot in the feed. Leaving the feed stops the music. The tap on the music chip mutes it. "Want something like this?" opens
+ * the Request form already filled in.
  */
 export default function WeatherWorkPost() {
   const t = useT();
@@ -31,31 +36,20 @@ export default function WeatherWorkPost() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   // Opened from a shared link with nothing loaded yet: the feed is fetched first (usePublicPortfolio), then the post is looked up.
   const { view } = usePublicPortfolio();
+  const feed = getLoadedPortfolio();
+  const posts = useMemo(() => feedPosts(feed?.posts ?? [], id), [feed, id]);
+  const startAt = Math.max(0, posts.findIndex((p) => p.id === id));
   const post = getLoadedPost(id);
   const stillLoading = !post && view.status === 'loading';
   // "On screen" also means the app is in front: switching apps pauses the music and any video, and they carry on when the person returns.
   const focused = useIsFocused() && useAppActive();
-  const [index, setIndex] = useState(0);
-  const [muted, setMuted] = useState(false);
-
-  const media = post ? sortedMedia(post) : [];
-  const onVideo = media[index]?.kind === 'video';
-  const clip = post?.music_url && post.music_start_s != null && post.music_end_s != null ? { startS: post.music_start_s, endS: post.music_end_s } : null;
-  // While a video with its own sound is on screen the music is lowered (not stopped) and comes back up after; the video's sound is off whenever the music replaces it.
-  const musicActive = focused && !!post?.music_url;
-  const duck = !!post?.keep_video_sound && onVideo;
-  useClipMusic(post?.music_url ?? null, clip, { active: musicActive, muted, fade: post?.music_fade ?? true, duck });
-
-  // The picture on screen and its neighbours are drawn (shouldLoadSlide), so a swipe never lands on an empty square. Once the screen has had
-  // a moment, the one AFTER the next is fetched quietly into the cache too, so it is ready by the time it becomes a neighbour.
-  React.useEffect(() => {
-    const ahead = media[index + 2];
-    if (!focused || !ahead || ahead.kind !== 'photo') return;
-    const timer = setTimeout(() => { void ExpoImage.prefetch(ahead.url); }, 500);
-    return () => clearTimeout(timer);
-  }, [focused, index, media]);
-
-  const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width)), [width]);
+  // The post that is mostly on screen is the one that plays (its music, its video); the others sit still.
+  const [activeId, setActiveId] = useState<string | undefined>(id);
+  const viewability = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const first = viewableItems.find((v) => v.isViewable);
+    if (first) setActiveId((first.item as PortfolioPost).id);
+  }).current;
 
   if (!post) {
     return (
@@ -67,8 +61,66 @@ export default function WeatherWorkPost() {
   }
 
   const goBack = () => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); };
+  const estimate = width + CARD_EXTRA;
+
+  return (
+    <View style={{ flex: 1, paddingTop: insets.top + 6 }}>
+      <View style={styles.top}>
+        <Pressable onPress={goBack} accessibilityRole="button" accessibilityLabel={t('Back')} style={styles.iconBtn}><MaterialCommunityIcons name="chevron-left" size={28} color={INK} /></Pressable>
+        <Text style={styles.topTitle}>{t('Projects')}</Text>
+        <View style={{ width: 44 }} />
+      </View>
+      <FlatList
+        data={posts}
+        keyExtractor={(p) => p.id}
+        renderItem={({ item }) => <PostCard post={item} width={width} active={focused && item.id === activeId} />}
+        initialScrollIndex={startAt}
+        getItemLayout={(_d, i) => ({ length: estimate, offset: estimate * i, index: i })}
+        onScrollToIndexFailed={() => { /* the estimate was off: the list stays where it landed, which is near the tapped post */ }}
+        initialNumToRender={2}
+        maxToRenderPerBatch={2}
+        windowSize={5}
+        removeClippedSubviews
+        showsVerticalScrollIndicator={false}
+        viewabilityConfig={viewability}
+        onViewableItemsChanged={onViewable}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
+    </View>
+  );
+}
+
+/** One post in the feed: header, the square (pictures to swipe, or a reel preview), the buttons and the words. */
+function PostCard({ post, width, active }: { post: PortfolioPost; width: number; active: boolean }) {
+  const t = useT();
+  const router = useRouter();
+  const [index, setIndex] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const media = sortedMedia(post);
+  const isReel = post.kind === 'video';
+  const reel = isReel ? media.find((m) => m.kind === 'video') : undefined;
+  const onVideo = media[index]?.kind === 'video';
+  const clip = post.music_url && post.music_start_s != null && post.music_end_s != null ? { startS: post.music_start_s, endS: post.music_end_s } : null;
+  // While a video with its own sound is on screen the music is lowered (not stopped) and comes back up after; the video's sound is off whenever the music replaces it.
+  // A reel's preview in the feed plays quietly: its music waits for the full-screen reels.
+  const musicActive = active && !isReel && !!post?.music_url;
+  const duck = !!post?.keep_video_sound && onVideo;
+  useClipMusic(post?.music_url ?? null, clip, { active: musicActive, muted, fade: post?.music_fade ?? true, duck });
+
+  // The picture on screen and its neighbours are drawn (shouldLoadSlide), so a swipe never lands on an empty square. Once the screen has had
+  // a moment, the one AFTER the next is fetched quietly into the cache too, so it is ready by the time it becomes a neighbour.
+  React.useEffect(() => {
+    const ahead = media[index + 2];
+    if (!active || !ahead || ahead.kind !== 'photo') return;
+    const timer = setTimeout(() => { void ExpoImage.prefetch(ahead.url); }, 500);
+    return () => clearTimeout(timer);
+  }, [active, index, media]);
+
+  const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width)), [width]);
   const ask = requestNoteFor(post);
   const openRequest = () => router.push({ pathname: '/weather/request', params: { services: ask.services.join('|'), note: ask.note } } as any);
+  const openReel = () => { if (reel) router.push({ pathname: '/weather/work-video', params: { post: post.id, media: reel.id } } as any); };
   // The share sheet gets the words and the LINK to this project (iOS shares the link itself; the message carries it too for the rest).
   const share = () => {
     const link = shareLinkFor(config.webUrl, post);
@@ -76,13 +128,7 @@ export default function WeatherWorkPost() {
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 130 }}>
-      <View style={styles.top}>
-        <Pressable onPress={goBack} accessibilityRole="button" accessibilityLabel={t('Back')} style={styles.iconBtn}><MaterialCommunityIcons name="chevron-left" size={28} color={INK} /></Pressable>
-        <Text style={styles.topTitle}>{t('Projects')}</Text>
-        <View style={{ width: 44 }} />
-      </View>
-
+    <View>
       <View style={styles.author}>
         <ProfileAvatar uri={getLoadedPortfolio()?.profile.avatar_url} size={38} />
         <View style={{ flex: 1 }}>
@@ -92,31 +138,45 @@ export default function WeatherWorkPost() {
       </View>
 
       <View style={{ width, height: width, backgroundColor: WX.leafTint }}>
-        <FlatList
-          data={media}
-          keyExtractor={(m) => m.id}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          initialNumToRender={2}
-          maxToRenderPerBatch={2}
-          windowSize={3}
-          getItemLayout={(_d, i) => ({ length: width, offset: width * i, index: i })}
-          onMomentumScrollEnd={onScrollEnd}
-          renderItem={({ item, index: i }) => <Slide media={item} size={width} load={shouldLoadSlide(i, index)} playing={focused && i === index} sound={!muted && (!post.music_url || post.keep_video_sound)} />}
-        />
-        {media.length > 1 ? <View style={styles.counter}><Text style={styles.counterText}>{index + 1}/{media.length}</Text></View> : null}
-        {post.music_url ? (
-          <Pressable onPress={() => setMuted((m) => !m)} accessibilityRole="button" accessibilityLabel={muted ? t('Music is off. Tap to turn it on') : t('Music is playing. Tap to mute')} style={styles.music}>
-            <MaterialCommunityIcons name={muted ? 'music-off' : 'music-note'} size={18} color="#FFFFFF" />
-            <Text style={styles.musicText} numberOfLines={1}>{post.music_title || t('Music')}</Text>
+        {isReel && reel ? (
+          // A reel in the feed: a square, quiet preview. Tap it to watch it full screen (and swipe up through the other reels).
+          <Pressable onPress={openReel} accessibilityRole="button" accessibilityLabel={t('Watch this reel')} style={StyleSheet.absoluteFill}>
+            <SlideVideo media={reel} size={width} playing={active} sound={false} />
+            <View style={styles.reelMark} pointerEvents="none">
+              <MaterialCommunityIcons name="play-circle-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.reelMarkText}>{t('Reel')}{reel.duration_s ? ` · ${formatDuration(reel.duration_s)}` : ''}</Text>
+            </View>
           </Pressable>
-        ) : null}
-        {media.length > 1 ? (
-          <View style={styles.dots} pointerEvents="none">
-            {media.map((m, i) => <View key={m.id} style={[styles.dot, i === index && styles.dotOn]} />)}
-          </View>
-        ) : null}
+        ) : (
+          <>
+            <FlatList
+              data={media}
+              keyExtractor={(m) => m.id}
+              horizontal
+              pagingEnabled
+              nestedScrollEnabled
+              showsHorizontalScrollIndicator={false}
+              initialNumToRender={2}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              getItemLayout={(_d, i) => ({ length: width, offset: width * i, index: i })}
+              onMomentumScrollEnd={onScrollEnd}
+              renderItem={({ item, index: i }) => <Slide media={item} size={width} load={shouldLoadSlide(i, index)} playing={active && i === index} sound={!muted && (!post.music_url || post.keep_video_sound)} />}
+            />
+            {media.length > 1 ? <View style={styles.counter}><Text style={styles.counterText}>{index + 1}/{media.length}</Text></View> : null}
+            {post.music_url ? (
+              <Pressable onPress={() => setMuted((m) => !m)} accessibilityRole="button" accessibilityLabel={muted ? t('Music is off. Tap to turn it on') : t('Music is playing. Tap to mute')} style={styles.music}>
+                <MaterialCommunityIcons name={muted ? 'music-off' : 'music-note'} size={18} color="#FFFFFF" />
+                <Text style={styles.musicText} numberOfLines={1}>{post.music_title || t('Music')}</Text>
+              </Pressable>
+            ) : null}
+            {media.length > 1 ? (
+              <View style={styles.dots} pointerEvents="none">
+                {media.map((m, i) => <View key={m.id} style={[styles.dot, i === index && styles.dotOn]} />)}
+              </View>
+            ) : null}
+          </>
+        )}
       </View>
 
       <View style={styles.actions}>
@@ -134,7 +194,7 @@ export default function WeatherWorkPost() {
           <Text style={styles.requestText}>{t('Want something like this? Request a quote')}</Text>
         </Pressable>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -162,12 +222,14 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 },
   topTitle: { color: INK, fontSize: 17, fontWeight: '700' },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  separator: { height: 18 },
   author: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: WX.leafTint, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#53A246' },
   handle: { color: INK, fontSize: 14.5, fontWeight: '700' },
   town: { color: WX.soft, fontSize: 12.5 },
   counter: { position: 'absolute', top: 12, right: 12, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: 'rgba(23,48,31,0.72)' },
   counterText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' },
+  reelMark: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: 'rgba(23,48,31,0.72)' },
+  reelMarkText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' },
   music: { position: 'absolute', top: 8, left: 10, maxWidth: '62%', minHeight: 44, paddingLeft: 10, paddingRight: 14, borderRadius: 99, backgroundColor: 'rgba(23,48,31,0.72)', flexDirection: 'row', alignItems: 'center', gap: 7 },
   musicText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', flexShrink: 1 },
   dots: { position: 'absolute', left: 0, right: 0, bottom: 14, flexDirection: 'row', justifyContent: 'center', gap: 5 },

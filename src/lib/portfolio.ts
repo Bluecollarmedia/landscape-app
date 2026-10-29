@@ -396,3 +396,14 @@ export function shareTextFor(post: Pick<PortfolioPost, 'caption' | 'town'>): str
   const town = (post.town ?? '').trim();
   return `${caption || 'Brighton Lawn & Landscape'}${town ? ` (${town})` : ''}`;
 }
+
+/**
+ * The posts of the feed, in the grid's order (every project post, and the reels the owner shows in the grid), newest first. The post that was
+ * tapped is always in it: a reel kept out of the grid, opened from the Videos tab or a link, is put first.
+ */
+export function feedPosts(posts: PortfolioPost[], openedId: string | undefined): PortfolioPost[] {
+  const list = gridPosts(posts);
+  if (!openedId || list.some((p) => p.id === openedId)) return list;
+  const opened = posts.find((p) => p.id === openedId);
+  return opened ? [opened, ...list] : list;
+}

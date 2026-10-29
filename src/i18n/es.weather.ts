@@ -39,6 +39,8 @@ export const ES_WEATHER: Record<string, string> = {
   'Send another request': 'Enviar otra solicitud',
   'Call {phone}': 'Llamar al {phone}',
   'Call us': 'Llámanos',
+  'Watch this reel': 'Ver este reel',
+  'Reel': 'Reel',
   'Hold to watch at double speed': 'Mantén presionado para ver a doble velocidad',
   'Open {site}': 'Abrir {site}',
   'Email us': 'Escríbenos',

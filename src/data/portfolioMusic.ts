@@ -85,8 +85,32 @@ export async function shrinkTrack(track: PickedTrack): Promise<{ uri: string; mi
   }
 }
 
-/** Sends the track, shrunk first. */
-export async function uploadTrack(track: PickedTrack, companyId: string, onProgress?: (p: number) => void): Promise<{ url: string; key: string }> {
+/**
+ * Cuts the track down to just the chosen part (a small AAC file of about 30 seconds) with the phone's own audio tool (the AudioTrim module,
+ * which is part of build 25 and later). Null when this build does not have the module or the phone cannot do it: the whole track goes up then.
+ */
+export async function trimTrack(uri: string, startS: number, endS: number): Promise<string | null> {
+  try {
+    const { requireOptionalNativeModule } = require('expo-modules-core') as typeof import('expo-modules-core');
+    const mod = requireOptionalNativeModule<{ trim: (uri: string, startS: number, endS: number) => Promise<string> }>('AudioTrim');
+    if (!mod) return null;
+    return (await mod.trim(uri, startS, endS)) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sends the track. When it can be cut, ONLY the chosen part goes up and the part to play becomes 0 to its length; otherwise the whole track goes
+ * up (shrunk) and the chosen start and end stay as they were.
+ */
+export async function uploadTrack(track: PickedTrack, companyId: string, onProgress?: (p: number) => void, part?: { startS: number; endS: number }): Promise<{ url: string; key: string; clip: { startS: number; endS: number } | null }> {
+  const cut = part ? await trimTrack(track.uri, part.startS, part.endS) : null;
+  if (cut && part) {
+    const up = await uploadImage(cut, portfolioFolder(companyId, 'music'), 'audio/mp4', onProgress, { raw: true });
+    return { ...up, clip: { startS: 0, endS: Math.max(1, part.endS - part.startS) } };
+  }
   const small = await shrinkTrack(track);
-  return uploadImage(small.uri, portfolioFolder(companyId, 'music'), small.mimeType ?? undefined, onProgress, { raw: true });
+  const up = await uploadImage(small.uri, portfolioFolder(companyId, 'music'), small.mimeType ?? undefined, onProgress, { raw: true });
+  return { ...up, clip: null };
 }

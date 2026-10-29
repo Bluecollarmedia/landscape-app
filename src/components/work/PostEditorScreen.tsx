@@ -166,8 +166,16 @@ export function PostEditorScreen() {
       let musicInput: { url: string; title: string; startS: number; endS: number; fade: boolean; keepVideoSound: boolean } | null = null;
       if (music) {
         let musicUrl = music.url;
-        if (music.track) { setBusy('Uploading music…'); musicUrl = (await uploadTrack(music.track, companyId, report)).url; done += 1; report(0); }
-        if (musicUrl) musicInput = { url: musicUrl, title: music.title, startS: music.startS, endS: music.endS, fade: music.fade, keepVideoSound: music.keepVideoSound };
+        let partS = music.startS, partE = music.endS;
+        if (music.track) {
+          setBusy('Uploading music…');
+          const up = await uploadTrack(music.track, companyId, report, { startS: music.startS, endS: music.endS });
+          musicUrl = up.url;
+          // A track that was cut to the chosen part plays from 0 to its own length.
+          if (up.clip) { partS = up.clip.startS; partE = up.clip.endS; }
+          done += 1; report(0);
+        }
+        if (musicUrl) musicInput = { url: musicUrl, title: music.title, startS: partS, endS: partE, fade: music.fade, keepVideoSound: music.keepVideoSound };
       }
       // 3. the cover (cropped square: a high-quality copy and a small one for the grid)
       let cover: { url: string; thumbUrl: string } | null = null;

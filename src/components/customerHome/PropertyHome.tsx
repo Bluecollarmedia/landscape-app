@@ -114,7 +114,7 @@ function ServiceSwitch({ group, current, attention, onPick }: { group: PropertyG
             style={[styles.switchItem, on && [{ backgroundColor: colors.surface }, shadow.sm]]}
           >
             {s === 'snow' && attention !== 'none' ? <View style={[styles.chipDot, { backgroundColor: dotColor(attention, colors.textTertiary) }]} /> : null}
-            <Text style={[typeScale.labelLarge, { color: on ? colors.primary : colors.textSecondary, fontWeight: on ? '800' : '600' }]}>{t(SERVICE_LABEL[s])}</Text>
+            <Text style={[typeScale.labelLarge, { color: on ? (s === 'snow' ? semantic.info : colors.primary) : colors.textSecondary, fontWeight: on ? '800' : '600' }]}>{t(SERVICE_LABEL[s])}</Text>
           </Pressable>
         );
       })}
@@ -166,7 +166,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
           <Text style={[typeScale.bodyMedium, { color: '#FFFFFFE6' }]}>{lastServiceLabel(latest.completedAt, t)}</Text>
         </View>
       ) : (
-        <View style={[styles.hero, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '33' }, shadow.sm]}>
+        <View style={[styles.hero, { backgroundColor: semantic.info + '14', borderColor: semantic.info + '40' }, shadow.sm]}>
           <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '800' }]}>{t('No storm right now')}</Text>
           <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>
             {latest ? t('Last service {when}', { when: lastServiceLabel(latest.completedAt, t) }) : t("We'll be ready when the snow falls.")}
@@ -188,7 +188,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
         </View>
       ) : null}
 
-      <Stats items={[
+      <Stats accent={semantic.info} items={[
         { value: String(stats.visits), label: t('Visits this season') },
         { value: stats.lastAt ? shortDate(stats.lastAt) : '–', label: t('Last visit') },
         { value: String(stats.photos), label: t('Photos') },
@@ -203,7 +203,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
           ))}
         </View>
       ) : null}
-      <SeeAll label={t('See all visits')} onPress={() => router.push(`/(customer)/history?service=snow&property=${encodeURIComponent(group.key)}` as never)} />
+      <SeeAll accent={semantic.info} label={t('See all visits')} onPress={() => router.push(`/(customer)/history?service=snow&property=${encodeURIComponent(group.key)}` as never)} />
       <TaskMediaViewer items={viewer?.items ?? []} index={viewer ? viewer.index : null} onIndexChange={(i) => setViewer((v) => (v ? { ...v, index: i } : v))} onClose={() => setViewer(null)} />
     </View>
   );
@@ -335,13 +335,14 @@ function ProjectCard({ item }: { item: HomeItem }) {
 
 // ── small pieces ─────────────────────────────────────────────────────────────
 
-export function Stats({ items }: { items: { value: string; label: string }[] }) {
+export function Stats({ items, accent }: { items: { value: string; label: string }[]; accent?: string }) {
   const { colors } = useTheme();
+  const tone = accent ?? colors.primary;
   return (
     <View style={styles.statsRow}>
       {items.map((s) => (
-        <View key={s.label} style={[styles.stat, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '33' }]}>
-          <Text style={[typeScale.headingSmall, { color: colors.primary, fontWeight: '800' }]} numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
+        <View key={s.label} style={[styles.stat, { backgroundColor: tone + '14', borderColor: tone + '40' }]}>
+          <Text style={[typeScale.headingSmall, { color: tone, fontWeight: '800' }]} numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={2}>{s.label}</Text>
         </View>
       ))}
@@ -349,12 +350,12 @@ export function Stats({ items }: { items: { value: string; label: string }[] }) 
   );
 }
 
-function SeeAll({ label, onPress }: { label: string; onPress: () => void }) {
+function SeeAll({ label, onPress, accent }: { label: string; onPress: () => void; accent?: string }) {
   const { colors } = useTheme();
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={styles.seeAll}>
-      <Text style={[typeScale.labelLarge, { color: colors.primary, fontWeight: '700', flex: 1 }]}>{label}</Text>
-      <Icon name="chevron-right" size={18} color={colors.primary} />
+      <Text style={[typeScale.labelLarge, { color: accent ?? colors.primary, fontWeight: '700', flex: 1 }]}>{label}</Text>
+      <Icon name="chevron-right" size={18} color={accent ?? colors.primary} />
     </Pressable>
   );
 }

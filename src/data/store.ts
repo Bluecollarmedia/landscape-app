@@ -21,6 +21,7 @@ import { properName } from '@/lib/names';
 import { Alert, AppState, Platform } from 'react-native';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { sweepStorageSoon } from '@/lib/storageSweep';
 import { uuid } from '@/lib/ids';
 import type { Company, CompanyMember, PersonSummary } from '@/types/company';
 import type {
@@ -1009,6 +1010,8 @@ export function deleteRow(table: TableName, id: string): void {
         .eq(snake(pk), id),
       (e) => { reportError(`Removing from ${label(table)}`, e); reloadTable(table); },
     );
+    // Whatever stored file the deleted row (or a row that goes with it) held is deleted from storage a few seconds later (update 119).
+    sweepStorageSoon();
   }
 }
 

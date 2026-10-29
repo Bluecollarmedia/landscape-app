@@ -15,6 +15,7 @@
 import { defaultStormNameFor } from '@/lib/snowServices';
 import { NEEDS_UPDATE_50, isMissingFunction, type StormCounts } from '@/lib/snowStormDelete';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { sweepStorageSoon } from '@/lib/storageSweep';
 import { uuid } from '@/lib/ids';
 import type { SnowService, SnowStorm } from '@/types/snow';
 
@@ -251,6 +252,7 @@ export async function deleteStormForGood(stormId: string, status?: string): Prom
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { data, error } = await supabase.rpc('snow_delete_storm', { p_storm_id: stormId });
   if (!error) {
+    sweepStorageSoon();
     const d = (data ?? {}) as { routes?: number; stops?: number };
     return ok({ routes: d.routes ?? 0, stops: d.stops ?? 0 });
   }
@@ -266,6 +268,7 @@ export async function deleteStormForGood(stormId: string, status?: string): Prom
 export async function deleteDraftStorm(stormId: string): Promise<Result> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { error } = await supabase.from('snow_storms').delete().eq('id', stormId);
+  if (!error) sweepStorageSoon();
   if (error) return fail(message(error, 'Couldn\'t delete the draft.'));
   return ok(undefined);
 }

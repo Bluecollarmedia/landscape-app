@@ -149,6 +149,15 @@ export async function discardSnowUpload(key: string): Promise<void> {
  * Signed links for the given keys. Keys the caller isn't allowed to see come
  * back without a link, so they are simply left out.
  */
+/**
+ * The public address of a Snow file in R2 (Snow photos are public files since 2026-10-23; the key is an unguessable id that a person only ever
+ * receives for their own properties). Used when asking for a signed link did not give one, so a photo still opens.
+ */
+export function snowPublicUrl(key: string): string | undefined {
+  const base = (process.env.EXPO_PUBLIC_R2_PUBLIC_URL ?? '').replace(/\/+$/, '');
+  return base && key ? `${base}/${key.split('/').map(encodeURIComponent).join('/')}` : undefined;
+}
+
 export async function signedSnowMediaUrls(keys: string[]): Promise<Record<string, string>> {
   if (!isSupabaseConfigured || keys.length === 0) return {};
   if (r2Enabled) {

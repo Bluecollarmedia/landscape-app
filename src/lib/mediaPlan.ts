@@ -3,7 +3,8 @@
  *
  * Photos: about 50% JPEG quality, the long edge capped so a 12-megapixel camera photo is not stored at full size, never enlarged.
  * A photo that is already small and already a web-friendly format is not recompressed (recompressing small files only loses quality).
- * Videos: at most 480p (854 x 480 landscape, 480 x 854 portrait), aspect ratio kept exactly, never enlarged, with a bitrate to match.
+ * Videos: at most 720p (1280 x 720 landscape, 720 x 1280 portrait), aspect ratio kept exactly, never enlarged, with a bitrate to match.
+ * (480p was tried on 2026-10-28 and looked blurry on a phone screen; 720p at about 2.8 Mbps is sharp and still a third of a phone recording.)
  */
 
 export const IMAGE_QUALITY = 0.5;
@@ -12,8 +13,8 @@ export const IMAGE_MAX_EDGE = 1600;
 /** A JPEG/WebP at or under this size, within the edge cap, is already optimised and is uploaded as it is. */
 export const IMAGE_SKIP_BYTES = 250 * 1024;
 
-export const VIDEO_MAX_LONG_EDGE = 854;
-export const VIDEO_MAX_SHORT_EDGE = 480;
+export const VIDEO_MAX_LONG_EDGE = 1280;
+export const VIDEO_MAX_SHORT_EDGE = 720;
 
 export interface Size { width: number; height: number }
 
@@ -47,14 +48,14 @@ export function planImage(input: { width?: number; height?: number; bytes?: numb
 
 export interface VideoPlan { width: number; height: number; bitrate: number; resize: boolean }
 
-/** Output size for a video: within 854x480 (or 480x854 portrait), ratio kept, even numbers (H.264 needs them), never enlarged. */
+/** Output size for a video: within 1280x720 (or 720x1280 portrait), ratio kept, even numbers (H.264 needs them), never enlarged. */
 export function planVideo(input: { width: number; height: number }): VideoPlan {
   const { width: w, height: h } = input;
   const fit = fitWithin(w, h, VIDEO_MAX_LONG_EDGE, VIDEO_MAX_SHORT_EDGE);
   const resize = fit.width !== w || fit.height !== h;
   const width = even(fit.width), height = even(fit.height);
-  // About 2.7 bits per pixel per second at 30 fps: roughly 1.1 Mbps at 854x480. Clamped so tiny clips are not starved.
-  const bitrate = Math.min(1_500_000, Math.max(600_000, Math.round(width * height * 2.7)));
+  // About 3 bits per pixel per second at 30 fps: roughly 2.8 Mbps at 1280x720. Clamped so tiny clips are not starved and big ones stay small.
+  const bitrate = Math.min(4_000_000, Math.max(1_000_000, Math.round(width * height * 3)));
   return { width, height, bitrate, resize };
 }
 

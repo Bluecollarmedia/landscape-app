@@ -9,6 +9,7 @@
 
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { VIDEO_PICK_OPTIONS } from '@/lib/videoPick';
 import { db, insertRow, deleteRow } from './store';
 import { removeMedia } from '@/lib/media';
 import { getStorageInfo } from '@/lib/storage';
@@ -80,7 +81,7 @@ export async function pickTaskMedia(alreadyPicked: number): Promise<TaskMediaDra
     mediaTypes: ['images', 'videos'],
     quality: 1,
     videoMaxDuration: MAX_TASK_VIDEO_SECONDS,
-    videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+    ...VIDEO_PICK_OPTIONS,
     allowsMultipleSelection: source === 'library' && room > 1,
     selectionLimit: room,
   };

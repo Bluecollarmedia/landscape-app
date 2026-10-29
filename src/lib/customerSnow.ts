@@ -13,7 +13,7 @@ const ORDER: SnowSvc[] = ['plowing', 'shoveling', 'salting'];
 
 export interface TimelineMedia { id: string; kind: 'photo' | 'video'; url?: string }
 export interface TimelineEntry {
-  visitId: string; propertyId: string; propertyName: string; service: SnowSvc; stormName?: string; completedAt: string; media: TimelineMedia[];
+  visitId: string; propertyId: string; propertyName: string; service: SnowSvc; stormName?: string; arrivedAt?: string; completedAt: string; media: TimelineMedia[];
 }
 export interface SnowStatus { propertyId: string; state: 'scheduled' | 'on_site'; since?: string; stormName?: string }
 

@@ -43,6 +43,7 @@ export default function WorkerLayout() {
         <Stack.Screen name="notifications" />
         <Stack.Screen name="my-resources" />
         <Stack.Screen name="resource/[id]" />
+        <Stack.Screen name="weather" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       </Stack>
     </WorkerProvider>
   );

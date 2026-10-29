@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
+import { useScrollToTop } from '@/lib/scrollTop';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,8 +14,10 @@ export default function WeatherAccount() {
   const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const pageRef = useRef<ScrollView>(null);
+  useScrollToTop('/weather/account', useCallback(() => { pageRef.current?.scrollTo({ y: 0, animated: true }); }, []));
   return (
-    <ScrollView contentContainerStyle={{ paddingTop: insets.top + 14, paddingHorizontal: 18, paddingBottom: insets.bottom + 130 }}>
+    <ScrollView ref={pageRef} contentContainerStyle={{ paddingTop: insets.top + 14, paddingHorizontal: 18, paddingBottom: insets.bottom + 130 }}>
       <Text style={styles.title}>{t('Brighton')}</Text>
       <Text style={styles.sub}>{t('Need work done, or already part of the team?')}</Text>
       <Pressable onPress={() => router.push('/(auth)/welcome' as any)} accessibilityRole="button" accessibilityLabel={t('Sign In')} style={({ pressed }) => [{ marginTop: 22 }, pressed && { opacity: 0.8 }]}>

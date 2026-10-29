@@ -7,6 +7,9 @@ import { SCRUB_BAR_HEIGHT, formatDuration, fractionOf, timeAtFraction } from '@/
  * The seek bar under a full-screen video. Thin at rest; the moment a finger touches it the bar grows and a handle and the time appear, so it is
  * easy to aim (like Instagram). Drag to scrub; lifting the finger jumps the video to that time. The touch area is much taller than the bar.
  */
+/** The strip along the left edge where iOS's swipe-back lives (about 5% of the screen). */
+export const EDGE_ZONE = 24;
+
 export function ScrubBar({ currentS, durationS, onSeek, onScrubChange }: {
   currentS: number;
   durationS: number;
@@ -22,9 +25,12 @@ export function ScrubBar({ currentS, durationS, onSeek, onScrubChange }: {
 
   const pan = useMemo(() => {
     const fractionAt = (pageX: number) => Math.min(1, Math.max(0, (pageX - left.current) / Math.max(1, width.current)));
+    // A touch that starts within the phone's left-edge zone is left alone: that swipe closes the screen (iOS's own back gesture). Everywhere else
+    // on the bar, the drag is a scrub and nothing else.
+    const notAtEdge = (e: { nativeEvent: { pageX: number } }) => e.nativeEvent.pageX > EDGE_ZONE;
     return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: notAtEdge,
+      onMoveShouldSetPanResponder: notAtEdge,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
         area.current?.measureInWindow((x, _y, w) => {

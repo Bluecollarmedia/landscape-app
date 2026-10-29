@@ -63,7 +63,7 @@ export interface PublicPortfolio {
 /** The tags an owner can put on a post (the same words as the circles at the top). */
 export const TAG_CHOICES = ['Pavers', 'Turf', 'Lighting', 'Planting', 'Commercial', 'Snow'] as const;
 
-export const MAX_VIDEO_S = 60;
+export const MAX_VIDEO_S = 180;
 /** A post holds up to 10 photos and videos (like Instagram). */
 export const MAX_POST_MEDIA = 10;
 export const MIN_CLIP_S = 5;
@@ -106,23 +106,25 @@ export const GRID_PAGE = 30;
 export const growCount = (count: number, total: number): number => Math.min(total, count + GRID_PAGE);
 
 /**
- * Which pictures in a swipe row may load: only the one on screen. (The next one is fetched quietly afterwards, one at a time, by the screen.)
- * A post with 10 photos therefore asks for 1 picture when it opens, not 10.
+ * Which pictures in a swipe row are drawn: the one on screen and its two neighbours, so a swipe lands on a picture that is already there
+ * (never on an empty green square). The one after that is fetched quietly by the screen. A post with 10 photos asks for 2 when it opens, not 10.
  */
-export const shouldLoadSlide = (slideIndex: number, currentIndex: number): boolean => slideIndex === currentIndex;
+export const shouldLoadSlide = (slideIndex: number, currentIndex: number): boolean => Math.abs(slideIndex - currentIndex) <= 1;
 
 export const hasVideo = (post: PortfolioPost): boolean => post.media.some((m) => m.kind === 'video');
 
 /** The posts in the photo grid: every project post, and a video post only when the owner chose to show it there. Newest first. */
 export function gridPosts(posts: PortfolioPost[]): PortfolioPost[] {
-  return posts.filter((p) => p.media.length > 0 && (p.kind === 'post' || p.show_in_grid)).sort(newestFirst);
+  // Every post with something in it, reels included (a reel always shows here; the old "also show in the grid" switch is gone).
+  return posts.filter((p) => p.media.length > 0).sort(newestFirst);
 }
 
-/** One entry per video, for the Videos tab (a post with a video in it shows that video; its length is shown on the tile). Newest first. */
+/** One entry per reel, for the Videos tab and the swipe-up reels feed. Only reels (a post that is a single video) go here; the videos inside a photo post stay in that post. Newest first. */
 export interface VideoEntry { post: PortfolioPost; media: PortfolioMedia }
 export function videoEntries(posts: PortfolioPost[]): VideoEntry[] {
   const out: VideoEntry[] = [];
   for (const post of [...posts].sort(newestFirst)) {
+    if (post.kind !== 'video') continue;
     for (const media of sortedMedia(post)) if (media.kind === 'video') out.push({ post, media });
   }
   return out;
@@ -370,4 +372,39 @@ export function highlightFrames(h: PortfolioHighlight, posts: PortfolioPost[]): 
     }
   }
   return out;
+}
+
+/** The address to open for the website shown on the profile: "brightonlawn.com" becomes "https://brightonlawn.com"; a full address is kept. */
+export function websiteHref(site: string | null | undefined): string {
+  const s = (site ?? '').trim();
+  if (!s) return '';
+  return /^https?:\/\//i.test(s) ? s : `https://${s.replace(/^\/+/, '')}`;
+}
+
+/**
+ * The link shared for a project or a reel: the website address the app claims (associatedDomains), so on a phone with the app it opens the
+ * project or reel itself; anyone else lands on the website. Empty when the app has no website address.
+ */
+export function shareLinkFor(webUrl: string, post: Pick<PortfolioPost, 'id'>, mediaId?: string | null): string {
+  const base = (webUrl ?? '').replace(/\/+$/, '');
+  if (!base) return '';
+  return mediaId ? `${base}/weather/work-video?post=${encodeURIComponent(post.id)}&media=${encodeURIComponent(mediaId)}` : `${base}/weather/work-post?id=${encodeURIComponent(post.id)}`;
+}
+
+/** The words that go with the link: the caption (and town), or the company name. */
+export function shareTextFor(post: Pick<PortfolioPost, 'caption' | 'town'>): string {
+  const caption = (post.caption ?? '').trim();
+  const town = (post.town ?? '').trim();
+  return `${caption || 'Brighton Lawn & Landscape'}${town ? ` (${town})` : ''}`;
+}
+
+/**
+ * The posts of the feed, in the grid's order (every project post, and the reels the owner shows in the grid), newest first. The post that was
+ * tapped is always in it: a reel kept out of the grid, opened from the Videos tab or a link, is put first.
+ */
+export function feedPosts(posts: PortfolioPost[], openedId: string | undefined): PortfolioPost[] {
+  const list = gridPosts(posts);
+  if (!openedId || list.some((p) => p.id === openedId)) return list;
+  const opened = posts.find((p) => p.id === openedId);
+  return opened ? [opened, ...list] : list;
 }

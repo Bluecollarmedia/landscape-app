@@ -20,9 +20,9 @@ const areas = [['app/(owner)', '_layout.tsx'], ['app/(customer)', '_layout.tsx']
 check('5 each area has its own weather screen, registered as a full-screen slide-up inside that area (so nobody is moved out of it)', areas.every(([d, l]) => has(`${d}/weather.tsx`) && /name="weather" options=\{\{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' \}\}/.test(read(`${d}/${l}`))));
 const route = read('app/(owner)/weather.tsx');
 check('6 the screen fades its content in and shows the signed-in version of the forecast', /FadeIn/.test(route) && /<WeatherHomeScreen embedded \/>/.test(route));
-const home = read('app/weather/index.tsx');
+const home = read('app/weather/(tabs)/index.tsx');
 check('7 the signed-in forecast has Close in place of Sign In, and the storm outlook opens as a sheet, not a public route', /embedded \? \(/.test(home) && /router\.back\(\)/.test(home) && /embedded \? setOutlookOpen\(true\)/.test(home) && /presentationStyle="pageSheet"/.test(home));
-const outlook = read('app/weather/outlook.tsx');
+const outlook = read('app/weather/(tabs)/outlook.tsx');
 check('8 inside the sheet nothing sends the person to the public Weather routes', /embedded \? goBack\(\)/.test(outlook) && /embedded \? undefined/.test(outlook));
 check('9 the public Weather route is unchanged: it still shows Sign In', /export default function WeatherHome\(\) \{\s*return <WeatherHomeScreen \/>;/.test(home) && /router\.push\('\/\(auth\)\/welcome' as any\)/.test(home));
 console.log(bad ? `\n${bad} failed` : '\nall passed');

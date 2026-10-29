@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useScrollToTop } from '@/lib/scrollTop';
 import { FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -170,6 +171,8 @@ export function WeatherHomeScreen({ embedded = false }: { embedded?: boolean }) 
   const [arcW, setArcW] = useState(0);
   const [moreDays, setMoreDays] = useState(false);
   const stripRef = useRef<FlatList<StripRow>>(null);
+  const pageRef = useRef<Animated.ScrollView>(null);
+  useScrollToTop('/weather', useCallback(() => { pageRef.current?.scrollTo({ y: 0, animated: true }); }, []));
   const [stripDate, setStripDate] = useState<string | null>(null);
   const { view, refresh, busy } = useWeather(place);
   const { storm } = useCurrentStorm();
@@ -253,16 +256,17 @@ export function WeatherHomeScreen({ embedded = false }: { embedded?: boolean }) 
   return (
     <View style={{ flex: 1 }}>
       <Animated.ScrollView
+        ref={pageRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={busy} onRefresh={refresh} tintColor={INK} />}
         contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 18, paddingBottom: insets.bottom + 130 }}
       >
-        <Image source={require('../../assets/images/weather-hero.jpg')} style={{ position: 'absolute', top: 0, left: 0, width: screenW, height: screenW * HERO_RATIO }} resizeMode="cover" accessible={false} />
+        <Image source={require('../../../assets/images/weather-hero.jpg')} style={{ position: 'absolute', top: 0, left: 0, width: screenW, height: screenW * HERO_RATIO }} resizeMode="cover" accessible={false} />
         <View style={styles.top}>
           <View style={styles.brand}>
-            <Image source={require('../../assets/images/logo-leaf.png')} style={styles.leaf} />
+            <Image source={require('../../../assets/images/logo-leaf.png')} style={styles.leaf} />
             <View>
               <Text style={styles.brandName}>BRIGHTON</Text>
               <Text style={styles.brandSub}>FORECAST</Text>

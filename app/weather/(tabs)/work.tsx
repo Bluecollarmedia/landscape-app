@@ -1,4 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
+import { useScrollToTop } from '@/lib/scrollTop';
+import { useWorkBase } from '@/lib/workRoutes';
 import { Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,10 +14,11 @@ import { useSeenStories } from '@/data/portfolioStories';
 import { usePublicPortfolio } from '@/hooks/usePortfolio';
 import { activeStories, ringState, startIndex } from '@/lib/portfolioStories';
 import {
-  formatDuration, GRID_PAGE, gridPosts, growCount, highlightCoverUrl, opensAsReel, portfolioCounts, postGridUrl, videoEntries, visibleHighlights,
+  formatDuration, GRID_PAGE, gridPosts, growCount, highlightCoverUrl, portfolioCounts, postGridUrl, videoEntries, visibleHighlights,
   type PortfolioPost, type PublicPortfolio,
 } from '@/lib/portfolio';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
+import { websiteHref } from '@/lib/portfolio';
 
 const INK = '#17301F';
 const GAP = 2;
@@ -36,7 +39,10 @@ export default function WeatherWork() {
   // Only the first page of tiles is drawn; more are drawn as the person scrolls near the end (a long feed never loads all at once).
   const [gridCount, setGridCount] = useState(GRID_PAGE);
   const [videoCount, setVideoCount] = useState(GRID_PAGE);
+  const base = useWorkBase();
   const pager = useRef<ScrollView>(null);
+  const pageRef = useRef<ScrollView>(null);
+  useScrollToTop('/weather/work', useCallback(() => { pageRef.current?.scrollTo({ y: 0, animated: true }); }, []));
   const seen = useSeenStories();
 
   const onRefresh = useCallback(async () => { setRefreshing(true); await refresh(); setRefreshing(false); }, [refresh]);
@@ -68,16 +74,15 @@ export default function WeatherWork() {
   // The ring around the profile picture: coloured while a story is unwatched, grey when all are watched, none without stories.
   const stories = activeStories(data.stories, Date.now());
   const ring = ringState(stories, seen);
-  const openStories = () => router.push({ pathname: '/weather/work-story', params: { start: String(startIndex(stories, seen)) } } as any);
-  const openVideo = (p: PortfolioPost, mediaId: string) => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any);
-  // A post that is only a video (a reel) opens as a reel you can swipe up through; a post with photos opens as a project.
-  const openPost = (p: PortfolioPost) => {
-    const reel = opensAsReel(p) ? p.media.find((m) => m.kind === 'video') : undefined;
-    if (reel) openVideo(p, reel.id); else router.push({ pathname: '/weather/work-post', params: { id: p.id } } as any);
-  };
+  const openStories = () => router.push({ pathname: `${base}/work-story`, params: { start: String(startIndex(stories, seen)) } } as any);
+  const openVideo = (p: PortfolioPost, mediaId: string) => router.push({ pathname: `${base}/work-video`, params: { post: p.id, media: mediaId } } as any);
+  // Every tile in the grid opens the feed on that post (a reel sits in the feed as a square preview; tapping it there goes full screen).
+  // The Videos tab opens the full-screen reels straight away.
+  const openPost = (p: PortfolioPost) => router.push({ pathname: `${base}/work-post`, params: { id: p.id } } as any);
 
   return (
     <ScrollView
+      ref={pageRef}
       scrollEventThrottle={100}
       onScroll={(e) => {
         const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
@@ -111,11 +116,15 @@ export default function WeatherWork() {
       <View style={styles.bioBox}>
         <Text style={styles.name}>Brighton Lawn &amp; Landscape</Text>
         {data.profile.bio ? <Text style={styles.bio}>{data.profile.bio}</Text> : null}
-        {data.profile.website ? <Text style={styles.link}>{data.profile.website}</Text> : null}
+        {data.profile.website ? (
+          <Pressable onPress={() => { void Linking.openURL(websiteHref(data.profile.website)); }} accessibilityRole="link" accessibilityLabel={t('Open {site}', { site: data.profile.website })} hitSlop={8}>
+            <Text style={styles.link}>{data.profile.website}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.buttons}>
-        <Pressable onPress={() => router.push('/weather/request' as any)} accessibilityRole="button" style={({ pressed }) => [styles.primary, { flex: 1 }, pressed && { opacity: 0.85 }]}><Text style={styles.primaryText}>{t('Request a quote')}</Text></Pressable>
+        <Pressable onPress={() => router.push(`${base}/request` as any)} accessibilityRole="button" style={({ pressed }) => [styles.primary, { flex: 1 }, pressed && { opacity: 0.85 }]}><Text style={styles.primaryText}>{t('Request a quote')}</Text></Pressable>
         <Pressable onPress={() => { void Linking.openURL(BRIGHTON_PHONE_LINK); }} accessibilityRole="button" style={({ pressed }) => [styles.secondary, { flex: 1 }, pressed && { opacity: 0.85 }]}><Text style={styles.secondaryText}>{t('Call')}</Text></Pressable>
       </View>
 
@@ -124,7 +133,7 @@ export default function WeatherWork() {
           {circles.map((h) => {
             const uri = highlightCoverUrl(h, data.posts);   // a circle is 64 points wide: its picture comes from the small copy when there is one
             return (
-              <Pressable key={h.id} onPress={() => router.push({ pathname: '/weather/work-story', params: { highlight: h.id } } as any)} accessibilityRole="button" accessibilityLabel={h.name} style={styles.circleItem}>
+              <Pressable key={h.id} onPress={() => router.push({ pathname: `${base}/work-story`, params: { highlight: h.id } } as any)} accessibilityRole="button" accessibilityLabel={h.name} style={styles.circleItem}>
                 <View style={styles.circleRing}>{uri ? <OptimizedImage source={uri} style={styles.circleImg} /> : <View style={[styles.circleImg, { backgroundColor: WX.leafTint }]} />}</View>
                 <Text style={styles.circleLabel} numberOfLines={1}>{h.name}</Text>
               </Pressable>
@@ -153,7 +162,7 @@ export default function WeatherWork() {
         <View style={{ width }}>
           {videos.length === 0 ? <Text style={[styles.soft, styles.empty]}>{t('No videos yet.')}</Text> : (
             <View style={styles.grid}>
-              {videos.slice(0, videoCount).map((v) => <VideoTile key={v.media.id} post={v.post} url={v.media.thumb_url ?? postGridUrl(v.post)} seconds={v.media.duration_s} size={tile} onPress={() => openVideo(v.post, v.media.id)} />)}
+              {videos.slice(0, videoCount).map((v) => <VideoTile key={v.media.id} post={v.post} url={postGridUrl(v.post) ?? v.media.thumb_url} seconds={v.media.duration_s} size={tile} onPress={() => openVideo(v.post, v.media.id)} />)}
             </View>
           )}
         </View>

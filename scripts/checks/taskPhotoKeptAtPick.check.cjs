@@ -42,6 +42,6 @@ const up = read('src/lib/uploadFile.ts');
 check('10 the upload itself reads and sends the file with the legacy API too', /legacy\.getInfoAsync\(localUri\)/.test(up) && /legacy\.createUploadTask\(url, localUri/.test(up) && /BINARY_CONTENT/.test(up));
 check('11 the queue adopts picked files through the same keeper', /keepPickedFileAsync\(job\.sourceUri/.test(read('src/lib/mediaQueueRuntime.ts')));
 const comp = read('src/lib/mediaCompress.ts');
-check('8 videos are never compressed: they go up exactly as picked', /Videos are never compressed/.test(comp) && !/compressor\.Video\.compress/.test(comp));
+check('8 videos are shrunk to 720p before upload, and fall back to the original', /compressor\.Video\.compress/.test(comp) && /return original/.test(comp));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

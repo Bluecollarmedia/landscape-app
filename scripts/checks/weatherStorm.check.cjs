@@ -39,9 +39,9 @@ check('13 reading never breaks the weather screens: a failed or missing answer f
 // ── the screens ──
 const page = read('src/components/weather/StormPage.tsx');
 const card = read('src/components/weather/StormCard.tsx');
-const home = read('app/weather/index.tsx');
-const hist = read('app/weather/history.tsx');
-const out = read('app/weather/outlook.tsx');
+const home = read('app/weather/(tabs)/index.tsx');
+const hist = read('app/weather/(tabs)/history.tsx');
+const out = read('app/weather/(tabs)/outlook.tsx');
 const edit = read('src/components/weather/StormOutlookEditor.tsx');
 check('14 the storm page shows the owner\'s headline, message and disclaimer, says "Unavailable" when there is no estimate, and shows measured snowfall only with its source', /version\.headline/.test(page) && /msg\.text/.test(page) && /version\.disclaimer/.test(page) && /snow \?\? t\('Unavailable'\)/.test(page) && /actual \? \(/.test(page) && /Source: \{source\}/.test(page));
 check('15 nothing is translated automatically: no translation service anywhere in the storm screens; a Spanish visitor sees the owner\'s Spanish only if it exists, with a note when it does not', !/googleapis|deepl|openai|translation ?api|translateText/i.test(page + card + hist + out + edit + data) && /Brighton's message is shown in English/.test(page));
@@ -54,7 +54,7 @@ check('21 the owner can preview exactly what visitors will see, add a Spanish ve
 check('22 measured snowfall can only be entered on an update to a storm, and always with its source', /\{active \? \(\s*<>\s*\{label\('Measured snowfall'\)\}/.test(edit) && /Who or what measured it/.test(edit));
 check('23 the owner screen is reached from Settings (landscaping) and from the Snow owner More tab, and both routes are registered', /storm-outlook/.test(read('app/(owner)/(tabs)/more/settings.tsx')) && /storm-outlook/.test(read('app/snow/owner/(tabs)/more.tsx')) && /name="storm-outlook"/.test(read('app/(owner)/_layout.tsx')) && /name="storm-outlook"/.test(read('app/snow/owner/_layout.tsx')) && fs.existsSync(path.join(root, 'app/(owner)/storm-outlook.tsx')) && fs.existsSync(path.join(root, 'app/snow/owner/storm-outlook.tsx')));
 check('24 only the owner sees the entry points (the same owner-only test as the Weather switch), and the database refuses anyone else anyway', (read('app/(owner)/(tabs)/more/settings.tsx').match(/weatherRow\.canChange \? \(\s*<SettingsGroup title="Brighton Weather"/) !== null) && /weatherRow\.canChange \? <Row icon="cloud-snow"/.test(read('app/snow/owner/(tabs)/more.tsx')));
-check('25 the weather area calls itself Brighton Forecast: BRIGHTON with FORECAST under it, and "Lawn" or "Landscape" appears nowhere in the weather screens', !/LANDSCAPE|Lawn|Landscape/.test(home + page + card + hist + out + read('app/weather/account.tsx') + read('app/weather/_layout.tsx')) && /FORECAST/.test(home) && /FORECAST/.test(page));
+check('25 the weather area calls itself Brighton Forecast: BRIGHTON with FORECAST under it, and "Lawn" or "Landscape" appears nowhere in the weather screens', !/LANDSCAPE|Lawn|Landscape/.test(home + page + card + hist + out + read('app/weather/(tabs)/account.tsx') + read('app/weather/_layout.tsx')) && /FORECAST/.test(home) && /FORECAST/.test(page));
 check('26 there are no haptics, glass or frost in the storm screens', !/haptics|GlassView|BlurView|backdrop/i.test(page + card + hist + out));
 check('27 the Weather tab stays lit on the outlook page and tapping it goes home', /pathname\.startsWith\('\/weather\/outlook'\)/.test(read('src/components/weather/FloatingTabBar.tsx')));
 

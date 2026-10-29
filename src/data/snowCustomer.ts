@@ -20,7 +20,9 @@ export const peekTimeline = (): TimelineEntry[] | null => rememberedTimeline;
 export async function loadTimeline(opts: { withUrls?: boolean } = {}): Promise<Result<TimelineEntry[]>> {
   const withUrls = opts.withUrls !== false;
   if (!isSupabaseConfigured) return fail('Snow updates need the live app, not demo mode.');
-  const { data, error } = await supabase.rpc('snow_customer_timeline');
+  // Update 116's history (adds the arrival time); the older timeline function answers when 116 has not been run.
+  let { data, error } = await supabase.rpc('snow_customer_history');
+  if (error && missing(error.message)) ({ data, error } = await supabase.rpc('snow_customer_timeline'));
   if (error) {
     if (!missing(error.message)) return fail("Couldn't load your snow updates.");
     // Older database: the previous function has no property id or storm name, so group by property name.
@@ -31,13 +33,13 @@ export async function loadTimeline(opts: { withUrls?: boolean } = {}): Promise<R
       completedAt: u.completedAt, media: u.media,
     })));
   }
-  type Row = { visit_id: string; property_id: string; property_name: string; service: SnowSvc; storm_name: string | null; completed_at: string; media: { id: string; kind: 'photo' | 'video'; file_key: string }[] };
+  type Row = { visit_id: string; property_id: string; property_name: string; service: SnowSvc; storm_name: string | null; arrived_at?: string | null; completed_at: string; media: { id: string; kind: 'photo' | 'video'; file_key: string }[] };
   const rows = (data ?? []) as Row[];
   let urls: Record<string, string> = {};
   if (withUrls) { try { urls = await signedSnowMediaUrls(rows.flatMap((r) => r.media.map((m) => m.file_key))); } catch { /* shown without photos */ } }
   const list = rows.map((r) => ({
     visitId: r.visit_id, propertyId: r.property_id, propertyName: r.property_name, service: r.service,
-    stormName: r.storm_name ?? undefined, completedAt: r.completed_at,
+    stormName: r.storm_name ?? undefined, arrivedAt: r.arrived_at ?? undefined, completedAt: r.completed_at,
     media: r.media.map((m) => ({ id: m.id, kind: m.kind, url: urls[m.file_key] })),
   }));
   if (withUrls) rememberedTimeline = list;

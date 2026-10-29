@@ -1,6 +1,6 @@
 /**
  * Owner and admin: make or change one Our Work post. A POST is photos and videos together (up to 10; every one is shown as a square, centred
- * automatically). A REEL is one video of up to 60 seconds, shown tall and uncropped, and it also appears in the photo grid unless you switch that
+ * automatically). A REEL is one video of up to 3 minutes, shown tall and uncropped, and it also appears in the photo grid unless you switch that
  * off. You can add from your phone or from one of your projects, put the pictures in order, remove any, change the words and tags, hide or delete it.
  * Photos upload high quality, with a small copy for the grid; videos upload exactly as they are.
  */
@@ -9,17 +9,19 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, us
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage } from '@/components/ui';
+import { Button, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage, ProgressBar } from '@/components/ui';
+import { overallProgress, percentOf, uploadLabel } from '@/lib/uploadProgress';
 import { confirmAction } from '@/components/financials/ActionSheet';
 import { createPost, deletePost, loadOwnerPortfolio, saveMedia, setPostVisible, updatePost, type MediaInput, type OwnerPost } from '@/data/portfolioOwner';
 import { CoverEditor } from '@/components/work/CoverEditor';
 import { MusicEditor, type MusicDraft } from '@/components/work/MusicEditor';
 import { uploadTrack } from '@/data/portfolioMusic';
-import { uploadPortfolioPhoto, uploadPortfolioVideo } from '@/data/portfolioUpload';
+import { uploadPortfolioPhoto, uploadPortfolioVideo, videoFrameToFile } from '@/data/portfolioUpload';
 import { db, rowsOf } from '@/data/store';
 import { keepPicked } from '@/lib/keepPickedFile';
 import { imageProblem, videoProblem } from '@/lib/mediaFormats';
 import { MAX_POST_MEDIA, MAX_VIDEO_S, TAG_CHOICES, formatDuration, moveItem, postProblem, sortedMedia, type MediaKind } from '@/lib/portfolio';
+import { VIDEO_PICK_OPTIONS } from '@/lib/videoPick';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -36,6 +38,9 @@ interface Item {
   /** True when the file is still on the phone and must be uploaded when saving. */
   local: boolean;
   durationS: number | null;
+  /** The picked video's size, as the phone reported it (so a 720p file is sent as it is). */
+  width?: number | null;
+  height?: number | null;
   thumbUrl: string | null;
   storageKey: string | null;
 }
@@ -61,9 +66,10 @@ export function PostEditorScreen() {
   const [town, setTown] = useState('');
   const [takenOn, setTakenOn] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [showInGrid, setShowInGrid] = useState(true);
   const [visible, setVisible] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  /** One bar for the whole save: every file is an equal step, and the file being sent moves the bar through its step. */
+  const [progress, setProgress] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [projectPicker, setProjectPicker] = useState(false);
   const [music, setMusic] = useState<MusicState | null>(null);
@@ -85,7 +91,7 @@ export function PostEditorScreen() {
       setPost(p);
       setReel(p.kind === 'video');
       if (p.music_url && p.music_start_s != null && p.music_end_s != null) setMusic({ track: null, url: p.music_url, title: p.music_title ?? 'My track', durationS: null, startS: p.music_start_s, endS: p.music_end_s, fade: p.music_fade, keepVideoSound: p.keep_video_sound });
-      setCaption(p.caption); setTown(p.town); setTakenOn(p.taken_on); setTags(p.tags); setShowInGrid(p.show_in_grid); setVisible(p.visible);
+      setCaption(p.caption); setTown(p.town); setTakenOn(p.taken_on); setTags(p.tags); setVisible(p.visible);
       setItems(sortedMedia(p).map((m) => ({ key: m.id, id: m.id, kind: m.kind, uri: m.thumb_url ?? m.url, full: m.url, local: false, durationS: m.duration_s, thumbUrl: m.thumb_url, storageKey: (m as { storage_key?: string | null }).storage_key ?? null })));
     });
     return () => { alive = false; };
@@ -100,7 +106,8 @@ export function PostEditorScreen() {
     if (room <= 0) { setProblem(reel ? 'A reel is one video. Remove it first to choose another.' : `A post holds up to ${MAX_POST_MEDIA} photos and videos.`); return; }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { setProblem('Turn on photo access for Brighton Lawn in the Settings app.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: reel ? ['videos'] : ['images', 'videos'], allowsMultipleSelection: !reel, selectionLimit: Math.max(1, room), quality: 1 });
+    // A video is handed over by iOS already at 720p (its own encoder, one pass): see VIDEO_PICK_OPTIONS.
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: reel ? ['videos'] : ['images', 'videos'], allowsMultipleSelection: !reel, selectionLimit: Math.max(1, room), quality: 1, ...VIDEO_PICK_OPTIONS });
     if (result.canceled) return;
     const added: Item[] = [];
     for (const a of result.assets.slice(0, room)) {
@@ -111,7 +118,7 @@ export function PostEditorScreen() {
       if (isVideo && (seconds ?? 0) > MAX_VIDEO_S) { setProblem(`A video can be up to ${MAX_VIDEO_S} seconds. Trim it first.`); continue; }
       // The picked file is copied somewhere safe at once (the phone may remove its temporary copy before the upload ends).
       const kept = await keepPicked(a.uri, isVideo ? 'video' : 'image');
-      added.push({ key: nextKey(), kind: isVideo ? 'video' : 'photo', uri: kept, full: kept, local: true, durationS: seconds, thumbUrl: null, storageKey: null });
+      added.push({ key: nextKey(), kind: isVideo ? 'video' : 'photo', uri: kept, full: kept, local: true, durationS: seconds, thumbUrl: null, storageKey: null, width: a.width, height: a.height });
     }
     setItems((cur) => [...cur, ...added]);
   }
@@ -137,37 +144,63 @@ export function PostEditorScreen() {
       const inputs: MediaInput[] = [];
       let n = 0;
       const toSend = items.filter((i) => i.local).length;
+      const totalSteps = toSend + (music?.track ? 1 : 0) + (coverLocal ? 1 : 0) + 1;
+      let done = 0;
+      const report = (f: number) => setProgress(overallProgress(done, totalSteps, f));
+      report(0);
       for (const i of items) {
         if (!i.local) { inputs.push({ id: i.id, kind: i.kind, url: i.uri, key: i.storageKey, thumbUrl: i.thumbUrl, durationS: i.durationS }); continue; }
         n += 1;
-        setBusy(`Uploading ${n} of ${toSend}…`);
+        setBusy(`${uploadLabel(n, toSend)}…`);
         if (i.kind === 'photo') {
-          const up = await uploadPortfolioPhoto(i.uri, companyId);
+          const up = await uploadPortfolioPhoto(i.uri, companyId, 'posts', report);
           inputs.push({ kind: 'photo', url: up.url, key: up.key, thumbUrl: up.thumbUrl });
         } else {
-          const up = await uploadPortfolioVideo(i.uri, companyId);
+          const up = await uploadPortfolioVideo(i.uri, companyId, 'posts', 0.5, report, { width: i.width, height: i.height });
           inputs.push({ kind: 'video', url: up.url, key: up.key, thumbUrl: up.thumbUrl, durationS: i.durationS });
         }
+        done += 1;
+        report(0);
       }
       // 2. the music (the whole track goes up once; the part that plays is just a start and an end)
       let musicInput: { url: string; title: string; startS: number; endS: number; fade: boolean; keepVideoSound: boolean } | null = null;
       if (music) {
         let musicUrl = music.url;
-        if (music.track) { setBusy('Uploading music…'); musicUrl = (await uploadTrack(music.track, companyId)).url; }
-        if (musicUrl) musicInput = { url: musicUrl, title: music.title, startS: music.startS, endS: music.endS, fade: music.fade, keepVideoSound: music.keepVideoSound };
+        let partS = music.startS, partE = music.endS;
+        if (music.track) {
+          setBusy('Uploading music…');
+          const up = await uploadTrack(music.track, companyId, report, { startS: music.startS, endS: music.endS });
+          musicUrl = up.url;
+          // A track that was cut to the chosen part plays from 0 to its own length.
+          if (up.clip) { partS = up.clip.startS; partE = up.clip.endS; }
+          done += 1; report(0);
+        }
+        if (musicUrl) musicInput = { url: musicUrl, title: music.title, startS: partS, endS: partE, fade: music.fade, keepVideoSound: music.keepVideoSound };
       }
       // 3. the cover (cropped square: a high-quality copy and a small one for the grid)
       let cover: { url: string; thumbUrl: string } | null = null;
-      if (coverLocal) { setBusy('Uploading cover…'); const up = await uploadPortfolioPhoto(coverLocal, companyId, 'covers'); cover = { url: up.url, thumbUrl: up.thumbUrl }; }
+      if (coverLocal) { setBusy('Uploading cover…'); const up = await uploadPortfolioPhoto(coverLocal, companyId, 'covers', report); cover = { url: up.url, thumbUrl: up.thumbUrl }; done += 1; report(0); }
+      // 3b. a reel whose video never got a still frame (an older upload) would show a blank cover: take one from the video now.
+      if (!cover && reel) {
+        const first = inputs.find((m) => m.kind === 'video');
+        if (first && !first.thumbUrl) {
+          setBusy('Making the cover…');
+          try {
+            const frame = await videoFrameToFile(first.url, 0.5);
+            if (frame) { const up = await uploadPortfolioPhoto(frame, companyId, 'covers', report); cover = { url: up.url, thumbUrl: up.thumbUrl }; first.thumbUrl = up.thumbUrl; }
+          } catch { /* the reel still saves; its cover stays automatic */ }
+        }
+      }
       // 4. save the post
       setBusy('Saving…');
+      report(0.5);
       if (!editingId) {
-        const r = await createPost({ kind: reel ? 'video' : 'post', caption, town, takenOn, tags, showInGrid, visible, music: musicInput, coverUrl: cover?.url ?? null, coverThumbUrl: cover?.thumbUrl ?? null, media: inputs });
+        const r = await createPost({ kind: reel ? 'video' : 'post', caption, town, takenOn, tags, showInGrid: true, visible, music: musicInput, coverUrl: cover?.url ?? null, coverThumbUrl: cover?.thumbUrl ?? null, media: inputs });
         if (!r.ok) { setProblem(r.error); return; }
       } else if (post) {
         const ex = await mediaUrlsOf(post);
         const coverPatch = cover ? { cover_url: cover.url, cover_thumb_url: cover.thumbUrl } : coverReset ? { cover_url: null } : {};
-        const r1 = await updatePost(post.id, { ...coverPatch, caption: caption.trim(), town: town.trim(), taken_on: takenOn.trim().slice(0, 30), tags, show_in_grid: reel ? showInGrid : true, visible,
+        const r1 = await updatePost(post.id, { ...coverPatch, caption: caption.trim(), town: town.trim(), taken_on: takenOn.trim().slice(0, 30), tags, show_in_grid: true, visible,
           music_url: musicInput?.url ?? null, music_title: musicInput?.title ?? null, music_start_s: musicInput?.startS ?? null, music_end_s: musicInput?.endS ?? null, music_fade: musicInput?.fade ?? true, keep_video_sound: musicInput?.keepVideoSound ?? false });
         if (!r1.ok) { setProblem(r1.error); return; }
         // existing pictures keep their saved address; only the order and what was removed change
@@ -176,11 +209,13 @@ export function PostEditorScreen() {
         if (!r2.ok) { setProblem(r2.error); return; }
         if (!cover && (coverReset || !post.cover_url)) await updatePost(post.id, { cover_thumb_url: arranged[0]?.thumbUrl ?? null });
       }
+      setProgress(1);
       router.back();
     } catch (e) {
       setProblem(e instanceof Error && e.message ? e.message : "Couldn't save. Check your connection and try again.");
     } finally {
       setBusy(null);
+      setProgress(null);
     }
   }
 
@@ -200,7 +235,7 @@ export function PostEditorScreen() {
   }
 
   const first = items[0];
-  const modeLabel = useMemo(() => (reel ? 'One video, up to 60 seconds. It plays tall, full screen, and swipes up like a reel.' : `Up to ${MAX_POST_MEDIA} photos and videos. Each one is shown as a square, centred automatically.`), [reel]);
+  const modeLabel = useMemo(() => (reel ? 'One video, up to 3 minutes. It plays tall, full screen, and swipes up like a reel.' : `Up to ${MAX_POST_MEDIA} photos and videos. Each one is shown as a square, centred automatically.`), [reel]);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -212,7 +247,12 @@ export function PostEditorScreen() {
         <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.lg }]}>{title}</Text>
         <Text style={[typeScale.bodyMedium, { color: colors.textSecondary, marginTop: 2, marginBottom: spacing.lg }]}>{modeLabel}</Text>
         {problem ? <InlineNotice icon="alert-circle" tone="error" text={problem} style={{ marginBottom: spacing.md }} /> : null}
-        {busy ? <InlineNotice icon="upload-cloud" tone="info" text={busy} style={{ marginBottom: spacing.md }} /> : null}
+        {busy ? (
+          <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityLiveRegion="polite" accessibilityLabel={`${busy} ${percentOf(progress ?? 0)}%`}>
+            <Text style={[typeScale.labelLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{busy}</Text>
+            <ProgressBar progress={percentOf(progress ?? 0)} showLabel />
+          </View>
+        ) : null}
 
         {loading ? <LoadingSpinner /> : (
           <>
@@ -283,15 +323,6 @@ export function PostEditorScreen() {
             </View>
 
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.md, gap: spacing.md, flexDirection: 'column', alignItems: 'stretch' }]}>
-              {reel ? (
-                <View style={styles.switchRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Also show in the photo grid</Text>
-                    <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Off: it only appears in Videos.</Text>
-                  </View>
-                  <Switch value={showInGrid} onValueChange={setShowInGrid} trackColor={{ true: '#2E5E34' }} accessibilityLabel="Also show in the photo grid" />
-                </View>
-              ) : null}
               <View style={styles.switchRow}>
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700', flex: 1 }]}>Show on Our Work</Text>
                 <Switch value={visible} onValueChange={setVisible} trackColor={{ true: '#2E5E34' }} accessibilityLabel="Show on Our Work" />
@@ -390,6 +421,7 @@ const styles = StyleSheet.create({
   vid: { position: 'absolute', left: 4, bottom: 4, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(8,16,12,0.65)' },
   vidText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '700' },
   cover: { position: 'absolute', left: 4, top: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99, backgroundColor: '#2E5E34' },
+  progressCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, marginBottom: spacing.md },
   coverText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '700' },
   x: { position: 'absolute', right: 4, top: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: '#B3261E', alignItems: 'center', justifyContent: 'center' },
   moves: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },

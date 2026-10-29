@@ -18,9 +18,9 @@
  * dismissing at once leave iOS stuck with an invisible layer that swallows every touch (the app looked frozen).
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, StyleSheet, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView, type GestureType } from 'react-native-gesture-handler';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 
 interface BottomSheetModalProps {
@@ -30,6 +30,8 @@ interface BottomSheetModalProps {
   scrollOffset?: SharedValue<number>;
   closeDistance?: number;
   closeVelocity?: number;
+  /** An extra downward offset the page drives (how far it is pulled past its top): the WHOLE sheet moves with it, live, under the finger. */
+  pull?: SharedValue<number>;
 }
 
 const IN_MS = 300;
@@ -45,7 +47,18 @@ const closing = new Set<symbol>();
 const waiting = new Set<() => void>();
 const notify = () => { for (const w of Array.from(waiting)) w(); };
 
-export function BottomSheetModal({ visible, onRequestClose, children, scrollOffset, closeDistance = CLOSE_DISTANCE, closeVelocity = CLOSE_VELOCITY }: BottomSheetModalProps) {
+const SheetPanContext = createContext<React.MutableRefObject<GestureType | undefined> | null>(null);
+/**
+ * For a page inside a sheet that passes `scrollOffset`: give its gesture-handler ScrollView `simultaneousHandlers={useSheetPanRef()}`, so the
+ * page's scrolling and the sheet's swipe-down are recognised together and the swipe works from the top of the page.
+ */
+export function useSheetPanRef(): React.MutableRefObject<GestureType | undefined> {
+  const r = useContext(SheetPanContext);
+  const fallback = useRef<GestureType | undefined>(undefined);
+  return r ?? fallback;
+}
+
+export function BottomSheetModal({ visible, onRequestClose, children, scrollOffset, closeDistance = CLOSE_DISTANCE, closeVelocity = CLOSE_VELOCITY, pull }: BottomSheetModalProps) {
   const { height } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
   const progress = useSharedValue(0);
@@ -102,10 +115,13 @@ export function BottomSheetModal({ visible, onRequestClose, children, scrollOffs
   // A sheet unmounted while closing must not hold others back.
   useEffect(() => () => { closing.delete(id); notify(); }, [id]);
 
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value * Math.max(0, 1 - drag.value / (height * 0.8)) }));
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - progress.value) * height + drag.value }] }));
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value * Math.max(0, 1 - (drag.value + (pull?.value ?? 0)) / (height * 0.8)) }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - progress.value) * height + drag.value + (pull?.value ?? 0) }] }));
 
-  const base = Gesture.Pan().enabled(Platform.OS !== 'web');
+  // The page's own scroll view (a gesture-handler ScrollView with simultaneousHandlers={useSheetPanRef()}) is recognised AT THE SAME TIME as the
+  // swipe-down, so iOS never hands the touch to the scroll view alone (which left the sheet unable to close by a swipe).
+  const panRef = useRef<GestureType | undefined>(undefined);
+  const base = Gesture.Pan().enabled(Platform.OS !== 'web').withRef(panRef);
   const pan = (scrollOffset
     ? base
       .manualActivation(true)
@@ -139,7 +155,7 @@ export function BottomSheetModal({ visible, onRequestClose, children, scrollOffs
       <GestureHandlerRootView style={styles.fill}>
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]} />
         <GestureDetector gesture={pan}>
-          <Animated.View style={[styles.fill, sheetStyle]}>{child}</Animated.View>
+          <Animated.View style={[styles.fill, sheetStyle]}><SheetPanContext.Provider value={panRef}>{child}</SheetPanContext.Provider></Animated.View>
         </GestureDetector>
       </GestureHandlerRootView>
     </Modal>

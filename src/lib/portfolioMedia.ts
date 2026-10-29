@@ -1,10 +1,10 @@
 /**
- * How Our Work pictures are made (pure: no phone, no network). The owner chose: photos HIGH quality, videos kept ORIGINAL (never compressed), and a
+ * How Our Work pictures are made (pure: no phone, no network). The owner chose (2026-10-28): photos shrunk to 1600 px, videos shrunk to 720p, and a
  * small square copy of every picture just for the grid, so a screen of tiles is light to load.
  */
 
-/** The long side of a full photo (a phone photo is usually 3000 to 4000 px, so this keeps it sharp but not huge). */
-export const FULL_LONG_SIDE = 2400;
+/** The long side of a full photo (a phone photo is usually 3000 to 4000 px, so this keeps it sharp but much lighter). */
+export const FULL_LONG_SIDE = 1600;
 export const FULL_QUALITY = 0.85;
 /** The grid copy: a centred square, this many pixels on a side. */
 export const THUMB_SIZE = 400;
@@ -32,5 +32,5 @@ export const portfolioFolder = (companyId: string, kind: PortfolioFolder): strin
 export const thumbFolder = (companyId: string, kind: PortfolioFolder): string => `${portfolioFolder(companyId, kind)}/thumbs`;
 
 /** The longest a video may be, in seconds, and how it is stored: as it came off the phone. */
-export const MAX_VIDEO_SECONDS = 60;
-export const VIDEO_IS_COMPRESSED = false;
+export const MAX_VIDEO_SECONDS = 180;
+export const VIDEO_IS_COMPRESSED = true;

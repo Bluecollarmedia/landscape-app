@@ -8,7 +8,7 @@ import { ActivityIndicator, Modal, PanResponder, Pressable, ScrollView, StyleShe
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer } from 'expo-video';
 import { Button, Icon, InlineNotice, Input } from '@/components/ui';
-import { pickTrack, readTrackDuration, type PickedTrack } from '@/data/portfolioMusic';
+import { pickTrack, pickTrackFromVideo, readTrackDuration, type PickedTrack } from '@/data/portfolioMusic';
 import {
   MIN_CLIP_S, clipFractions, clipLengthS, defaultClip, dragClipEnd, dragClipStart, formatDuration, moveClip, normalizeClip, rulerMarks, trackTitleFromFile, type Clip,
 } from '@/lib/portfolio';
@@ -92,11 +92,13 @@ export function MusicEditor({ visible, initial, hasVideo, onCancel, onDone }: {
     setPlaying(true);
   }
 
-  async function choose() {
+  /** A track from the phone's files, or the sound taken out of one of its videos: either way the same timeline follows. */
+  async function choose(from: 'file' | 'video' = 'file') {
     setProblem(null);
-    const r = await pickTrack();
-    if (!r) return;
-    if (!r.ok) { setProblem(r.error); return; }
+    setLoading(from === 'video');
+    const r = from === 'video' ? await pickTrackFromVideo() : await pickTrack();
+    if (!r) { setLoading(false); return; }
+    if (!r.ok) { setLoading(false); setProblem(r.error); return; }
     setLoading(true);
     const d = await readTrackDuration(r.track.uri);
     setLoading(false);
@@ -147,7 +149,8 @@ export function MusicEditor({ visible, initial, hasVideo, onCancel, onDone }: {
 
           {!source ? (
             <View style={{ gap: spacing.md }}>
-              <Button title="Choose a track from your phone" onPress={choose} loading={loading} />
+              <Button title="Choose a track from your phone" onPress={() => choose('file')} loading={loading} />
+              <Button title="Use the sound from a video" variant="secondary" onPress={() => choose('video')} loading={loading} />
               <RightsNote />
             </View>
           ) : (
@@ -158,7 +161,8 @@ export function MusicEditor({ visible, initial, hasVideo, onCancel, onDone }: {
                   <View style={{ flex: 1 }}>
                     <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{track?.fileName ?? 'Saved track'}{total ? ` · ${formatDuration(total)}` : ''}</Text>
                   </View>
-                  <Button title="Change" size="sm" variant="secondary" onPress={choose} />
+                  <Button title="Change" size="sm" variant="secondary" onPress={() => choose('file')} />
+                  <Button title="From a video" size="sm" variant="secondary" onPress={() => choose('video')} />
                 </View>
                 <Input label="Name shown on the music chip" value={title} onChangeText={setTitle} maxLength={60} containerStyle={{ marginTop: spacing.md }} />
               </View>

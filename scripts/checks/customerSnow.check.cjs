@@ -46,19 +46,20 @@ const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 
 
   // Wiring
   const home = read('app/(customer)/(tabs)/index.tsx');
-  check('15 Home: Snow is its own section, separate from "Active Projects"; the strip only exists during a storm', /<SectionHeading title="Snow"/.test(home) && /active\.filter\(\(i\) => i\.kind === 'snow'\)/.test(home) && /activeRest/.test(home) && /strip \? <StormStrip/.test(home) && !/All clear/.test(home));
-  check('16 Home: a Snow-only customer gets no empty "Active Projects" box', /activeRest\.length > 0 \|\| \(snowItems\.length === 0\)/.test(home));
-  check('17 Home: tapping a Snow card opens that property on the Snow screen', /snow-updates\?property=/.test(home));
+  const ph = read('src/components/customerHome/PropertyHome.tsx');
+  check('15 Home: Snow is its own tab, separate from Project and Lawn; the live "Right now" card only exists while a storm involves the property', /<SnowPane/.test(ph) && /<ProjectPane/.test(ph) && /<LawnPane/.test(ph) && /\{sv \? \(/.test(ph) && !/All clear/.test(ph));
+  check('16 Home: a property with only one kind of service gets no switch', /group\.services\.length > 1/.test(ph));
+  check('17 Home: "See all visits" opens the history for Snow', /history\?service=snow/.test(ph));
   const screen = read('src/components/snow/customer/CustomerSnowScreen.tsx');
   check('18 the Snow screen swipes between properties (one page each, with dots) and has no tab switcher', /pagingEnabled/.test(screen) && /properties\.map\(\(p\) => \(\s*<View key=\{p\.id\} style=\{\{ width \}\}>/.test(screen) && /styles\.dots/.test(screen) && !/Maple/.test(screen));
   check('19 the Snow screen has the Right now card, This season tiles, Included services, the Timeline, and the friendly empty state', /RIGHT NOW/.test(screen) && /THIS SEASON/.test(screen) && /INCLUDED AT YOUR PROPERTY/.test(screen) && /TIMELINE/.test(screen) && /HOW IT WORKS/.test(screen) && /No service yet this season/.test(screen));
   check('20 photos open in the full-screen viewer, and the screen has NO notification switches', /TaskMediaViewer/.test(screen) && !/<Switch/.test(screen) && !/Notification settings/.test(screen));
   check('21 the route opens the new screen', /CustomerSnowScreen/.test(read('app/(customer)/snow-updates.tsx')));
   const acct = read('app/(customer)/(tabs)/account.tsx');
-  check('22 Account has the Snow notification switches; its duplicate "Snow updates" and "Maintenance updates" rows are gone (Home is the one way in)', /<SnowNotifyChoices \/>/.test(acct) && !/title="Snow updates"/.test(acct) && !/title="Maintenance updates"/.test(acct) && /maintenance-updates/.test(home));
+  check('22 Account has the Snow notification switches; its duplicate "Snow updates" and "Maintenance updates" rows are gone (Home is the one way in)', /<SnowNotifyChoices \/>/.test(acct) && !/title="Snow updates"/.test(acct) && !/title="Maintenance updates"/.test(acct) && /history\?service=lawn/.test(ph));
   const sw = read('src/components/snow/customer/SnowNotifyChoices.tsx');
   check('23 the switches are Crew arrives and Service finished, save at once, and go back if saving fails', /Crew arrives/.test(sw) && /Service finished/.test(sw) && /saveNotifyChoices\(/.test(sw) && /setChoices\(before\)/.test(sw));
-  check('24 the landscaping screens (project card, project screen) were not touched by this change', /ActiveCard/.test(home) && /No active projects right now/.test(home));
+  check('24 the project card and Past work are kept on Home (they open the existing project screen)', /ProjectCard/.test(ph) && /PastRow/.test(ph) && /\/\(customer\)\/project\?id=/.test(ph));
   const noSpin = screen + read('src/hooks/useSnowHome.ts') + read('src/components/snow/customer/SnowNotifyChoices.tsx');
   check('25 the customer Snow screen has NO spinner: no LoadingSpinner or ActivityIndicator, anywhere', !/LoadingSpinner|ActivityIndicator|Spinner/.test(noSpin));
   check('26 while loading it shows quiet placeholder blocks in the shape of the page, not a spinner', /function Placeholder\(\)/.test(screen) && /waiting \? \(\s*<Placeholder \/>/.test(screen));

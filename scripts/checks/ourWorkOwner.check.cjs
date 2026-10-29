@@ -14,18 +14,18 @@ let bad = 0;
 let n = 0;
 const check = (name, ok, detail = '') => { n += 1; if (!ok) bad += 1; console.log(`${ok ? 'PASS' : 'FAIL'}  ${n} ${name}${ok ? '' : '  - ' + detail}`); };
 
-check('1 a big phone photo is saved with its long side at 2400, keeping its shape', JSON.stringify(M.fitLongSide(4032, 3024)) === JSON.stringify({ width: 2400, height: 1800 }) && JSON.stringify(M.fitLongSide(3024, 4032)) === JSON.stringify({ width: 1800, height: 2400 }));
+check('1 a big phone photo is saved with its long side at 1600, keeping its shape', JSON.stringify(M.fitLongSide(4032, 3024)) === JSON.stringify({ width: 1600, height: 1200 }) && JSON.stringify(M.fitLongSide(3024, 4032)) === JSON.stringify({ width: 1200, height: 1600 }));
 check('2 a photo that is already small is never enlarged, and a missing size is handled', JSON.stringify(M.fitLongSide(1200, 800)) === JSON.stringify({ width: 1200, height: 800 }) && M.fitLongSide(0, 10).width === 0);
 check('3 the grid copy is a centred square cut', JSON.stringify(M.squareCrop(4000, 3000)) === JSON.stringify({ originX: 500, originY: 0, size: 3000 }) && JSON.stringify(M.squareCrop(3000, 4000)) === JSON.stringify({ originX: 0, originY: 500, size: 3000 }) && M.THUMB_SIZE === 400);
-check('4 photos are high quality (0.85, the app\'s usual is 0.5) and the grid copy is small and light', M.FULL_QUALITY === 0.85 && M.THUMB_QUALITY < M.FULL_QUALITY && M.FULL_LONG_SIDE > 1600);
+check('4 photos are high quality (0.85, the app\'s usual is 0.5) and the grid copy is small and light', M.FULL_QUALITY === 0.85 && M.THUMB_QUALITY < M.FULL_QUALITY && M.FULL_LONG_SIDE === 1600);
 check('5 files go in the company\'s own portfolio folder, and the small copies in a thumbs folder under it', M.portfolioFolder('c1', 'posts') === 'c1/portfolio/posts' && M.thumbFolder('c1', 'posts') === 'c1/portfolio/posts/thumbs');
-check('6 a video is limited to 60 seconds and is NOT compressed', M.MAX_VIDEO_SECONDS === 60 && M.VIDEO_IS_COMPRESSED === false);
+check('6 a reel may be up to 3 minutes, and videos are sent at 720p', M.MAX_VIDEO_SECONDS === 180 && M.VIDEO_IS_COMPRESSED === true);
 
 const media = read('src/lib/media.ts');
 check('7 the shared uploader can skip its own compression (raw) so Our Work\'s quality is kept, and every other screen still compresses as before', /opts\?: \{ raw\?: boolean \}/.test(media) && /startsWith\('image\/'\) && !opts\?\.raw/.test(media));
 const up = read('src/data/portfolioUpload.ts');
 check('8 a photo uploads as a high-quality copy plus a small square copy, both without the app\'s usual compression', /FULL_QUALITY/.test(up) && /squareCrop\(full\.width, full\.height\)/.test(up) && (up.match(/\{ raw: true \}/g) || []).length >= 4);
-check('9 a video uploads exactly as it is (no compression), with a best-effort still frame for the grid that never stops the post', /uploadImage\(localUri, portfolioFolder\(companyId, kind\), 'video\/mp4', undefined, \{ raw: true \}\)/.test(up) && !/prepareVideo|react-native-compressor|compressVideo/.test(up) && /catch \{\s*return \{ url: up\.url, key: up\.key, thumbUrl: null/.test(up));
+check('9 a video is shrunk to 720p first (the original if that fails), with a best-effort still frame for the grid that never stops the post', /uploadImage\(source, portfolioFolder\(companyId, kind\), 'video\/mp4', \(p\) => onProgress\?\.\(0\.05 \+ p \* 0\.85\), \{ raw: true \}\)/.test(up) && /const source = await shrinkVideoUri\(localUri, size\)/.test(up) && /catch \{\s*onProgress\?\.\(1\);\s*return \{ url: up\.url, key: up\.key, thumbUrl: null/.test(up));
 
 const own = read('src/data/portfolioOwner.ts');
 check('10 a post that cannot save its pictures is not left behind half made', /portfolio_posts'\)\.delete\(\)\.eq\('id', postId\)/.test(own) && /if \(ins\.error\) \{/.test(own));
@@ -46,8 +46,8 @@ check('19 every post is listed with its own show/hide switch and an Edit button,
 const ed = read('src/components/work/PostEditorScreen.tsx');
 check('20 a post takes up to 10 photos and videos, a reel one video of up to 60 seconds, picked from the phone (copied to a safe place at once) or from one of the owner\'s projects', /MAX_POST_MEDIA/.test(ed) && /reel \? \['videos'\] : \['images', 'videos'\]/.test(ed) && /seconds \?\? 0\) > MAX_VIDEO_S/.test(ed) && /keepPicked\(a\.uri/.test(ed) && /ProjectPhotoPicker/.test(ed) && /rowsOf\('project_photos'\)/.test(ed));
 check('21 the pictures can be put in order and any removed, and the first is the cover', /moveItem\(cur, from, to\)/.test(ed) && /Move earlier/.test(ed) && /first one is the cover/.test(ed) && /accessibilityLabel="Remove"/.test(ed));
-check('22 saving sends photos high quality with a small copy and videos as they are, shows "Uploading 2 of 5…", then creates or updates the post', /uploadPortfolioPhoto\(i\.uri, companyId\)/.test(ed) && /uploadPortfolioVideo\(i\.uri, companyId\)/.test(ed) && /Uploading \$\{n\} of \$\{toSend\}/.test(ed) && /createPost\(/.test(ed) && /saveMedia\(post\.id/.test(ed) && /postProblem\(/.test(ed));
-check('23 a reel has "Also show in the photo grid" (on to start); every post has "Show on Our Work"; the editor can take a post down, show it again, and delete it (asked first)', /Also show in the photo grid/.test(ed) && /useState\(true\)/.test(ed) && /Show on Our Work/.test(ed) && /Take down from Our Work/.test(ed) && /Show on Our Work again/.test(ed) && /confirmAction\('Delete this post\?'/.test(ed));
+check('22 saving sends photos with a small copy and videos shrunk, shows "Uploading 2 of 5…" with one bar, then creates or updates the post', /uploadPortfolioPhoto\(i\.uri, companyId, 'posts', report\)/.test(ed) && /uploadPortfolioVideo\(i\.uri, companyId, 'posts', 0\.5, report, \{ width: i\.width, height: i\.height \}\)/.test(ed) && /uploadLabel\(n, toSend\)/.test(ed) && /createPost\(/.test(ed) && /saveMedia\(post\.id/.test(ed) && /postProblem\(/.test(ed));
+check('23 a reel is always in the photo grid (no switch for it any more); every post has "Show on Our Work"; the editor can take a post down, show it again, and delete it (asked first)', !/Also show in the photo grid/.test(ed) && /useState\(true\)/.test(ed) && /Show on Our Work/.test(ed) && /Take down from Our Work/.test(ed) && /Show on Our Work again/.test(ed) && /confirmAction\('Delete this post\?'/.test(ed));
 check('24 the words say post and reel, and say that posts are shown square and centred', /'New reel'/.test(ed) && /'New post'/.test(ed) && /shown as a square, centred automatically/.test(ed) && /Only the town shows/.test(ed));
 
 const hs = read('src/components/work/HighlightsScreen.tsx');

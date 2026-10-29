@@ -12,7 +12,7 @@ const UNREACHABLE = "Couldn't send your request. Check your connection and try a
 export async function submitServiceRequest(r: ServiceRequestInput): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured) return { ok: false, error: UNREACHABLE };
   try {
-    const { error } = await supabase.rpc('submit_service_request', {
+    const { data, error } = await supabase.rpc('submit_service_request', {
       p_property_type: r.propertyType,
       p_services: r.services,
       p_details: r.details.trim(),
@@ -23,6 +23,10 @@ export async function submitServiceRequest(r: ServiceRequestInput): Promise<{ ok
     });
     // The server's own wording (code P0001: it refused the request) is shown as is; anything else (no connection, the update not run yet) gets the plain sentence.
     if (error) return { ok: false, error: error.code === 'P0001' && error.message ? error.message : UNREACHABLE };
+    // Update 118 returns the new request's id: the owner is emailed about it (notify-request). Before 118 there is no id and no email; the
+    // request is saved and shown in the app either way, so a failure here is never shown to the visitor.
+    const id = (data as { id?: unknown } | null)?.id;
+    if (typeof id === 'string') void supabase.functions.invoke('notify-request', { body: { id } }).catch(() => {});
     return { ok: true };
   } catch {
     return { ok: false, error: UNREACHABLE };

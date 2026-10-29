@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Image, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Reanimated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
+import { markStep } from '@/lib/errorReporting';
+import { useWorkBase } from '@/lib/workRoutes';
 import { OptimizedImage } from '@/components/ui';
 import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { StoryBackdrop, StoryCard } from '@/components/work/StoryCard';
@@ -29,21 +33,26 @@ export default function WeatherWorkStory() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const { start, highlight } = useLocalSearchParams<{ start?: string; highlight?: string }>();
+  const base = useWorkBase();
   const feed = getLoadedPortfolio();
   // A highlight plays like a story that never expires: its posts' photos and videos, one after another, in this same viewer.
   const hl = highlight ? feed?.highlights.find((h) => h.id === highlight) : undefined;
   const stories = useMemo(() => (hl && feed ? highlightFrames(hl, feed.posts) : activeStories(feed?.stories, Date.now())), [feed, hl]);
   const seen = useSeenStories();
-  const focused = useIsFocused() && useAppActive();
+  const isFocused = useIsFocused();
+  const appActive = useAppActive();
+  const focused = isFocused && appActive;
   const [index, setIndex] = useState(() => {
     const n = Number(start);
     return Number.isInteger(n) && n >= 0 && n < stories.length ? n : startIndex(stories, seen);
   });
   const [holding, setHolding] = useState(false);
+  // While the viewer is being pulled down the story waits (like a hold).
+  const [dragging, setDragging] = useState(false);
   const [sound, setSound] = useState(false);
   const story = stories[index];
 
-  const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); }, [router]);
+  const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace(`${base}/work` as any); }, [router, base]);
 
   // ── the timer for the story on screen (stops while held, while another screen is on top, or when the app is switched away) ──
   const progress = useRef(new Animated.Value(0)).current;
@@ -58,7 +67,7 @@ export default function WeatherWorkStory() {
   advanceRef.current = advance;
 
   useEffect(() => { progress.setValue(0); value.current = 0; }, [index, progress]);
-  const playing = focused && !holding;
+  const playing = focused && !holding && !dragging;
   useEffect(() => {
     if (!story) return;
     if (!playing) { run.current?.stop(); return; }
@@ -82,10 +91,29 @@ export default function WeatherWorkStory() {
     if (held.current) return;
     if (tapZone(x, width) === 'previous') setIndex(previousIndex(index)); else advance();
   };
-  const pan = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponderCapture: (_e, g) => g.dy > 18 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
-    onPanResponderRelease: (_e, g) => { if (g.dy > 90) goBack(); },
-  }), [goBack]);
+  // ── pull down to close, like Instagram: the whole viewer follows the finger, shrinks a little and shows the screen behind it; let go far
+  // enough (or fast enough) and it slides away and closes; otherwise it springs back. A sideways move is never a pull (failOffsetX), so the
+  // taps and holds on the story keep working.
+  const dragY = useSharedValue(0);
+  const dismiss = useMemo(() => Gesture.Pan()
+    .activeOffsetY(12)
+    .failOffsetY(-12)
+    .failOffsetX([-24, 24])
+    .onStart(() => { runOnJS(setDragging)(true); })
+    .onUpdate((e) => { dragY.value = Math.max(0, e.translationY); })
+    .onEnd((e) => {
+      if (dragY.value > 140 || e.velocityY > 900) {
+        dragY.value = withTiming(height, { duration: 220 }, (done) => { if (done) runOnJS(goBack)(); });
+      } else {
+        dragY.value = withSpring(0, { damping: 20, stiffness: 240 });
+        runOnJS(setDragging)(false);
+      }
+    }), [dragY, height, goBack]);
+  const viewerStyle = useAnimatedStyle(() => {
+    const p = Math.min(1, dragY.value / height);
+    return { transform: [{ translateY: dragY.value }, { scale: 1 - p * 0.18 }], borderRadius: p * 36 };
+  });
+  const dimStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, dragY.value / height) * 0.9 }));
 
   if (!story) {
     return (
@@ -98,21 +126,31 @@ export default function WeatherWorkStory() {
 
   const post = story.post_id ? feed?.posts.find((p) => p.id === story.post_id) : undefined;
   const target = story.kind === 'share' ? shareTarget(story, post) : null;
+  // Opening a post or a reel from here CLOSES the story first, then opens it (never the two on top of each other, each with its own video and
+  // timer alive); back from the post returns to Our Work. A breadcrumb is written first, so if the app dies here the next launch can say so.
+  const openAfterClosing = (what: string, href: { pathname: string; params: Record<string, string> }) => {
+    markStep(what);
+    goBack();
+    setTimeout(() => router.push(href as any), 150);
+  };
   const openTarget = () => {
     if (held.current || !target) return;   // a hold only shows the hint; a short tap opens
-    if (target.type === 'video') router.push({ pathname: '/weather/work-video', params: { post: target.postId, media: target.mediaId } } as any);
-    else router.push({ pathname: '/weather/work-post', params: { id: target.postId } } as any);
+    if (target.type === 'video') openAfterClosing('opening a reel from a story', { pathname: `${base}/work-video`, params: { post: target.postId, media: target.mediaId } });
+    else openAfterClosing('opening a project from a story', { pathname: `${base}/work-post`, params: { id: target.postId } });
   };
 
   // Inside a highlight, a small button at the bottom opens the post (or reel) the picture came from.
   const openFrame = () => {
     if (!post) return;
-    if (story.kind === 'video' && story.media_id) router.push({ pathname: '/weather/work-video', params: { post: post.id, media: story.media_id } } as any);
-    else router.push({ pathname: '/weather/work-post', params: { id: post.id } } as any);
+    if (story.kind === 'video' && story.media_id) openAfterClosing('opening a reel from a highlight', { pathname: `${base}/work-video`, params: { post: post.id, media: story.media_id } });
+    else openAfterClosing('opening a project from a highlight', { pathname: `${base}/work-post`, params: { id: post.id } });
   };
 
   return (
-    <View style={styles.screen} {...pan.panHandlers}>
+    <View style={styles.stage}>
+      <Reanimated.View style={[StyleSheet.absoluteFill, styles.dim, dimStyle]} pointerEvents="none" />
+      <GestureDetector gesture={dismiss}>
+      <Reanimated.View style={[styles.screen, viewerStyle]}>
       <StoryLayer key={story.id} story={story} post={post} width={width} height={height} playing={playing} sound={sound} holding={holding} onHold={press} onTap={onBackgroundPress} onOpen={openTarget} />
 
       {hl && post ? (
@@ -143,6 +181,8 @@ export default function WeatherWorkStory() {
           <Pressable onPress={goBack} accessibilityRole="button" accessibilityLabel={t('Close')} style={styles.roundBtn}><MaterialCommunityIcons name="close" size={24} color="#FFFFFF" /></Pressable>
         </View>
       </View>
+      </Reanimated.View>
+      </GestureDetector>
     </View>
   );
 }
@@ -184,13 +224,15 @@ function StoryLayer({ story, post, width, height, playing, sound, holding, onHol
 /** A story video: a fresh player for each one, played from the start, paused (not reset) when held or when the screen is covered. */
 function StoryVideo({ url, playing, sound }: { url: string; playing: boolean; sound: boolean }) {
   const player = useVideoPlayer(url, (p) => { p.loop = false; p.muted = true; });
-  useEffect(() => { player.muted = !sound; }, [player, sound]);
-  useEffect(() => { if (playing) player.play(); else player.pause(); }, [player, playing]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
+  useEffect(() => { try { player.muted = !sound; } catch { /* released */ } }, [player, sound]);
+  useEffect(() => { try { if (playing) player.play(); else player.pause(); } catch { /* released */ } }, [player, playing]);
+  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsVideoFrameAnalysis={false} />;
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0E1A12' },
+  stage: { flex: 1 },
+  dim: { backgroundColor: '#000000' },
+  screen: { flex: 1, backgroundColor: '#0E1A12', overflow: 'hidden' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 30, backgroundColor: '#F7FAF4' },
   emptyTitle: { color: '#0B4736', fontSize: 18, fontWeight: '700', textAlign: 'center' },
   emptyBtn: { minHeight: 44, paddingHorizontal: 24, borderRadius: 99, backgroundColor: '#E3F1DC', alignItems: 'center', justifyContent: 'center' },

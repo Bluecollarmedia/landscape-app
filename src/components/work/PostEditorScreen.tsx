@@ -4,6 +4,7 @@
  * off. You can add from your phone or from one of your projects, put the pictures in order, remove any, change the words and tags, hide or delete it.
  * Photos upload high quality, with a small copy for the grid; videos upload exactly as they are.
  */
+import { VideoThumb } from '@/components/media/VideoThumb';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -270,7 +271,7 @@ export function PostEditorScreen() {
                 {items.map((it, i) => (
                   <View key={it.key} style={{ width: tile }}>
                     <View style={[styles.tile, { width: tile, height: tile, backgroundColor: colors.backgroundTertiary }, i === 0 && !reel ? { borderWidth: 2.5, borderColor: '#2E5E34' } : null]}>
-                      {it.kind === 'photo' || it.thumbUrl ? <OptimizedImage source={it.thumbUrl ?? it.uri} style={{ width: '100%', height: '100%' }} /> : <Icon name="video" size={22} color={colors.textSecondary} />}
+                      {it.kind === 'photo' || it.thumbUrl ? <OptimizedImage source={it.thumbUrl ?? it.uri} style={{ width: '100%', height: '100%' }} /> : <VideoThumb uri={it.uri} fallback={<Icon name="video" size={22} color={colors.textSecondary} />} />}
                       {it.kind === 'video' ? <View style={styles.vid}><Icon name="play" size={12} color="#FFFFFF" /><Text style={styles.vidText}>{formatDuration(it.durationS)}</Text></View> : null}
                       {i === 0 && !reel && items.length > 1 ? <View style={styles.cover}><Text style={styles.coverText}>Cover</Text></View> : null}
                       <Pressable onPress={() => remove(it.key)} accessibilityRole="button" accessibilityLabel="Remove" hitSlop={6} style={styles.x}><Icon name="x" size={13} color="#FFFFFF" /></Pressable>

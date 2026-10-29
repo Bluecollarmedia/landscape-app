@@ -7,6 +7,7 @@ import { View, Text, Pressable, StyleSheet, Modal, useWindowDimensions } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Icon, OptimizedImage } from '@/components/ui';
+import { VideoThumb } from '@/components/media/VideoThumb';
 import { MediaJobOverlay } from '@/components/media/MediaJobOverlay';
 import { db } from '@/data/store';
 const isDemoMode = () => !!db.demo;
@@ -60,9 +61,12 @@ export function TaskMediaStrip({ items, onOpen, onAdd, onRemove, drafts }: TaskM
             {item.mediaType === 'image' ? (
               <OptimizedImage source={item.uri} style={styles.tileImage} />
             ) : (
-              <View style={styles.playCircle}>
-                <Icon name="play" size={18} color="#FFFFFF" />
-              </View>
+              <>
+                <VideoThumb uri={item.uri} />
+                <View style={styles.playCircle}>
+                  <Icon name="play" size={18} color="#FFFFFF" />
+                </View>
+              </>
             )}
             {/* Still a local file? Says Preparing / Uploading / Not saved (Retry) so a preview is never mistaken for a saved file. */}
             {drafts ? null : <MediaJobOverlay rowId={item.key} localOnly={!/^https?:\/\//i.test(item.uri) && !/^(data|blob):/i.test(item.uri) && !isDemoMode()} />}

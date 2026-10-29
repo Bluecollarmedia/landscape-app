@@ -4,6 +4,7 @@
  * the three never share a list. Finished projects sit in a quiet "Past work" row at the bottom. Everything comes from real data
  * (useCustomerHome); a line with no data behind it is simply left out.
  */
+import { VideoThumb } from '@/components/media/VideoThumb';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -180,7 +181,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
           <View style={styles.tiles}>
             {shown.map((m, i) => (
               <Pressable key={m.id} onPress={() => open(withPhotos, i)} accessibilityRole="button" accessibilityLabel={m.kind === 'video' ? t('Play video') : t('View photo')} style={[styles.tile, { backgroundColor: colors.borderLight }]}>
-                {m.kind === 'photo' ? <Image source={{ uri: m.url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <View style={styles.tileCenter}><Icon name="video" size={22} color={colors.textTertiary} /></View>}
+                {m.kind === 'photo' ? <Image source={{ uri: m.url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <VideoThumb uri={m.url ?? ''} fallback={<Icon name="video" size={22} color={colors.textTertiary} />} />}
                 {i === shown.length - 1 && extra > 0 ? <View style={styles.tileMore}><Text style={[typeScale.headingSmall, { color: '#FFFFFF' }]}>+{extra}</Text></View> : null}
               </Pressable>
             ))}

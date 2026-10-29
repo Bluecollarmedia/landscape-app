@@ -4,6 +4,7 @@
  * and a timeline of every completed, sent service with its photos. Plowing and salting are separate entries even when different crews did
  * them. Everything comes from real data (src/data/snowCustomer.ts); nothing is made up. Notification switches live in Account, not here.
  */
+import { VideoThumb } from '@/components/media/VideoThumb';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, RefreshControl, useWindowDimensions, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { Image } from 'expo-image';
@@ -288,7 +289,7 @@ function EntryCard({ entry, onOpenPhoto }: { entry: TimelineEntry; onOpenPhoto: 
           <View style={styles.strip}>
             {strip.map((m, i) => (
               <Pressable key={m.id} onPress={() => onOpenPhoto(i)} accessibilityRole="button" accessibilityLabel={m.kind === 'video' ? t('Play video') : t('View photo')} style={[styles.tile, { backgroundColor: colors.borderLight }]}>
-                {m.kind === 'photo' ? <Image source={{ uri: m.url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <View style={styles.tileIcon}><Icon name="video" size={22} color={colors.textTertiary} /></View>}
+                {m.kind === 'photo' ? <Image source={{ uri: m.url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <VideoThumb uri={m.url ?? ''} fallback={<Icon name="video" size={22} color={colors.textTertiary} />} />}
                 {i === strip.length - 1 && extra > 0 ? <View style={styles.tileMore}><Text style={[typeScale.labelLarge, { color: '#FFFFFF' }]}>+{extra}</Text></View> : null}
               </Pressable>
             ))}

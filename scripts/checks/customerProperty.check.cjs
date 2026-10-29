@@ -65,10 +65,11 @@ check('25 words can be translated', lib.visitTimes(visits[1], (t) => `ES:${t}`) 
 const entries = [
   { visitId: 'v1', propertyId: 's1', propertyName: 'Hillcrest Lane', service: 'plowing', arrivedAt: '2026-10-28T06:05:00', completedAt: '2026-10-28T06:40:00', media: [{ id: 'm1', kind: 'photo' }, { id: 'm2', kind: 'video' }] },
   { visitId: 'v2', propertyId: 's2', propertyName: 'Riverside Plaza', service: 'salting', completedAt: '2026-10-28T07:00:00', media: [] },
-  { visitId: 'v3', propertyId: 'old', propertyName: ' hillcrest lane ', service: 'salting', completedAt: '2026-01-14T18:10:00', media: [{ id: 'm3', kind: 'photo' }] },
+  { visitId: 'v3', propertyId: ' hillcrest lane ', propertyName: ' hillcrest lane ', service: 'salting', completedAt: '2026-01-14T18:10:00', media: [{ id: 'm3', kind: 'photo' }] },
+  { visitId: 'v4', propertyId: 's9', propertyName: 'HILLCREST LANE', service: 'salting', completedAt: '2026-01-15T18:10:00', media: [] },
 ];
 const sv = lib.snowVisits(entries, hill);
-check('26 snow visits for a property: matched by id, or by the same name on an older database; others left out', sv.map((v) => v.id).sort().join() === 'v1,v3', sv.map((v) => v.id).join());
+check('26 snow visits for a property: matched by id, or by name only on an older database (no ids); a different property with the same name is left out', sv.map((v) => v.id).sort().join() === 'v1,v3', sv.map((v) => v.id).join());
 check('27 a video is not counted as a photo; the title is the verb; the arrival time carries through', sv.find((v) => v.id === 'v1').photos === 1 && sv.find((v) => v.id === 'v1').title === 'Plowed' && sv.find((v) => v.id === 'v1').arrivedAt === '2026-10-28T06:05:00');
 const lawnUp = [
   { stopId: 'l1', propertyId: 'm1', propertyName: 'Hillcrest Lane', arrivedAt: '2026-10-23T08:00:00', completedAt: '2026-10-23T09:00:00', services: 'Edging, Mowing', photos: [1, 2, 3] },

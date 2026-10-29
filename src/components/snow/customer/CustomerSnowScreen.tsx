@@ -30,7 +30,7 @@ import { semantic } from '@/theme/colors';
 
 interface Prop { id: string; name: string; address: string }
 
-const sameProperty = (e: TimelineEntry, p: Prop) => e.propertyId === p.id || e.propertyName.trim().toLowerCase() === p.name.trim().toLowerCase();
+const sameProperty = (e: TimelineEntry, p: Prop) => e.propertyId === p.id || (e.propertyId === e.propertyName && e.propertyName.trim().toLowerCase() === p.name.trim().toLowerCase());
 
 export function CustomerSnowScreen() {
   const t = useT();

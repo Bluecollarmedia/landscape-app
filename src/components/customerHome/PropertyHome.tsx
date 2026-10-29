@@ -133,7 +133,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
   const ids = group.items.filter((i) => i.kind === 'snow').map((i) => i.key.slice('snow:'.length));
   const names = group.items.filter((i) => i.kind === 'snow').map((i) => i.name.trim().toLowerCase());
   const entries = useMemo(
-    () => (data.timeline ?? []).filter((e) => ids.includes(e.propertyId) || names.includes(e.propertyName.trim().toLowerCase())).sort((a, b) => b.completedAt.localeCompare(a.completedAt)),
+    () => (data.timeline ?? []).filter((e) => ids.includes(e.propertyId) || (e.propertyId === e.propertyName && names.includes(e.propertyName.trim().toLowerCase()))).sort((a, b) => b.completedAt.localeCompare(a.completedAt)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data.timeline, group.key],
   );
@@ -220,7 +220,7 @@ function LawnPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
   const ids = group.items.filter((i) => i.kind === 'maintenance').map((i) => i.key.slice('maintenance:'.length));
   const names = group.items.filter((i) => i.kind === 'maintenance').map((i) => i.name.trim().toLowerCase());
   const updates = useMemo(
-    () => (data.lawn ?? []).filter((u) => (u.propertyId ? ids.includes(u.propertyId) : false) || names.includes(u.propertyName.trim().toLowerCase())).sort((a, b) => b.completedAt.localeCompare(a.completedAt)),
+    () => (data.lawn ?? []).filter((u) => (u.propertyId ? ids.includes(u.propertyId) : names.includes(u.propertyName.trim().toLowerCase()))).sort((a, b) => b.completedAt.localeCompare(a.completedAt)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data.lawn, group.key],
   );

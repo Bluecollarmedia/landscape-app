@@ -189,8 +189,8 @@ function PostCard({ post, width, active, warm, focused, onOpenReel }: { post: Po
               renderItem={({ item, index: i }) => <Slide media={item} size={width} load={shouldLoadSlide(i, index)} playing={active && i === index} sound={videoSound} live={focused} />}
             />
             {media.length > 1 ? <View style={styles.counter}><Text style={styles.counterText}>{index + 1}/{media.length}</Text></View> : null}
+            {/* Music: just a note icon (the mute button). The track's name is never shown, since it is often a file name. */}
             {post.music_url ? (
-              {/* Just a note icon (the mute button): the track's name is never shown, since it is often a file name. */}
               <Pressable onPress={() => setMuted((m) => !m)} accessibilityRole="button" accessibilityLabel={muted ? t('Music is off. Tap to turn it on') : t('Music is playing. Tap to mute')} style={styles.music} hitSlop={8}>
                 <MaterialCommunityIcons name={muted ? 'music-off' : 'music-note'} size={20} color="#FFFFFF" />
               </Pressable>

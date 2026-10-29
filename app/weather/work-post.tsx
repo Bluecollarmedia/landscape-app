@@ -190,9 +190,9 @@ function PostCard({ post, width, active, warm, focused, onOpenReel }: { post: Po
             />
             {media.length > 1 ? <View style={styles.counter}><Text style={styles.counterText}>{index + 1}/{media.length}</Text></View> : null}
             {post.music_url ? (
-              <Pressable onPress={() => setMuted((m) => !m)} accessibilityRole="button" accessibilityLabel={muted ? t('Music is off. Tap to turn it on') : t('Music is playing. Tap to mute')} style={styles.music}>
-                <MaterialCommunityIcons name={muted ? 'music-off' : 'music-note'} size={18} color="#FFFFFF" />
-                <Text style={styles.musicText} numberOfLines={1}>{post.music_title || t('Music')}</Text>
+              {/* Just a note icon (the mute button): the track's name is never shown, since it is often a file name. */}
+              <Pressable onPress={() => setMuted((m) => !m)} accessibilityRole="button" accessibilityLabel={muted ? t('Music is off. Tap to turn it on') : t('Music is playing. Tap to mute')} style={styles.music} hitSlop={8}>
+                <MaterialCommunityIcons name={muted ? 'music-off' : 'music-note'} size={20} color="#FFFFFF" />
               </Pressable>
             ) : null}
             {media.length > 1 ? (
@@ -273,8 +273,7 @@ const styles = StyleSheet.create({
   reelMark: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: 'rgba(23,48,31,0.72)' },
   reelMarkText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' },
   soundBtn: { position: 'absolute', right: 12, bottom: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(23,48,31,0.72)', alignItems: 'center', justifyContent: 'center' },
-  music: { position: 'absolute', top: 8, left: 10, maxWidth: '62%', minHeight: 44, paddingLeft: 10, paddingRight: 14, borderRadius: 99, backgroundColor: 'rgba(23,48,31,0.72)', flexDirection: 'row', alignItems: 'center', gap: 7 },
-  musicText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  music: { position: 'absolute', top: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(23,48,31,0.72)', alignItems: 'center', justifyContent: 'center' },
   dots: { position: 'absolute', left: 0, right: 0, bottom: 14, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
   dotOn: { backgroundColor: '#FFFFFF' },

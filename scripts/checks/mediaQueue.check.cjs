@@ -28,6 +28,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('3c a 4:3 video fits inside 1280 x 720 with the same ratio and even numbers (960 x 720)', v43.width === 960 && v43.height === 720, JSON.stringify(v43));
   const small = plan.planVideo({ width: 640, height: 360 });
   check('3d a video already under 720p is never enlarged', small.width === 640 && small.height === 360 && !small.resize);
+  const pf = plan.planVideo({ width: 1920, height: 1080 });
+  check('3f the fallback plan for an unknown size (1920x1080) gives a long side of 1280, which is the compressor\'s limit whatever the orientation', Math.max(pf.width, pf.height) === 1280);
   check('3e the video bitrate is sensible (between 1 and 4 Mbps, about 2.8 at 720p) and the size is always even', v.bitrate >= 2_500_000 && v.bitrate <= 3_000_000 && plan.planVideo({ width: 1001, height: 563 }).width % 2 === 0);
 
   // ── the queue ──

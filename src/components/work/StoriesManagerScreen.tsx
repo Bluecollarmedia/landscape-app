@@ -65,7 +65,7 @@ export function StoriesManagerScreen() {
     // The picked file is copied somewhere safe at once (the phone may remove its temporary copy before the upload ends).
     const kept = await keepPicked(a.uri, isVideo ? 'video' : 'image');
     setProgress(0);
-    const r = await addMediaStory({ kind: isVideo ? 'video' : 'photo', localUri: kept, mimeType: a.mimeType, durationS: seconds }, setProgress);
+    const r = await addMediaStory({ kind: isVideo ? 'video' : 'photo', localUri: kept, mimeType: a.mimeType, durationS: seconds, width: a.width, height: a.height }, setProgress);
     setProgress(null);
     setBusy(false);
     if (!r.ok) { setProblem(r.error); return; }

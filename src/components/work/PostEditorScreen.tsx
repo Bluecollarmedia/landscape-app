@@ -38,6 +38,9 @@ interface Item {
   /** True when the file is still on the phone and must be uploaded when saving. */
   local: boolean;
   durationS: number | null;
+  /** The picked video's size, as the phone reported it (so a 720p file is sent as it is). */
+  width?: number | null;
+  height?: number | null;
   thumbUrl: string | null;
   storageKey: string | null;
 }
@@ -116,7 +119,7 @@ export function PostEditorScreen() {
       if (isVideo && (seconds ?? 0) > MAX_VIDEO_S) { setProblem(`A video can be up to ${MAX_VIDEO_S} seconds. Trim it first.`); continue; }
       // The picked file is copied somewhere safe at once (the phone may remove its temporary copy before the upload ends).
       const kept = await keepPicked(a.uri, isVideo ? 'video' : 'image');
-      added.push({ key: nextKey(), kind: isVideo ? 'video' : 'photo', uri: kept, full: kept, local: true, durationS: seconds, thumbUrl: null, storageKey: null });
+      added.push({ key: nextKey(), kind: isVideo ? 'video' : 'photo', uri: kept, full: kept, local: true, durationS: seconds, thumbUrl: null, storageKey: null, width: a.width, height: a.height });
     }
     setItems((cur) => [...cur, ...added]);
   }
@@ -154,7 +157,7 @@ export function PostEditorScreen() {
           const up = await uploadPortfolioPhoto(i.uri, companyId, 'posts', report);
           inputs.push({ kind: 'photo', url: up.url, key: up.key, thumbUrl: up.thumbUrl });
         } else {
-          const up = await uploadPortfolioVideo(i.uri, companyId, 'posts', 0.5, report);
+          const up = await uploadPortfolioVideo(i.uri, companyId, 'posts', 0.5, report, { width: i.width, height: i.height });
           inputs.push({ kind: 'video', url: up.url, key: up.key, thumbUrl: up.thumbUrl, durationS: i.durationS });
         }
         done += 1;

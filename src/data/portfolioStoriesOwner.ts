@@ -40,14 +40,14 @@ export async function loadPostsToShare(): Promise<Result<PortfolioPost[]>> {
 }
 
 /** Adds a photo or a video (up to 60 seconds) to the story. A video is shrunk to 720p first (the original goes up if that cannot be done). */
-export async function addMediaStory(input: { kind: 'photo' | 'video'; localUri: string; mimeType?: string; durationS?: number | null }, onProgress?: (p: number) => void): Promise<Result<null>> {
+export async function addMediaStory(input: { kind: 'photo' | 'video'; localUri: string; mimeType?: string; durationS?: number | null; width?: number | null; height?: number | null }, onProgress?: (p: number) => void): Promise<Result<null>> {
   const bad = storyProblem({ kind: input.kind, mediaUrl: input.localUri, durationS: input.durationS ?? null });
   if (bad) return { ok: false, error: bad };
   const companyId = db.companyId;
   if (!companyId) return { ok: false, error: 'Sign in again.' };
   try {
     const { shrinkVideoUri } = require('@/lib/mediaCompress') as typeof import('@/lib/mediaCompress');
-    const source = input.kind === 'video' ? await shrinkVideoUri(input.localUri) : input.localUri;
+    const source = input.kind === 'video' ? await shrinkVideoUri(input.localUri, { width: input.width, height: input.height }) : input.localUri;
     const up = await uploadImage(source, `${companyId}/portfolio/stories`, input.mimeType, onProgress);
     const { error } = await supabase.from('portfolio_stories').insert({
       company_id: companyId, kind: input.kind, media_url: up.url, duration_s: input.kind === 'video' ? input.durationS : null, created_by: db.personId ?? null,

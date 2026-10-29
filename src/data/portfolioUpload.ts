@@ -35,10 +35,10 @@ export async function uploadPortfolioPhoto(localUri: string, companyId: string, 
 }
 
 /** A video, shrunk to 720p. The still frame for the grid is best effort: a video with no frame still posts (its tile just has no picture). */
-export async function uploadPortfolioVideo(localUri: string, companyId: string, kind: PortfolioFolder = 'posts', frameAtS = 0.5, onProgress?: (p: number) => void): Promise<UploadedVideo> {
+export async function uploadPortfolioVideo(localUri: string, companyId: string, kind: PortfolioFolder = 'posts', frameAtS = 0.5, onProgress?: (p: number) => void, size?: { width?: number | null; height?: number | null }): Promise<UploadedVideo> {
   const { shrinkVideoUri } = require('@/lib/mediaCompress') as typeof import('@/lib/mediaCompress');
   onProgress?.(0);
-  const source = await shrinkVideoUri(localUri);
+  const source = await shrinkVideoUri(localUri, size);
   // The video's own bytes are most of the wait: they move the bar from 5% to 90%; the still frame for the grid is the last bit.
   onProgress?.(0.05);
   const up = await uploadImage(source, portfolioFolder(companyId, kind), 'video/mp4', (p) => onProgress?.(0.05 + p * 0.85), { raw: true });

@@ -10,7 +10,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
 import { OptimizedImage } from '@/components/ui';
 import { WX } from '@/components/weather/WeatherUI';
-import { ScrubBar } from '@/components/work/ScrubBar';
+import { EDGE_ZONE, ScrubBar } from '@/components/work/ScrubBar';
 import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { useClipMusic } from '@/components/work/useClipMusic';
 import { getLoadedPortfolio } from '@/data/portfolio';
@@ -63,6 +63,7 @@ export default function WeatherWorkVideo() {
 
   return (
     <View style={styles.screen}>
+      <EdgeClose onClose={goBack} />
       <FlatList
         data={entries}
         keyExtractor={(e) => e.media.id}
@@ -94,6 +95,17 @@ export default function WeatherWorkVideo() {
       />
     </View>
   );
+}
+
+/**
+ * The only swipe that closes the reels: a drag to the right that STARTS in the strip along the left edge (EDGE_ZONE wide, about 5% of the
+ * screen). The phone's own back gesture is switched off for this screen, so a scrub on the seek bar, or a swipe anywhere else, never closes it.
+ * The strip starts below the header so the Close button is never covered.
+ */
+function EdgeClose({ onClose }: { onClose: () => void }) {
+  const g = useMemo(() => Gesture.Pan().activeOffsetX(8).failOffsetY([-20, 20])
+    .onEnd((e) => { if (e.translationX > 50 || e.velocityX > 600) runOnJS(onClose)(); }), [onClose]);
+  return <GestureDetector gesture={g}><View style={styles.edge} /></GestureDetector>;
 }
 
 /** One reel. Idle reels are a still picture; the active one plays; the next one (preload) is buffered and waits, silent, out of sight. */
@@ -220,6 +232,7 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
 }
 
 const styles = StyleSheet.create({
+  edge: { position: 'absolute', left: 0, top: 120, bottom: 0, width: EDGE_ZONE, zIndex: 5 },
   fastWrap: { position: 'absolute', top: 110, left: 0, right: 0, alignItems: 'center' },
   fastPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, backgroundColor: 'rgba(8,16,12,0.6)' },
   fastText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },

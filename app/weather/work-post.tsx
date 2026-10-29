@@ -54,7 +54,7 @@ export default function WeatherWorkPost() {
   const openReel = useCallback((p: PortfolioPost, mediaId: string) => {
     markStep('opening a reel from the feed');
     setLeaving(true);
-    setTimeout(() => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any), 150);
+    setTimeout(() => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any), 250);
   }, [router]);
   // The post that is mostly on screen is the one that plays (its music, its video); the others sit still.
   const [activeId, setActiveId] = useState<string | undefined>(id);
@@ -125,7 +125,6 @@ function PostCard({ post, width, active, focused, onOpenReel }: { post: Portfoli
   // A reel's preview in the feed plays quietly: its music waits for the full-screen reels.
   const musicActive = active && !isReel && !!post?.music_url;
   const duck = !!post?.keep_video_sound && onVideo;
-  useClipMusic(post?.music_url ?? null, clip, { active: musicActive, muted, fade: post?.music_fade ?? true, duck });
 
   // The picture on screen and its neighbours are drawn (shouldLoadSlide), so a swipe never lands on an empty square. Once the screen has had
   // a moment, the one AFTER the next is fetched quietly into the cache too, so it is ready by the time it becomes a neighbour.
@@ -149,6 +148,8 @@ function PostCard({ post, width, active, focused, onOpenReel }: { post: Portfoli
 
   return (
     <View>
+      {/* The music is its own small component so that, like the video players, it is UNMOUNTED (player released) while another screen is on top. */}
+      {focused && post.music_url ? <CardMusic url={post.music_url} clip={clip} active={musicActive} muted={muted} fade={post.music_fade ?? true} duck={duck} /> : null}
       <View style={styles.author}>
         <ProfileAvatar uri={getLoadedPortfolio()?.profile.avatar_url} size={38} />
         <View style={{ flex: 1 }}>
@@ -221,6 +222,12 @@ function PostCard({ post, width, active, focused, onOpenReel }: { post: Portfoli
       </View>
     </View>
   );
+}
+
+/** The post's music, alive only while the card is mounted with `focused` (see PostCard). */
+function CardMusic({ url, clip, active, muted, fade, duck }: { url: string; clip: { startS: number; endS: number } | null; active: boolean; muted: boolean; fade: boolean; duck: boolean }) {
+  useClipMusic(url, clip, { active, muted, fade, duck });
+  return null;
 }
 
 /** One picture or video in the swipe row. A video plays (muted unless it is allowed sound) only while it is the one on screen. */

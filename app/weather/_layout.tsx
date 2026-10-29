@@ -26,7 +26,7 @@ export default function WeatherLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="work-post" />
         <Stack.Screen name="work-video" />
-        <Stack.Screen name="work-story" />
+        <Stack.Screen name="work-story" options={{ presentation: 'transparentModal', animation: 'fade', animationDuration: 160, gestureEnabled: false }} />
       </Stack>
     </View>
   );

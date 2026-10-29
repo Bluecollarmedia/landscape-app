@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Image, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Reanimated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -41,6 +43,8 @@ export default function WeatherWorkStory() {
     return Number.isInteger(n) && n >= 0 && n < stories.length ? n : startIndex(stories, seen);
   });
   const [holding, setHolding] = useState(false);
+  // While the viewer is being pulled down the story waits (like a hold).
+  const [dragging, setDragging] = useState(false);
   const [sound, setSound] = useState(false);
   const story = stories[index];
 
@@ -59,7 +63,7 @@ export default function WeatherWorkStory() {
   advanceRef.current = advance;
 
   useEffect(() => { progress.setValue(0); value.current = 0; }, [index, progress]);
-  const playing = focused && !holding;
+  const playing = focused && !holding && !dragging;
   useEffect(() => {
     if (!story) return;
     if (!playing) { run.current?.stop(); return; }
@@ -83,10 +87,29 @@ export default function WeatherWorkStory() {
     if (held.current) return;
     if (tapZone(x, width) === 'previous') setIndex(previousIndex(index)); else advance();
   };
-  const pan = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponderCapture: (_e, g) => g.dy > 18 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5,
-    onPanResponderRelease: (_e, g) => { if (g.dy > 90) goBack(); },
-  }), [goBack]);
+  // ── pull down to close, like Instagram: the whole viewer follows the finger, shrinks a little and shows the screen behind it; let go far
+  // enough (or fast enough) and it slides away and closes; otherwise it springs back. A sideways move is never a pull (failOffsetX), so the
+  // taps and holds on the story keep working.
+  const dragY = useSharedValue(0);
+  const dismiss = useMemo(() => Gesture.Pan()
+    .activeOffsetY(12)
+    .failOffsetY(-12)
+    .failOffsetX([-24, 24])
+    .onStart(() => { runOnJS(setDragging)(true); })
+    .onUpdate((e) => { dragY.value = Math.max(0, e.translationY); })
+    .onEnd((e) => {
+      if (dragY.value > 140 || e.velocityY > 900) {
+        dragY.value = withTiming(height, { duration: 220 }, (done) => { if (done) runOnJS(goBack)(); });
+      } else {
+        dragY.value = withSpring(0, { damping: 20, stiffness: 240 });
+        runOnJS(setDragging)(false);
+      }
+    }), [dragY, height, goBack]);
+  const viewerStyle = useAnimatedStyle(() => {
+    const p = Math.min(1, dragY.value / height);
+    return { transform: [{ translateY: dragY.value }, { scale: 1 - p * 0.18 }], borderRadius: p * 36 };
+  });
+  const dimStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, dragY.value / height) * 0.9 }));
 
   if (!story) {
     return (
@@ -120,7 +143,10 @@ export default function WeatherWorkStory() {
   };
 
   return (
-    <View style={styles.screen} {...pan.panHandlers}>
+    <View style={styles.stage}>
+      <Reanimated.View style={[StyleSheet.absoluteFill, styles.dim, dimStyle]} pointerEvents="none" />
+      <GestureDetector gesture={dismiss}>
+      <Reanimated.View style={[styles.screen, viewerStyle]}>
       <StoryLayer key={story.id} story={story} post={post} width={width} height={height} playing={playing} sound={sound} holding={holding} onHold={press} onTap={onBackgroundPress} onOpen={openTarget} />
 
       {hl && post ? (
@@ -151,6 +177,8 @@ export default function WeatherWorkStory() {
           <Pressable onPress={goBack} accessibilityRole="button" accessibilityLabel={t('Close')} style={styles.roundBtn}><MaterialCommunityIcons name="close" size={24} color="#FFFFFF" /></Pressable>
         </View>
       </View>
+      </Reanimated.View>
+      </GestureDetector>
     </View>
   );
 }
@@ -198,7 +226,9 @@ function StoryVideo({ url, playing, sound }: { url: string; playing: boolean; so
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0E1A12' },
+  stage: { flex: 1 },
+  dim: { backgroundColor: '#000000' },
+  screen: { flex: 1, backgroundColor: '#0E1A12', overflow: 'hidden' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 30, backgroundColor: '#F7FAF4' },
   emptyTitle: { color: '#0B4736', fontSize: 18, fontWeight: '700', textAlign: 'center' },
   emptyBtn: { minHeight: 44, paddingHorizontal: 24, borderRadius: 99, backgroundColor: '#E3F1DC', alignItems: 'center', justifyContent: 'center' },

@@ -13,7 +13,7 @@ const route = read('src/components/snow/routes/MyRouteScreen.tsx');
 check('1 the project worker home has the weather button, pointing at the worker forecast', /<WeatherButton to="\/\(worker\)\/weather"/.test(home));
 check('2 the button sits beside the avatar on the right, so the "On Site" pill on the left is never covered', /weatherWrap: \{ position: 'absolute', right:/.test(home));
 check('3 the maintenance worker home has it too, at the top left of the picture', /<WeatherButton to="\/\(worker\)\/weather"/.test(maint) && /weatherWrap: \{ position: 'absolute', left:/.test(maint) && /useSafeAreaInsets/.test(maint));
-check('4 the Snow worker Route tab has it, and leaves no empty gap when Weather is switched off', /<WeatherButton to="\/snow\/worker\/weather"/.test(route) && /weatherOn \? </.test(route));
+check('4 the Snow worker Route tab has it, and leaves no empty gap when Weather is switched off', /<WeatherButton to="\/snow\/worker\/weather"/.test(route) && /weatherOn && !pastOnly \? </.test(route));
 for (const [file, layout] of [['app/(worker)/weather.tsx', 'app/(worker)/_layout.tsx'], ['app/snow/worker/weather.tsx', 'app/snow/worker/_layout.tsx']]) {
   const w = read(file);
   const l = read(layout);

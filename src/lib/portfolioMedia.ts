@@ -32,5 +32,5 @@ export const portfolioFolder = (companyId: string, kind: PortfolioFolder): strin
 export const thumbFolder = (companyId: string, kind: PortfolioFolder): string => `${portfolioFolder(companyId, kind)}/thumbs`;
 
 /** The longest a video may be, in seconds, and how it is stored: as it came off the phone. */
-export const MAX_VIDEO_SECONDS = 60;
-export const VIDEO_IS_COMPRESSED = false;
+export const MAX_VIDEO_SECONDS = 180;
+export const VIDEO_IS_COMPRESSED = true;

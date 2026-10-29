@@ -4,6 +4,7 @@
  */
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { VIDEO_PICK_OPTIONS } from '@/lib/videoPick';
 import { keepPicked } from '@/lib/keepPickedFile';
 import { formatBytes } from '@/types/storage';
 import { tr } from '@/i18n';
@@ -49,7 +50,7 @@ export async function pickSnowMedia(): Promise<SnowMediaDraft[]> {
     mediaTypes: ['images', 'videos'],
     quality: 1,
     videoMaxDuration: MAX_SNOW_VIDEO_SECONDS,
-    videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+    ...VIDEO_PICK_OPTIONS,
     allowsMultipleSelection: source === 'library',
     selectionLimit: MAX_PER_PICK,
   };

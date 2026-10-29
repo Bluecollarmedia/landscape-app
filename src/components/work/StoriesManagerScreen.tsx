@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage, ProgressBar } from '@/components/ui';
 import { percentOf } from '@/lib/uploadProgress';
+import { VIDEO_PICK_OPTIONS } from '@/lib/videoPick';
 import { StoryBackdrop, StoryCard } from '@/components/work/StoryCard';
 import { addMediaStory, addShareStory, deleteStory, loadMyStories, loadPostsToShare } from '@/data/portfolioStoriesOwner';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -52,7 +53,7 @@ export function StoriesManagerScreen() {
     setProblem(null);
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { setProblem('Turn on photo access for Brighton Lawn in the Settings app.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 1 });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 1, ...VIDEO_PICK_OPTIONS });
     if (result.canceled || !result.assets[0]) return;
     const a = result.assets[0];
     const isVideo = a.type === 'video';

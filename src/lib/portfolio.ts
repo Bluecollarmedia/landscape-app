@@ -63,7 +63,7 @@ export interface PublicPortfolio {
 /** The tags an owner can put on a post (the same words as the circles at the top). */
 export const TAG_CHOICES = ['Pavers', 'Turf', 'Lighting', 'Planting', 'Commercial', 'Snow'] as const;
 
-export const MAX_VIDEO_S = 60;
+export const MAX_VIDEO_S = 180;
 /** A post holds up to 10 photos and videos (like Instagram). */
 export const MAX_POST_MEDIA = 10;
 export const MIN_CLIP_S = 5;

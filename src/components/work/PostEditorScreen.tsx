@@ -1,6 +1,6 @@
 /**
  * Owner and admin: make or change one Our Work post. A POST is photos and videos together (up to 10; every one is shown as a square, centred
- * automatically). A REEL is one video of up to 60 seconds, shown tall and uncropped, and it also appears in the photo grid unless you switch that
+ * automatically). A REEL is one video of up to 3 minutes, shown tall and uncropped, and it also appears in the photo grid unless you switch that
  * off. You can add from your phone or from one of your projects, put the pictures in order, remove any, change the words and tags, hide or delete it.
  * Photos upload high quality, with a small copy for the grid; videos upload exactly as they are.
  */
@@ -21,6 +21,7 @@ import { db, rowsOf } from '@/data/store';
 import { keepPicked } from '@/lib/keepPickedFile';
 import { imageProblem, videoProblem } from '@/lib/mediaFormats';
 import { MAX_POST_MEDIA, MAX_VIDEO_S, TAG_CHOICES, formatDuration, moveItem, postProblem, sortedMedia, type MediaKind } from '@/lib/portfolio';
+import { VIDEO_PICK_OPTIONS } from '@/lib/videoPick';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -103,7 +104,8 @@ export function PostEditorScreen() {
     if (room <= 0) { setProblem(reel ? 'A reel is one video. Remove it first to choose another.' : `A post holds up to ${MAX_POST_MEDIA} photos and videos.`); return; }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { setProblem('Turn on photo access for Brighton Lawn in the Settings app.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: reel ? ['videos'] : ['images', 'videos'], allowsMultipleSelection: !reel, selectionLimit: Math.max(1, room), quality: 1 });
+    // A video is handed over by iOS already at 720p (its own encoder, one pass): see VIDEO_PICK_OPTIONS.
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: reel ? ['videos'] : ['images', 'videos'], allowsMultipleSelection: !reel, selectionLimit: Math.max(1, room), quality: 1, ...VIDEO_PICK_OPTIONS });
     if (result.canceled) return;
     const added: Item[] = [];
     for (const a of result.assets.slice(0, room)) {
@@ -223,7 +225,7 @@ export function PostEditorScreen() {
   }
 
   const first = items[0];
-  const modeLabel = useMemo(() => (reel ? 'One video, up to 60 seconds. It plays tall, full screen, and swipes up like a reel.' : `Up to ${MAX_POST_MEDIA} photos and videos. Each one is shown as a square, centred automatically.`), [reel]);
+  const modeLabel = useMemo(() => (reel ? 'One video, up to 3 minutes. It plays tall, full screen, and swipes up like a reel.' : `Up to ${MAX_POST_MEDIA} photos and videos. Each one is shown as a square, centred automatically.`), [reel]);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>

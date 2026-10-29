@@ -86,6 +86,8 @@ export async function prepareVideo(job: MediaJob): Promise<Prepared> {
   try { compressor = require('react-native-compressor'); } catch { compressor = undefined; }
   if (!compressor?.Video) return original;
   const plan = planVideo({ width: job.width ?? VIDEO_FALLBACK, height: job.height ?? VIDEO_FALLBACK });
+  // Already 720p or smaller (the picker hands videos over at 720p): sent as it is, never encoded a second time.
+  if (!plan.resize) return original;
   try {
     // maxSize is the longest side: 1280 keeps landscape at 1280x720 and portrait at 720x1280, aspect ratio unchanged. Audio is kept.
     const made = await compressor.Video.compress(job.sourceUri, { compressionMethod: 'manual', maxSize: Math.max(plan.width, plan.height), bitrate: plan.bitrate, minimumFileSizeForCompress: 0 });

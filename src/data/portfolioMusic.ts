@@ -38,14 +38,14 @@ export async function readTrackDuration(uri: string): Promise<number | null> {
 }
 
 /**
- * Shrinks the track on the phone (AAC in an .m4a, medium quality: a 10 MB song becomes about 2 MB, which is what makes the music start fast
+ * Shrinks the track on the phone (AAC in an .m4a at 128 kbps: a 10 MB song becomes about 3 MB, which is what makes the music start fast
  * in a post), then sends it. If the phone cannot shrink it, the track goes up as it is.
  */
 export async function shrinkTrack(track: PickedTrack): Promise<{ uri: string; mimeType: string | null }> {
   try {
     const compressor = require('react-native-compressor') as { Audio?: { compress: (uri: string, o: { quality?: 'low' | 'medium' | 'high'; bitrate?: number }) => Promise<string> } };
     if (!compressor.Audio) return { uri: track.uri, mimeType: track.mimeType };
-    const out = await compressor.Audio.compress(track.uri, { quality: 'medium' });
+    const out = await compressor.Audio.compress(track.uri, { bitrate: 128000 });
     return out ? { uri: out, mimeType: 'audio/mp4' } : { uri: track.uri, mimeType: track.mimeType };
   } catch {
     return { uri: track.uri, mimeType: track.mimeType };

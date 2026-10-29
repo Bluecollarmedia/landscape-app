@@ -19,7 +19,7 @@ check('2 a photo that is already small is never enlarged, and a missing size is 
 check('3 the grid copy is a centred square cut', JSON.stringify(M.squareCrop(4000, 3000)) === JSON.stringify({ originX: 500, originY: 0, size: 3000 }) && JSON.stringify(M.squareCrop(3000, 4000)) === JSON.stringify({ originX: 0, originY: 500, size: 3000 }) && M.THUMB_SIZE === 400);
 check('4 photos are high quality (0.85, the app\'s usual is 0.5) and the grid copy is small and light', M.FULL_QUALITY === 0.85 && M.THUMB_QUALITY < M.FULL_QUALITY && M.FULL_LONG_SIDE === 1600);
 check('5 files go in the company\'s own portfolio folder, and the small copies in a thumbs folder under it', M.portfolioFolder('c1', 'posts') === 'c1/portfolio/posts' && M.thumbFolder('c1', 'posts') === 'c1/portfolio/posts/thumbs');
-check('6 a video is limited to 60 seconds and is NOT compressed', M.MAX_VIDEO_SECONDS === 60 && M.VIDEO_IS_COMPRESSED === false);
+check('6 a reel may be up to 3 minutes, and videos are sent at 720p', M.MAX_VIDEO_SECONDS === 180 && M.VIDEO_IS_COMPRESSED === true);
 
 const media = read('src/lib/media.ts');
 check('7 the shared uploader can skip its own compression (raw) so Our Work\'s quality is kept, and every other screen still compresses as before', /opts\?: \{ raw\?: boolean \}/.test(media) && /startsWith\('image\/'\) && !opts\?\.raw/.test(media));

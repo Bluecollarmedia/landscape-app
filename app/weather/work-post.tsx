@@ -14,7 +14,8 @@ import { getLoadedPortfolio, getLoadedPost } from '@/data/portfolio';
 import { usePublicPortfolio } from '@/hooks/usePortfolio';
 import { config } from '@/lib/config';
 import { Image as ExpoImage } from 'expo-image';
-import { feedPosts, formatDuration, requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia, type PortfolioPost, shareLinkFor, shareTextFor } from '@/lib/portfolio';
+import { feedPosts, formatDuration, postGridUrl, requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia, type PortfolioPost, shareLinkFor, shareTextFor } from '@/lib/portfolio';
+import { markStep } from '@/lib/errorReporting';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
 
 const INK = '#17301F';
@@ -73,7 +74,7 @@ export default function WeatherWorkPost() {
       <FlatList
         data={posts}
         keyExtractor={(p) => p.id}
-        renderItem={({ item }) => <PostCard post={item} width={width} active={focused && item.id === activeId} />}
+        renderItem={({ item }) => <PostCard post={item} width={width} active={focused && item.id === activeId} focused={focused} />}
         initialScrollIndex={startAt}
         getItemLayout={(_d, i) => ({ length: estimate, offset: estimate * i, index: i })}
         onScrollToIndexFailed={() => { /* the estimate was off: the list stays where it landed, which is near the tapped post */ }}
@@ -91,12 +92,18 @@ export default function WeatherWorkPost() {
   );
 }
 
-/** One post in the feed: header, the square (pictures to swipe, or a reel preview), the buttons and the words. */
-function PostCard({ post, width, active }: { post: PortfolioPost; width: number; active: boolean }) {
+/**
+ * One post in the feed: header, the square (pictures to swipe, or a reel preview), the buttons and the words.
+ * While another screen is on top (the full-screen reels), the card shows stills instead of video players (`focused` false): two screens of live
+ * players stacked on each other closed the app. The feed itself stays where it was, so coming back lands on the same spot.
+ */
+function PostCard({ post, width, active, focused }: { post: PortfolioPost; width: number; active: boolean; focused: boolean }) {
   const t = useT();
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const [muted, setMuted] = useState(false);
+  // Videos start silent; the speaker button at the bottom right of the square turns their own sound on.
+  const [sound, setSound] = useState(false);
   const media = sortedMedia(post);
   const isReel = post.kind === 'video';
   const reel = isReel ? media.find((m) => m.kind === 'video') : undefined;
@@ -120,7 +127,8 @@ function PostCard({ post, width, active }: { post: PortfolioPost; width: number;
   const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width)), [width]);
   const ask = requestNoteFor(post);
   const openRequest = () => router.push({ pathname: '/weather/request', params: { services: ask.services.join('|'), note: ask.note } } as any);
-  const openReel = () => { if (reel) router.push({ pathname: '/weather/work-video', params: { post: post.id, media: reel.id } } as any); };
+  const openReel = () => { if (reel) { markStep('opening a reel from the feed'); router.push({ pathname: '/weather/work-video', params: { post: post.id, media: reel.id } } as any); } };
+  const videoSound = sound && (!post.music_url || !!post.keep_video_sound);
   // The share sheet gets the words and the LINK to this project (iOS shares the link itself; the message carries it too for the rest).
   const share = () => {
     const link = shareLinkFor(config.webUrl, post);
@@ -141,7 +149,7 @@ function PostCard({ post, width, active }: { post: PortfolioPost; width: number;
         {isReel && reel ? (
           // A reel in the feed: a square, quiet preview. Tap it to watch it full screen (and swipe up through the other reels).
           <Pressable onPress={openReel} accessibilityRole="button" accessibilityLabel={t('Watch this reel')} style={StyleSheet.absoluteFill}>
-            <SlideVideo media={reel} size={width} playing={active} sound={false} />
+            {focused ? <SlideVideo media={reel} size={width} playing={active} sound={sound} /> : <Still url={postGridUrl(post) ?? reel.thumb_url} size={width} />}
             <View style={styles.reelMark} pointerEvents="none">
               <MaterialCommunityIcons name="play-circle-outline" size={18} color="#FFFFFF" />
               <Text style={styles.reelMarkText}>{t('Reel')}{reel.duration_s ? ` · ${formatDuration(reel.duration_s)}` : ''}</Text>
@@ -161,7 +169,7 @@ function PostCard({ post, width, active }: { post: PortfolioPost; width: number;
               windowSize={3}
               getItemLayout={(_d, i) => ({ length: width, offset: width * i, index: i })}
               onMomentumScrollEnd={onScrollEnd}
-              renderItem={({ item, index: i }) => <Slide media={item} size={width} load={shouldLoadSlide(i, index)} playing={active && i === index} sound={!muted && (!post.music_url || post.keep_video_sound)} />}
+              renderItem={({ item, index: i }) => <Slide media={item} size={width} load={shouldLoadSlide(i, index)} playing={active && i === index} sound={videoSound} live={focused} />}
             />
             {media.length > 1 ? <View style={styles.counter}><Text style={styles.counterText}>{index + 1}/{media.length}</Text></View> : null}
             {post.music_url ? (
@@ -177,6 +185,11 @@ function PostCard({ post, width, active }: { post: PortfolioPost; width: number;
             ) : null}
           </>
         )}
+        {isReel || onVideo ? (
+          <Pressable onPress={() => setSound((s) => !s)} accessibilityRole="button" accessibilityLabel={sound ? t('Sound on, tap to turn off') : t('Sound off, tap to turn on')} style={styles.soundBtn} hitSlop={8}>
+            <MaterialCommunityIcons name={sound ? 'volume-high' : 'volume-off'} size={20} color="#FFFFFF" />
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.actions}>
@@ -199,11 +212,17 @@ function PostCard({ post, width, active }: { post: PortfolioPost; width: number;
 }
 
 /** One picture or video in the swipe row. A video plays (muted unless it is allowed sound) only while it is the one on screen. */
-function Slide({ media, size, load, playing, sound }: { media: PortfolioMedia; size: number; load: boolean; playing: boolean; sound: boolean }) {
+function Slide({ media, size, load, playing, sound, live }: { media: PortfolioMedia; size: number; load: boolean; playing: boolean; sound: boolean; live: boolean }) {
   // A slide that is not the one on screen stays an empty square: it does not ask for its picture or video.
   if (!load) return <View style={{ width: size, height: size, backgroundColor: WX.leafTint }} />;
   if (media.kind === 'photo') return <OptimizedImage source={media.url} style={{ width: size, height: size }} contentFit="cover" />;
+  if (!live) return <Still url={media.thumb_url} size={size} />;
   return <SlideVideo media={media} size={size} playing={playing} sound={sound} />;
+}
+
+/** A video's still picture, shown in place of its player while another screen is on top. */
+function Still({ url, size }: { url: string | null | undefined; size: number }) {
+  return url ? <OptimizedImage source={url} style={{ width: size, height: size }} contentFit="cover" /> : <View style={{ width: size, height: size, backgroundColor: '#0E1A12' }} />;
 }
 
 function SlideVideo({ media, size, playing, sound }: { media: PortfolioMedia; size: number; playing: boolean; sound: boolean }) {
@@ -230,6 +249,7 @@ const styles = StyleSheet.create({
   counterText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' },
   reelMark: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: 'rgba(23,48,31,0.72)' },
   reelMarkText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' },
+  soundBtn: { position: 'absolute', right: 12, bottom: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(23,48,31,0.72)', alignItems: 'center', justifyContent: 'center' },
   music: { position: 'absolute', top: 8, left: 10, maxWidth: '62%', minHeight: 44, paddingLeft: 10, paddingRight: 14, borderRadius: 99, backgroundColor: 'rgba(23,48,31,0.72)', flexDirection: 'row', alignItems: 'center', gap: 7 },
   musicText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600', flexShrink: 1 },
   dots: { position: 'absolute', left: 0, right: 0, bottom: 14, flexDirection: 'row', justifyContent: 'center', gap: 5 },

@@ -175,13 +175,13 @@ export default function SettingsScreen() {
           </SettingsGroup>
         ) : null}
 
-        <SettingsGroup title="Tasks" footer="By default anyone assigned to a job can check off its tasks. Turn this on to let only the job's Task Lead do it (you pick the lead on each project).">
+        <SettingsGroup title="Project Tasks" footer="By default anyone assigned to a project can check off its tasks. Choose Task Lead only to limit it to the lead you pick on each project.">
           <SettingsRow
             icon="check-square"
             tint={tileColors.green}
-            title="Who checks off tasks"
+            title="Check off tasks"
             subtitle="Tap to change"
-            value={db.company?.taskLeadOnly ? 'Task Lead only' : 'Anyone on the job'}
+            value={db.company?.taskLeadOnly ? 'Task Lead' : 'Anyone'}
             onPress={() => { if (db.company) updateRow('companies', db.company.id, { taskLeadOnly: !db.company.taskLeadOnly }); }}
           />
         </SettingsGroup>

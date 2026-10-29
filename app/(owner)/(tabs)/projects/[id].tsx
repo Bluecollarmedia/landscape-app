@@ -1453,8 +1453,8 @@ export default function ProjectDetailScreen() {
                 ? 'Only the Task Lead can start and complete tasks. The rest of the crew can see them.'
                 : 'Pick one worker to run the task list. Until then, workers cannot change tasks.')
               : (p.taskLeadId
-                ? 'Anyone on this job can check off tasks. (More → Settings → Tasks can limit this to the Task Lead.)'
-                : 'Anyone on this job can check off tasks. Picking a Task Lead is optional. (More → Settings → Tasks can limit checking off to the Task Lead.)')}
+                ? 'Anyone on this job can check off tasks. (More → Settings → Project Tasks can limit this to the Task Lead.)'
+                : 'Anyone on this job can check off tasks. Picking a Task Lead is optional. (More → Settings → Project Tasks can limit checking off to the Task Lead.)')}
           </Text>
           {team.length ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>

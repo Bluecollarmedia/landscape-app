@@ -30,6 +30,8 @@ interface BottomSheetModalProps {
   scrollOffset?: SharedValue<number>;
   closeDistance?: number;
   closeVelocity?: number;
+  /** An extra downward offset the page drives (how far it is pulled past its top): the WHOLE sheet moves with it, live, under the finger. */
+  pull?: SharedValue<number>;
 }
 
 const IN_MS = 300;
@@ -56,7 +58,7 @@ export function useSheetPanRef(): React.MutableRefObject<GestureType | undefined
   return r ?? fallback;
 }
 
-export function BottomSheetModal({ visible, onRequestClose, children, scrollOffset, closeDistance = CLOSE_DISTANCE, closeVelocity = CLOSE_VELOCITY }: BottomSheetModalProps) {
+export function BottomSheetModal({ visible, onRequestClose, children, scrollOffset, closeDistance = CLOSE_DISTANCE, closeVelocity = CLOSE_VELOCITY, pull }: BottomSheetModalProps) {
   const { height } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
   const progress = useSharedValue(0);
@@ -113,8 +115,8 @@ export function BottomSheetModal({ visible, onRequestClose, children, scrollOffs
   // A sheet unmounted while closing must not hold others back.
   useEffect(() => () => { closing.delete(id); notify(); }, [id]);
 
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value * Math.max(0, 1 - drag.value / (height * 0.8)) }));
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - progress.value) * height + drag.value }] }));
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value * Math.max(0, 1 - (drag.value + (pull?.value ?? 0)) / (height * 0.8)) }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - progress.value) * height + drag.value + (pull?.value ?? 0) }] }));
 
   // The page's own scroll view (a gesture-handler ScrollView with simultaneousHandlers={useSheetPanRef()}) is recognised AT THE SAME TIME as the
   // swipe-down, so iOS never hands the touch to the scroll view alone (which left the sheet unable to close by a swipe).

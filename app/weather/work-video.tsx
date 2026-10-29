@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useWorkBase } from '@/lib/workRoutes';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -31,6 +32,7 @@ export default function WeatherWorkVideo() {
   const router = useRouter();
   const { height } = useWindowDimensions();
   const params = useLocalSearchParams<{ post?: string; media?: string }>();
+  const base = useWorkBase();
   // Opened from a shared link with nothing loaded yet: the feed is fetched first (usePublicPortfolio), then the reel is looked up.
   const { view } = usePublicPortfolio();
   const feed = view.status === 'ready' || view.status === 'loading' ? getLoadedPortfolio() : getLoadedPortfolio();
@@ -46,7 +48,7 @@ export default function WeatherWorkVideo() {
   // While a reel is held (2x) the list does not scroll, so the finger can wander anywhere and the hold stays.
   const [holding, setHolding] = useState(false);
 
-  const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); }, [router]);
+  const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace(`${base}/work` as any); }, [router, base]);
   const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.y / height);
     setActive((cur) => { if (cur !== i) setStarted(false); return i; });
@@ -91,7 +93,7 @@ export default function WeatherWorkVideo() {
             onScrubChange={setScrubbing}
             onHoldChange={setHolding}
             onClose={goBack}
-            onRequest={(note) => router.push({ pathname: '/weather/request', params: { services: note.services.join('|'), note: note.note } } as any)}
+            onRequest={(note) => router.push({ pathname: `${base}/request`, params: { services: note.services.join('|'), note: note.note } } as any)}
           />
         )}
       />

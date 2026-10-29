@@ -276,4 +276,5 @@ export const ES_CUSTOMER: Record<string, string> = {
   'No visits in this season': 'No hay visitas en esta temporada',
   'When we visit, it will be listed here with the time and photos.': 'Cuando visitemos, aparecerá aquí con la hora y las fotos.',
   '{count} photos': '{count} fotos',
+  'See the projects and reels we have done': 'Mira los proyectos y reels que hemos hecho',
 };

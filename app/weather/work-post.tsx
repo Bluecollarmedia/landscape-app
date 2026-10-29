@@ -16,6 +16,7 @@ import { config } from '@/lib/config';
 import { Image as ExpoImage } from 'expo-image';
 import { feedPosts, formatDuration, postGridUrl, requestNoteFor, shouldLoadSlide, sortedMedia, type PortfolioMedia, type PortfolioPost, shareLinkFor, shareTextFor } from '@/lib/portfolio';
 import { markStep } from '@/lib/errorReporting';
+import { useWorkBase } from '@/lib/workRoutes';
 import { BRIGHTON_PHONE_LINK } from '@/lib/serviceRequest';
 
 const INK = '#17301F';
@@ -33,6 +34,7 @@ export default function WeatherWorkPost() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const base = useWorkBase();
   // Opened from a shared link with nothing loaded yet: the feed is fetched first (usePublicPortfolio), then the post is looked up.
   const { view } = usePublicPortfolio();
   const feed = getLoadedPortfolio();
@@ -53,8 +55,8 @@ export default function WeatherWorkPost() {
   const openReel = useCallback((p: PortfolioPost, mediaId: string) => {
     markStep('opening a reel from the feed');
     setLeaving(true);
-    setTimeout(() => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any), 150);
-  }, [router]);
+    setTimeout(() => router.push({ pathname: `${base}/work-video`, params: { post: p.id, media: mediaId } } as any), 150);
+  }, [router, base]);
   // The post that is mostly on screen is the one that plays (its music, its video); the others sit still.
   const [activeId, setActiveId] = useState<string | undefined>(id);
   // The post after the one on screen gets its music ready in the background (one only), so scrolling on never waits for the song.
@@ -75,7 +77,7 @@ export default function WeatherWorkPost() {
     );
   }
 
-  const goBack = () => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); };
+  const goBack = () => { if (router.canGoBack()) router.back(); else router.replace(`${base}/work` as any); };
   // The tapped post is put at the top of the feed, fully in view, using the cards' REAL heights (no guessed height): once the list has its
   // content, it scrolls to that post; if the post has not been drawn yet, it jumps near it first and then settles exactly on it.
   const listRef = useRef<FlatList<PortfolioPost>>(null);
@@ -150,7 +152,8 @@ function PostCard({ post, width, active, warm, focused, onOpenReel }: { post: Po
 
   const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width)), [width]);
   const ask = requestNoteFor(post);
-  const openRequest = () => router.push({ pathname: '/weather/request', params: { services: ask.services.join('|'), note: ask.note } } as any);
+  const base = useWorkBase();
+  const openRequest = () => router.push({ pathname: `${base}/request`, params: { services: ask.services.join('|'), note: ask.note } } as any);
   const openReel = () => { if (reel) onOpenReel(post, reel.id); };
   const videoSound = sound && (!post.music_url || !!post.keep_video_sound);
   // The share sheet gets the words and the LINK to this project (iOS shares the link itself; the message carries it too for the rest).

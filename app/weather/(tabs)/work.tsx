@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useScrollToTop } from '@/lib/scrollTop';
+import { useWorkBase } from '@/lib/workRoutes';
 import { Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +39,7 @@ export default function WeatherWork() {
   // Only the first page of tiles is drawn; more are drawn as the person scrolls near the end (a long feed never loads all at once).
   const [gridCount, setGridCount] = useState(GRID_PAGE);
   const [videoCount, setVideoCount] = useState(GRID_PAGE);
+  const base = useWorkBase();
   const pager = useRef<ScrollView>(null);
   const pageRef = useRef<ScrollView>(null);
   useScrollToTop('/weather/work', useCallback(() => { pageRef.current?.scrollTo({ y: 0, animated: true }); }, []));
@@ -72,11 +74,11 @@ export default function WeatherWork() {
   // The ring around the profile picture: coloured while a story is unwatched, grey when all are watched, none without stories.
   const stories = activeStories(data.stories, Date.now());
   const ring = ringState(stories, seen);
-  const openStories = () => router.push({ pathname: '/weather/work-story', params: { start: String(startIndex(stories, seen)) } } as any);
-  const openVideo = (p: PortfolioPost, mediaId: string) => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any);
+  const openStories = () => router.push({ pathname: `${base}/work-story`, params: { start: String(startIndex(stories, seen)) } } as any);
+  const openVideo = (p: PortfolioPost, mediaId: string) => router.push({ pathname: `${base}/work-video`, params: { post: p.id, media: mediaId } } as any);
   // Every tile in the grid opens the feed on that post (a reel sits in the feed as a square preview; tapping it there goes full screen).
   // The Videos tab opens the full-screen reels straight away.
-  const openPost = (p: PortfolioPost) => router.push({ pathname: '/weather/work-post', params: { id: p.id } } as any);
+  const openPost = (p: PortfolioPost) => router.push({ pathname: `${base}/work-post`, params: { id: p.id } } as any);
 
   return (
     <ScrollView
@@ -122,7 +124,7 @@ export default function WeatherWork() {
       </View>
 
       <View style={styles.buttons}>
-        <Pressable onPress={() => router.push('/weather/request' as any)} accessibilityRole="button" style={({ pressed }) => [styles.primary, { flex: 1 }, pressed && { opacity: 0.85 }]}><Text style={styles.primaryText}>{t('Request a quote')}</Text></Pressable>
+        <Pressable onPress={() => router.push(`${base}/request` as any)} accessibilityRole="button" style={({ pressed }) => [styles.primary, { flex: 1 }, pressed && { opacity: 0.85 }]}><Text style={styles.primaryText}>{t('Request a quote')}</Text></Pressable>
         <Pressable onPress={() => { void Linking.openURL(BRIGHTON_PHONE_LINK); }} accessibilityRole="button" style={({ pressed }) => [styles.secondary, { flex: 1 }, pressed && { opacity: 0.85 }]}><Text style={styles.secondaryText}>{t('Call')}</Text></Pressable>
       </View>
 
@@ -131,7 +133,7 @@ export default function WeatherWork() {
           {circles.map((h) => {
             const uri = highlightCoverUrl(h, data.posts);   // a circle is 64 points wide: its picture comes from the small copy when there is one
             return (
-              <Pressable key={h.id} onPress={() => router.push({ pathname: '/weather/work-story', params: { highlight: h.id } } as any)} accessibilityRole="button" accessibilityLabel={h.name} style={styles.circleItem}>
+              <Pressable key={h.id} onPress={() => router.push({ pathname: `${base}/work-story`, params: { highlight: h.id } } as any)} accessibilityRole="button" accessibilityLabel={h.name} style={styles.circleItem}>
                 <View style={styles.circleRing}>{uri ? <OptimizedImage source={uri} style={styles.circleImg} /> : <View style={[styles.circleImg, { backgroundColor: WX.leafTint }]} />}</View>
                 <Text style={styles.circleLabel} numberOfLines={1}>{h.name}</Text>
               </Pressable>

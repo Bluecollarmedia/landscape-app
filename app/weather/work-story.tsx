@@ -8,6 +8,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
 import { markStep } from '@/lib/errorReporting';
+import { useWorkBase } from '@/lib/workRoutes';
 import { OptimizedImage } from '@/components/ui';
 import { ProfileAvatar } from '@/components/work/ProfileAvatar';
 import { StoryBackdrop, StoryCard } from '@/components/work/StoryCard';
@@ -32,6 +33,7 @@ export default function WeatherWorkStory() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const { start, highlight } = useLocalSearchParams<{ start?: string; highlight?: string }>();
+  const base = useWorkBase();
   const feed = getLoadedPortfolio();
   // A highlight plays like a story that never expires: its posts' photos and videos, one after another, in this same viewer.
   const hl = highlight ? feed?.highlights.find((h) => h.id === highlight) : undefined;
@@ -50,7 +52,7 @@ export default function WeatherWorkStory() {
   const [sound, setSound] = useState(false);
   const story = stories[index];
 
-  const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); }, [router]);
+  const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace(`${base}/work` as any); }, [router, base]);
 
   // ── the timer for the story on screen (stops while held, while another screen is on top, or when the app is switched away) ──
   const progress = useRef(new Animated.Value(0)).current;
@@ -133,15 +135,15 @@ export default function WeatherWorkStory() {
   };
   const openTarget = () => {
     if (held.current || !target) return;   // a hold only shows the hint; a short tap opens
-    if (target.type === 'video') openAfterClosing('opening a reel from a story', { pathname: '/weather/work-video', params: { post: target.postId, media: target.mediaId } });
-    else openAfterClosing('opening a project from a story', { pathname: '/weather/work-post', params: { id: target.postId } });
+    if (target.type === 'video') openAfterClosing('opening a reel from a story', { pathname: `${base}/work-video`, params: { post: target.postId, media: target.mediaId } });
+    else openAfterClosing('opening a project from a story', { pathname: `${base}/work-post`, params: { id: target.postId } });
   };
 
   // Inside a highlight, a small button at the bottom opens the post (or reel) the picture came from.
   const openFrame = () => {
     if (!post) return;
-    if (story.kind === 'video' && story.media_id) openAfterClosing('opening a reel from a highlight', { pathname: '/weather/work-video', params: { post: post.id, media: story.media_id } });
-    else openAfterClosing('opening a project from a highlight', { pathname: '/weather/work-post', params: { id: post.id } });
+    if (story.kind === 'video' && story.media_id) openAfterClosing('opening a reel from a highlight', { pathname: `${base}/work-video`, params: { post: post.id, media: story.media_id } });
+    else openAfterClosing('opening a project from a highlight', { pathname: `${base}/work-post`, params: { id: post.id } });
   };
 
   return (

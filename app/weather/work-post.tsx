@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Linking, Pressable, Share, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ViewToken } from 'react-native';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,7 +43,19 @@ export default function WeatherWorkPost() {
   const post = getLoadedPost(id);
   const stillLoading = !post && view.status === 'loading';
   // "On screen" also means the app is in front: switching apps pauses the music and any video, and they carry on when the person returns.
-  const focused = useIsFocused() && useAppActive();
+  const isFocused = useIsFocused();
+  const focused = isFocused && useAppActive();
+  // Opening the full-screen reels: the feed's video players are taken down FIRST (stills in their place), and the reels open a moment later.
+  // Two screens of live players on top of each other closed the app (the phone's crash note said so); this keeps them apart, and the feed
+  // keeps its place for the way back.
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => { if (isFocused) setLeaving(false); }, [isFocused]);
+  const live = focused && !leaving;
+  const openReel = useCallback((p: PortfolioPost, mediaId: string) => {
+    markStep('opening a reel from the feed');
+    setLeaving(true);
+    setTimeout(() => router.push({ pathname: '/weather/work-video', params: { post: p.id, media: mediaId } } as any), 150);
+  }, [router]);
   // The post that is mostly on screen is the one that plays (its music, its video); the others sit still.
   const [activeId, setActiveId] = useState<string | undefined>(id);
   const viewability = useRef({ itemVisiblePercentThreshold: 60 }).current;
@@ -74,7 +86,7 @@ export default function WeatherWorkPost() {
       <FlatList
         data={posts}
         keyExtractor={(p) => p.id}
-        renderItem={({ item }) => <PostCard post={item} width={width} active={focused && item.id === activeId} focused={focused} />}
+        renderItem={({ item }) => <PostCard post={item} width={width} active={live && item.id === activeId} focused={live} onOpenReel={openReel} />}
         initialScrollIndex={startAt}
         getItemLayout={(_d, i) => ({ length: estimate, offset: estimate * i, index: i })}
         onScrollToIndexFailed={() => { /* the estimate was off: the list stays where it landed, which is near the tapped post */ }}
@@ -97,7 +109,7 @@ export default function WeatherWorkPost() {
  * While another screen is on top (the full-screen reels), the card shows stills instead of video players (`focused` false): two screens of live
  * players stacked on each other closed the app. The feed itself stays where it was, so coming back lands on the same spot.
  */
-function PostCard({ post, width, active, focused }: { post: PortfolioPost; width: number; active: boolean; focused: boolean }) {
+function PostCard({ post, width, active, focused, onOpenReel }: { post: PortfolioPost; width: number; active: boolean; focused: boolean; onOpenReel: (post: PortfolioPost, mediaId: string) => void }) {
   const t = useT();
   const router = useRouter();
   const [index, setIndex] = useState(0);
@@ -127,7 +139,7 @@ function PostCard({ post, width, active, focused }: { post: PortfolioPost; width
   const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width)), [width]);
   const ask = requestNoteFor(post);
   const openRequest = () => router.push({ pathname: '/weather/request', params: { services: ask.services.join('|'), note: ask.note } } as any);
-  const openReel = () => { if (reel) { markStep('opening a reel from the feed'); router.push({ pathname: '/weather/work-video', params: { post: post.id, media: reel.id } } as any); } };
+  const openReel = () => { if (reel) onOpenReel(post, reel.id); };
   const videoSound = sound && (!post.music_url || !!post.keep_video_sound);
   // The share sheet gets the words and the LINK to this project (iOS shares the link itself; the message carries it too for the rest).
   const share = () => {

@@ -3,12 +3,44 @@
  * once (shrunk to a small AAC file so it starts fast) together with the part chosen (start and end); the app plays just that part. Nothing here talks to a music service.
  */
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
+import { keepPicked } from '@/lib/keepPickedFile';
 import { uploadImage } from '@/lib/media';
 import { portfolioFolder } from '@/lib/portfolioMedia';
 import { audioProblem } from '@/lib/mediaFormats';
 import { MAX_TRACK_MB } from '@/lib/portfolio';
 
-export interface PickedTrack { uri: string; fileName: string; mimeType: string | null; sizeBytes: number | null }
+export interface PickedTrack { uri: string; fileName: string; mimeType: string | null; sizeBytes: number | null; /** Already a small AAC file made by the app (the audio taken from a video): sent as it is. */ ready?: boolean }
+
+/**
+ * Takes the sound out of a video on the phone and saves it as a small AAC file (.m4a, 128 kbps), using the audio tool already in the app
+ * (it reads a video file's audio track like any other). Null when the phone cannot do it.
+ */
+export async function extractAudioFromVideo(videoUri: string): Promise<string | null> {
+  try {
+    const compressor = require('react-native-compressor') as { Audio?: { compress: (uri: string, o: { bitrate?: number }) => Promise<string> } };
+    if (!compressor.Audio) return null;
+    const out = await compressor.Audio.compress(videoUri, { bitrate: 128000 });
+    return out || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Opens the phone's videos and takes the sound out of the chosen one, as a track to use for a post. Null when cancelled, or an error in plain words. */
+export async function pickTrackFromVideo(): Promise<{ ok: true; track: PickedTrack } | { ok: false; error: string } | null> {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) return { ok: false, error: 'Turn on photo access for Brighton Lawn in the Settings app.' };
+  const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], allowsMultipleSelection: false, quality: 1 });
+  if (res.canceled || !res.assets?.[0]) return null;
+  const a = res.assets[0];
+  // The picked file is copied somewhere safe at once (the phone may remove its temporary copy).
+  const kept = await keepPicked(a.uri, 'video');
+  const audio = await extractAudioFromVideo(kept);
+  if (!audio) return { ok: false, error: "Couldn't take the sound out of that video. Try another one." };
+  const base = (a.fileName ?? 'video').replace(/\.[^.]+$/, '');
+  return { ok: true, track: { uri: audio, fileName: `${base} (from video).m4a`, mimeType: 'audio/mp4', sizeBytes: a.fileSize ?? null, ready: true } };
+}
 
 /** Opens the phone's Files picker for an audio file. Returns null when cancelled, or an error in plain words. */
 export async function pickTrack(): Promise<{ ok: true; track: PickedTrack } | { ok: false; error: string } | null> {
@@ -42,6 +74,7 @@ export async function readTrackDuration(uri: string): Promise<number | null> {
  * in a post), then sends it. If the phone cannot shrink it, the track goes up as it is.
  */
 export async function shrinkTrack(track: PickedTrack): Promise<{ uri: string; mimeType: string | null }> {
+  if (track.ready) return { uri: track.uri, mimeType: track.mimeType };
   try {
     const compressor = require('react-native-compressor') as { Audio?: { compress: (uri: string, o: { quality?: 'low' | 'medium' | 'high'; bitrate?: number }) => Promise<string> } };
     if (!compressor.Audio) return { uri: track.uri, mimeType: track.mimeType };

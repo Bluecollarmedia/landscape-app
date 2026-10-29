@@ -8,7 +8,7 @@ export const BUSINESS = {
   email: 'shmuelsasson3@gmail.com',
   phone: '848-226-0090',
   website: 'https://brighton-app.netlify.app',
-  effective: 'October 18, 2026',
+  effective: 'October 29, 2026',
 } as const;
 
 export type LegalSection = { heading: string; paragraphs?: string[]; bullets?: string[] };
@@ -36,6 +36,9 @@ export const PRIVACY: LegalDoc = {
         'Customer and property details entered by the company: names, phone numbers, email addresses, service addresses, contact and gate or access instructions, and notes.',
         'Work records: projects, tasks, schedules, hours worked, pay rates and payroll estimates, maintenance routes and visit history, snow storms, routes, stops and clock-in/clock-out times.',
         'Photos and videos you take or choose (job photos, stop photos, problem reports, profile photos). The app asks for camera and photo-library permission before it can use them.',
+        'Our Work: the company owner can add photos, videos (reels), stories and music (an audio file chosen from the phone, or the sound taken from one of its videos) to show finished projects. When the owner turns Our Work on, these are public: anyone who opens the app, including people who are not signed in, can see them. They show the town of a project, never the name or address of a customer.',
+        'Service requests: if you use the Request page (you do not need an account), the name, phone number, optional email address, town or ZIP code, kind of property, services you choose and any details you write. They are saved for the company, shown to its owner and administrators in the app, and emailed to them.',
+        'Weather: the Weather page shows a forecast for a town you choose from a list or type. It does not track you and does not read your location.',
         'Messages sent inside a project, and reports of problems at a property.',
         'Quotes, change orders and invoices, including the name, time, IP address and browser a customer records when approving or declining one through a link.',
         'Location: only when you tap to check in at a job site, the app reads your phone\'s precise location once to check that you are near the job. It does not track you in the background. If you deny location access, you can still use the app, and check-in then records that location was unavailable.',
@@ -68,7 +71,7 @@ export const PRIVACY: LegalDoc = {
         'Supabase: sign-in, the database and file storage.',
         'Cloudflare: storage and delivery of photos and videos.',
         'Expo: delivery of push notifications to your phone.',
-        'Resend: delivery of some email notices, such as an arrival or completion notice a customer asked for.',
+        'Resend: delivery of some email notices, such as an arrival or completion notice a customer asked for, and the email that tells the company about a new service request.',
         'Netlify: hosting of the web page that customers use to approve a quote, and of this policy.',
         'Google: address suggestions. When you type an address, the text you have typed so far is sent to Google Places to suggest matching addresses.',
       ],

@@ -16,6 +16,8 @@ export function useClipMusic(url: string | null, clip: Clip | null, opts: { acti
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
     p.timeUpdateEventInterval = 0.25;
+    // Start as soon as a few seconds are in, rather than waiting for a comfortable buffer: a song that starts a second late feels broken.
+    try { p.bufferOptions = { ...p.bufferOptions, waitsToMinimizeStalling: false, preferredForwardBufferDuration: 8 }; } catch { /* older player */ }
   });
   const { active, muted, fade } = opts;
   const duck = !!opts.duck;
@@ -27,11 +29,17 @@ export function useClipMusic(url: string | null, clip: Clip | null, opts: { acti
   const endS = clip?.endS ?? 0;
   const hasClip = !!clip;
   const begun = useRef(false);
+  // A different track is a different player: it starts at its own chosen start.
+  useEffect(() => { begun.current = false; }, [url]);
+  // The loop below must never start a player that was not asked to play (every post with music used to start at once in the feed).
+  const wanted = useRef(false);
+  wanted.current = active && !muted;
 
   useEffect(() => {
     if (!url || !hasClip) return;
     const sub = player.addListener('timeUpdate', ({ currentTime }) => {
       try {
+        if (!wanted.current) return;
         const c = { startS, endS };
         const jump = nextLoopPosition(currentTime, c);
         if (jump !== null) { player.currentTime = jump; player.play(); return; }

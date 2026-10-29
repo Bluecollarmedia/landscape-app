@@ -58,6 +58,9 @@ export default function WeatherWorkPost() {
   }, [router]);
   // The post that is mostly on screen is the one that plays (its music, its video); the others sit still.
   const [activeId, setActiveId] = useState<string | undefined>(id);
+  // The post after the one on screen gets its music ready in the background (one only), so scrolling on never waits for the song.
+  const activeIndex = posts.findIndex((p) => p.id === activeId);
+  const nextId = activeIndex >= 0 ? posts[activeIndex + 1]?.id : undefined;
   const viewability = useRef({ itemVisiblePercentThreshold: 60 }).current;
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const first = viewableItems.find((v) => v.isViewable);
@@ -86,7 +89,7 @@ export default function WeatherWorkPost() {
       <FlatList
         data={posts}
         keyExtractor={(p) => p.id}
-        renderItem={({ item }) => <PostCard post={item} width={width} active={live && item.id === activeId} focused={live} onOpenReel={openReel} />}
+        renderItem={({ item }) => <PostCard post={item} width={width} active={live && item.id === activeId} warm={live && item.id === nextId} focused={live} onOpenReel={openReel} />}
         initialScrollIndex={startAt}
         getItemLayout={(_d, i) => ({ length: estimate, offset: estimate * i, index: i })}
         onScrollToIndexFailed={() => { /* the estimate was off: the list stays where it landed, which is near the tapped post */ }}
@@ -109,7 +112,7 @@ export default function WeatherWorkPost() {
  * While another screen is on top (the full-screen reels), the card shows stills instead of video players (`focused` false): two screens of live
  * players stacked on each other closed the app. The feed itself stays where it was, so coming back lands on the same spot.
  */
-function PostCard({ post, width, active, focused, onOpenReel }: { post: PortfolioPost; width: number; active: boolean; focused: boolean; onOpenReel: (post: PortfolioPost, mediaId: string) => void }) {
+function PostCard({ post, width, active, warm, focused, onOpenReel }: { post: PortfolioPost; width: number; active: boolean; warm: boolean; focused: boolean; onOpenReel: (post: PortfolioPost, mediaId: string) => void }) {
   const t = useT();
   const router = useRouter();
   const [index, setIndex] = useState(0);
@@ -148,8 +151,9 @@ function PostCard({ post, width, active, focused, onOpenReel }: { post: Portfoli
 
   return (
     <View>
-      {/* The music is its own small component so that, like the video players, it is UNMOUNTED (player released) while another screen is on top. */}
-      {focused && post.music_url ? <CardMusic url={post.music_url} clip={clip} active={musicActive} muted={muted} fade={post.music_fade ?? true} duck={duck} /> : null}
+      {/* The music is its own small component: it exists only for the post on screen and the one after it (warmed up, silent), and like the
+          video players it is UNMOUNTED (player released) while another screen is on top. Other posts' songs are never loaded. */}
+      {focused && post.music_url && (active || warm) ? <CardMusic url={post.music_url} clip={clip} active={musicActive} muted={muted} fade={post.music_fade ?? true} duck={duck} /> : null}
       <View style={styles.author}>
         <ProfileAvatar uri={getLoadedPortfolio()?.profile.avatar_url} size={38} />
         <View style={{ flex: 1 }}>

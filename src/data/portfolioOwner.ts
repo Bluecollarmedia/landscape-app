@@ -7,6 +7,13 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { removeMedia } from '@/lib/media';
 import { db } from '@/data/store';
 import { portfolioFolder } from '@/lib/portfolioMedia';
+import { config } from '@/lib/config';
+import { highlightFileKeys, mediaFileKeys, postFileKeys } from '@/lib/portfolioFiles';
+
+/** Deletes stored files, best effort and one by one (a file that is already gone is not an error). */
+export function removeStoredFiles(keys: string[]): void {
+  for (const k of keys) void removeMedia(k);
+}
 import { highlightProblem, postProblem, type MediaKind, type PortfolioHighlight, type PortfolioMedia, type PortfolioPost, type PostKind } from '@/lib/portfolio';
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -148,7 +155,7 @@ export const setPostVisible = (id: string, visible: boolean): Promise<Result<nul
  * gets its place in the order. Files the owner uploaded for Our Work are deleted from storage; a picture that came from somewhere else (a
  * project's photo) is only taken out of the post, never deleted.
  */
-export async function saveMedia(postId: string, items: MediaInput[], before: Pick<PortfolioMedia, 'id'>[], keysByMediaId: Record<string, string | null | undefined>): Promise<Result<null>> {
+export async function saveMedia(postId: string, items: MediaInput[], before: Pick<PortfolioMedia, 'id' | 'url' | 'thumb_url'>[], keysByMediaId: Record<string, string | null | undefined>): Promise<Result<null>> {
   const companyId = db.companyId;
   if (!companyId) return { ok: false, error: 'Sign in again.' };
   try {
@@ -157,9 +164,10 @@ export async function saveMedia(postId: string, items: MediaInput[], before: Pic
     if (removed.length) {
       const del = await supabase.from('portfolio_media').delete().in('id', removed.map((m) => m.id));
       if (del.error) return { ok: false, error: friendly(del.error.message) };
+      // The removed picture's file AND its small grid copy / still frame.
       for (const m of removed) {
-        const key = keysByMediaId[m.id];
-        if (key && key.startsWith(`${portfolioFolder(companyId, 'posts')}/`)) void removeMedia(key);
+        const keys = new Set(mediaFileKeys({ url: (m as PortfolioMedia).url, thumb_url: (m as PortfolioMedia).thumb_url, storage_key: keysByMediaId[m.id] }, config.r2PublicUrl, companyId));
+        removeStoredFiles([...keys]);
       }
     }
     for (let i = 0; i < items.length; i++) {
@@ -179,12 +187,13 @@ export async function saveMedia(postId: string, items: MediaInput[], before: Pic
 }
 
 /** Deletes a post for good (its photos and videos too). Files the owner uploaded are removed from storage. */
-export async function deletePost(id: string, keys: (string | null | undefined)[]): Promise<Result<null>> {
+/** Deletes a post and EVERY stored file of it: its photos and videos with their small copies and still frames, its cover, its music. */
+export async function deletePost(id: string, post: { media: (PortfolioMedia & { storage_key?: string | null })[]; cover_url?: string | null; cover_thumb_url?: string | null; music_url?: string | null }): Promise<Result<null>> {
   const companyId = db.companyId;
   try {
     const { error } = await supabase.from('portfolio_posts').delete().eq('id', id);
     if (error) return { ok: false, error: friendly(error.message) };
-    if (companyId) for (const k of keys) if (k && k.startsWith(`${portfolioFolder(companyId, 'posts')}/`)) void removeMedia(k);
+    if (companyId) removeStoredFiles(postFileKeys(post, config.r2PublicUrl, companyId));
     return { ok: true, data: null };
   } catch {
     return { ok: false, error: UNREACHABLE };
@@ -226,8 +235,12 @@ export async function saveHighlight(id: string | null, input: HighlightInput, po
 
 export async function deleteHighlight(id: string): Promise<Result<null>> {
   try {
+    const companyId = db.companyId;
+    // The circle's own picture (if the owner uploaded one) goes with it.
+    const { data: row } = await supabase.from('portfolio_highlights').select('cover_url').eq('id', id).maybeSingle();
     const { error } = await supabase.from('portfolio_highlights').delete().eq('id', id);
     if (error) return { ok: false, error: friendly(error.message) };
+    if (companyId && row) removeStoredFiles(highlightFileKeys(row as { cover_url?: string | null }, config.r2PublicUrl, companyId));
     return { ok: true, data: null };
   } catch {
     return { ok: false, error: UNREACHABLE };

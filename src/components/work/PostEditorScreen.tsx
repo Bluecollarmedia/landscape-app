@@ -12,7 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage, ProgressBar } from '@/components/ui';
 import { overallProgress, percentOf, uploadLabel } from '@/lib/uploadProgress';
 import { confirmAction } from '@/components/financials/ActionSheet';
-import { createPost, deletePost, loadOwnerPortfolio, saveMedia, setPostVisible, updatePost, type MediaInput, type OwnerPost } from '@/data/portfolioOwner';
+import { createPost, deletePost, loadOwnerPortfolio, saveMedia, setPostVisible, updatePost, type MediaInput, type OwnerPost, removeStoredFiles } from '@/data/portfolioOwner';
+import { config } from '@/lib/config';
+import { postFileKeys, replacedFileKeys } from '@/lib/portfolioFiles';
 import { CoverEditor } from '@/components/work/CoverEditor';
 import { MusicEditor, type MusicDraft } from '@/components/work/MusicEditor';
 import { uploadTrack } from '@/data/portfolioMusic';
@@ -208,6 +210,12 @@ export function PostEditorScreen() {
         const r2 = await saveMedia(post.id, arranged, post.media, ex.keys);
         if (!r2.ok) { setProblem(r2.error); return; }
         if (!cover && (coverReset || !post.cover_url)) await updatePost(post.id, { cover_thumb_url: arranged[0]?.thumbUrl ?? null });
+        // A replaced or removed cover, and a replaced or removed song, no longer sit in storage.
+        if (db.companyId) {
+          const before = postFileKeys({ media: [], cover_url: post.cover_url, cover_thumb_url: post.cover_thumb_url, music_url: post.music_url }, config.r2PublicUrl, db.companyId);
+          const after = postFileKeys({ media: [], cover_url: cover ? cover.url : coverReset ? null : post.cover_url, cover_thumb_url: cover ? cover.thumbUrl : coverReset ? null : post.cover_thumb_url, music_url: musicInput?.url ?? null }, config.r2PublicUrl, db.companyId);
+          removeStoredFiles(replacedFileKeys(before, after));
+        }
       }
       setProgress(1);
       router.back();
@@ -228,7 +236,7 @@ export function PostEditorScreen() {
   function confirmDelete() {
     if (!post) return;
     confirmAction('Delete this post?', 'It is removed from Our Work for good, with its photos and videos. This cannot be undone. (To only hide it, use Take down.)', 'Delete', async () => {
-      const r = await deletePost(post.id, post.media.map((m) => (m as { storage_key?: string | null }).storage_key));
+      const r = await deletePost(post.id, post);
       if (!r.ok) { setProblem(r.error); return; }
       router.back();
     }, true);

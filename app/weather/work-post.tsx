@@ -46,12 +46,12 @@ export default function WeatherWorkPost() {
   const duck = !!post?.keep_video_sound && onVideo;
   useClipMusic(post?.music_url ?? null, clip, { active: musicActive, muted, fade: post?.music_fade ?? true, duck });
 
-  // Only the picture on screen is loaded. Once it has had a moment, the NEXT one is fetched quietly (one at a time), so swiping on is instant
-  // without asking for all of them when the post opens.
+  // The picture on screen and its neighbours are drawn (shouldLoadSlide), so a swipe never lands on an empty square. Once the screen has had
+  // a moment, the one AFTER the next is fetched quietly into the cache too, so it is ready by the time it becomes a neighbour.
   React.useEffect(() => {
-    const next = media[index + 1];
-    if (!focused || !next || next.kind !== 'photo') return;
-    const timer = setTimeout(() => { void ExpoImage.prefetch(next.url); }, 700);
+    const ahead = media[index + 2];
+    if (!focused || !ahead || ahead.kind !== 'photo') return;
+    const timer = setTimeout(() => { void ExpoImage.prefetch(ahead.url); }, 500);
     return () => clearTimeout(timer);
   }, [focused, index, media]);
 
@@ -98,9 +98,9 @@ export default function WeatherWorkPost() {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          initialNumToRender={1}
-          maxToRenderPerBatch={1}
-          windowSize={2}
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          windowSize={3}
           getItemLayout={(_d, i) => ({ length: width, offset: width * i, index: i })}
           onMomentumScrollEnd={onScrollEnd}
           renderItem={({ item, index: i }) => <Slide media={item} size={width} load={shouldLoadSlide(i, index)} playing={focused && i === index} sound={!muted && (!post.music_url || post.keep_video_sound)} />}

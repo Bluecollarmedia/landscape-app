@@ -106,10 +106,10 @@ export const GRID_PAGE = 30;
 export const growCount = (count: number, total: number): number => Math.min(total, count + GRID_PAGE);
 
 /**
- * Which pictures in a swipe row may load: only the one on screen. (The next one is fetched quietly afterwards, one at a time, by the screen.)
- * A post with 10 photos therefore asks for 1 picture when it opens, not 10.
+ * Which pictures in a swipe row are drawn: the one on screen and its two neighbours, so a swipe lands on a picture that is already there
+ * (never on an empty green square). The one after that is fetched quietly by the screen. A post with 10 photos asks for 2 when it opens, not 10.
  */
-export const shouldLoadSlide = (slideIndex: number, currentIndex: number): boolean => slideIndex === currentIndex;
+export const shouldLoadSlide = (slideIndex: number, currentIndex: number): boolean => Math.abs(slideIndex - currentIndex) <= 1;
 
 export const hasVideo = (post: PortfolioPost): boolean => post.media.some((m) => m.kind === 'video');
 

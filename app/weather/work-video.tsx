@@ -112,6 +112,8 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
   const insets = useSafeAreaInsets();
   const { post, media: item } = entry;
   const [paused, setPaused] = useState(false);
+  // Hold the reel to watch it at 2x; let go and it is back to normal. The hold survives a finger that drifts (pressRetentionOffset).
+  const [fast, setFast] = useState(false);
   const [now, setNow] = useState(0);
   const [length, setLength] = useState(item.duration_s ?? 0);
   const musicReplaces = !!post.music_url && !post.keep_video_sound;
@@ -131,6 +133,8 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
   useEffect(() => { try { if (player.duration > 0) setLength((l) => l || player.duration); } catch { /* released */ } });
   useEffect(() => { try { player.muted = !live || !sound || musicReplaces; } catch { /* released */ } }, [player, live, sound, musicReplaces]);
   useEffect(() => { try { if (playing) player.play(); else player.pause(); } catch { /* released */ } }, [player, playing]);
+  useEffect(() => { try { player.playbackRate = fast && playing ? 2 : 1; } catch { /* released */ } }, [player, fast, playing]);
+  useEffect(() => { if (!live) setFast(false); }, [live]);
 
   const clip = post.music_url && post.music_start_s != null && post.music_end_s != null ? { startS: post.music_start_s, endS: post.music_end_s } : null;
   // A reel that keeps its own sound plays its music lowered underneath it; otherwise the music replaces the reel's sound.
@@ -146,7 +150,18 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
 
   return (
     <View style={{ height, backgroundColor: '#0E1A12' }}>
-      <Pressable style={StyleSheet.absoluteFill} disabled={!live} onPress={() => setPaused((p) => !p)} accessibilityRole="button" accessibilityLabel={paused ? t('Play') : t('Pause')}>
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        disabled={!live}
+        onPress={() => setPaused((p) => !p)}
+        onLongPress={() => { if (!paused) setFast(true); }}
+        delayLongPress={220}
+        onPressOut={() => setFast(false)}
+        pressRetentionOffset={{ top: 2000, bottom: 2000, left: 2000, right: 2000 }}
+        accessibilityRole="button"
+        accessibilityLabel={paused ? t('Play') : t('Pause')}
+        accessibilityHint={t('Hold to watch at double speed')}
+      >
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsVideoFrameAnalysis={false} />
       </Pressable>
       {!live ? null : (
@@ -154,6 +169,7 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
           {/* The video plays on top at full brightness, edge to edge. Only a short soft fade sits at the very bottom, behind the words and the seek bar. */}
           <LinearGradient colors={['transparent', 'rgba(8,16,12,0.55)']} style={[styles.shade, { height: Math.min(300, height * 0.3) }]} pointerEvents="none" />
           {paused ? <View style={styles.pauseWrap} pointerEvents="none"><View style={styles.pauseDot}><MaterialCommunityIcons name="play" size={40} color="#FFFFFF" /></View></View> : null}
+          {fast ? <View style={styles.fastWrap} pointerEvents="none"><View style={styles.fastPill}><MaterialCommunityIcons name="fast-forward" size={16} color="#FFFFFF" /><Text style={styles.fastText}>2x</Text></View></View> : null}
 
           <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
             <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('Close')} style={styles.roundBtn}><MaterialCommunityIcons name="close" size={24} color="#FFFFFF" /></Pressable>
@@ -193,6 +209,9 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
 }
 
 const styles = StyleSheet.create({
+  fastWrap: { position: 'absolute', top: 110, left: 0, right: 0, alignItems: 'center' },
+  fastPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, backgroundColor: 'rgba(8,16,12,0.6)' },
+  fastText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   screen: { flex: 1, backgroundColor: '#0E1A12' },
   shade: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 30, backgroundColor: WX.page },

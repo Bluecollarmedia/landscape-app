@@ -25,7 +25,7 @@ export default function WeatherLayout() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="work-post" />
-        <Stack.Screen name="work-video" />
+        <Stack.Screen name="work-video" options={{ gestureEnabled: false }} />
         <Stack.Screen name="work-story" />
       </Stack>
     </View>

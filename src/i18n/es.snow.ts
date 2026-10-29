@@ -33,7 +33,7 @@ export const ES_SNOW: Record<string, string> = {
   'Clock out in the Time Clock tab.': 'Registra tu salida en la pestaña Reloj de tiempo.',
   'Back to current work': 'Volver al trabajo actual',
   'No active route': 'No hay una ruta activa',
-  'When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are under Past work below.': 'Cuando el dueño active una tormenta contigo en una ruta (como líder o parte de la cuadrilla), las paradas aparecerán aquí. Las tormentas terminadas están abajo, en Trabajo anterior.',
+  'When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are in Settings, under Past storms.': 'Cuando el dueño active una tormenta contigo en una ruta (como líder o parte de la cuadrilla), las paradas aparecerán aquí. Las tormentas terminadas están en Ajustes, en Tormentas anteriores.',
   'This route was cancelled.': 'Esta ruta fue cancelada.',
   'This storm has ended. Nothing more to do here.': 'Esta tormenta terminó. Ya no hay nada más que hacer aquí.',
   '{done} of {total} stop completed': '{done} de {total} parada completada',

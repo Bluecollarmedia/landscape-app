@@ -213,7 +213,7 @@ export function MyRouteScreen({ clockedInSince, topNotice, pastOnly }: { /** Set
 
         {!route && pastOnly ? (pastRoutes.length === 0 ? <EmptyState icon="clock" title={t('No past storms yet')} description={t('Storms you worked on show up here once they have ended.')} /> : null) : !route ? (
           <>
-          <EmptyState icon="navigation" title={t('No active route')} description={t('When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are under Past work below.')} />
+          <EmptyState icon="navigation" title={t('No active route')} description={t('When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are in Settings, under Past storms.')} />
           </>
         ) : (
           <>
@@ -376,8 +376,8 @@ export function MyRouteScreen({ clockedInSince, topNotice, pastOnly }: { /** Set
           </>
         )}
 
-        {/* Past work stays out of the way while a storm is running; it shows once nothing is active. */}
-        {!historyId && (pastOnly || activeRoutes.length === 0) && pastRoutes.length > 0 ? (
+        {/* Past work is not on the Route tab at all: it lives in Settings > Past storms (pastOnly). */}
+        {!historyId && pastOnly && pastRoutes.length > 0 ? (
           <>
             <Pressable onPress={() => { if (!pastOnly) setShowHistory(!showHistory); }} style={styles.historyHeader} accessibilityRole="button" accessibilityState={{ expanded: showHistory || !!pastOnly }}>
               <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>{t('PAST WORK ({n})', { n: pastRoutes.length })}</Text>

@@ -66,7 +66,6 @@ export function PostEditorScreen() {
   const [town, setTown] = useState('');
   const [takenOn, setTakenOn] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [showInGrid, setShowInGrid] = useState(true);
   const [visible, setVisible] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   /** One bar for the whole save: every file is an equal step, and the file being sent moves the bar through its step. */
@@ -92,7 +91,7 @@ export function PostEditorScreen() {
       setPost(p);
       setReel(p.kind === 'video');
       if (p.music_url && p.music_start_s != null && p.music_end_s != null) setMusic({ track: null, url: p.music_url, title: p.music_title ?? 'My track', durationS: null, startS: p.music_start_s, endS: p.music_end_s, fade: p.music_fade, keepVideoSound: p.keep_video_sound });
-      setCaption(p.caption); setTown(p.town); setTakenOn(p.taken_on); setTags(p.tags); setShowInGrid(p.show_in_grid); setVisible(p.visible);
+      setCaption(p.caption); setTown(p.town); setTakenOn(p.taken_on); setTags(p.tags); setVisible(p.visible);
       setItems(sortedMedia(p).map((m) => ({ key: m.id, id: m.id, kind: m.kind, uri: m.thumb_url ?? m.url, full: m.url, local: false, durationS: m.duration_s, thumbUrl: m.thumb_url, storageKey: (m as { storage_key?: string | null }).storage_key ?? null })));
     });
     return () => { alive = false; };
@@ -188,12 +187,12 @@ export function PostEditorScreen() {
       setBusy('Saving…');
       report(0.5);
       if (!editingId) {
-        const r = await createPost({ kind: reel ? 'video' : 'post', caption, town, takenOn, tags, showInGrid, visible, music: musicInput, coverUrl: cover?.url ?? null, coverThumbUrl: cover?.thumbUrl ?? null, media: inputs });
+        const r = await createPost({ kind: reel ? 'video' : 'post', caption, town, takenOn, tags, showInGrid: true, visible, music: musicInput, coverUrl: cover?.url ?? null, coverThumbUrl: cover?.thumbUrl ?? null, media: inputs });
         if (!r.ok) { setProblem(r.error); return; }
       } else if (post) {
         const ex = await mediaUrlsOf(post);
         const coverPatch = cover ? { cover_url: cover.url, cover_thumb_url: cover.thumbUrl } : coverReset ? { cover_url: null } : {};
-        const r1 = await updatePost(post.id, { ...coverPatch, caption: caption.trim(), town: town.trim(), taken_on: takenOn.trim().slice(0, 30), tags, show_in_grid: reel ? showInGrid : true, visible,
+        const r1 = await updatePost(post.id, { ...coverPatch, caption: caption.trim(), town: town.trim(), taken_on: takenOn.trim().slice(0, 30), tags, show_in_grid: true, visible,
           music_url: musicInput?.url ?? null, music_title: musicInput?.title ?? null, music_start_s: musicInput?.startS ?? null, music_end_s: musicInput?.endS ?? null, music_fade: musicInput?.fade ?? true, keep_video_sound: musicInput?.keepVideoSound ?? false });
         if (!r1.ok) { setProblem(r1.error); return; }
         // existing pictures keep their saved address; only the order and what was removed change
@@ -316,15 +315,6 @@ export function PostEditorScreen() {
             </View>
 
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.md, gap: spacing.md, flexDirection: 'column', alignItems: 'stretch' }]}>
-              {reel ? (
-                <View style={styles.switchRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>Also show in the photo grid</Text>
-                    <Text style={[typeScale.caption, { color: colors.textSecondary }]}>Off: it only appears in Videos.</Text>
-                  </View>
-                  <Switch value={showInGrid} onValueChange={setShowInGrid} trackColor={{ true: '#2E5E34' }} accessibilityLabel="Also show in the photo grid" />
-                </View>
-              ) : null}
               <View style={styles.switchRow}>
                 <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700', flex: 1 }]}>Show on Our Work</Text>
                 <Switch value={visible} onValueChange={setVisible} trackColor={{ true: '#2E5E34' }} accessibilityLabel="Show on Our Work" />

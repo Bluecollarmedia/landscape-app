@@ -115,7 +115,8 @@ export const hasVideo = (post: PortfolioPost): boolean => post.media.some((m) =>
 
 /** The posts in the photo grid: every project post, and a video post only when the owner chose to show it there. Newest first. */
 export function gridPosts(posts: PortfolioPost[]): PortfolioPost[] {
-  return posts.filter((p) => p.media.length > 0 && (p.kind === 'post' || p.show_in_grid)).sort(newestFirst);
+  // Every post with something in it, reels included (a reel always shows here; the old "also show in the grid" switch is gone).
+  return posts.filter((p) => p.media.length > 0).sort(newestFirst);
 }
 
 /** One entry per reel, for the Videos tab and the swipe-up reels feed. Only reels (a post that is a single video) go here; the videos inside a photo post stay in that post. Newest first. */

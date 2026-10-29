@@ -22,6 +22,12 @@ export const ES_SNOW: Record<string, string> = {
 
   // ── Worker: Route tab (My Route) ──
   'My Route': 'Mi ruta',
+  'Past storms': 'Tormentas anteriores',
+  'Back to past storms': 'Volver a tormentas anteriores',
+  'No past storms yet': 'Aún no hay tormentas anteriores',
+  'Storms you worked on show up here once they have ended.': 'Las tormentas en las que trabajaste aparecen aquí cuando terminan.',
+  'Storms you worked on that have ended': 'Tormentas en las que trabajaste que ya terminaron',
+  'History': 'Historial',
   'Clocked in since {time}. Clock out in the Time Clock tab.': 'Trabajando desde {time}. Registra tu salida en la pestaña Reloj de tiempo.',
   'Clocked in since {time}.': 'Trabajando desde {time}.',
   'Clock out in the Time Clock tab.': 'Registra tu salida en la pestaña Reloj de tiempo.',

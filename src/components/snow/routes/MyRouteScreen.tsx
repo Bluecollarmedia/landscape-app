@@ -14,6 +14,7 @@ import { pickActiveRoute, splitMyRoutes } from '@/lib/snowMyRoute';
 import { canWorkRoute } from '@/lib/snowCrew';
 import { groupStatus, groupStops, isGroupClosed, servicesText } from '@/lib/snowStopGroups';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, Icon, InlineNotice, Input, LoadingSpinner, ProgressBar, StatusBadge } from '@/components/ui';
@@ -43,10 +44,11 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { SnowService } from '@/types/snow';
 
-export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the worker clocked in (the Route tab only shows this screen once they have). */ clockedInSince?: string; /** Shown first (the "you didn't clock out" card for an earlier shift). */ topNotice?: React.ReactNode } = {}) {
+export function MyRouteScreen({ clockedInSince, topNotice, pastOnly }: { /** Settings > Past storms: only the ended storms (and one opened read-only), none of the current work. */ pastOnly?: boolean; /** When the worker clocked in (the Route tab only shows this screen once they have). */ clockedInSince?: string; /** Shown first (the "you didn't clock out" card for an earlier shift). */ topNotice?: React.ReactNode } = {}) {
   const t = useT();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const weatherOn = usePublicWeatherSwitch(false);
   const tabBarClearance = useTabBarClearance();
   const [routes, setRoutes] = useState<MyRoute[]>([]);
@@ -74,13 +76,13 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
     const { active } = splitMyRoutes(mine.data);
     const current = pickActiveRoute(active, routeId);
     setRouteId(current);
-    const pick = historyId && mine.data.some((r) => r.id === historyId) ? historyId : current;
+    const pick = historyId && mine.data.some((r) => r.id === historyId) ? historyId : (pastOnly ? null : current);
     if (!pick) { setRoute(null); setLoading(false); return setError(null); }
     const r = await loadRoute(pick);
     setLoading(false);
     setError(r.ok ? null : r.error);
     if (r.ok) setRoute(r.data);
-  }, [routeId, historyId]);
+  }, [routeId, historyId, pastOnly]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -158,9 +160,15 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}
         keyboardShouldPersistTaps="handled"
       >
-        {weatherOn ? <View style={{ alignSelf: 'flex-start', marginBottom: spacing.md }}><WeatherButton to="/snow/worker/weather" /></View> : null}
-        {topNotice}
-        {clockedInSince ? (
+        {pastOnly && !historyId ? (
+          <Pressable onPress={() => router.back()} style={styles.backToCurrent} accessibilityRole="button" accessibilityLabel={t('Back')}>
+            <Icon name="arrow-left" size={18} color={colors.primary} />
+            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('Back')}</Text>
+          </Pressable>
+        ) : null}
+        {weatherOn && !pastOnly ? <View style={{ alignSelf: 'flex-start', marginBottom: spacing.md }}><WeatherButton to="/snow/worker/weather" /></View> : null}
+        {pastOnly ? null : topNotice}
+        {clockedInSince && !pastOnly ? (
           <View style={[styles.clockLine, { backgroundColor: colors.primarySurface }]} accessible accessibilityLabel={t('Clocked in since {time}. Clock out in the Time Clock tab.', { time: formatClock(clockedInSince) })}>
             <View style={[styles.clockDot, { backgroundColor: colors.success }]} />
             <Text style={[typeScale.caption, { color: colors.textSecondary, flex: 1 }]} numberOfLines={2}>
@@ -168,7 +176,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
             </Text>
           </View>
         ) : null}
-        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>{t('My Route')}</Text>
+        <Text style={[typeScale.displaySmall, { color: colors.textPrimary, marginTop: spacing.sm }]}>{pastOnly ? t('Past storms') : t('My Route')}</Text>
         {error ? <InlineNotice icon="alert-circle" tone="error" text={t(error)} style={{ marginTop: spacing.md }} /> : null}
 
         {/* Photos of earlier stops (or ended storms) still uploading or failed: always visible, so Retry / Remove is never lost. */}
@@ -179,11 +187,11 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
         {historyId ? (
           <Pressable onPress={() => setHistoryId(null)} style={styles.backToCurrent} accessibilityRole="button" accessibilityLabel={t('Back to current work')}>
             <Icon name="arrow-left" size={18} color={colors.primary} />
-            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{t('Back to current work')}</Text>
+            <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{pastOnly ? t('Back to past storms') : t('Back to current work')}</Text>
           </Pressable>
         ) : null}
 
-        {!historyId && activeRoutes.length > 1 ? (
+        {!pastOnly && !historyId && activeRoutes.length > 1 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, marginTop: spacing.md }}>
             {activeRoutes.map((r) => {
               const on = r.id === routeId;
@@ -203,7 +211,7 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
           </ScrollView>
         ) : null}
 
-        {!route ? (
+        {!route && pastOnly ? (pastRoutes.length === 0 ? <EmptyState icon="clock" title={t('No past storms yet')} description={t('Storms you worked on show up here once they have ended.')} /> : null) : !route ? (
           <>
           <EmptyState icon="navigation" title={t('No active route')} description={t('When the owner dispatches a storm with you on a route (as its lead or crew), the stops show up here. Finished storms are under Past work below.')} />
           </>
@@ -369,13 +377,13 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
         )}
 
         {/* Past work stays out of the way while a storm is running; it shows once nothing is active. */}
-        {!historyId && activeRoutes.length === 0 && pastRoutes.length > 0 ? (
+        {!historyId && (pastOnly || activeRoutes.length === 0) && pastRoutes.length > 0 ? (
           <>
-            <Pressable onPress={() => setShowHistory(!showHistory)} style={styles.historyHeader} accessibilityRole="button" accessibilityState={{ expanded: showHistory }}>
+            <Pressable onPress={() => { if (!pastOnly) setShowHistory(!showHistory); }} style={styles.historyHeader} accessibilityRole="button" accessibilityState={{ expanded: showHistory || !!pastOnly }}>
               <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>{t('PAST WORK ({n})', { n: pastRoutes.length })}</Text>
-              <Icon name={showHistory ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
+              {pastOnly ? null : <Icon name={showHistory ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />}
             </Pressable>
-            {showHistory ? (
+            {showHistory || pastOnly ? (
               <View style={[styles.group, { backgroundColor: colors.surface }]}>
                 {pastRoutes.map((r, i) => (
                   <Pressable

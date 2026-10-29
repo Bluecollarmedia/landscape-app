@@ -25,7 +25,7 @@ import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
 import { ProjectPrivateNotes } from '@/components/projects/ProjectPrivateNotes';
 import { useIsProjectOwner, useOwnerNotes } from '@/data/ownerProjectNotes';
 import { MessageThread } from '@/components/messages/MessageThread';
-import { db, rowsOf } from '@/data/store';
+import { db, rowsOf, updateRow } from '@/data/store';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
@@ -2323,6 +2323,19 @@ export default function ProjectDetailScreen() {
             <Switch
               value={settings.completionPhotoRequired}
               onValueChange={(v) => updateSettings({ completionPhotoRequired: v })}
+            />
+          </View>
+
+          <Divider style={{ marginVertical: spacing.xs }} />
+          <View style={styles.settingsDetailRow}>
+            <View style={{ flex: 1, marginRight: spacing.sm }}>
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Only the Task Lead checks off tasks</Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Off: anyone on the job can. On: only the Task Lead you pick below. Applies to every project.</Text>
+            </View>
+            <Switch
+              value={db.company?.taskLeadOnly === true}
+              onValueChange={(v) => { if (db.company) updateRow('companies', db.company.id, { taskLeadOnly: v }); }}
+              accessibilityLabel="Only the Task Lead checks off tasks"
             />
           </View>
 

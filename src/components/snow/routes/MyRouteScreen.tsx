@@ -368,7 +368,8 @@ export function MyRouteScreen({ clockedInSince, topNotice }: { /** When the work
           </>
         )}
 
-        {!historyId && pastRoutes.length > 0 ? (
+        {/* Past work stays out of the way while a storm is running; it shows once nothing is active. */}
+        {!historyId && activeRoutes.length === 0 && pastRoutes.length > 0 ? (
           <>
             <Pressable onPress={() => setShowHistory(!showHistory)} style={styles.historyHeader} accessibilityRole="button" accessibilityState={{ expanded: showHistory }}>
               <Text style={[typeScale.overline, { color: colors.textSecondary, flex: 1 }]}>{t('PAST WORK ({n})', { n: pastRoutes.length })}</Text>

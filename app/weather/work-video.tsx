@@ -4,6 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useT } from '@/i18n';
 import { OptimizedImage } from '@/components/ui';
@@ -39,6 +41,8 @@ export default function WeatherWorkVideo() {
   const [started, setStarted] = useState(false);
   const [sound, setSound] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
+  // While a reel is held (2x) the list does not scroll, so the finger can wander anywhere and the hold stays.
+  const [holding, setHolding] = useState(false);
 
   const goBack = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace('/weather/work' as any); }, [router]);
   const onScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -64,7 +68,7 @@ export default function WeatherWorkVideo() {
         keyExtractor={(e) => e.media.id}
         pagingEnabled
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!scrubbing}
+        scrollEnabled={!scrubbing && !holding}
         initialScrollIndex={Math.max(0, startAt)}
         getItemLayout={(_d, i) => ({ length: height, offset: height * i, index: i })}
         initialNumToRender={1}
@@ -82,6 +86,7 @@ export default function WeatherWorkVideo() {
             onSound={() => setSound((s) => !s)}
             onStarted={onStarted}
             onScrubChange={setScrubbing}
+            onHoldChange={setHolding}
             onClose={goBack}
             onRequest={(note) => router.push({ pathname: '/weather/request', params: { services: note.services.join('|'), note: note.note } } as any)}
           />
@@ -92,28 +97,34 @@ export default function WeatherWorkVideo() {
 }
 
 /** One reel. Idle reels are a still picture; the active one plays; the next one (preload) is buffered and waits, silent, out of sight. */
-function Reel({ entry, mode, height, sound, focused, scrubbing, onSound, onStarted, onScrubChange, onClose, onRequest }: {
+function Reel({ entry, mode, height, sound, focused, scrubbing, onSound, onStarted, onScrubChange, onHoldChange, onClose, onRequest }: {
   entry: VideoEntry; mode: ReelMode; height: number; sound: boolean; focused: boolean; scrubbing: boolean;
-  onSound: () => void; onStarted: () => void; onScrubChange: (s: boolean) => void; onClose: () => void; onRequest: (n: { services: string[]; note: string }) => void;
+  onSound: () => void; onStarted: () => void; onScrubChange: (s: boolean) => void; onHoldChange: (h: boolean) => void; onClose: () => void; onRequest: (n: { services: string[]; note: string }) => void;
 }) {
   // The owner's chosen cover first; otherwise the frame the app took when the video was posted.
   const poster = postGridUrl(entry.post) ?? entry.media.thumb_url;
   if (mode === 'idle') {
     return <View style={{ height, backgroundColor: '#0E1A12' }}>{poster ? <OptimizedImage source={poster} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}</View>;
   }
-  return <ReelPlayer entry={entry} live={mode === 'active'} height={height} sound={sound} focused={focused} scrubbing={scrubbing} onSound={onSound} onStarted={onStarted} onScrubChange={onScrubChange} onClose={onClose} onRequest={onRequest} />;
+  return <ReelPlayer entry={entry} live={mode === 'active'} height={height} sound={sound} focused={focused} scrubbing={scrubbing} onSound={onSound} onStarted={onStarted} onScrubChange={onScrubChange} onHoldChange={onHoldChange} onClose={onClose} onRequest={onRequest} />;
 }
 
-function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, onStarted, onScrubChange, onClose, onRequest }: {
+function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, onStarted, onScrubChange, onHoldChange, onClose, onRequest }: {
   entry: VideoEntry; live: boolean; height: number; sound: boolean; focused: boolean; scrubbing: boolean;
-  onSound: () => void; onStarted: () => void; onScrubChange: (s: boolean) => void; onClose: () => void; onRequest: (n: { services: string[]; note: string }) => void;
+  onSound: () => void; onStarted: () => void; onScrubChange: (s: boolean) => void; onHoldChange: (h: boolean) => void; onClose: () => void; onRequest: (n: { services: string[]; note: string }) => void;
 }) {
   const t = useT();
   const insets = useSafeAreaInsets();
   const { post, media: item } = entry;
   const [paused, setPaused] = useState(false);
-  // Hold the reel to watch it at 2x; let go and it is back to normal. The hold survives a finger that drifts (pressRetentionOffset).
+  // Hold the reel to watch it at 2x; let go and it is back to normal. The hold is a gesture-handler long press with no distance limit, and the
+  // list stops scrolling while it is held (onHoldChange), so the finger can move anywhere and the 2x stays until it lifts.
   const [fast, setFast] = useState(false);
+  const setHold = useCallback((h: boolean) => { setFast(h); onHoldChange(h); }, [onHoldChange]);
+  const hold = useMemo(() => Gesture.LongPress().minDuration(200).maxDistance(100000).enabled(live)
+    .onStart(() => { runOnJS(setHold)(true); })
+    .onEnd(() => { runOnJS(setHold)(false); })
+    .onFinalize(() => { runOnJS(setHold)(false); }), [live, setHold]);
   const [now, setNow] = useState(0);
   const [length, setLength] = useState(item.duration_s ?? 0);
   const musicReplaces = !!post.music_url && !post.keep_video_sound;
@@ -134,7 +145,9 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
   useEffect(() => { try { player.muted = !live || !sound || musicReplaces; } catch { /* released */ } }, [player, live, sound, musicReplaces]);
   useEffect(() => { try { if (playing) player.play(); else player.pause(); } catch { /* released */ } }, [player, playing]);
   useEffect(() => { try { player.playbackRate = fast && playing ? 2 : 1; } catch { /* released */ } }, [player, fast, playing]);
-  useEffect(() => { if (!live) setFast(false); }, [live]);
+  // A hold always plays: holding a paused reel resumes it at 2x.
+  useEffect(() => { if (fast) setPaused(false); }, [fast]);
+  useEffect(() => { if (!live) setHold(false); }, [live, setHold]);
 
   const clip = post.music_url && post.music_start_s != null && post.music_end_s != null ? { startS: post.music_start_s, endS: post.music_end_s } : null;
   // A reel that keeps its own sound plays its music lowered underneath it; otherwise the music replaces the reel's sound.
@@ -150,20 +163,18 @@ function ReelPlayer({ entry, live, height, sound, focused, scrubbing, onSound, o
 
   return (
     <View style={{ height, backgroundColor: '#0E1A12' }}>
-      <Pressable
-        style={StyleSheet.absoluteFill}
-        disabled={!live}
-        onPress={() => setPaused((p) => !p)}
-        onLongPress={() => { if (!paused) setFast(true); }}
-        delayLongPress={220}
-        onPressOut={() => setFast(false)}
-        pressRetentionOffset={{ top: 2000, bottom: 2000, left: 2000, right: 2000 }}
-        accessibilityRole="button"
-        accessibilityLabel={paused ? t('Play') : t('Pause')}
-        accessibilityHint={t('Hold to watch at double speed')}
-      >
-        <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsVideoFrameAnalysis={false} />
-      </Pressable>
+      <GestureDetector gesture={hold}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          disabled={!live}
+          onPress={() => setPaused((p) => !p)}
+          accessibilityRole="button"
+          accessibilityLabel={paused ? t('Play') : t('Pause')}
+          accessibilityHint={t('Hold to watch at double speed')}
+        >
+          <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsVideoFrameAnalysis={false} />
+        </Pressable>
+      </GestureDetector>
       {!live ? null : (
         <>
           {/* The video plays on top at full brightness, edge to edge. Only a short soft fade sits at the very bottom, behind the words and the seek bar. */}

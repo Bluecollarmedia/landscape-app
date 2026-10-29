@@ -23,5 +23,6 @@ check('8 "New Vendor" from "Vendor & Pickup" still goes through those shared she
 check('9 the quote/invoice editor can be swiped down (the screen no longer turns the gesture off)', !/document-edit"[^\n]*gestureEnabled: false/.test(layout));
 check('10 and a swipe saves the draft first, or is stopped when something is invalid', /addListener\('beforeRemove'/.test(doc) && /if \(leaveRef\.current\(\)\) leaving\.current = true; else e\.preventDefault\(\)/.test(doc));
 check('11 the X and the swipe share one rule (save, or drop an untouched new draft)', /const leaveOk = \(\): boolean/.test(doc) && /if \(leaveOk\(\)\) \{ leaving\.current = true; router\.back\(\); \}/.test(doc));
+check('X the Details sheet scroll view runs alongside the swipe-down (Gesture.Native, simultaneous), so swiping down from the top closes it', /simultaneousWithExternalGesture\(native\)/.test(read('src/components/ui/BottomSheetModal.tsx')) && /export function useSheetScroll/.test(read('src/components/ui/BottomSheetModal.tsx')) && /<GestureDetector gesture=\{sheetScroll\}>/.test(read('src/components/weather/WeatherDetails.tsx')));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

@@ -2,7 +2,8 @@ import React, { memo, useCallback, useDeferredValue, useEffect, useMemo, useStat
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { BottomSheetModal, useSheetScroll } from '@/components/ui/BottomSheetModal';
 import { ScrubArea } from '@/components/weather/ScrubArea';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage, useT } from '@/i18n';
@@ -183,6 +184,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
   const locale = language === 'es' ? 'es' : 'en-US';
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
+  const sheetScroll = useSheetScroll();
   const onScroll = useAnimatedScrollHandler((e) => { scrollY.value = e.contentOffset.y; });
   const [date, setDate] = useState('');
   const [idx, setIdx] = useState(0);
@@ -257,6 +259,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
       <View style={{ flex: 1 }}>
       <View style={{ flex: 1, marginTop: insets.top + 8, backgroundColor: WX.page, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' }}>
         <WeatherBackground />
+        <GestureDetector gesture={sheetScroll}>
         <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} bounces={false} contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
           {header}
 
@@ -318,6 +321,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
             })}
           </View>
         </Animated.ScrollView>
+        </GestureDetector>
       </View>
       </View>
     </BottomSheetModal>

@@ -2,8 +2,8 @@ import React, { memo, useCallback, useDeferredValue, useEffect, useMemo, useStat
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GestureDetector } from 'react-native-gesture-handler';
-import { BottomSheetModal, useSheetScroll } from '@/components/ui/BottomSheetModal';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
+import { BottomSheetModal, useSheetPanRef } from '@/components/ui/BottomSheetModal';
 import { ScrubArea } from '@/components/weather/ScrubArea';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage, useT } from '@/i18n';
@@ -178,13 +178,16 @@ export interface DetailsStart { date: string; time?: string; metric?: MetricKey 
  * The details screen: pick a day, pick a figure, then drag across the chart (or tap, or use the arrows) to read it hour by hour.
  * It opens as a sheet over the weather home, so closing it brings the person back to exactly where they were.
  */
+// The page's scroll view is a gesture-handler one, so it can be told to run together with the sheet's swipe-down (see BottomSheetModal).
+const AnimatedSheetScrollView = Animated.createAnimatedComponent(GHScrollView);
+
 export function WeatherDetails({ visible, data, start, onClose }: { visible: boolean; data: WeatherPayload | null; start: DetailsStart | null; onClose: () => void }) {
   const t = useT();
   const { language } = useLanguage();
   const locale = language === 'es' ? 'es' : 'en-US';
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
-  const sheetScroll = useSheetScroll();
+  const sheetPan = useSheetPanRef();
   const onScroll = useAnimatedScrollHandler((e) => { scrollY.value = e.contentOffset.y; });
   const [date, setDate] = useState('');
   const [idx, setIdx] = useState(0);
@@ -259,8 +262,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
       <View style={{ flex: 1 }}>
       <View style={{ flex: 1, marginTop: insets.top + 8, backgroundColor: WX.page, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' }}>
         <WeatherBackground />
-        <GestureDetector gesture={sheetScroll}>
-        <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} bounces={false} contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+        <AnimatedSheetScrollView simultaneousHandlers={sheetPan} onScroll={onScroll} scrollEventThrottle={16} bounces={false} contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
           {header}
 
           {dayRow}
@@ -320,8 +322,7 @@ export function WeatherDetails({ visible, data, start, onClose }: { visible: boo
               return <MetricTile key={m.key} metric={m} on={m.key === metricKey} valueText={text} off={v === null} label={t(m.label)} a11y={`${t(m.label)}, ${text}`} onPress={setMetric} />;
             })}
           </View>
-        </Animated.ScrollView>
-        </GestureDetector>
+        </AnimatedSheetScrollView>
       </View>
       </View>
     </BottomSheetModal>

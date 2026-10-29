@@ -18,9 +18,9 @@
  * dismissing at once leave iOS stuck with an invisible layer that swallows every touch (the app looked frozen).
  */
 
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Modal, Platform, StyleSheet, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView, type GestureType } from 'react-native-gesture-handler';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 
 interface BottomSheetModalProps {
@@ -45,12 +45,15 @@ const closing = new Set<symbol>();
 const waiting = new Set<() => void>();
 const notify = () => { for (const w of Array.from(waiting)) w(); };
 
-const SheetScrollContext = createContext<ReturnType<typeof Gesture.Native> | null>(null);
-/** For a page inside a sheet that passes `scrollOffset`: wrap its scroll view in <GestureDetector gesture={useSheetScroll()}> so swipe-down works from the top. */
-export function useSheetScroll(): ReturnType<typeof Gesture.Native> {
-  const g = useContext(SheetScrollContext);
-  const fallback = useMemo(() => Gesture.Native(), []);
-  return g ?? fallback;
+const SheetPanContext = createContext<React.MutableRefObject<GestureType | undefined> | null>(null);
+/**
+ * For a page inside a sheet that passes `scrollOffset`: give its gesture-handler ScrollView `simultaneousHandlers={useSheetPanRef()}`, so the
+ * page's scrolling and the sheet's swipe-down are recognised together and the swipe works from the top of the page.
+ */
+export function useSheetPanRef(): React.MutableRefObject<GestureType | undefined> {
+  const r = useContext(SheetPanContext);
+  const fallback = useRef<GestureType | undefined>(undefined);
+  return r ?? fallback;
 }
 
 export function BottomSheetModal({ visible, onRequestClose, children, scrollOffset, closeDistance = CLOSE_DISTANCE, closeVelocity = CLOSE_VELOCITY }: BottomSheetModalProps) {
@@ -113,10 +116,10 @@ export function BottomSheetModal({ visible, onRequestClose, children, scrollOffs
   const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value * Math.max(0, 1 - drag.value / (height * 0.8)) }));
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - progress.value) * height + drag.value }] }));
 
-  // The page's own scroll view (wrapped by the sheet's child in <GestureDetector gesture={useSheetScroll()}>) runs AT THE SAME TIME as the swipe-down,
-  // so iOS never hands the touch to the scroll view alone (which left the sheet unable to close by a swipe).
-  const native = useMemo(() => Gesture.Native(), []);
-  const base = Gesture.Pan().enabled(Platform.OS !== 'web').simultaneousWithExternalGesture(native);
+  // The page's own scroll view (a gesture-handler ScrollView with simultaneousHandlers={useSheetPanRef()}) is recognised AT THE SAME TIME as the
+  // swipe-down, so iOS never hands the touch to the scroll view alone (which left the sheet unable to close by a swipe).
+  const panRef = useRef<GestureType | undefined>(undefined);
+  const base = Gesture.Pan().enabled(Platform.OS !== 'web').withRef(panRef);
   const pan = (scrollOffset
     ? base
       .manualActivation(true)
@@ -150,7 +153,7 @@ export function BottomSheetModal({ visible, onRequestClose, children, scrollOffs
       <GestureHandlerRootView style={styles.fill}>
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]} />
         <GestureDetector gesture={pan}>
-          <Animated.View style={[styles.fill, sheetStyle]}><SheetScrollContext.Provider value={native}>{child}</SheetScrollContext.Provider></Animated.View>
+          <Animated.View style={[styles.fill, sheetStyle]}><SheetPanContext.Provider value={panRef}>{child}</SheetPanContext.Provider></Animated.View>
         </GestureDetector>
       </GestureHandlerRootView>
     </Modal>

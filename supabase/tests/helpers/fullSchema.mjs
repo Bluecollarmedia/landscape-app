@@ -5,8 +5,8 @@ import { PGlite } from '@electric-sql/pglite';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export async function buildFullSchema(repo, { upTo } = {}) {
-  const db = new PGlite();
+export async function buildFullSchema(repo, { upTo, extensions } = {}) {
+  const db = new PGlite(extensions ? { extensions } : undefined);   // extensions: optional, e.g. { pgcrypto } for tests that need crypt()
   const failures = [];
   const read = (p) => fs.readFileSync(path.join(repo, p), 'utf8');
   const run = async (name, sql) => { try { await db.exec(sql); } catch (e) { failures.push([name, String(e.message).slice(0, 200)]); } };

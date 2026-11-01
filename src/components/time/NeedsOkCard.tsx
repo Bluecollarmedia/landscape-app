@@ -2,9 +2,8 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Button } from '@/components/ui';
 import { useTheme } from '@/providers/ThemeProvider';
-import { acceptAllSuggestedEnds, acceptSuggestedEnd, loadReviewList, settleNoHours, sourceText, type ReviewDay } from '@/data/timeReview';
+import { loadReviewList, settleNoHours, sourceText, type ReviewDay } from '@/data/timeReview';
 import { confirmAction } from '@/components/financials/ActionSheet';
 import { haptics } from '@/lib/haptics';
 import { typeScale } from '@/theme/typography';
@@ -15,7 +14,7 @@ const dayOf = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekd
 
 /**
  * "Needs your OK": days a worker never clocked out of. They count for no hours until the owner decides. Each row says when the worker
- * probably stopped (the database's suggestion) with one tap to accept it, or "Set time" when it can't tell. Hidden when nothing is waiting.
+ * probably stopped (the database's suggestion) with an Edit button that opens the day to set the end time ("Set time" when it can't tell). Hidden when nothing is waiting.
  */
 export function NeedsOkCard() {
   const { colors } = useTheme();
@@ -31,17 +30,7 @@ export function NeedsOkCard() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   if (days.length === 0 && !error) return null;
-  const withSuggestion = days.filter((d) => d.suggestedEndAt).length;
 
-  async function accept(id: string) {
-    setBusy(id);
-    setError('');
-    const r = await acceptSuggestedEnd(id);
-    setBusy(null);
-    if (!r.ok) { setError(r.error); haptics.warning(); return; }
-    haptics.success();
-    load();
-  }
   function noHours(d: ReviewDay) {
     confirmAction(`No hours for ${d.name}?`, `${dayOf(d.clockInAt)} counts as zero hours and leaves this list. It stays in the time history.`, 'No hours', async () => {
       setBusy(d.workdayId);
@@ -53,26 +42,14 @@ export function NeedsOkCard() {
       load();
     });
   }
-  async function acceptAll() {
-    setBusy('all');
-    setError('');
-    const r = await acceptAllSuggestedEnds();
-    setBusy(null);
-    if (!r.ok) { setError(r.error); haptics.warning(); return; }
-    if (r.data.left > 0) setError(`${r.data.left} could not be accepted. Open them and set the time.`);
-    haptics.success();
-    load();
-  }
-
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.warning }, shadow.sm]}>
       <View style={styles.head}>
         <Feather name="clock" size={18} color={colors.warning} />
         <Text style={[typeScale.headingSmall, { color: colors.textPrimary, flex: 1 }]}>Needs your OK</Text>
-        {withSuggestion > 1 ? <Button title="Accept all" size="sm" onPress={acceptAll} loading={busy === 'all'} /> : null}
       </View>
       <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: 2 }]}>
-        These days closed on their own. They count as zero hours until you accept an end time.
+        These days closed on their own. They count as zero hours until you set an end time.
       </Text>
       {days.map((d) => (
         <View key={d.workdayId} style={[styles.row, { borderTopColor: colors.border }]}>
@@ -85,9 +62,6 @@ export function NeedsOkCard() {
             </Text>
           </View>
           <View style={styles.actions}>
-            {d.suggestedEndAt ? (
-              <Button title="Accept" size="sm" onPress={() => accept(d.workdayId)} loading={busy === d.workdayId} />
-            ) : null}
             <Pressable
               onPress={() => router.push({ pathname: '/(owner)/more/labor-day', params: { id: d.workdayId } } as never)}
               accessibilityRole="button"

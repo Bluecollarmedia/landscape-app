@@ -19,7 +19,7 @@ check('6 only the owner can list or accept', (sql.match(/Only the owner can do t
 check('7 daily alert hours add up every session of the date', /group by ws\.person_id, ws\.work_date/.test(sql));
 check('8 the worker\'s day says whether work is open', /'has_open_work'/.test(sql));
 check('9 the app lists, accepts one, and accepts all', /time_review_list/.test(data) && /time_accept_suggested_end/.test(data) && /time_accept_all_suggested_ends/.test(data));
-check('10 the dashboard card has Accept, Accept all and a way to set another time', /title="Accept"/.test(card) && /Accept all/.test(card) && /labor-day/.test(card) && /<NeedsOkCard \/>/.test(dash));
+check('10 the dashboard card has no Accept buttons: Edit opens the day to set the end time', !/title="Accept/.test(card) && /labor-day/.test(card) && /'Edit' : 'Set time'/.test(card) && /<NeedsOkCard \/>/.test(dash));
 check('11 the card hides itself when nothing is waiting or the update is not installed', /days\.length === 0 && !error/.test(card) && /notInstalled/.test(card));
 check('12 a database test proves it on the full schema', fs.existsSync(path.join(__dirname, '../../supabase/tests/098_auto_close_workday.pglite.mjs')));
 console.log(bad ? `\n${bad} failed` : '\nall passed');

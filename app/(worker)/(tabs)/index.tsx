@@ -317,7 +317,12 @@ function LandscapingToday() {
       : lastCheckIn ? formatElapsed(lastCheckIn.timestamp, tick) : '—';
 
     return (
-      <View style={[styles.screen, styles.checkedOutScreen, { backgroundColor: colors.background, paddingTop: insets.top + spacing['3xl'] }]}>
+      <ScrollView
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentContainerStyle={[styles.checkedOutScreen, { flexGrow: 1, paddingTop: insets.top + spacing['3xl'], paddingBottom: tabBarClearance }]}
+      >
         <View style={[styles.checkedOutIcon, { backgroundColor: colors.success }]}>
           <Feather name="check" size={40} color="#FFFFFF" />
         </View>
@@ -384,7 +389,7 @@ function LandscapingToday() {
         <Pressable onPress={handleCheckIn} hitSlop={8} style={{ marginTop: spacing.lg }} accessibilityRole="button">
           <Text style={[typeScale.labelLarge, { color: colors.primary }]}>{locating ? t('Finding your location…') : t('Left by mistake? Check back in')}</Text>
         </Pressable>
-      </View>
+      </ScrollView>
     );
   }
 

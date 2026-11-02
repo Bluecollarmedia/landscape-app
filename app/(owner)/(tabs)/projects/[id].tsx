@@ -47,6 +47,7 @@ import { ProjectMaterials } from '@/components/materials/ProjectMaterials';
 import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
 import { pickTaskMedia, saveTaskMedia, removeTaskMedia, type TaskMediaDraft } from '@/data/taskMedia';
 import { keepPicked } from '@/lib/keepPickedFile';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const today = todayKey();
 
@@ -216,6 +217,7 @@ export default function ProjectDetailScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
 
   // 'requests' / 'updates' are old deep-link values (e.g. from the Owner
   // Dashboard's Needs Attention "Review" action) — they now live inside the
@@ -2476,7 +2478,7 @@ export default function ProjectDetailScreen() {
       )}
 
       <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
       >
         {sectionRenderers[activeSection]?.()}

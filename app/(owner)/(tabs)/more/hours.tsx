@@ -10,6 +10,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { useWorkSessions, type WorkerWeeklyHours, type DailyHours } from '@/hooks/useOperations';
 import { localDateKey } from '@/lib/ids';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -33,6 +34,7 @@ export default function HoursScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const { getAllWorkersWeeklyHours } = useWorkSessions();
 
   const [weekOffset, setWeekOffset] = useState(0);
@@ -95,7 +97,7 @@ export default function HoursScreen() {
         </Pressable>
       </View>
 
-      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }]}>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>TEAM TOTAL</Text>
           <Text style={[typeScale.displaySmall, { color: colors.primary }]}>

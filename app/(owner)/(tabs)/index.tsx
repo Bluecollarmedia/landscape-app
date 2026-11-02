@@ -26,6 +26,7 @@ import { AdminJobCard } from '@/components/admin/AdminJobCard';
 import { NeedsOkCard } from '@/components/time/NeedsOkCard';
 import { showMessage } from '@/components/financials/ActionSheet';
 import { WeatherButton } from '@/components/weather/WeatherButton';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 
@@ -62,6 +63,7 @@ export default function OwnerDashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [reminding, setReminding] = useState<string | null>(null);
   const [reminded, setReminded] = useState<Record<string, boolean>>({});
@@ -239,7 +241,7 @@ export default function OwnerDashboard() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView bounces={false} ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} ref={scrollRef} contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, flexShrink: 1 }}>
             <WeatherButton to="/(owner)/weather" />

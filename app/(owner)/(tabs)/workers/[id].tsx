@@ -22,6 +22,7 @@ import { loadBirthdays } from '@/data/birthday';
 import { OwnerWorkerExtras } from '@/components/account/WorkerExtras';
 import { OwnerClockCard } from '@/components/time/OwnerClockCard';
 import { formatBirthday, birthdaySoon } from '@/lib/birthday';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const today = todayKey();
 
@@ -59,6 +60,7 @@ export default function WorkerDetailScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const { getWorker, updateWorker } = useWorkers({ includeInactive: true });
   const team = useTeamAccess();
   const schedule = useSchedule();
@@ -177,7 +179,7 @@ export default function WorkerDetailScreen() {
         </Text>
       </View>
 
-      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Profile header */}
           <View style={[styles.profileCard, { backgroundColor: colors.surface }, shadow.sm]}>

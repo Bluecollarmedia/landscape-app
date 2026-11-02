@@ -12,6 +12,7 @@ import { semantic } from '@/theme/colors';
 import { useAttendance } from '@/hooks/useOperations';
 import type { AttendanceStatus, WorkerAttendance } from '@/types/operations';
 import { todayKey, localDateKey } from '@/lib/ids';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -39,6 +40,7 @@ export default function AttendanceScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const { getAttendanceForDate, settings } = useAttendance();
 
   const [dayOffset, setDayOffset] = useState(0);
@@ -91,7 +93,7 @@ export default function AttendanceScreen() {
         </Pressable>
       </View>
 
-      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={styles.statusChips}>
           {statusCounts.checked_in > 0 && (
             <View style={[styles.chip, { backgroundColor: semantic.successLight }]}>

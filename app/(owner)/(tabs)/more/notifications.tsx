@@ -12,10 +12,12 @@ import { spacing, radius } from '@/theme/spacing';
 import { useNotifications } from '@/hooks/useOperations';
 import { EVENT_LABELS, ALL_EVENTS } from '@/lib/notificationEvents';
 import { db, useDb } from '@/data/store';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 type Tab = 'defaults' | 'overrides';
 
 export default function NotificationPreferencesScreen() {
+  const tabBarClearance = useTabBarClearance();
   const { colors } = useTheme();
   const router = useRouter();
   const { unreadCount, preferences, getCompanyDefault, getWorkerOverride, updatePreference, setWorkerOverride } = useNotifications();
@@ -52,7 +54,7 @@ export default function NotificationPreferencesScreen() {
         onChange={setTab}
       />
 
-      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         {tab === 'defaults' && (
           <>
             <Text style={[typeScale.caption, { color: colors.textSecondary, marginBottom: spacing.sm }]}>

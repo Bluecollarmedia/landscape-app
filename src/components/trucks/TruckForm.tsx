@@ -24,6 +24,7 @@ import { semantic } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { TruckStatus } from '@/types/truck';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const STATUS_OPTIONS: { key: TruckStatus; label: string; dot: string }[] = [
   { key: 'available', label: 'Available', dot: semantic.success },
@@ -38,6 +39,7 @@ export function TruckForm({ truckId }: { truckId?: string }) {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const { addTruck, updateTruck, allTrucks } = useTrucks();
   const isOwner = useIsOwner();
   const existing = truckId ? allTrucks.find((t) => t.id === truckId) : undefined;
@@ -128,7 +130,7 @@ export function TruckForm({ truckId }: { truckId?: string }) {
         <View style={{ width: 44 }} />
       </View>
 
-      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} keyboardShouldPersistTaps="handled">
         <Pressable style={[styles.photoBox, { borderColor: colors.borderLight }]} onPress={() => setPhotoSheet(true)} accessibilityRole="button" accessibilityLabel={photoUri ? 'Change the truck photo' : 'Add a truck photo'}>
           {photoUri ? (
             <>

@@ -17,6 +17,7 @@ import { repeatShortLabel } from '@/lib/recurrence';
 import { haptics } from '@/lib/haptics';
 import { todayKey, localDateKey } from '@/lib/ids';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const today = todayKey();
 
@@ -72,6 +73,7 @@ export default function ScheduleScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const params = useLocalSearchParams<{ date?: string }>();
   const [selectedDate, setSelectedDate] = useState(params.date ?? today);
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
@@ -390,7 +392,7 @@ export default function ScheduleScreen() {
         />
       </View>
 
-      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         {viewMode === 'day' ? renderDayView() : renderWeekView()}
       </ScrollView>
 

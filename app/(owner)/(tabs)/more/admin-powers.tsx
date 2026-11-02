@@ -8,12 +8,14 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { ADMIN_POWERS, useAdminPermissions, type AdminPermissions } from '@/hooks/useTeamAccess';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 /** Owner only: what admins may do. Everything is on until you switch it off; the database enforces each switch, not just this screen. */
 export default function AdminPowersScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const A = useAdminPermissions();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -33,7 +35,7 @@ export default function AdminPowersScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>Admin powers</Text>
         <View style={{ width: 24 }} />
       </View>
-      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginBottom: spacing.lg }]}>
           Admins run the day to day: projects, schedules, customers, assignments. These five more sensitive powers are on by default; switch off any you want to keep for yourself.
           Admins can never delete the company, deactivate or replace the owner, or make themselves an owner, whatever these say.

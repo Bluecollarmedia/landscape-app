@@ -14,6 +14,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { usePayroll, type PayrollEstimate, type OvertimeTerms } from '@/hooks/useOperations';
 import { localDateKey } from '@/lib/ids';
 import { db } from '@/data/store';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 function formatHours(hours: number): string {
   const h = Math.floor(hours);
@@ -52,6 +53,7 @@ export default function PayrollScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const {
     getPayrollEstimates, getRatesForWorker, setHourlyRate, setWorkerOvertime,
     targetPayEnabled, setTargetPayEnabled, setTargetRate,
@@ -116,7 +118,7 @@ export default function PayrollScreen() {
         </Pressable>
       </View>
 
-      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryRow, { gap: spacing.md }]}>
           <View style={[styles.summaryCard, { backgroundColor: colors.primarySurface }, shadow.sm]}>
             <Text style={[typeScale.caption, { color: colors.textSecondary }]}>ESTIMATED TOTAL</Text>

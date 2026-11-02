@@ -20,11 +20,13 @@ import {
   STORAGE_LIMIT_OPTIONS_GB,
   SUPABASE_FREE_PLAN_GB,
 } from '@/types/storage';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 export default function StorageScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const { info, loading, error, refresh } = useStorageInfo();
   const { limitGb, limitBytes, setLimitGb } = useStorageLimit();
   const { maxMb, setMaxMb } = useMaxFileSize();
@@ -77,7 +79,7 @@ export default function StorageScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <Header colors={colors} insets={insets} onBack={() => router.back()} />
 
-      <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         {error && (
           <View style={[styles.errorBanner, { backgroundColor: semantic.errorLight }]}>
             <Icon name="alert-circle" size={16} color={semantic.error} />

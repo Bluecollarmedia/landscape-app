@@ -10,6 +10,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { REVIEW_LABEL, type ReviewState } from '@/lib/timeCalc';
 import { localDateKey } from '@/lib/ids';
 import { useT, tr } from '@/i18n';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 export const fmtClock = (iso?: string | null) => (iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '–');
 export const fmtDay = (key: string) => new Date(`${key}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -25,6 +26,7 @@ export function LaborScreen({ title, subtitle, right, children, loading, onRefre
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   return (
     <View style={[styles.screen, { backgroundColor: colors.groupedBackground }]}>
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
@@ -35,7 +37,7 @@ export function LaborScreen({ title, subtitle, right, children, loading, onRefre
         </View>
         <View style={{ minWidth: 24, alignItems: 'flex-end' }}>{right}</View>
       </View>
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing['4xl'], gap: spacing.md }} refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} /> : undefined} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: tabBarClearance + spacing.lg, gap: spacing.md }} refreshControl={onRefresh ? <RefreshControl refreshing={false} onRefresh={onRefresh} /> : undefined} keyboardShouldPersistTaps="handled">
         {loading ? <ActivityIndicator style={{ marginTop: spacing.xl }} color={colors.primary} /> : children}
       </ScrollView>
     </View>

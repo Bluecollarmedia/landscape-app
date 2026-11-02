@@ -8,6 +8,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { SearchBar, FilterChips, EmptyState } from '@/components/ui';
 import { ProjectCard } from '@/components/projects/ProjectCard';
 import { useProjects } from '@/hooks/useProjects';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { typeScale } from '@/theme/typography';
 import { spacing } from '@/theme/spacing';
 import type { ProjectStatus } from '@/types/project';
@@ -27,6 +28,7 @@ export default function ProjectsListScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterKey>('active');
 
@@ -107,7 +109,7 @@ export default function ProjectsListScreen() {
               </Text>
             </View>
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: tabBarClearance }]}
           stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
         />

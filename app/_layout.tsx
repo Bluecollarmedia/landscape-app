@@ -31,6 +31,7 @@ import { WebDialogHost } from '@/components/ui/WebDialogHost';
 import { usePublicWeatherSwitch } from '@/hooks/usePublicWeatherSwitch';
 import { useWidgetSync } from '@/hooks/useWidgetSync';
 import { signedOutRedirect } from '@/lib/launchRoute';
+import { sweepStorageSoon } from '@/lib/storageSweep';
 
 // On the website Alert.alert does nothing by itself; this points it at the app's own dialog (a phone keeps the system alert).
 installWebAlert();
@@ -54,6 +55,8 @@ function RootNavigator() {
   const weatherOn = usePublicWeatherSwitch(!isAuthenticated);
 
   usePushNotifications(user?.role, appState === 'active' && isAuthenticated && !!user);
+  // Files of things deleted earlier (or by someone else, or along with their project) are cleared out shortly after the app opens signed in.
+  useEffect(() => { if (appState === 'active' && isAuthenticated && user) sweepStorageSoon(); }, [appState, isAuthenticated, user?.id]);
   // Tell the server which language this person uses, so its push notices come in it (update 95).
   useEffect(() => { if (appState === 'active' && isAuthenticated && user) syncLanguageToAccount(); }, [appState, isAuthenticated, user?.id]);
   usePrefetchKeyImages();

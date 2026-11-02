@@ -4,6 +4,7 @@
  * the three never share a list. Finished projects sit in a quiet "Past work" row at the bottom. Everything comes from real data
  * (useCustomerHome); a line with no data behind it is simply left out.
  */
+import { VideoThumb } from '@/components/media/VideoThumb';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -58,10 +59,10 @@ export function PropertyHome({ data }: { data: CustomerHomeData }) {
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
                 accessibilityLabel={a === 'on_site' ? t('{name}. Crew on site.', { name: g.name }) : a === 'scheduled' ? t('{name}. Crew assigned.', { name: g.name }) : g.name}
-                style={[styles.chip, { backgroundColor: on ? colors.textPrimary : colors.surface, borderColor: on ? colors.textPrimary : colors.border }]}
+                style={[styles.chip, { backgroundColor: on ? colors.primary : colors.surface, borderColor: on ? colors.primary : colors.primary + '40' }]}
               >
                 {a !== 'none' ? <View style={[styles.chipDot, { backgroundColor: on && a === 'scheduled' ? colors.border : dotColor(a, colors.textTertiary) }]} /> : null}
-                <Text style={[typeScale.labelLarge, { color: on ? colors.background : colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{g.name}</Text>
+                <Text style={[typeScale.labelLarge, { color: on ? '#FFFFFF' : colors.textPrimary, fontWeight: '700' }]} numberOfLines={1}>{g.name}</Text>
               </Pressable>
             );
           })}
@@ -102,7 +103,7 @@ function ServiceSwitch({ group, current, attention, onPick }: { group: PropertyG
   const t = useT();
   const { colors } = useTheme();
   return (
-    <View style={[styles.switchTrack, { backgroundColor: colors.backgroundTertiary }]} accessibilityRole="tablist">
+    <View style={[styles.switchTrack, { backgroundColor: colors.primary + '1A' }]} accessibilityRole="tablist">
       {group.services.map((s) => {
         const on = s === current;
         return (
@@ -114,7 +115,7 @@ function ServiceSwitch({ group, current, attention, onPick }: { group: PropertyG
             style={[styles.switchItem, on && [{ backgroundColor: colors.surface }, shadow.sm]]}
           >
             {s === 'snow' && attention !== 'none' ? <View style={[styles.chipDot, { backgroundColor: dotColor(attention, colors.textTertiary) }]} /> : null}
-            <Text style={[typeScale.labelLarge, { color: on ? colors.textPrimary : colors.textSecondary, fontWeight: on ? '800' : '600' }]}>{t(SERVICE_LABEL[s])}</Text>
+            <Text style={[typeScale.labelLarge, { color: on ? (s === 'snow' ? semantic.info : colors.primary) : colors.textSecondary, fontWeight: on ? '800' : '600' }]}>{t(SERVICE_LABEL[s])}</Text>
           </Pressable>
         );
       })}
@@ -132,7 +133,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
   const ids = group.items.filter((i) => i.kind === 'snow').map((i) => i.key.slice('snow:'.length));
   const names = group.items.filter((i) => i.kind === 'snow').map((i) => i.name.trim().toLowerCase());
   const entries = useMemo(
-    () => (data.timeline ?? []).filter((e) => ids.includes(e.propertyId) || names.includes(e.propertyName.trim().toLowerCase())).sort((a, b) => b.completedAt.localeCompare(a.completedAt)),
+    () => (data.timeline ?? []).filter((e) => ids.includes(e.propertyId) || (e.propertyId === e.propertyName && names.includes(e.propertyName.trim().toLowerCase()))).sort((a, b) => b.completedAt.localeCompare(a.completedAt)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data.timeline, group.key],
   );
@@ -166,7 +167,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
           <Text style={[typeScale.bodyMedium, { color: '#FFFFFFE6' }]}>{lastServiceLabel(latest.completedAt, t)}</Text>
         </View>
       ) : (
-        <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.borderLight }, shadow.sm]}>
+        <View style={[styles.hero, { backgroundColor: semantic.info + '14', borderColor: semantic.info + '40' }, shadow.sm]}>
           <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '800' }]}>{t('No storm right now')}</Text>
           <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>
             {latest ? t('Last service {when}', { when: lastServiceLabel(latest.completedAt, t) }) : t("We'll be ready when the snow falls.")}
@@ -180,7 +181,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
           <View style={styles.tiles}>
             {shown.map((m, i) => (
               <Pressable key={m.id} onPress={() => open(withPhotos, i)} accessibilityRole="button" accessibilityLabel={m.kind === 'video' ? t('Play video') : t('View photo')} style={[styles.tile, { backgroundColor: colors.borderLight }]}>
-                {m.kind === 'photo' ? <Image source={{ uri: m.url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <View style={styles.tileCenter}><Icon name="video" size={22} color={colors.textTertiary} /></View>}
+                {m.kind === 'photo' ? <Image source={{ uri: m.url }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <VideoThumb uri={m.url ?? ''} fallback={<Icon name="video" size={22} color={colors.textTertiary} />} />}
                 {i === shown.length - 1 && extra > 0 ? <View style={styles.tileMore}><Text style={[typeScale.headingSmall, { color: '#FFFFFF' }]}>+{extra}</Text></View> : null}
               </Pressable>
             ))}
@@ -188,7 +189,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
         </View>
       ) : null}
 
-      <Stats items={[
+      <Stats accent={semantic.info} items={[
         { value: String(stats.visits), label: t('Visits this season') },
         { value: stats.lastAt ? shortDate(stats.lastAt) : '–', label: t('Last visit') },
         { value: String(stats.photos), label: t('Photos') },
@@ -203,7 +204,7 @@ function SnowPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
           ))}
         </View>
       ) : null}
-      <SeeAll label={t('See all visits')} onPress={() => router.push(`/(customer)/history?service=snow&property=${encodeURIComponent(group.key)}` as never)} />
+      <SeeAll accent={semantic.info} label={t('See all visits')} onPress={() => router.push(`/(customer)/history?service=snow&property=${encodeURIComponent(group.key)}` as never)} />
       <TaskMediaViewer items={viewer?.items ?? []} index={viewer ? viewer.index : null} onIndexChange={(i) => setViewer((v) => (v ? { ...v, index: i } : v))} onClose={() => setViewer(null)} />
     </View>
   );
@@ -219,7 +220,7 @@ function LawnPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
   const ids = group.items.filter((i) => i.kind === 'maintenance').map((i) => i.key.slice('maintenance:'.length));
   const names = group.items.filter((i) => i.kind === 'maintenance').map((i) => i.name.trim().toLowerCase());
   const updates = useMemo(
-    () => (data.lawn ?? []).filter((u) => (u.propertyId ? ids.includes(u.propertyId) : false) || names.includes(u.propertyName.trim().toLowerCase())).sort((a, b) => b.completedAt.localeCompare(a.completedAt)),
+    () => (data.lawn ?? []).filter((u) => (u.propertyId ? ids.includes(u.propertyId) : names.includes(u.propertyName.trim().toLowerCase()))).sort((a, b) => b.completedAt.localeCompare(a.completedAt)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data.lawn, group.key],
   );
@@ -239,7 +240,7 @@ function LawnPane({ data, group }: { data: CustomerHomeData; group: PropertyGrou
           {next.services ? <Text style={[typeScale.bodyMedium, { color: '#FFFFFFE6' }]}>{next.services}</Text> : null}
         </View>
       ) : (
-        <View style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.borderLight }, shadow.sm]}>
+        <View style={[styles.hero, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '33' }, shadow.sm]}>
           <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '800' }]}>{t('No visit scheduled yet')}</Text>
           <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>{t('Your next visit will show here once it is scheduled.')}</Text>
         </View>
@@ -335,13 +336,14 @@ function ProjectCard({ item }: { item: HomeItem }) {
 
 // ── small pieces ─────────────────────────────────────────────────────────────
 
-export function Stats({ items }: { items: { value: string; label: string }[] }) {
+export function Stats({ items, accent }: { items: { value: string; label: string }[]; accent?: string }) {
   const { colors } = useTheme();
+  const tone = accent ?? colors.primary;
   return (
     <View style={styles.statsRow}>
       {items.map((s) => (
-        <View key={s.label} style={[styles.stat, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-          <Text style={[typeScale.headingSmall, { color: colors.textPrimary, fontWeight: '800' }]} numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
+        <View key={s.label} style={[styles.stat, { backgroundColor: tone + '14', borderColor: tone + '40' }]}>
+          <Text style={[typeScale.headingSmall, { color: tone, fontWeight: '800' }]} numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]} numberOfLines={2}>{s.label}</Text>
         </View>
       ))}
@@ -349,12 +351,12 @@ export function Stats({ items }: { items: { value: string; label: string }[] }) 
   );
 }
 
-function SeeAll({ label, onPress }: { label: string; onPress: () => void }) {
+function SeeAll({ label, onPress, accent }: { label: string; onPress: () => void; accent?: string }) {
   const { colors } = useTheme();
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={styles.seeAll}>
-      <Text style={[typeScale.labelLarge, { color: colors.primary, fontWeight: '700', flex: 1 }]}>{label}</Text>
-      <Icon name="chevron-right" size={18} color={colors.primary} />
+      <Text style={[typeScale.labelLarge, { color: accent ?? colors.primary, fontWeight: '700', flex: 1 }]}>{label}</Text>
+      <Icon name="chevron-right" size={18} color={accent ?? colors.primary} />
     </Pressable>
   );
 }

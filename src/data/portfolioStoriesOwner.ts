@@ -4,6 +4,9 @@
  */
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { uploadImage } from '@/lib/media';
+import { config } from '@/lib/config';
+import { storyFileKeys } from '@/lib/portfolioFiles';
+import { removeStoredFiles } from '@/data/portfolioOwner';
 import { db } from '@/data/store';
 import { storyProblem, type PortfolioStory, type StoryDesign } from '@/lib/portfolioStories';
 import type { PortfolioPost } from '@/lib/portfolio';
@@ -12,8 +15,22 @@ type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 const SOMETHING_WRONG = "Couldn't reach the server. Check your connection and try again.";
 
 /** The stories that are up right now (the owner sees them with their time left). */
+/** Stories older than 24 hours are gone for good: their rows and their files are deleted (best effort, whenever the owner looks at the stories). */
+export async function purgeExpiredStories(): Promise<void> {
+  try {
+    const companyId = db.companyId;
+    if (!companyId) return;
+    const { data } = await supabase.from('portfolio_stories').select('id, media_url, media_thumb_url').lte('expires_at', new Date().toISOString()).limit(50);
+    for (const row of (data ?? []) as { id: string; media_url: string | null; media_thumb_url: string | null }[]) {
+      const { error } = await supabase.from('portfolio_stories').delete().eq('id', row.id);
+      if (!error) removeStoredFiles(storyFileKeys(row, config.r2PublicUrl, companyId));
+    }
+  } catch { /* clearing out old stories is never allowed to get in the way */ }
+}
+
 export async function loadMyStories(): Promise<Result<PortfolioStory[]>> {
   if (!isSupabaseConfigured) return { ok: false, error: SOMETHING_WRONG };
+  void purgeExpiredStories();
   try {
     const { data, error } = await supabase.from('portfolio_stories').select('*').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: true });
     if (error) return { ok: false, error: friendly(error.message) };
@@ -78,8 +95,11 @@ export async function addShareStory(input: { postId: string; mediaId?: string | 
 
 export async function deleteStory(id: string): Promise<Result<null>> {
   try {
+    const { data: row } = await supabase.from('portfolio_stories').select('media_url, media_thumb_url').eq('id', id).maybeSingle();
     const { error } = await supabase.from('portfolio_stories').delete().eq('id', id);
     if (error) return { ok: false, error: friendly(error.message) };
+    // The story's picture or video is removed from storage as well (a shared card has no file of its own).
+    if (db.companyId && row) removeStoredFiles(storyFileKeys(row as { media_url?: string | null; media_thumb_url?: string | null }, config.r2PublicUrl, db.companyId));
     return { ok: true, data: null };
   } catch {
     return { ok: false, error: SOMETHING_WRONG };

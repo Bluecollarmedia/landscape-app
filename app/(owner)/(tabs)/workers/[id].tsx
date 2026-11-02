@@ -8,7 +8,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useResources } from '@/hooks/useResources';
-import { StatusBadge, Avatar, EmptyState, CrewLabel } from '@/components/ui';
+import { StatusBadge, Avatar, EmptyState, CrewLabels } from '@/components/ui';
 import { useCrews } from '@/hooks/useCrews';
 import { worksOnMaintenance } from '@/lib/workerAreas';
 import { WorkerAreasCard } from '@/components/team/WorkerAreasCard';
@@ -22,6 +22,7 @@ import { loadBirthdays } from '@/data/birthday';
 import { OwnerWorkerExtras } from '@/components/account/WorkerExtras';
 import { OwnerClockCard } from '@/components/time/OwnerClockCard';
 import { formatBirthday, birthdaySoon } from '@/lib/birthday';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const today = todayKey();
 
@@ -59,11 +60,12 @@ export default function WorkerDetailScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const { getWorker, updateWorker } = useWorkers({ includeInactive: true });
   const team = useTeamAccess();
   const schedule = useSchedule();
   const { resourcesFor } = useResources();
-  const { crews, crewOf, setWorkerCrew } = useCrews();
+  const { crews, crewsOf, setWorkerInCrew } = useCrews();
 
   const worker = getWorker(id);
 
@@ -95,7 +97,7 @@ export default function WorkerDetailScreen() {
   const p = w.person;
   const isActive = w.member.status === 'active';
 
-  const crew = crewOf(p.id);
+  const workerCrews = crewsOf(p.id);
   const isMaint = worksOnMaintenance(w.member);
 
   const todayAssignments = schedule.getByWorker(p.id, today);
@@ -177,7 +179,7 @@ export default function WorkerDetailScreen() {
         </Text>
       </View>
 
-      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Profile header */}
           <View style={[styles.profileCard, { backgroundColor: colors.surface }, shadow.sm]}>
@@ -189,7 +191,7 @@ export default function WorkerDetailScreen() {
                 </Text>
                 <View style={styles.badgeRow}>
                   <StatusBadge label={isActive ? 'Active' : 'Inactive'} status={isActive ? 'success' : 'error'} />
-                  {crew && <CrewLabel name={crew.name} color={crew.color} />}
+                  <CrewLabels crews={workerCrews} />
                 </View>
                 <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.xs }]}>
                   Worker · Hired {formatHiredDate(w.member.createdAt)}
@@ -240,14 +242,14 @@ export default function WorkerDetailScreen() {
               </Pressable>
             </View>
             <View style={styles.crewChoices}>
-              {[{ id: null as string | null, name: 'No Crew', color: colors.textTertiary }, ...crews].map(c => {
-                const selected = (crew?.id ?? null) === c.id;
+              {crews.map(c => {
+                const selected = workerCrews.some(wc => wc.id === c.id);
                 // Landscaping workers can't join the Maintenance Crew.
-                const blocked = 'isMaintenance' in c && !!c.isMaintenance && !isMaint;
+                const blocked = !!c.isMaintenance && !isMaint;
                 return (
                   <Pressable
                     key={c.id ?? 'none'}
-                    onPress={() => { haptics.select(); setWorkerCrew(p.id, c.id); }}
+                    onPress={() => { haptics.select(); setWorkerInCrew(p.id, c.id, !selected); }}
                     disabled={blocked}
                     style={({ pressed }) => [
                       styles.crewChoice,
@@ -255,11 +257,11 @@ export default function WorkerDetailScreen() {
                       blocked && { opacity: 0.4 },
                       pressed && { opacity: 0.7 },
                     ]}
-                    accessibilityRole="radio"
+                    accessibilityRole="checkbox"
                     accessibilityState={{ checked: selected, disabled: blocked }}
                     accessibilityHint={blocked ? 'Only maintenance workers can join this crew' : undefined}
                   >
-                    {c.id && <View style={[styles.crewDot, { backgroundColor: c.color }]} />}
+                    <View style={[styles.crewDot, { backgroundColor: c.color }]} />
                     <Text style={[typeScale.bodySmall, { color: selected ? c.color : colors.textSecondary, fontWeight: selected ? '700' : '500' }]}>
                       {c.name}
                     </Text>

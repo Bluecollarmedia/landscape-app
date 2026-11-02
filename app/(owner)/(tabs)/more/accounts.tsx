@@ -14,6 +14,7 @@ import { semantic } from '@/theme/colors';
 import { useAccounts, type Account, type AccountStatus } from '@/hooks/useAccounts';
 import { CollapsibleFilters } from '@/components/ui/CollapsibleFilters';
 import { haptics } from '@/lib/haptics';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 type RoleFilter = 'all' | 'owner' | 'worker' | 'customer' | 'none';
 type StatusFilter = 'all' | AccountStatus;
@@ -49,6 +50,7 @@ export default function AccountsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const { accounts, loading, error, reload, removeAccess, restoreAccess, deleteAccount } = useAccounts();
 
   const [query, setQuery] = useState('');
@@ -232,7 +234,7 @@ export default function AccountsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

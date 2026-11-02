@@ -299,6 +299,8 @@ serve(async (req: Request) => {
       let bytes = 0;
       let photos = 0;
       let avatars = 0;
+      let work = 0;
+      let workBytes = 0;
       for (const base of [BUCKET_URL, PRIVATE_BUCKET_URL].filter(Boolean)) for (const prefix of prefixes) {
         let token = '';
         do {
@@ -310,12 +312,15 @@ serve(async (req: Request) => {
           for (const m of xml.matchAll(/<Contents>[\s\S]*?<\/Contents>/g)) {
             const size = Number(/<Size>(\d+)<\/Size>/.exec(m[0])?.[1] ?? 0);
             bytes += size;
-            if (prefix.startsWith('avatars/')) avatars++; else photos++;
+            // Our Work files live under <company>/portfolio/ and are counted on their own line.
+            if (prefix.startsWith('avatars/')) avatars++;
+            else if ((/<Key>([^<]*)<\/Key>/.exec(m[0])?.[1] ?? '').includes('/portfolio/')) { work++; workBytes += size; }
+            else photos++;
           }
           token = /<NextContinuationToken>([^<]+)<\/NextContinuationToken>/.exec(xml)?.[1] ?? '';
         } while (token);
       }
-      return reply({ bytes, photos, avatars });
+      return reply({ bytes, photos, avatars, work, workBytes });
     }
 
     return reply({ error: 'Unknown action' }, 400);

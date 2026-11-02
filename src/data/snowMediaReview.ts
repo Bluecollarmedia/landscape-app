@@ -5,6 +5,7 @@
  * only shared media for their own properties.
  */
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { sweepStorageSoon } from '@/lib/storageSweep';
 import { signedSnowMediaUrls } from '@/lib/snowMedia';
 import { SNOW_OWNER_MEDIA_TARGET } from '@/data/snowMediaTargets';
 import type { SnowMediaDraft } from '@/data/snowProperties';
@@ -135,5 +136,6 @@ export async function withdrawMedia(mediaId: string): Promise<Result> {
 export async function deleteMedia(mediaId: string): Promise<Result> {
   if (!isSupabaseConfigured) return fail(NOT_CONNECTED);
   const { error } = await supabase.rpc('snow_delete_media', { p_media_id: mediaId });
+  if (!error) sweepStorageSoon();
   return error ? fail(message(error, "Couldn't delete the photo.")) : ok(undefined);
 }

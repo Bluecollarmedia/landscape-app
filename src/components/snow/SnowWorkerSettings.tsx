@@ -111,6 +111,10 @@ export function SnowWorkerSettings() {
           <SettingsRow icon="shield" title={t('Role')} value={t(roleLabel(user?.role, access?.services ?? []))} />
         </SettingsGroup>
 
+        <SettingsGroup title={t('History')}>
+          <SettingsRow icon="clock" title={t('Past storms')} subtitle={t('Storms you worked on that have ended')} onPress={() => router.push('/snow/worker/past-storms' as any)} />
+        </SettingsGroup>
+
         {error ? (
           <InlineNotice icon="alert-circle" tone="warning" text={t("Couldn't load your snow team access. Close and reopen this screen, or try again later.")} style={{ marginBottom: spacing.xl }} />
         ) : null}

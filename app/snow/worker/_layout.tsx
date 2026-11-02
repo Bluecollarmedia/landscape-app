@@ -11,6 +11,7 @@ export default function SnowWorkerLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="edit-profile" />
+        <Stack.Screen name="past-storms" />
         <Stack.Screen name="weather" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       </Stack>
     </>

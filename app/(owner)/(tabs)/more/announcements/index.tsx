@@ -18,6 +18,7 @@ import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 import type { Announcement } from '@/types/announcement';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 type Audience = 'workers' | 'customers';
 
@@ -36,6 +37,7 @@ export default function AnnouncementsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const { announcements } = useAnnouncements();
   const [audience, setAudience] = useState<Audience>('workers');
   const [expandedAnnouncement, setExpandedAnnouncement] = useState<Announcement | null>(null);
@@ -51,7 +53,7 @@ export default function AnnouncementsScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1 }]}>Announcements</Text>
       </View>
 
-      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP} contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={[styles.segment, { backgroundColor: colors.backgroundTertiary }]}>
           {(['workers', 'customers'] as const).map((key) => {
             const on = audience === key;

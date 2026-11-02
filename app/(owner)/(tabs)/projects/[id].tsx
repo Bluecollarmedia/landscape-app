@@ -25,7 +25,8 @@ import { CheckInRadiusSheet } from '@/components/projects/CheckInRadiusSheet';
 import { ProjectPrivateNotes } from '@/components/projects/ProjectPrivateNotes';
 import { useIsProjectOwner, useOwnerNotes } from '@/data/ownerProjectNotes';
 import { MessageThread } from '@/components/messages/MessageThread';
-import { db, rowsOf } from '@/data/store';
+import { db, rowsOf, updateRow } from '@/data/store';
+import { estimateProgress } from '@/lib/projectProgress';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useWorkers } from '@/hooks/useWorkers';
 import { useCustomerAccess } from '@/hooks/useCustomerAccess';
@@ -46,6 +47,7 @@ import { ProjectMaterials } from '@/components/materials/ProjectMaterials';
 import { TaskMediaStrip, TaskMediaViewer, type TaskMediaItem } from '@/components/tasks/TaskMedia';
 import { pickTaskMedia, saveTaskMedia, removeTaskMedia, type TaskMediaDraft } from '@/data/taskMedia';
 import { keepPicked } from '@/lib/keepPickedFile';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const today = todayKey();
 
@@ -215,6 +217,7 @@ export default function ProjectDetailScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
 
   // 'requests' / 'updates' are old deep-link values (e.g. from the Owner
   // Dashboard's Needs Attention "Review" action) — they now live inside the
@@ -300,6 +303,8 @@ export default function ProjectDetailScreen() {
   const [newPhotoType, setNewPhotoType] = useState<PhotoType>('progress');
   const [newPhotoTaskId, setNewPhotoTaskId] = useState('');
   const [newPhotoCaption, setNewPhotoCaption] = useState('');
+  // Asked while adding: share with the customer now (and the one optional description serves both the team and the customer).
+  const [newPhotoShare, setNewPhotoShare] = useState(false);
   const [showPhotoTaskPicker, setShowPhotoTaskPicker] = useState(false);
 
   if (!project) {
@@ -399,9 +404,42 @@ export default function ProjectDetailScreen() {
               </Text>
             </View>
             <ProgressBar progress={p.progress} height={8} style={{ marginTop: spacing.sm }} />
-            <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.xs }]}>
-              Manually set by owner
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }}>
+              <View style={{ flex: 1, marginRight: spacing.sm }}>
+                <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Estimate from tasks</Text>
+                <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+                  {settings.autoProgress !== false
+                    ? 'Updates by itself as tasks are checked off (an in-progress task counts half).'
+                    : 'You set the number by hand. Checking off tasks does not change it.'}
+                </Text>
+              </View>
+              <Switch
+                value={settings.autoProgress !== false}
+                onValueChange={(v) => {
+                  updateSettings({ autoProgress: v });
+                  if (v) { const est = estimateProgress(taskStats); if (est != null) updateProject({ progress: est }); }
+                }}
+                accessibilityLabel="Estimate progress from tasks"
+              />
+            </View>
+            {settings.autoProgress === false ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md }}>
+                <Pressable
+                  onPress={() => updateProject({ progress: Math.max(0, p.progress - 5) })}
+                  accessibilityRole="button" accessibilityLabel="Lower progress by 5 percent"
+                  style={{ paddingVertical: spacing.xs, paddingHorizontal: spacing.lg, borderRadius: radius.full, backgroundColor: colors.primarySurface }}
+                >
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>− 5%</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => updateProject({ progress: Math.min(100, p.progress + 5) })}
+                  accessibilityRole="button" accessibilityLabel="Raise progress by 5 percent"
+                  style={{ paddingVertical: spacing.xs, paddingHorizontal: spacing.lg, borderRadius: radius.full, backgroundColor: colors.primarySurface }}
+                >
+                  <Text style={[typeScale.labelLarge, { color: colors.primary }]}>+ 5%</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
 
           <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
@@ -1446,9 +1484,13 @@ export default function ProjectDetailScreen() {
         <View style={[styles.taskStatsHeader, { gap: spacing.sm }]}>
           <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>Task Lead</Text>
           <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
-            {p.taskLeadId
-              ? 'Only the Task Lead can start and complete tasks. The rest of the crew can see them.'
-              : 'Pick one worker to run the task list. Until then, workers can\'t change tasks.'}
+            {db.company?.taskLeadOnly
+              ? (p.taskLeadId
+                ? 'Only the Task Lead can start and complete tasks. The rest of the crew can see them.'
+                : 'Pick one worker to run the task list. Until then, workers cannot change tasks.')
+              : (p.taskLeadId
+                ? 'Anyone on this job can check off tasks. (More → Settings → Project Tasks can limit this to the Task Lead.)'
+                : 'Anyone on this job can check off tasks. Picking a Task Lead is optional. (More → Settings → Project Tasks can limit checking off to the Task Lead.)')}
           </Text>
           {team.length ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -1590,6 +1632,7 @@ export default function ProjectDetailScreen() {
     setNewPhotoType('progress');
     setNewPhotoTaskId('');
     setNewPhotoCaption('');
+    setNewPhotoShare(false);
     setShowAddPhoto(true);
   }
 
@@ -1601,7 +1644,8 @@ export default function ProjectDetailScreen() {
       uploadedBy: user?.id ?? '',
       fileUrl: newPhotoUri,
       caption: newPhotoCaption.trim() || undefined,
-      isCustomerVisible: false,
+      isCustomerVisible: newPhotoShare,
+      ...(newPhotoShare ? { customerDescription: newPhotoCaption.trim() || undefined, sharedBy: user?.id, sharedAt: new Date().toISOString() } : {}),
       photoType: newPhotoType,
       takenAt: new Date().toISOString(),
     });
@@ -2318,6 +2362,19 @@ export default function ProjectDetailScreen() {
             />
           </View>
 
+          <Divider style={{ marginVertical: spacing.xs }} />
+          <View style={styles.settingsDetailRow}>
+            <View style={{ flex: 1, marginRight: spacing.sm }}>
+              <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '600' }]}>Only the Task Lead checks off tasks</Text>
+              <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>Off: anyone on the job can. On: only the Task Lead you pick below. Applies to every project.</Text>
+            </View>
+            <Switch
+              value={db.company?.taskLeadOnly === true}
+              onValueChange={(v) => { if (db.company) updateRow('companies', db.company.id, { taskLeadOnly: v }); }}
+              accessibilityLabel="Only the Task Lead checks off tasks"
+            />
+          </View>
+
           {(
             <>
               <Divider style={{ marginVertical: spacing.xs }} />
@@ -2421,7 +2478,7 @@ export default function ProjectDetailScreen() {
       )}
 
       <KeyboardAwareScrollView bounces={false} bottomOffset={KEYBOARD_GAP}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
       >
         {sectionRenderers[activeSection]?.()}
@@ -2720,6 +2777,27 @@ export default function ProjectDetailScreen() {
                 <OptimizedImage source={newPhotoUri} style={[styles.reviewImage, { marginTop: spacing.lg }]} />
               )}
 
+              <View style={[styles.taskPhotoNote, { backgroundColor: newPhotoShare ? colors.primarySurface : colors.backgroundTertiary, marginTop: spacing.lg, alignItems: 'center' }]}>
+                <Icon name={newPhotoShare ? 'eye' : 'lock'} size={16} color={newPhotoShare ? colors.primary : colors.textSecondary} />
+                <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                  <Text style={[typeScale.bodySmall, { color: colors.textPrimary, fontWeight: '700' }]}>Share with the customer?</Text>
+                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>
+                    {newPhotoShare ? 'The customer will see this photo in their portal.' : 'Off: only your team sees this photo.'}
+                  </Text>
+                </View>
+                <Switch value={newPhotoShare} onValueChange={setNewPhotoShare} accessibilityLabel="Share this photo with the customer" />
+              </View>
+
+              <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Description (optional)</Text>
+              <TextInput
+                style={[styles.composerInput, styles.composerBody, { backgroundColor: colors.surface, borderColor: colors.borderLight, color: colors.textPrimary, marginTop: spacing.xs }]}
+                value={newPhotoCaption}
+                onChangeText={setNewPhotoCaption}
+                placeholder={newPhotoShare ? 'What does this photo show? The customer sees this.' : 'What does this photo show?'}
+                placeholderTextColor={colors.textTertiary}
+                multiline
+              />
+
               <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Photo Type</Text>
               <View style={styles.taskStatusPickerRow}>
                 {(['before', 'progress', 'after', 'issue'] as PhotoType[]).map(t => (
@@ -2761,23 +2839,6 @@ export default function ProjectDetailScreen() {
                   ))}
                 </View>
               )}
-
-              <Text style={[typeScale.labelSmall, { color: colors.textTertiary, marginTop: spacing.lg }]}>Note (internal, optional)</Text>
-              <TextInput
-                style={[styles.composerInput, styles.composerBody, { backgroundColor: colors.surface, borderColor: colors.borderLight, color: colors.textPrimary, marginTop: spacing.xs }]}
-                value={newPhotoCaption}
-                onChangeText={setNewPhotoCaption}
-                placeholder="What does this photo show?"
-                placeholderTextColor={colors.textTertiary}
-                multiline
-              />
-
-              <View style={[styles.taskPhotoNote, { backgroundColor: colors.backgroundTertiary }]}>
-                <Icon name="lock" size={14} color={colors.textSecondary} />
-                <Text style={[typeScale.caption, { color: colors.textSecondary, marginLeft: spacing.xs, flex: 1 }]}>
-                  This photo will be added as Internal. Share it with the customer from Photo Details when you're ready.
-                </Text>
-              </View>
 
               <View style={styles.actions}>
                 <Button title="Add Photo" onPress={handleCreatePhoto} icon="plus" fullWidth />

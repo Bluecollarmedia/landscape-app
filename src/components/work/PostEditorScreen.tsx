@@ -4,6 +4,7 @@
  * off. You can add from your phone or from one of your projects, put the pictures in order, remove any, change the words and tags, hide or delete it.
  * Photos upload high quality, with a small copy for the grid; videos upload exactly as they are.
  */
+import { VideoThumb } from '@/components/media/VideoThumb';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -12,7 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, GlassIconButton, Icon, InlineNotice, Input, LoadingSpinner, OptimizedImage, ProgressBar } from '@/components/ui';
 import { overallProgress, percentOf, uploadLabel } from '@/lib/uploadProgress';
 import { confirmAction } from '@/components/financials/ActionSheet';
-import { createPost, deletePost, loadOwnerPortfolio, saveMedia, setPostVisible, updatePost, type MediaInput, type OwnerPost } from '@/data/portfolioOwner';
+import { createPost, deletePost, loadOwnerPortfolio, saveMedia, setPostVisible, updatePost, type MediaInput, type OwnerPost, removeStoredFiles } from '@/data/portfolioOwner';
+import { config } from '@/lib/config';
+import { postFileKeys, replacedFileKeys } from '@/lib/portfolioFiles';
 import { CoverEditor } from '@/components/work/CoverEditor';
 import { MusicEditor, type MusicDraft } from '@/components/work/MusicEditor';
 import { uploadTrack } from '@/data/portfolioMusic';
@@ -208,6 +211,12 @@ export function PostEditorScreen() {
         const r2 = await saveMedia(post.id, arranged, post.media, ex.keys);
         if (!r2.ok) { setProblem(r2.error); return; }
         if (!cover && (coverReset || !post.cover_url)) await updatePost(post.id, { cover_thumb_url: arranged[0]?.thumbUrl ?? null });
+        // A replaced or removed cover, and a replaced or removed song, no longer sit in storage.
+        if (db.companyId) {
+          const before = postFileKeys({ media: [], cover_url: post.cover_url, cover_thumb_url: post.cover_thumb_url, music_url: post.music_url }, config.r2PublicUrl, db.companyId);
+          const after = postFileKeys({ media: [], cover_url: cover ? cover.url : coverReset ? null : post.cover_url, cover_thumb_url: cover ? cover.thumbUrl : coverReset ? null : post.cover_thumb_url, music_url: musicInput?.url ?? null }, config.r2PublicUrl, db.companyId);
+          removeStoredFiles(replacedFileKeys(before, after));
+        }
       }
       setProgress(1);
       router.back();
@@ -228,7 +237,7 @@ export function PostEditorScreen() {
   function confirmDelete() {
     if (!post) return;
     confirmAction('Delete this post?', 'It is removed from Our Work for good, with its photos and videos. This cannot be undone. (To only hide it, use Take down.)', 'Delete', async () => {
-      const r = await deletePost(post.id, post.media.map((m) => (m as { storage_key?: string | null }).storage_key));
+      const r = await deletePost(post.id, post);
       if (!r.ok) { setProblem(r.error); return; }
       router.back();
     }, true);
@@ -262,7 +271,7 @@ export function PostEditorScreen() {
                 {items.map((it, i) => (
                   <View key={it.key} style={{ width: tile }}>
                     <View style={[styles.tile, { width: tile, height: tile, backgroundColor: colors.backgroundTertiary }, i === 0 && !reel ? { borderWidth: 2.5, borderColor: '#2E5E34' } : null]}>
-                      {it.kind === 'photo' || it.thumbUrl ? <OptimizedImage source={it.thumbUrl ?? it.uri} style={{ width: '100%', height: '100%' }} /> : <Icon name="video" size={22} color={colors.textSecondary} />}
+                      {it.kind === 'photo' || it.thumbUrl ? <OptimizedImage source={it.thumbUrl ?? it.uri} style={{ width: '100%', height: '100%' }} /> : <VideoThumb uri={it.uri} fallback={<Icon name="video" size={22} color={colors.textSecondary} />} />}
                       {it.kind === 'video' ? <View style={styles.vid}><Icon name="play" size={12} color="#FFFFFF" /><Text style={styles.vidText}>{formatDuration(it.durationS)}</Text></View> : null}
                       {i === 0 && !reel && items.length > 1 ? <View style={styles.cover}><Text style={styles.coverText}>Cover</Text></View> : null}
                       <Pressable onPress={() => remove(it.key)} accessibilityRole="button" accessibilityLabel="Remove" hitSlop={6} style={styles.x}><Icon name="x" size={13} color="#FFFFFF" /></Pressable>

@@ -17,6 +17,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import {
   SERVICE_LABEL, lawnVisits, seasonKey, seasonLabel, seasonsOf, shortDate, snowVisits, visitStats, visitTimes, visitsIn,
 } from '@/lib/customerProperty';
+import { semantic } from '@/theme/colors';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
@@ -26,6 +27,8 @@ export function CustomerHistoryScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ service?: string; property?: string }>();
   const service: 'snow' | 'lawn' = params.service === 'lawn' ? 'lawn' : 'snow';
+  // Snow is blue, Lawn is green.
+  const accent = service === 'snow' ? semantic.info : colors.primary;
   const data = useCustomerHome();
   const group = data.groups.find((g) => g.key === params.property);
   const visits = useMemo(
@@ -61,14 +64,14 @@ export function CustomerHistoryScreen() {
           {seasons.map((s) => {
             const on = s === current;
             return (
-              <Pressable key={s} onPress={() => setSeason(s)} accessibilityRole="button" accessibilityState={{ selected: on }} style={[styles.chip, { backgroundColor: on ? colors.textPrimary : colors.surface, borderColor: on ? colors.textPrimary : colors.border }]}>
+              <Pressable key={s} onPress={() => setSeason(s)} accessibilityRole="button" accessibilityState={{ selected: on }} style={[styles.chip, { backgroundColor: on ? accent : colors.surface, borderColor: on ? accent : colors.border }]}>
                 <Text style={[typeScale.labelLarge, { color: on ? colors.background : colors.textPrimary, fontWeight: '700' }]}>{seasonLabel(s, service)}</Text>
               </Pressable>
             );
           })}
         </ScrollView>
 
-        <Stats items={[
+        <Stats accent={accent} items={[
           { value: String(stats.visits), label: t('Visits') },
           { value: stats.lastAt ? shortDate(stats.lastAt) : '–', label: t('Last visit') },
           { value: String(stats.photos), label: t('Photos') },
@@ -84,7 +87,7 @@ export function CustomerHistoryScreen() {
                 onPress={() => openPhotos(v.id)}
                 disabled={v.photos === 0}
                 accessibilityRole={v.photos ? 'button' : undefined}
-                accessibilityLabel={`${shortDate(v.completedAt)}. ${v.title}. ${visitTimes(v, t)}${v.photos ? '. ' + t('{count} photos', { count: v.photos }) : ''}`}
+                accessibilityLabel={`${shortDate(v.completedAt)}. ${v.title}. ${visitTimes(v, t)}${v.photos ? '. ' + (v.photos === 1 ? t('1 photo') : t('{count} photos', { count: v.photos })) : ''}`}
                 style={[styles.row, n > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
               >
                 <View style={{ flex: 1, gap: 2 }}>
@@ -94,7 +97,7 @@ export function CustomerHistoryScreen() {
                 </View>
                 {v.photos > 0 ? (
                   <View style={styles.photoLink}>
-                    <Text style={[typeScale.labelSmall, { color: colors.primary, fontWeight: '700' }]}>{t('{count} photos', { count: v.photos })}</Text>
+                    <Text style={[typeScale.labelSmall, { color: colors.primary, fontWeight: '700' }]}>{(v.photos === 1 ? t('1 photo') : t('{count} photos', { count: v.photos }))}</Text>
                     <Icon name="chevron-right" size={16} color={colors.primary} />
                   </View>
                 ) : null}

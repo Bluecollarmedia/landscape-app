@@ -4,7 +4,7 @@
  * 86 yet, the timeline falls back to the older function and the rest is simply empty, so the screens never break.
  */
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { signedSnowMediaUrls } from '@/lib/snowMedia';
+import { signedSnowMediaUrls, snowPublicUrl } from '@/lib/snowMedia';
 import { loadCustomerSnowUpdates } from '@/data/snowMediaReview';
 import type { SnowStatus, SnowSvc, TimelineEntry } from '@/lib/customerSnow';
 
@@ -40,7 +40,7 @@ export async function loadTimeline(opts: { withUrls?: boolean } = {}): Promise<R
   const list = rows.map((r) => ({
     visitId: r.visit_id, propertyId: r.property_id, propertyName: r.property_name, service: r.service,
     stormName: r.storm_name ?? undefined, arrivedAt: r.arrived_at ?? undefined, completedAt: r.completed_at,
-    media: r.media.map((m) => ({ id: m.id, kind: m.kind, url: urls[m.file_key] })),
+    media: r.media.map((m) => ({ id: m.id, kind: m.kind, url: urls[m.file_key] ?? (withUrls ? snowPublicUrl(m.file_key) : undefined) })),
   }));
   if (withUrls) rememberedTimeline = list;
   return ok(list);

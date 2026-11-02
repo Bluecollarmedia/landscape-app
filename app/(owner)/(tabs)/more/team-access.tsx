@@ -11,6 +11,7 @@ import { spacing, radius, shadow } from '@/theme/spacing';
 import { semantic } from '@/theme/colors';
 import { haptics } from '@/lib/haptics';
 import { SNOW_SERVICES, useTeamAccess, type SnowService, type TeamPerson, type TeamState } from '@/hooks/useTeamAccess';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 type Sheet =
   | { kind: 'deactivate'; person: TeamPerson; warnings: string[]; blocking: string[] }
@@ -32,6 +33,7 @@ export default function TeamAccessScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const T = useTeamAccess();
   const [filter, setFilter] = useState<TeamState>('active');
   const [open, setOpen] = useState<string | null>(null);
@@ -168,7 +170,7 @@ export default function TeamAccessScreen() {
         <Text style={[typeScale.headingLarge, { color: colors.textPrimary, flex: 1, textAlign: 'center' }]}>Team access</Text>
         <View style={{ width: 24 }} />
       </View>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await T.reload(); setRefreshing(false); }} />}>
         {isOwner ? (
           <Pressable onPress={() => router.push('/(owner)/more/admin-powers' as never)} style={[styles.link, { backgroundColor: colors.surface }, shadow.sm]} accessibilityRole="button">

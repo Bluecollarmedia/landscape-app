@@ -106,7 +106,7 @@ export function snowVisits(entries: TimelineEntry[], group: PropertyGroup): Visi
   const ids = keyIds(group, 'snow');
   const names = keyNames(group, 'snow');
   return entries
-    .filter((e) => ids.includes(e.propertyId) || names.some((n) => sameName(n, e.propertyName)))
+    .filter((e) => ids.includes(e.propertyId) || (e.propertyId === e.propertyName && names.some((n) => sameName(n, e.propertyName))))
     .map((e) => ({ id: e.visitId, arrivedAt: e.arrivedAt, completedAt: e.completedAt, photos: e.media.filter((m) => m.kind === 'photo').length, title: SERVICE_VERB[e.service] ?? 'Visit' }));
 }
 
@@ -117,7 +117,7 @@ export function lawnVisits(updates: LawnUpdateLike[], group: PropertyGroup): Vis
   const ids = keyIds(group, 'maintenance');
   const names = keyNames(group, 'maintenance');
   return updates
-    .filter((u) => (u.propertyId ? ids.includes(u.propertyId) : false) || names.some((n) => sameName(n, u.propertyName)))
+    .filter((u) => (u.propertyId ? ids.includes(u.propertyId) : names.some((n) => sameName(n, u.propertyName))))
     .map((u) => ({ id: u.stopId, arrivedAt: u.arrivedAt, completedAt: u.completedAt, photos: u.photos.length, title: u.services || 'Lawn visit' }));
 }
 

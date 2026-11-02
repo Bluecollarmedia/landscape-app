@@ -26,6 +26,7 @@ const storms = compile(read('src/data/snowStorms.ts'), (n) => {
   if (n === '@/lib/ids') return { uuid: () => 'u' };
   if (n === '@/lib/snowServices') return { defaultStormNameFor: () => 'x' };
   if (n === '@/lib/snowStormDelete') return lib;
+  if (n === '@/lib/storageSweep') return { sweepStorageSoon: () => {} };
   return {};
 });
 const { deleteStormForGood, loadStormCounts } = storms;

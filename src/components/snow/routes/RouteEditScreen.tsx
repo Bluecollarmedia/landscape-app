@@ -5,6 +5,8 @@
  * the existing app style; no approved mockup yet.
  */
 import { crewChoices, nextCrew, routeTeamMulti, toggleLead, type TeamMember } from '@/lib/snowCrew';
+import { useCrews } from '@/hooks/useCrews';
+import { CrewChips } from '@/components/crews/CrewChips';
 import { PhotoRuleEditor } from '@/components/maintenance/PhotoRuleEditor';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
@@ -61,6 +63,7 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
   // The route's other crew leads (the first lead is route.leadPersonId); together they are the leads, any number.
   const [extraLeadIds, setExtraLeadIds] = useState<string[]>([]);
   const [pickCrew, setPickCrew] = useState(false);
+  const { crews } = useCrews();
   // The property whose notes and photo setting are being edited.
   const [detailStop, setDetailStop] = useState<RouteStop[] | null>(null);
   const [stopNote, setStopNote] = useState('');
@@ -148,6 +151,21 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
     const res = await setRouteLeads(route.id, toggleLead(leadIds, personId));
     setBusy(false);
     if (!res.ok) showMessage("Couldn't save", res.error);
+    reload();
+  }
+
+  /** A whole crew tapped on or off: the database gets the new full list; anyone not on the Snow team yet gets Snow access first. */
+  async function changeCrewMany(next: string[]) {
+    if (!route) return;
+    setBusy(true);
+    for (const pid of next) {
+      if (crew.some((c) => c.personId === pid) || leads.some((l) => l.personId === pid)) continue;
+      const granted = await grantSnowAccessForRoute(pid);
+      if (!granted.ok) { setBusy(false); return showMessage("Couldn't add them", granted.error); }
+    }
+    const res = await setRouteCrew(route.id, next);
+    setBusy(false);
+    if (!res.ok) return showMessage("Couldn't change the crew", res.error);
     reload();
   }
 
@@ -268,6 +286,8 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
   const team = routeTeamMulti(leadIds, nameOf, crew);
   const crewPeople = crewChoices(pool.length ? pool : leads, route.leadPersonId, [...crew.map((c) => c.personId), ...extraLeadIds]);
   const onSnowTeam = new Set(leads.map((l) => l.personId));
+  // Who a crew tap may put on this route: anyone not already leading it (crew members are included so a second tap takes them off).
+  const crewable = new Set([...crewPeople.map((l) => l.personId), ...crew.map((c) => c.personId)]);
   // A property can be on a route more than once (repeat passes), so every
   // eligible property stays pickable; we just show how many visits it has.
   const visitsOn = new Map<string, number>();
@@ -340,7 +360,13 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
             <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>No crew selected. Tap Add Crew.</Text>
           )}
           {pickCrew ? (
-            crewPeople.length ? (
+            <>
+              {crews.length ? (
+                <View style={{ marginTop: spacing.md }}>
+                  <CrewChips crews={crews} picked={crew.map((c) => c.personId)} onChange={changeCrewMany} check={(pid) => (crewable.has(pid) ? { ok: true } : { ok: false })} />
+                </View>
+              ) : null}
+            {crewPeople.length ? (
               <View style={[styles.group, { borderColor: colors.borderLight, marginTop: spacing.md }]}>
                 {crewPeople.map((l, i) => (
                   <Pressable key={l.personId} style={[styles.row, i > 0 && sep]} onPress={() => changeCrew(l.personId, true)} accessibilityRole="button">
@@ -356,7 +382,8 @@ export function RouteEditor({ routeId: id, embedded = true, onDragActive, refres
               <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginTop: spacing.md }]}>
                 No one else to add. Everyone on your team is already on this route.
               </Text>
-            )
+            )}
+            </>
           ) : null}
           {editable && !pickCrew ? <Button title="Add Crew" icon="plus" variant="secondary" size="sm" disabled={busy} onPress={() => setPickCrew(true)} style={{ marginTop: spacing.md, alignSelf: 'flex-start' }} /> : null}
         </SetupCard>

@@ -8,6 +8,7 @@ import { StatusBadge, OptimizedImage, ScreenHeader, RaisedAddButton, IconTile, P
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { TruckStatus } from '@/types/truck';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const STATUS_MAP: Record<TruckStatus, { label: string; status: 'success' | 'warning' | 'error' | 'info' | 'neutral' }> = {
   available: { label: 'Available', status: 'success' },
@@ -17,6 +18,7 @@ const STATUS_MAP: Record<TruckStatus, { label: string; status: 'success' | 'warn
 };
 
 export default function TrucksScreen() {
+  const tabBarClearance = useTabBarClearance();
   const { colors } = useTheme();
   const router = useRouter();
   const { trucks, counts } = useTrucks();
@@ -34,7 +36,7 @@ export default function TrucksScreen() {
         }
       />
 
-      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         <View style={styles.statsRow}>
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <IconTile name="truck" size={32} />

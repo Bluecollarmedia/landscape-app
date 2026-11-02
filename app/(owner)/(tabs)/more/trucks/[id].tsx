@@ -12,6 +12,7 @@ import { useIsOwner } from '@/data/truckFiles';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { TruckStatus } from '@/types/truck';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 
 const STATUS_MAP: Record<TruckStatus, { label: string; status: 'success' | 'warning' | 'error' | 'info' | 'neutral' }> = {
   available: { label: 'Available', status: 'success' },
@@ -35,6 +36,7 @@ export default function TruckDetailScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const { allTrucks } = useTrucks();
   const isOwner = useIsOwner();
   const [viewPhoto, setViewPhoto] = useState(false);
@@ -64,7 +66,7 @@ export default function TruckDetailScreen() {
         <GlassIconButton icon="edit-2" onPress={() => router.push({ pathname: '/(owner)/more/trucks/edit', params: { id: truck.id } } as any)} accessibilityLabel="Edit this truck" />
       </View>
 
-      <ScrollView bounces={false} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         {truck.photoUrl ? (
           <Pressable onPress={() => setViewPhoto(true)} accessibilityRole="button" accessibilityLabel="View photo">
             <OptimizedImage source={truck.photoUrl} style={styles.photo} />

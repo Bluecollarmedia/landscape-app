@@ -174,6 +174,8 @@ export default function LaborDayScreen() {
     );
   }
 
+  const reviewProblems = (row?.problems ?? []).filter((p) => !(row?.state === 'needs_end_time' && /never clocked out/i.test(p.message)));
+
   return (
     <LaborScreen title={row?.personName ?? 'Workday'} subtitle={dateKey ? fmtDayLong(dateKey) : undefined} loading={(L.loading || !ref) && !row && !refError} onRefresh={reloadAll}>
       {L.notInstalled ? <NotInstalled /> : null}
@@ -219,15 +221,13 @@ export default function LaborDayScreen() {
             </Card>
           ) : null}
 
-          {row.problems.length ? (
+          {reviewProblems.length ? (
             <Card title="NEEDS REVIEW">
-              {row.problems.map((p, i) => <View key={i} style={styles.problem}><Icon name="alert-circle" size={16} color={colors.warning} /><Text style={[typeScale.bodyMedium, { color: colors.textPrimary, flex: 1 }]}>{p.message}</Text></View>)}
+              {reviewProblems.map((p, i) => <View key={i} style={styles.problem}><Icon name="alert-circle" size={16} color={colors.warning} /><Text style={[typeScale.bodyMedium, { color: colors.textPrimary, flex: 1 }]}>{p.message}</Text></View>)}
             </Card>
           ) : null}
 
-          <Card title="HOURS" right={<Pressable onPress={() => setSheet({ kind: 'workday' })} hitSlop={8} accessibilityRole="button"><Text style={[typeScale.labelSmall, { color: colors.primary }]}>Correct clock times</Text></Pressable>}>
-            <KV label="Clocked in" value={fmtClock(wd.clockInAt)} />
-            <KV label="Clocked out" value={wd.clockOutAt ? fmtClock(wd.clockOutAt) : 'Not clocked out'} />
+          <Card title="HOURS">
             <KV label="Gross workday time" value={durationText(row.summary.grossMs)} hint="Clock-in to clock-out" />
             <KV label="Recorded breaks" value={durationText(row.summary.recordedBreakMs)} />
             <KV label="Break time deducted" value={durationText(row.summary.deductedBreakMs)} hint="Only unpaid breaks are deducted" />
@@ -259,7 +259,7 @@ export default function LaborDayScreen() {
                   <Text style={[typeScale.labelSmall, { color: colors.textTertiary, width: 84 }]}>{fmtClock(e.startedAt)}{e.endedAt ? ` – ${fmtClock(e.endedAt)}` : e.kind === 'open' ? ' – now' : ''}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={[typeScale.bodyMedium, { color: muted ? colors.textTertiary : colors.textPrimary, fontStyle: muted ? 'italic' : 'normal' }]}>{e.label}</Text>
-                    {e.ms > 0 ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{durationText(e.ms)}</Text> : null}
+                    {e.ms > 0 || iv ? <Text style={[typeScale.caption, { color: colors.textTertiary }]}>{iv ? `Labor ${durationText(intervalMs(iv, now))}${iv.billable ? '' : ' · non-billable'}${iv.hourlyRate != null ? ` · ${money(iv.hourlyRate)}/h` : ''}` : durationText(e.ms)}</Text> : null}
                   </View>
                   {iv ? (
                     <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
@@ -271,17 +271,6 @@ export default function LaborDayScreen() {
               );
             })}
             {row.intervals.some((i) => i.status === 'void') ? <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: spacing.sm }]}>{row.intervals.filter((i) => i.status === 'void').length} removed time(s) are not shown; see the history below.</Text> : null}
-          </Card>
-
-          <Card title="PROPERTY TIMES">
-            {row.intervals.filter((i) => i.status !== 'void').length === 0 ? <Text style={[typeScale.bodyMedium, { color: colors.textSecondary }]}>No property time was recorded on this day.</Text> : row.intervals.filter((i) => i.status !== 'void').map((i) => (
-              <View key={i.id} style={styles.tl}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[typeScale.bodyMedium, { color: colors.textPrimary }]}>{i.label ?? 'Property'}{i.billable ? '' : '  (non-billable)'}</Text>
-                  <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{fmtClock(i.startedAt)} – {i.endedAt ? fmtClock(i.endedAt) : 'running'} · Labor {durationText(intervalMs(i, now))}{i.hourlyRate != null ? ` · ${money(i.hourlyRate)}/h` : ''}</Text>
-                </View>
-              </View>
-            ))}
           </Card>
 
           <Card title="CHANGE HISTORY" right={audit.length ? <Pressable onPress={onExportAudit} hitSlop={8} accessibilityRole="button"><Text style={[typeScale.labelSmall, { color: colors.primary }]}>Export</Text></Pressable> : undefined}>

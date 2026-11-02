@@ -21,7 +21,7 @@ import type { AppState } from '@/providers/AuthProvider';
 import { ListSection } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
-import { db, useDb } from '@/data/store';
+import { db, useDb, updateRow } from '@/data/store';
 import { documentDefaults } from '@/data/financials';
 import { useCompanyYard } from '@/hooks/useCompanyYard';
 import { useStorageInfo, useStorageLimit } from '@/hooks/useStorage';
@@ -174,6 +174,21 @@ export default function SettingsScreen() {
             <SettingsRow icon="cloud-snow" tint={tileColors.blue} title="Storm outlook" subtitle="Write a storm update for everyone to read" onPress={() => router.push('/(owner)/storm-outlook' as any)} />
           </SettingsGroup>
         ) : null}
+
+        <SettingsGroup title="Crews" footer="Build a crew once, then add the whole crew to a job or route with one tap. A worker can be in more than one crew.">
+          <SettingsRow icon="users" tint={tileColors.green} title="Crews" subtitle="Make and edit your crews" onPress={() => router.push('/(owner)/crews' as any)} />
+        </SettingsGroup>
+
+        <SettingsGroup title="Project Tasks" footer="By default anyone assigned to a project can check off its tasks. Choose Task Lead only to limit it to the lead you pick on each project.">
+          <SettingsRow
+            icon="check-square"
+            tint={tileColors.green}
+            title="Check off tasks"
+            subtitle="Tap to change"
+            value={db.company?.taskLeadOnly ? 'Task Lead' : 'Anyone'}
+            onPress={() => { if (db.company) updateRow('companies', db.company.id, { taskLeadOnly: !db.company.taskLeadOnly }); }}
+          />
+        </SettingsGroup>
 
         <SettingsGroup title="Quotes & Invoices">
           <SettingsRow

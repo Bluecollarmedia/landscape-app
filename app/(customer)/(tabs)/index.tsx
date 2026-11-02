@@ -1,8 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { usePortfolioEnabled } from '@/hooks/usePortfolio';
+import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useT } from '@/i18n';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -27,8 +24,6 @@ export default function CustomerHomeScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const data = useCustomerHome();
-  const router = useRouter();
-  const workOn = usePortfolioEnabled();
   const empty = data.groups.length === 0 && data.past.length === 0;
 
   return (
@@ -42,22 +37,6 @@ export default function CustomerHomeScreen() {
       </View>
 
       <AnnouncementBanner />
-
-      {workOn ? (
-        <Pressable
-          onPress={() => router.push('/(customer)/work' as any)}
-          accessibilityRole="button"
-          accessibilityLabel={t('Our Work')}
-          style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }, pressed && { opacity: 0.85 }]}
-        >
-          <MaterialCommunityIcons name="image-multiple-outline" size={26} color={colors.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '700' }]}>{t('Our Work')}</Text>
-            <Text style={[typeScale.caption, { color: colors.textSecondary }]}>{t('See the projects and reels we have done')}</Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={22} color={colors.textSecondary} />
-        </Pressable>
-      ) : null}
 
       {empty ? (
         <EmptyState icon="layers" title={t(emptyPortalText().title)} description={t(emptyPortalText().description)} />

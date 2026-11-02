@@ -77,12 +77,18 @@ export default function CustomerProjectScreen() {
   const [reqDescription, setReqDescription] = useState('');
   const [reqCategory, setReqCategory] = useState<RequestCategory>('question');
 
-  const { project, photos, customerTimeline, updates, requests, submitRequest, settings, taskStats } = useProject(id);
+  const { project, photos, tasks, customerTimeline, updates, requests, submitRequest, settings, taskStats } = useProject(id);
   const [reporting, setReporting] = useState<ReportTarget | null>(null);
 
   const sharedPhotos = useMemo(
     () => photos.filter(p => p.isCustomerVisible),
     [photos],
+  );
+
+  // Finished tasks (the database only lets a customer read these), newest first, each with the photos the owner shared for it.
+  const doneTasks = useMemo(
+    () => tasks.filter(tk => tk.status === 'completed').sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? '')),
+    [tasks],
   );
 
   const visibleUpdates = useMemo(
@@ -186,6 +192,38 @@ export default function CustomerProjectScreen() {
             ))
           )}
         </View>
+
+        {/* 2b. Work completed: finished tasks with the photos shared for each */}
+        {doneTasks.length > 0 ? (
+          <View style={cardStyle}>
+            <Text style={[typeScale.headingSmall, { color: colors.textPrimary, marginBottom: spacing.xs }]}>{t('Work completed')}</Text>
+            {doneTasks.map((tk, i) => {
+              const pics = sharedPhotos.filter(ph => ph.taskId === tk.id);
+              return (
+                <View key={tk.id} style={[{ paddingVertical: spacing.sm }, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={[styles.actCheck, { backgroundColor: semantic.successLight, marginRight: spacing.sm }]}>
+                      <Icon name="check" size={14} color={semantic.success} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typeScale.bodyLarge, { color: colors.textPrimary }]} numberOfLines={2}>{tk.title}</Text>
+                      {tk.completedAt ? <Text style={[typeScale.caption, { color: colors.textTertiary, marginTop: 2 }]}>{formatDateTime(tk.completedAt)}</Text> : null}
+                    </View>
+                  </View>
+                  {pics.length > 0 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingTop: spacing.sm }}>
+                      {pics.map(ph => (
+                        <Pressable key={ph.id} onPress={() => setViewing({ photos: pics.map(x => ({ id: x.id, url: x.fileUrl })), startId: ph.id })} accessibilityRole="button" accessibilityLabel={t('View photo')}>
+                          <OptimizedImage source={ph.fileUrl} style={[styles.actThumb, { backgroundColor: colors.backgroundTertiary }]} />
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
 
         {/* 3. Project Details */}
         <View style={cardStyle}>

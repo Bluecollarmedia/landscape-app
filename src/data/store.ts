@@ -21,6 +21,7 @@ import { properName } from '@/lib/names';
 import { Alert, AppState, Platform } from 'react-native';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { sweepStorageSoon } from '@/lib/storageSweep';
 import { uuid } from '@/lib/ids';
 import type { Company, CompanyMember, PersonSummary } from '@/types/company';
 import type {
@@ -56,13 +57,13 @@ interface TableDef {
 }
 
 const TABLES = {
-  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'storageLimitGb', 'maxFileSizeMb', 'targetPayEnabled', 'activeMode', 'activeModeChangedAt', 'activeModeChangedBy', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
+  companies: { scope: 'company_self', cols: ['id', 'name', 'logoUrl', 'phone', 'email', 'address', 'city', 'state', 'zip', 'yardAddress', 'yardCity', 'yardState', 'yardZip', 'yardLatitude', 'yardLongitude', 'coverPhotoUrl', 'workerCoverPhotoUrl', 'storageLimitGb', 'maxFileSizeMb', 'taskLeadOnly', 'targetPayEnabled', 'activeMode', 'activeModeChangedAt', 'activeModeChangedBy', 'setupState', 'setupCompletedAt', 'createdAt', 'updatedAt'] },
   people: { scope: 'all', cols: ['id', 'userId', 'email', 'firstName', 'lastName', 'avatarUrl', 'phone', 'createdAt', 'updatedAt'] },
   company_members: { scope: 'company', cols: ['id', 'companyId', 'personId', 'role', 'status', 'workerType', 'worksLandscaping', 'worksMaintenance', 'joinMethod', 'joinRequestId', 'approvedBy', 'approvedAt', 'deactivatedAt', 'deactivatedBy', 'createdAt', 'updatedAt'] },
   projects: { scope: 'company', cols: ['id', 'companyId', 'customerId', 'propertyId', 'name', 'taskLeadId', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'status', 'progress', 'startDate', 'estimatedEndDate', 'completedAt', 'notes', 'coverPhotoUrl', 'customerProjectCode', 'customerClaimedBy', 'customerClaimedAt', 'createdAt', 'updatedAt'] },
   project_team: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'personId', 'addedAt', 'removedAt'] },
   project_tasks: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'title', 'description', 'status', 'sortOrder', 'assignedTo', 'completedAt', 'completedBy', 'createdAt', 'updatedAt'] },
-  project_settings: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'customerInteractionEnabled', 'completionPhotoRequired', 'checkinRadiusMeters', 'customerCanRequest', 'customerCanViewPhotos', 'customerCanComment', 'createdAt', 'updatedAt'] },
+  project_settings: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'customerInteractionEnabled', 'completionPhotoRequired', 'checkinRadiusMeters', 'customerCanRequest', 'customerCanViewPhotos', 'customerCanComment', 'autoProgress', 'createdAt', 'updatedAt'] },
   project_photos: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'taskId', 'assignmentId', 'uploadedBy', 'fileKey', 'fileUrl', 'caption', 'customerDescription', 'isCustomerVisible', 'sharedBy', 'sharedAt', 'photoType', 'timePhase', 'takenAt', 'createdAt'] },
   project_updates: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'createdBy', 'title', 'body', 'isCustomerVisible', 'photoIds', 'createdAt', 'updatedAt'] },
   project_messages: { scope: 'company', cols: ['id', 'companyId', 'projectId', 'senderId', 'body', 'createdAt'] },
@@ -220,7 +221,8 @@ export interface Db {
   scheduleSeries: ScheduleSeries[];
   crews: Crew[];
   /** Each worker's crew, by person id. */
-  crewByPerson: Record<string, Crew>;
+  /** Every crew a person is in (a worker can be in several). */
+  crewsByPerson: Record<string, Crew[]>;
   scheduleChanges: ScheduleChange[];
   announcements: Announcement[];
   announcementReads: AnnouncementRead[];
@@ -288,7 +290,7 @@ export const db: Db = {
   assignments: [],
   scheduleSeries: [],
   crews: [],
-  crewByPerson: {},
+  crewsByPerson: {},
   scheduleChanges: [],
   announcements: [],
   announcementReads: [],
@@ -452,8 +454,8 @@ function derive() {
     .slice()
     .sort((a, b) => String(a.name).localeCompare(String(b.name)))
     .map((c) => ({ ...c, memberIds: (crewMemberIds[c.id] ?? []).map((m) => m.personId) }) as Crew);
-  db.crewByPerson = {};
-  for (const c of db.crews) for (const pid of c.memberIds) db.crewByPerson[pid] = c;
+  db.crewsByPerson = {};
+  for (const c of db.crews) for (const pid of c.memberIds) (db.crewsByPerson[pid] ??= []).push(c);
 
   db.scheduleSeries = raw.schedule_series.slice().sort(byCreated) as ScheduleSeries[];
 
@@ -1009,6 +1011,8 @@ export function deleteRow(table: TableName, id: string): void {
         .eq(snake(pk), id),
       (e) => { reportError(`Removing from ${label(table)}`, e); reloadTable(table); },
     );
+    // Whatever stored file the deleted row (or a row that goes with it) held is deleted from storage a few seconds later (update 119).
+    sweepStorageSoon();
   }
 }
 

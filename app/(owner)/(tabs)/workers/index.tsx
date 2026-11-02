@@ -7,6 +7,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useWorkers, WorkerWithStatus } from '@/hooks/useWorkers';
 import { SearchBar, FilterChips, EmptyState, Avatar, StatusBadge, CrewLabel } from '@/components/ui';
 import { useCrews } from '@/hooks/useCrews';
+import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { typeScale } from '@/theme/typography';
 import { spacing, radius, shadow } from '@/theme/spacing';
 
@@ -31,6 +32,7 @@ export default function WorkersListScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const tabBarClearance = useTabBarClearance();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
   const [crewFilter, setCrewFilter] = useState<string | null>(null);
@@ -155,7 +157,7 @@ export default function WorkersListScreen() {
         <FlatList bounces={false}
           data={displayedWorkers}
           keyExtractor={(item) => item.person.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: tabBarClearance }]}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const isInactive = item.todayStatus === 'inactive';

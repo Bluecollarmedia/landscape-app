@@ -16,7 +16,7 @@ export { ListSection, ListRow } from './List';
 export { InlineNotice } from './InlineNotice';
 export { Icon } from './Icon';
 export { Switch } from './Switch';
-export { CrewLabel } from './CrewLabel';
+export { CrewLabel, CrewLabels } from './CrewLabel';
 export { PressableScale } from './PressableScale';
 export { IconTile } from './IconTile';
 export { ScreenHeader, GlassIconButton, RaisedAddButton } from './ScreenHeader';

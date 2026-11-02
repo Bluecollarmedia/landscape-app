@@ -10,6 +10,9 @@ import { Input, Avatar, CrewLabel, InlineNotice, Switch } from '@/components/ui'
 import { useTheme } from '@/providers/ThemeProvider';
 import { useMaintenanceDue, useMaintenanceWorkers } from '@/hooks/useMaintenance';
 import { createRouteWithCrew, routeCandidates } from '@/data/maintenance';
+import { useCrews } from '@/hooks/useCrews';
+import { CrewChips, type CrewPerson } from '@/components/crews/CrewChips';
+import { bookedOn } from '@/lib/crewBooking';
 import { dueLabel } from '@/lib/maintenanceSchedule';
 import type { DueStatus, PropertyDueInfo } from '@/types/maintenance';
 import { offsetDateKey, todayKey } from '@/lib/ids';
@@ -154,7 +157,8 @@ export default function NewRouteScreen() {
     }
     return { photos, checklist };
   }, [due]);
-  const { eligibleCrew, maintenanceCrew } = useMaintenanceWorkers();
+  const { maintenanceCrew } = useMaintenanceWorkers();
+  const { crews } = useCrews();
   const dbVersion = useDb();
   // Every active worker can be put on a route (Maintenance workers listed first); the picked ones are the crew.
   const everyone = useMemo(() => routeCandidates(), [dbVersion]);
@@ -232,9 +236,18 @@ export default function NewRouteScreen() {
     if (leadPersonId === id) setLeadPersonId(null);
   }
 
-  function pickMaintenanceCrew() {
+  /** A crew tap adds or removes the whole crew; a leader who is no longer on the route is cleared. */
+  function changeCrewPick(next: string[]) {
     haptics.success();
-    setCrewPick(eligibleCrew.map((p) => p.id));
+    setCrewPick(next);
+    if (leadPersonId && !next.includes(leadPersonId)) setLeadPersonId(null);
+  }
+
+  /** Whether a crew member can be added by a crew tap: on the team list, and not already out on another job or route that day. */
+  function crewCheck(pid: string): CrewPerson {
+    if (!everyone.some((w) => w.person.id === pid)) return { ok: false };
+    const busy = bookedOn(pid, serviceDate);
+    return busy ? { ok: false, reason: `is already on ${busy} that day` } : { ok: true };
   }
 
   function unassignCrew() {
@@ -338,16 +351,7 @@ export default function NewRouteScreen() {
               ) : (
                 <>
                   <Text style={[typeScale.bodySmall, { color: colors.textSecondary }]}>Tap everyone who works this route. Anyone on your team can be added.</Text>
-                  {eligibleCrew.length > 0 && !eligibleCrew.every((p) => crewPick.includes(p.id)) && (
-                    <Pressable
-                      onPress={pickMaintenanceCrew}
-                      style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.primary, opacity: pressed ? 0.7 : 1 }]}
-                      accessibilityRole="button"
-                    >
-                      <Icon name="users" size={18} color={colors.primary} />
-                      <Text style={[typeScale.labelLarge, { color: colors.primary }]}>Add the maintenance crew</Text>
-                    </Pressable>
-                  )}
+                  <CrewChips crews={crews} picked={crewPick} onChange={changeCrewPick} check={crewCheck} />
                   {everyone.map(({ person: p, maintenance }) => {
                     const on = crewPick.includes(p.id);
                     return (

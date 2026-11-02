@@ -175,6 +175,10 @@ export default function SettingsScreen() {
           </SettingsGroup>
         ) : null}
 
+        <SettingsGroup title="Crews" footer="Build a crew once, then add the whole crew to a job or route with one tap. A worker can be in more than one crew.">
+          <SettingsRow icon="users" tint={tileColors.green} title="Crews" subtitle="Make and edit your crews" onPress={() => router.push('/(owner)/crews' as any)} />
+        </SettingsGroup>
+
         <SettingsGroup title="Project Tasks" footer="By default anyone assigned to a project can check off its tasks. Choose Task Lead only to limit it to the lead you pick on each project.">
           <SettingsRow
             icon="check-square"

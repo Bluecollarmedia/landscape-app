@@ -35,3 +35,13 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4 },
   label: { ...typeScale.caption, fontWeight: '700', flexShrink: 1 },
 });
+
+/** Every crew a worker is in, side by side (nothing when they are in none). */
+export function CrewLabels({ crews, style }: { crews: { id: string; name: string; color: string }[]; style?: ViewStyle }) {
+  if (crews.length === 0) return null;
+  return (
+    <View style={[{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, style]}>
+      {crews.map((c) => <CrewLabel key={c.id} name={c.name} color={c.color} />)}
+    </View>
+  );
+}

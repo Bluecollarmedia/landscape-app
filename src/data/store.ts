@@ -221,7 +221,8 @@ export interface Db {
   scheduleSeries: ScheduleSeries[];
   crews: Crew[];
   /** Each worker's crew, by person id. */
-  crewByPerson: Record<string, Crew>;
+  /** Every crew a person is in (a worker can be in several). */
+  crewsByPerson: Record<string, Crew[]>;
   scheduleChanges: ScheduleChange[];
   announcements: Announcement[];
   announcementReads: AnnouncementRead[];
@@ -289,7 +290,7 @@ export const db: Db = {
   assignments: [],
   scheduleSeries: [],
   crews: [],
-  crewByPerson: {},
+  crewsByPerson: {},
   scheduleChanges: [],
   announcements: [],
   announcementReads: [],
@@ -453,8 +454,8 @@ function derive() {
     .slice()
     .sort((a, b) => String(a.name).localeCompare(String(b.name)))
     .map((c) => ({ ...c, memberIds: (crewMemberIds[c.id] ?? []).map((m) => m.personId) }) as Crew);
-  db.crewByPerson = {};
-  for (const c of db.crews) for (const pid of c.memberIds) db.crewByPerson[pid] = c;
+  db.crewsByPerson = {};
+  for (const c of db.crews) for (const pid of c.memberIds) (db.crewsByPerson[pid] ??= []).push(c);
 
   db.scheduleSeries = raw.schedule_series.slice().sort(byCreated) as ScheduleSeries[];
 

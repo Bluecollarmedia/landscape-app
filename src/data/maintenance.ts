@@ -93,12 +93,10 @@ export function setMaintenanceCrew(crewId: string | null, memberIds?: string[]):
 export function placeInMaintenanceCrew(personId: string, workerType: WorkerType) {
   const crew = maintenanceCrew();
   if (!crew) return;
-  const current = (rowsOf('crew_members') as { id: string; crewId: string; personId: string }[]).find((r) => r.personId === personId);
+  const current = (rowsOf('crew_members') as { id: string; crewId: string; personId: string }[]).find((r) => r.personId === personId && r.crewId === crew.id);
   if (workerType === 'maintenance') {
-    if (current?.crewId === crew.id) return;
-    if (current) deleteRow('crew_members', current.id);
-    insertRow('crew_members', { crewId: crew.id, personId });
-  } else if (current?.crewId === crew.id) {
+    if (!current) insertRow('crew_members', { crewId: crew.id, personId });
+  } else if (current) {
     deleteRow('crew_members', current.id);
   }
 }

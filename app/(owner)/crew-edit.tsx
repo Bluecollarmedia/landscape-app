@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, Platform } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { KEYBOARD_GAP } from '@/components/layout/ScreenContainer';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { Input, Avatar, CrewLabel, Switch, InlineNotice } from '@/components/ui';
@@ -27,13 +27,15 @@ export default function CrewEditScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id?: string }>();
-  const { crews, crewOf, isNameFree, createCrew, updateCrew, setCrewMembers, deleteCrew } = useCrews();
+  const { crews, crewsOf, isNameFree, createCrew, updateCrew, setCrewMembers, deleteCrew } = useCrews();
   const existing = crews.find(c => c.id === params.id);
   const { maintenanceCrew, setMaintenanceCrew } = useMaintenanceCrew();
 
   const [name, setName] = useState(existing?.name ?? '');
   const [color, setColor] = useState(existing?.color ?? CREW_COLORS[crews.length % CREW_COLORS.length]);
   const [memberIds, setMemberIds] = useState<string[]>(existing?.memberIds ?? []);
+  // Snow Mode shows the same screen without the Maintenance Crew switch.
+  const inSnow = usePathname().startsWith('/snow');
   const [isMaintenance, setIsMaintenance] = useState(!!existing?.isMaintenance);
   const otherMaintenance = maintenanceCrew && maintenanceCrew.id !== existing?.id ? maintenanceCrew : undefined;
 
@@ -107,7 +109,7 @@ export default function CrewEditScreen() {
           {existing ? 'Edit Crew' : 'New Crew'}
         </Text>
         <Text style={[typeScale.bodyLarge, { color: colors.textTertiary, marginTop: 2 }]}>
-          Group workers so you can see who's on which crew and schedule them together
+          Group workers so you can pick the whole crew at once. A worker can be in more than one crew
         </Text>
 
         <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
@@ -133,6 +135,7 @@ export default function CrewEditScreen() {
           </View>
         </View>
 
+        {!inSnow && (
         <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
           <View style={styles.cardHeader}>
             <View style={{ flex: 1, gap: 2 }}>
@@ -147,6 +150,7 @@ export default function CrewEditScreen() {
             <InlineNotice icon="info" tone="warning" text={`${otherMaintenance.name} is the Maintenance Crew now. Saving moves that to this crew.`} />
           )}
         </View>
+        )}
 
         <View style={[styles.card, { backgroundColor: colors.surface }, shadow.sm]}>
           <View style={styles.cardHeader}>
@@ -161,8 +165,8 @@ export default function CrewEditScreen() {
           {workers.map(w => {
             const p = w.person!;
             const selected = memberIds.includes(w.personId);
-            const other = crewOf(w.personId);
-            const inOther = other && other.id !== existing?.id ? other : undefined;
+            const otherCrews = crewsOf(w.personId).filter(c => c.id !== existing?.id);
+            const inOther = otherCrews.length > 0 ? otherCrews.map(c => c.name).join(', ') : undefined;
             return (
               <Pressable
                 key={w.personId}
@@ -170,14 +174,14 @@ export default function CrewEditScreen() {
                 style={({ pressed }) => [styles.workerRow, pressed && { opacity: 0.7 }]}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: selected }}
-                accessibilityLabel={`${p.firstName} ${p.lastName}${inOther ? `, in ${inOther.name}` : ''}`}
+                accessibilityLabel={`${p.firstName} ${p.lastName}${inOther ? `, also in ${inOther}` : ''}`}
               >
                 <Avatar firstName={p.firstName} lastName={p.lastName} size={36} uri={p.avatarUrl} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={[typeScale.bodyLarge, { color: colors.textPrimary, fontWeight: '600' }]}>{p.firstName} {p.lastName}</Text>
                   {inOther && (
-                    <Text style={[typeScale.caption, { color: selected ? semantic.warning : colors.textTertiary }]} numberOfLines={1}>
-                      {selected ? `Moves here from ${inOther.name}` : `In ${inOther.name}`}
+                    <Text style={[typeScale.caption, { color: colors.textTertiary }]} numberOfLines={1}>
+                      Also in {inOther}
                     </Text>
                   )}
                 </View>

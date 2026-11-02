@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorkers, WorkerWithStatus } from '@/hooks/useWorkers';
-import { SearchBar, FilterChips, EmptyState, Avatar, StatusBadge, CrewLabel } from '@/components/ui';
+import { SearchBar, FilterChips, EmptyState, Avatar, StatusBadge, CrewLabels } from '@/components/ui';
 import { useCrews } from '@/hooks/useCrews';
 import { useTabBarClearance } from '@/hooks/useTabBarClearance';
 import { typeScale } from '@/theme/typography';
@@ -36,7 +36,7 @@ export default function WorkersListScreen() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
   const [crewFilter, setCrewFilter] = useState<string | null>(null);
-  const { crews, crewOf } = useCrews();
+  const { crews, crewsOf } = useCrews();
 
   // No statusFilter passed to the hook — it only supports the old
   // confirmed/scheduled/not_scheduled/inactive keys. We filter locally
@@ -65,7 +65,7 @@ export default function WorkersListScreen() {
 
   const activeCrewFilter = crews.some(c => c.id === crewFilter) ? crewFilter : null;
   const displayedWorkers = searched.filter((w) =>
-    matchesFilter(w, statusFilter) && (!activeCrewFilter || crewOf(w.person.id)?.id === activeCrewFilter));
+    matchesFilter(w, statusFilter) && (!activeCrewFilter || crewsOf(w.person.id).some(c => c.id === activeCrewFilter)));
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -161,7 +161,7 @@ export default function WorkersListScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const isInactive = item.todayStatus === 'inactive';
-            const crew = crewOf(item.person.id);
+            const workerCrews = crewsOf(item.person.id);
             const assignment = item.todayAssignments[0];
             const badge = isInactive
               ? { label: 'Inactive', status: 'error' as const }
@@ -189,7 +189,7 @@ export default function WorkersListScreen() {
                     </Text>
                     <StatusBadge label={badge.label} status={badge.status} />
                   </View>
-                  {crew && <CrewLabel name={crew.name} color={crew.color} style={{ marginTop: 4 }} />}
+                  <CrewLabels crews={workerCrews} style={{ marginTop: 4 }} />
 
                   {isInactive ? (
                     <>

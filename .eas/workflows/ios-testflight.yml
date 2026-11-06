@@ -1,0 +1,23 @@
+name: iOS build to TestFlight
+run_name: iOS build to TestFlight
+
+# Run it by hand from expo.dev (Workflows -> iOS build to TestFlight -> Run). It builds the iPhone app from the
+# latest master on Expo's servers and sends it to TestFlight. Nothing here needs your computer.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build_ios:
+    name: Build iPhone app
+    type: build
+    params:
+      platform: ios
+      profile: live-test
+
+  submit_ios:
+    name: Send to TestFlight
+    needs: [build_ios]
+    type: submit
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: live-test

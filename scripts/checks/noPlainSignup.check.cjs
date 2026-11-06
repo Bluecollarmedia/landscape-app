@@ -1,5 +1,5 @@
 // Run: node scripts/checks/noPlainSignup.check.cjs
-// There are two ways in: Sign In, and a private link (workers and customers). There is no Get started or Create a Company on the entry screens.
+// There are three ways in: Sign In, Create a Company (only while no company exists, for the business owner), and a private link (workers and customers). There is no Get started.
 // There is no plain "Create an account" screen that would leave someone with a login and nothing attached.
 const fs = require('fs');
 const path = require('path');
@@ -18,7 +18,7 @@ walk('app'); walk('src');
 const stale = files.filter((f) => /\(auth\)\/signup|Invited by your company\? Use the email|Use the email they invited/.test(fs.readFileSync(path.join(root, f), 'utf8')));
 check('3 nothing in the app points to the removed screen or says to "use the email they invited"', stale.length === 0, stale.join(', '));
 const welcome = read('app/(auth)/welcome.tsx');
-check('4 the welcome screen offers Sign In (no Create a Company) and tells workers and customers to open their private link', /Sign In/.test(welcome) && /Open the private link your employer texted you/.test(welcome));
+check('4 the welcome screen offers Sign In, Create a Company only while no company exists, and tells workers and customers to open their private link', /Sign In/.test(welcome) && /canCreateCompany && \(/.test(welcome) && /Create a Company/.test(welcome) && /Open the private link your employer texted you/.test(welcome));
 check('5 workers and customers still create their login from their private link page', /signUp\(/.test(read('app/invite/[token].tsx')) && /inviteToken/.test(read('app/invite/[token].tsx')));
 console.log(bad ? `\n${bad} failed` : '\nall passed');
 process.exit(bad ? 1 : 0);

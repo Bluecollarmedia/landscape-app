@@ -30,6 +30,17 @@ export const ES: Record<string, string> = {
 
   // ── Forgot password ──
   'Back to sign in': 'Volver a iniciar sesión',
+  'Confirm your email': 'Confirma tu correo',
+  'We sent a code to your email. Enter it here to finish setting up.': 'Te enviamos un código a tu correo. Escríbelo aquí para terminar.',
+  'Your email is not confirmed yet. Enter the code from the email we sent you, or send a new one.': 'Tu correo aún no está confirmado. Escribe el código del correo que te enviamos o pide uno nuevo.',
+  'Code': 'Código',
+  'Send a new code': 'Enviar un código nuevo',
+  'Send a new code in {n}s': 'Enviar un código nuevo en {n}s',
+  'A new code is on its way. Use the newest email.': 'Va en camino un código nuevo. Usa el correo más reciente.',
+  'Enter your email.': 'Escribe tu correo.',
+  'Enter the code from the email.': 'Escribe el código del correo.',
+  'That code is wrong or has expired. Check the newest email, or send a new code.': 'Ese código es incorrecto o venció. Revisa el correo más reciente o pide un código nuevo.',
+  'Too many emails were sent just now. Wait a minute, then try again.': 'Se enviaron demasiados correos. Espera un minuto y vuelve a intentarlo.',
   'Enter the email you signed up with and we will send you a link to choose a new password.': 'Escribe el correo con el que te registraste y te enviaremos un enlace para elegir una contraseña nueva.',
   'If there is an account for that email, a reset link is on its way. Open it on this phone, choose a new password, then come back and sign in.': 'Si existe una cuenta con ese correo, el enlace va en camino. Ábrelo en este teléfono, elige una contraseña nueva y luego vuelve para iniciar sesión.',
   'Send reset link': 'Enviar enlace',

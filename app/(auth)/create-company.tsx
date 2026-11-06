@@ -187,10 +187,8 @@ export default function CreateCompanyScreen() {
       if (result.needsEmailConfirmation) {
         // Not signed in yet: keep the photo on the phone and save it at first sign-in.
         await stashPendingSignup({ email: email.trim(), photoUri });
-        const msg = `We sent a confirmation link to ${email.trim()}. Open it, then sign in. Your company is already set up.${photoUri ? ' Your photo is saved and will be added then.' : ''}`;
-        if (Platform.OS === 'web') alert(msg);
-        else Alert.alert('Check your email', msg);
-        router.replace('/(auth)/login');
+        // The company is already set up; the code from the email confirms it and signs them in.
+        router.replace({ pathname: '/(auth)/verify-email', params: { email: email.trim(), from: 'signup' } } as any);
       }
       // Otherwise the new session routes straight to the owner screens.
     } catch (err: any) {

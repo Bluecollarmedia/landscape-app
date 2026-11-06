@@ -9,7 +9,7 @@ let bad = 0;
 const check = (n, ok, d = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${ok ? '' : '  - ' + d}`); };
 
 const auth = fs.readdirSync(path.join(root, 'app/(auth)')).sort().join(',');
-check('1 the sign-in group is welcome, login, create-company, forgot-password (and its layout): no plain signup screen', !fs.existsSync(path.join(root, 'app/(auth)/signup.tsx')) && auth === '_layout.tsx,create-company.tsx,forgot-password.tsx,login.tsx,welcome.tsx', auth);
+check('1 the sign-in group is welcome, login, create-company, forgot-password, verify-email (and its layout): no plain signup screen', !fs.existsSync(path.join(root, 'app/(auth)/signup.tsx')) && auth === '_layout.tsx,create-company.tsx,forgot-password.tsx,login.tsx,verify-email.tsx,welcome.tsx', auth);
 const login = read('app/(auth)/login.tsx');
 check('2 the sign-in screen has no Get started button and no longer sends anyone to a plain "Create your account" or says "Invited by email?"', !/auth\)\/signup/.test(login) && !/Invited by email/.test(login) && !/Get started/.test(login));
 const files = [];

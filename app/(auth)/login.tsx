@@ -72,7 +72,8 @@ export default function LoginScreen() {
     >
       {/* Back to welcome, and the language switch (English by default) */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Pressable onPress={() => router.back()} style={styles.backRow}>
+        {/* The app can open straight on this screen with nothing behind it; then Back goes to the welcome screen. */}
+        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/welcome'))} style={styles.backRow}>
           <Icon name="arrow-left" size={20} color={colors.textSecondary} />
           <Text style={[typeScale.bodySmall, { color: colors.textSecondary, marginLeft: spacing.xs }]}>{t('Back')}</Text>
         </Pressable>

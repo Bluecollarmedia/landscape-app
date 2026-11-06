@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useCompanySlotOpen } from '@/hooks/useCompanySlot';
+import { isEmailNotConfirmed } from '@/data/emailCode';
 import { ScreenContainer } from '@/components/layout';
 import { Button, Input } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -57,6 +58,10 @@ export default function LoginScreen() {
       await signIn(email.trim(), password);
     } catch (err: any) {
       cancelWelcome();
+      if (isEmailNotConfirmed(err)) {
+        router.push({ pathname: '/(auth)/verify-email', params: { email: email.trim(), from: 'login' } } as any);
+        return;
+      }
       setError(err?.message ?? t('Something went wrong. Please try again.'));
     } finally {
       setLoading(false);

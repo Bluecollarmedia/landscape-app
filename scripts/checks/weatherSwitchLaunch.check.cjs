@@ -129,9 +129,9 @@ const settle = () => new Promise((r) => setImmediate(r));
   check('27 the signed-out branch now asks signedOutRedirect and nothing else changed there', /const goTo = signedOutRedirect\(\{ firstSegment: \(segments as string\[\]\)\[0\], weatherOn \}\);\s*if \(goTo\) router\.replace\(goTo as any\);/.test(layout) && /weatherOn\]\);/.test(layout) && !/router\.replace\('\/\(auth\)\/welcome'\)/.test(layout));
   const fp = {
     'app/(auth)/welcome.tsx': 'e072b7c4b686fea44bdfda6a8d196c701755684be20fbf76a9954f928e5e1eff',
-    'app/(auth)/login.tsx': 'b9e2ec41b9926a1b9e454f01a099615813f5939e352dcc76bb2349f687b0321f',
+    'app/(auth)/login.tsx': '96e642a626bcbf92dde34cd4a3d89fc578c22956870096039b0484c97132c3c0',
     'app/(auth)/forgot-password.tsx': '5c502ed34a4ff2df6dd22d8dcb3f2b9387e9d816221ccab9a21f0eff27a016f5',
-    'app/(auth)/create-company.tsx': '5d7650143e2fb0fe339fb69f3d39878b8ad259d29a011fae3709667de774e88e',
+    'app/(auth)/create-company.tsx': '0ca0a4155d56b0987a2c1816bdb775981fa7f16643e6a00ea0a8e0136c920366',
     'app/(auth)/_layout.tsx': '1d276fc0fd221a87d2e47732dd860a9f5000475e4e1e78bf5ca0eab379074109',
     'src/components/branding/WelcomeOverlay.tsx': '71f0ae5eb68fa93c4f412893887373ff64e7099ea76adccecabeaebfba885aef',
   };

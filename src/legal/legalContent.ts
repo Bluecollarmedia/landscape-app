@@ -7,7 +7,7 @@ export const BUSINESS = {
   addressLines: ['111 Spruce Street', 'Lakewood, New Jersey 08701'],
   email: 'shmuelsasson3@gmail.com',
   phone: '848-226-0090',
-  website: 'https://brighton-app.netlify.app',
+  website: 'https://app.brightonlawn.com',
   effective: 'October 29, 2026',
 } as const;
 

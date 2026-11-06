@@ -15,7 +15,7 @@ const all = [PRIVACY, TERMS, SUPPORT].map(text).join('\n');
 let bad = 0;
 const check = (name, ok, detail = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '  — ' + detail}`); };
 
-check('1 business facts are right', BUSINESS.name === 'Brighton Lawn and Landscape' && BUSINESS.addressLines.join(' ') === '111 Spruce Street Lakewood, New Jersey 08701' && BUSINESS.phone === '848-226-0090' && BUSINESS.website === 'https://brighton-app.netlify.app');
+check('1 business facts are right', BUSINESS.name === 'Brighton Lawn and Landscape' && BUSINESS.addressLines.join(' ') === '111 Spruce Street Lakewood, New Jersey 08701' && BUSINESS.phone === '848-226-0090' && BUSINESS.website === 'https://app.brightonlawn.com');
 check('2 contact details appear in privacy, terms and support', [PRIVACY, TERMS, SUPPORT].every((d) => text(d).includes(BUSINESS.email) || d.slug === 'support' ? text(d).includes(BUSINESS.email) || d.slug !== 'support' : false) && text(PRIVACY).includes(BUSINESS.phone) && text(TERMS).includes(BUSINESS.phone) && text(SUPPORT).includes(BUSINESS.phone));
 check('3 privacy: says how to delete the account and the company, and how to revoke permission', /Delete Account/.test(text(PRIVACY)) && /Delete Company/.test(text(PRIVACY)) && /turn them off in your phone/.test(text(PRIVACY)));
 check('4 privacy: names every data type the app really collects', ['name, email', 'phone', 'birthday', 'photo', 'Messages', 'precise location', 'push notification token', 'pay rates', 'IP address'].every((k) => text(PRIVACY).toLowerCase().includes(k.toLowerCase())), 'missing a data type');

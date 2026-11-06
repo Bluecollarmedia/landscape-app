@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { useCompanySlotOpen } from '@/hooks/useCompanySlot';
 import { ScreenContainer } from '@/components/layout';
 import { Button, Input } from '@/components/ui';
 import { typeScale } from '@/theme/typography';
@@ -29,6 +30,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { signIn } = useAuth();
   const router = useRouter();
+  const canCreateCompany = useCompanySlotOpen();
   const t = useT();
 
   const [email, setEmail] = useState('');
@@ -145,6 +147,18 @@ export default function LoginScreen() {
           fullWidth
           size="lg"
         />
+
+        {/* The app opens on this screen, so the owner needs the button here too. Gone once a company exists. */}
+        {canCreateCompany && (
+          <Button
+            title={t('Create a Company')}
+            onPress={() => router.push('/(auth)/create-company')}
+            variant="secondary"
+            icon="briefcase"
+            fullWidth
+            size="lg"
+          />
+        )}
       </View>
 
     </ScreenContainer>

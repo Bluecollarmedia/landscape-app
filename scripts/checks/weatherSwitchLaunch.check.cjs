@@ -129,7 +129,7 @@ const settle = () => new Promise((r) => setImmediate(r));
   check('27 the signed-out branch now asks signedOutRedirect and nothing else changed there', /const goTo = signedOutRedirect\(\{ firstSegment: \(segments as string\[\]\)\[0\], weatherOn \}\);\s*if \(goTo\) router\.replace\(goTo as any\);/.test(layout) && /weatherOn\]\);/.test(layout) && !/router\.replace\('\/\(auth\)\/welcome'\)/.test(layout));
   const fp = {
     'app/(auth)/welcome.tsx': 'e072b7c4b686fea44bdfda6a8d196c701755684be20fbf76a9954f928e5e1eff',
-    'app/(auth)/login.tsx': 'f5da5e0dd9d8f97558af5b360e9a8241e50ada2ab9415fbc011f742186d281df',
+    'app/(auth)/login.tsx': '8b6fc6fd888b24ffd92a1f59b6bef34d9323e3ee393e3b5d4033ba168ee4a01d',
     'app/(auth)/forgot-password.tsx': '5c502ed34a4ff2df6dd22d8dcb3f2b9387e9d816221ccab9a21f0eff27a016f5',
     'app/(auth)/create-company.tsx': '5d7650143e2fb0fe339fb69f3d39878b8ad259d29a011fae3709667de774e88e',
     'app/(auth)/_layout.tsx': '1d276fc0fd221a87d2e47732dd860a9f5000475e4e1e78bf5ca0eab379074109',
